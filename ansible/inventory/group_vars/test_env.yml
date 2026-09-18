@@ -1,0 +1,12 @@
+hou1_vpn_ip: "10.10.0.10"
+certbot_mode: "dns"
+
+DIRECTUS_KEY: "{{ TEST_DIRECTUS_KEY }}"
+DIRECTUS_SECRET: "{{ TEST_DIRECTUS_SECRET }}"
+DIRECTUS_ADMIN_EMAIL: "{{ TEST_DIRECTUS_ADMIN_EMAIL }}"
+DIRECTUS_ADMIN_PASSWORD: "{{ TEST_DIRECTUS_ADMIN_PASSWORD }}"
+DIRECTUS_PUBLIC_URL: "{{ TEST_DIRECTUS_PUBLIC_URL }}"
+DIRECTUS_TOKEN: "{{ TEST_DIRECTUS_TOKEN }}"
+
+ssl_domains:
+  - { name: "test.{{ primary_domain }}", flags: "-d test.{{ primary_domain }} -d *.test.{{ primary_domain }} -d cms-test.{{ primary_domain }}" }

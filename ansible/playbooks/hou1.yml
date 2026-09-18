@@ -1,0 +1,20 @@
+---
+- name: Rebuild HOU1 Infrastructure
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: yes
+
+  roles:
+    - role: common
+      tags: ['init', 'common']
+      
+    - role: wireguard
+      tags: ['wireguard', 'network']
+      
+    - role: security
+      tags: ['security', 'ufw', 'ssh']
+      
+    - role: docker
+      tags: ['docker']
+      
+    - role: webstack
+      tags: ['deploy', 'webstack', 'ssl']

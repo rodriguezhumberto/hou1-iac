@@ -1,0 +1,60 @@
+---
+- name: Ensure resolv.conf is unlocked before modifying
+  file:
+    path: /etc/resolv.conf
+    attributes: -i
+  ignore_errors: yes 
+
+- name: Force Google DNS to resolve apt update failures
+  copy:
+    dest: /etc/resolv.conf
+    content: "nameserver 8.8.8.8\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Lock resolv.conf to prevent DHCP network overwrites
+  file:
+    path: /etc/resolv.conf
+    attributes: +i
+
+- name: Update and upgrade apt packages
+  apt:
+    update_cache: yes
+    upgrade: dist
+
+- name: Install required system packages
+  apt:
+    name:
+      - ufw
+      - wireguard
+      - apt-transport-https
+      - ca-certificates
+      - curl
+      - gnupg
+      - git
+      - python3-docker
+      - sqlite3
+      - mtr-tiny
+    state: present
+
+- name: Create the new non-root user
+  user:
+    name: "{{ new_user }}"
+    shell: /bin/bash
+    groups: sudo
+    append: yes
+    create_home: yes
+
+- name: Set up authorized SSH keys for the new user
+  authorized_key:
+    user: "{{ new_user }}"
+    state: present
+    key: "{{ new_user_public_key }}"
+
+- name: Allow passwordless sudo for the new user
+  copy:
+    dest: "/etc/sudoers.d/{{ new_user }}"
+    content: "{{ new_user }} ALL=(ALL) NOPASSWD: ALL"
+    mode: '0440'
+    validate: /usr/sbin/visudo -csf %s

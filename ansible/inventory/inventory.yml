@@ -1,0 +1,43 @@
+all:
+  children:
+    # TEST ENVIRONMENT
+    test_env:
+      children:
+        hou1_test_init:
+          hosts:
+            test_hou1_init:
+              ansible_host: "{{ test_vps_public_ip }}"
+          vars:
+            ansible_user: debian
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        
+        hou1_test:
+          hosts:
+            test_hou1:
+              ansible_host: 10.10.0.10
+          vars:
+            ansible_user: "{{ new_user}}"
+            ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    # PRODUCTION ENVIRONMENT
+    prod_env:
+      children:
+        hou1_prod_init:
+          hosts:
+            prod_hou1_init:
+              ansible_host: "{{ prod_vps_public_ip }}"
+          vars:
+            ansible_user: root
+            # -e "manual_root_password=your_pass" when running init
+            ansible_ssh_pass: "{{ manual_root_password | default(omit) }}"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+        
+        hou1_prod:
+          hosts:
+            prod_hou1:
+              ansible_host: 10.10.0.1
+          vars:
+            ansible_user: "{{ new_user }}"
+            ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=no"

@@ -1,0 +1,29 @@
+---
+- name: Ensure IPv4 traffic forwarding is enabled for routing
+  ansible.posix.sysctl:
+    name: net.ipv4.ip_forward
+    value: '1'
+    sysctl_set: yes
+    state: present
+    reload: yes
+
+- name: Create WireGuard directory
+  file:
+    path: /etc/wireguard
+    state: directory
+    mode: '0700'
+
+- name: Deploy WireGuard server configuration from template
+  template:
+    src: hou1_wg0.conf.j2
+    dest: /etc/wireguard/wg0.conf
+    owner: root
+    group: root
+    mode: '0600'
+  notify: Restart WireGuard
+
+- name: Enable and start WireGuard interface
+  systemd:
+    name: wg-quick@wg0
+    enabled: yes
+    state: started

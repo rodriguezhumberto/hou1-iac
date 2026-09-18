@@ -1,0 +1,15 @@
+[Interface]
+# Private key and Address pulled from playbook variables
+PrivateKey = {{ hou1_wireguard_server_private_key }}
+Address = {{ hou1_vpn_ip }}/32
+ListenPort = 51820
+PostUp = iptables -A FORWARD -i %i -j ACCEPT; iptables -t nat -A POSTROUTING -o eth0 -j MASQUERADE
+PostDown = iptables -D FORWARD -i %i -j ACCEPT; iptables -t nat -D POSTROUTING -o eth0 -j MASQUERADE
+
+# --- PEERS ---
+{% for peer in hou1_wireguard_peers %}
+# Peer: {{ peer.name }}
+[Peer]
+PublicKey = {{ peer.public_key }}
+AllowedIPs = {{ peer.allowed_ips }}
+{% endfor %}

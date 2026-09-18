@@ -1,0 +1,13 @@
+hou1_vpn_ip: "10.10.0.1"
+certbot_mode: "http"
+
+DIRECTUS_KEY: "{{ PROD_DIRECTUS_KEY }}"
+DIRECTUS_SECRET: "{{ PROD_DIRECTUS_SECRET }}"
+DIRECTUS_ADMIN_EMAIL: "{{ PROD_DIRECTUS_ADMIN_EMAIL }}"
+DIRECTUS_ADMIN_PASSWORD: "{{ PROD_DIRECTUS_ADMIN_PASSWORD }}"
+DIRECTUS_PUBLIC_URL: "{{ PROD_DIRECTUS_PUBLIC_URL }}"
+DIRECTUS_TOKEN: "{{ PROD_DIRECTUS_TOKEN }}"
+
+ssl_domains:
+  - { name: "{{ secondary_domain }}", flags: "-d {{ secondary_domain }} -d www.{{ secondary_domain }}" }
+  - { name: "{{ primary_domain }}", flags: "-d {{ primary_domain }} -d www.{{ primary_domain }} -d cms.{{ primary_domain }}" }

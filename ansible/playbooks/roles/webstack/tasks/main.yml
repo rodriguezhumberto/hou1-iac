@@ -1,0 +1,132 @@
+---
+- name: Pull from GitHub
+  git:
+    repo: "{{ app_repo_pat }}"
+    dest: "{{ app_directory }}"
+    version: "{{ deploy_branch | default('main') }}"
+    update: yes
+    force: yes
+  no_log: true
+
+- name: Ensure database directory exists with open permissions for Astro container
+  file:
+    path: "{{ app_directory }}/database"
+    state: directory
+    mode: '0777'
+
+- name: Ensure Directus directories exist with correct permissions
+  file:
+    path: "{{ app_directory }}/directus-data/{{ item }}"
+    state: directory
+    owner: "1000"
+    group: "1000"
+    mode: '0755'
+  loop:
+    - extensions
+    - uploads
+
+- name: Seed initial SQLite database files (will NOT overwrite existing production data)
+  copy:
+    src: "{{ seed_db_source_path }}/"
+    dest: "{{ app_directory }}/database/"
+    mode: '0666'
+    force: no
+
+- name: Seed initial Directus image uploads (will NOT overwrite existing production media)
+  copy:
+    src: "{{ seed_uploads_source_path }}/" 
+    dest: "{{ app_directory }}/directus-data/uploads/"
+    owner: "1000"
+    group: "1000"
+    mode: '0644'
+    directory_mode: '0755'
+    force: no
+
+- name: Inject production .env file for Astro
+  copy:
+    dest: "{{ app_directory }}/.env"
+    mode: '0600'
+    content: |
+      # Network Setup
+      HOU1_VPN_IP={{ hou1_vpn_ip }}
+      vpn_subnet={{ vpn_subnet }}
+
+      # Directus Environment Variables
+      DIRECTUS_LICENSE_KEY={{ DIRECTUS_LICENSE_KEY }}
+      DIRECTUS_KEY={{ DIRECTUS_KEY }}
+      DIRECTUS_SECRET={{ DIRECTUS_SECRET }}
+      DIRECTUS_ADMIN_EMAIL={{ DIRECTUS_ADMIN_EMAIL }}
+      DIRECTUS_ADMIN_PASSWORD={{ DIRECTUS_ADMIN_PASSWORD }}
+      DIRECTUS_PUBLIC_URL={{ DIRECTUS_PUBLIC_URL }}
+      DIRECTUS_TOKEN={{ DIRECTUS_TOKEN }}
+      
+      # Nginx Environment Mappings
+      PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
+      SECONDARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
+
+      # for hCaptcha
+      PUBLIC_HCAPTCHA_SITE_KEY={{ public_hcaptcha_site_key }}
+      HCAPTCHA_SECRET_KEY={{ hcaptcha_secret_key }}
+
+      # For Discord Webhooks
+      DISCORD_WEBHOOK_URL={{ discord_webhook_url }}
+      DISCORD_INTAKE_WEBHOOK_URL={{ discord_intake_webhook_url }}
+
+- name: Deploy Cloudflare API Credentials File
+  copy:
+    dest: "{{ app_directory }}/certbot/cloudflare.ini"
+    mode: '0600'
+    content: |
+      dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}
+  no_log: true
+
+- name: Check if SSL certificates exist
+  stat:
+    path: "{{ app_directory }}/certbot/conf/live/{{ item.name }}/fullchain.pem"
+  register: cert_status
+  loop: "{{ ssl_domains | default([]) }}"
+  loop_control:
+    label: "Hidden Domain"
+
+- name: Obtain SSL Certificates via Cloudflare DNS-01
+  command: >
+    docker run --rm
+    -v {{ app_directory }}/certbot/conf:/etc/letsencrypt 
+    -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro
+    certbot/dns-cloudflare certonly 
+    -a dns-cloudflare
+    -m {{ letsencrypt_email }} 
+    {{ item.item.flags }}
+    --dns-cloudflare-credentials /cloudflare.ini
+    --dns-cloudflare-propagation-seconds 20
+  when: not item.stat.exists
+  loop: "{{ cert_status.results | default([]) }}"
+  loop_control:
+    label: "Hidden Domain"
+
+- name: Create automated SSL renewal script
+  copy:
+    dest: "{{ app_directory }}/certbot/renew_ssl.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      
+      docker run --rm \
+        -v {{ app_directory }}/certbot/conf:/etc/letsencrypt \
+        -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro \
+        certbot/dns-cloudflare renew
+
+      cd {{ app_directory }} && docker compose restart nginx
+
+- name: Schedule cron job for SSL renewal
+  cron:
+    name: "Renew Let's Encrypt SSL Certificates"
+    minute: "0"
+    hour: "2"
+    day: "1,15"
+    job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
+  
+- name: Rebuild and deploy updated Docker containers
+  command: docker compose up -d --build
+  args:
+    chdir: "{{ app_directory }}"

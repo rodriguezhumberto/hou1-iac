@@ -1,0 +1,26 @@
+# Secrets
+.vault_pass
+vault_pass.txt
+*.vault_pass
+*.age
+*_unencrypted.yml
+*.dec
+.env
+
+# Ansible
+*.retry
+.ansible/
+fact_caching/
+roles/external/
+
+# General
+*.swp
+*.swo
+*~
+.DS_Store
+.AppleDouble
+.LSOverride
+.vscode/
+.idea/
+*.log
+*.tmp
