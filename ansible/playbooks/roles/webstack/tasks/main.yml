@@ -110,13 +110,16 @@
     mode: '0755'
     content: |
       #!/bin/bash
+      set -euo pipefail
       
       docker run --rm \
         -v {{ app_directory }}/certbot/conf:/etc/letsencrypt \
         -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro \
         certbot/dns-cloudflare renew
 
-      cd {{ app_directory }} && docker compose restart nginx
+      cd "{{ app_directory }}"
+      docker compose exec -T nginx nginx -t
+      docker compose exec -T nginx nginx -s reload
 
 - name: Schedule cron job for SSL renewal
   cron:
