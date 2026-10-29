@@ -1,11 +1,17 @@
 ---
-- name: Disable Root SSH Login
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^#?PermitRootLogin'
-    line: 'PermitRootLogin no'
+- name: Set SSH authentication policy before provider overrides
+  copy:
+    dest: /etc/ssh/sshd_config.d/00-ansible-security.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      # Managed by Ansible; loaded before provider and cloud-init settings.
+      PermitRootLogin no
+      PasswordAuthentication no
+      KbdInteractiveAuthentication no
     validate: /usr/sbin/sshd -t -f %s
-  notify: Restart SSH
+  notify: Reload SSH
 
 - name: Restrict SSH ListenAddress to WireGuard VPN
   lineinfile:
@@ -13,15 +19,7 @@
     regexp: '^#?ListenAddress'
     line: 'ListenAddress {{ hou1_vpn_ip }}'
     validate: /usr/sbin/sshd -t -f %s
-  notify: Restart SSH
-
-- name: Disable SSH Password Authentication
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^#?PasswordAuthentication'
-    line: 'PasswordAuthentication no'
-    validate: /usr/sbin/sshd -t -f %s
-  notify: Restart SSH
+  notify: Reload SSH
 
 - name: Allow UFW Ports
   ufw:
@@ -33,12 +31,22 @@
     - { port: '80', proto: 'tcp' }
     - { port: '443', proto: 'tcp' }
 
-- name: Allow SSH strictly from the WireGuard VPN subnet
+- name: Allow SSH from the VPN subnet only through WireGuard
   ufw:
+    rule: allow
+    direction: in
+    interface: wg0
+    port: '22'
+    proto: tcp
+    src: "{{ vpn_subnet }}"
+
+- name: Remove the legacy source-only SSH allowance
+  ufw:
+    delete: yes
     rule: allow
     port: '22'
     proto: tcp
-    src: '10.10.0.0/24'
+    src: "{{ vpn_subnet }}"
 
 - name: Enable UFW and set default deny incoming
   ufw:
