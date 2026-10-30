@@ -24,3 +24,6 @@ roles/external/
 .idea/
 *.log
 *.tmp
+# Python validation artifacts
+__pycache__/
+*.pyc

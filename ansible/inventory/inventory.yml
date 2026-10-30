@@ -14,7 +14,7 @@ all:
         hou1_test:
           hosts:
             test_hou1:
-              ansible_host: 10.10.0.10
+              ansible_host: "{{ management_ip }}"
           vars:
             ansible_user: "{{ new_user}}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
@@ -36,7 +36,7 @@ all:
         hou1_prod:
           hosts:
             prod_hou1:
-              ansible_host: 10.10.0.1
+              ansible_host: "{{ management_ip }}"
           vars:
             ansible_user: "{{ new_user }}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"

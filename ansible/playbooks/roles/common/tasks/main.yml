@@ -12,11 +12,13 @@
     owner: root
     group: root
     mode: '0644'
+  when: not (netbird_enabled | bool)
 
 - name: Lock resolv.conf to prevent DHCP network overwrites
   file:
     path: /etc/resolv.conf
     attributes: +i
+  when: not (netbird_enabled | bool)
 
 - name: Update and upgrade apt packages
   apt:

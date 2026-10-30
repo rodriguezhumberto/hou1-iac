@@ -1,0 +1,30 @@
+name: Validate Ansible migration
+on:
+  pull_request:
+  push:
+    branches: [main]
+permissions:
+  contents: read
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - name: Prepare the current Nginx configuration parser
+        run: |
+          docker pull nginx:1.28-alpine
+          cat > "$RUNNER_TEMP/nginx-validator" <<'EOF'
+          #!/bin/sh
+          exec docker run --rm -v /tmp:/tmp nginx:1.28-alpine nginx "$@"
+          EOF
+          chmod +x "$RUNNER_TEMP/nginx-validator"
+          echo "NGINX_BIN=$RUNNER_TEMP/nginx-validator" >> "$GITHUB_ENV"
+      - run: docker compose version
+      - run: pip install -r requirements-dev.txt
+      - run: ansible-galaxy collection install -r ansible/requirements.yml
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
+      - run: python -m unittest discover -s tests -v

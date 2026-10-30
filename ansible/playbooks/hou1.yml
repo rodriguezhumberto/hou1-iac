@@ -3,18 +3,55 @@
   hosts: "{{ target_hosts | default('hou1_test') }}"
   become: yes
 
+  pre_tasks:
+    - name: Validate VPN configuration for every run, including tagged runs
+      ansible.builtin.import_role:
+        name: vpn_config
+      tags: [always]
+
   roles:
     - role: common
       tags: ['init', 'common']
       
     - role: wireguard
       tags: ['wireguard', 'network']
-      
-    - role: security
-      tags: ['security', 'ufw', 'ssh']
-      
+      when: wireguard_enabled | bool
+
     - role: docker
       tags: ['docker']
-      
+
+    - role: netbird_control_plane
+      tags: ['netbird-control-plane']
+      when: netbird_control_plane_enabled | bool
+
+    - role: netbird
+      tags: ['netbird', 'network']
+      when: netbird_enabled | bool
+
+    - role: security
+      tags: ['security', 'ufw', 'ssh']
+
     - role: webstack
       tags: ['deploy', 'webstack', 'ssl']
+
+  post_tasks:
+    # Intentionally untagged: a targeted network/SSH/deploy run must never stop
+    # the recovery VPN before the other migration steps have completed.
+    - name: Finish SSH handler changes before verifying the replacement connection
+      ansible.builtin.meta: flush_handlers
+
+    - name: Verify fresh management access before retiring WireGuard
+      when: not (wireguard_enabled | bool)
+      block:
+        - name: Close the existing Ansible SSH connection
+          ansible.builtin.meta: reset_connection
+
+        - name: Verify a fresh authenticated connection over NetBird
+          ansible.builtin.wait_for_connection:
+            timeout: 60
+
+        - name: Retire the legacy VPN after NetBird configuration and deployment
+          ansible.builtin.systemd:
+            name: wg-quick@wg0
+            enabled: false
+            state: stopped

@@ -1,0 +1,11 @@
+# BEGIN ANSIBLE VPN LISTENERS
+{% if wireguard_enabled | bool %}
+ListenAddress {{ hou1_vpn_ip }}
+{% endif %}
+{% if netbird_enabled | bool %}
+ListenAddress {{ netbird_ip }}
+{% endif %}
+# END ANSIBLE VPN LISTENERS
+{{ ssh_config_before.content | b64decode |
+   regex_replace('(?ms)^# BEGIN ANSIBLE VPN LISTENERS\n.*?^# END ANSIBLE VPN LISTENERS\n?', '') |
+   regex_replace('(?m)^[ \t]*ListenAddress[^\n]*\n?', '') }}

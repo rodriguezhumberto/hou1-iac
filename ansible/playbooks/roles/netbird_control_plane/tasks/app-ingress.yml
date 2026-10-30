@@ -1,0 +1,39 @@
+---
+- name: Refuse to overwrite an application-owned Compose override
+  ansible.builtin.command:
+    argv: [git, ls-files, --error-unmatch, docker-compose.override.yml]
+    chdir: "{{ app_directory }}"
+  register: netbird_tracked_override
+  failed_when: netbird_tracked_override.rc not in [0, 1]
+  changed_when: false
+
+- name: Require an untracked infrastructure-owned override
+  ansible.builtin.assert:
+    that: netbird_tracked_override.rc == 1
+    fail_msg: The app now owns docker-compose.override.yml. Review Compose integration before deployment.
+
+- name: Check for an existing Compose override
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/docker-compose.override.yml"
+  register: netbird_app_override_stat
+
+- name: Read an existing Compose override
+  ansible.builtin.slurp:
+    src: "{{ app_directory }}/docker-compose.override.yml"
+  register: netbird_app_override_before
+  when: netbird_app_override_stat.stat.exists
+
+- name: Refuse to replace an operator-owned Compose override
+  ansible.builtin.assert:
+    that: "(netbird_app_override_before.content | b64decode).startswith('# Managed by hou1-iac.')"
+    fail_msg: Merge the existing Compose override before deploying the NetBird ingress.
+  when: netbird_app_override_stat.stat.exists
+
+- name: Connect application Nginx to NetBird without changing the app repository
+  ansible.builtin.template:
+    src: "{{ role_path }}/../netbird_control_plane/templates/app-compose.override.yml.j2"
+    dest: "{{ app_directory }}/docker-compose.override.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  register: netbird_app_override

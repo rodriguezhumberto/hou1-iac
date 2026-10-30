@@ -1,0 +1,30 @@
+services:
+  netbird-server:
+    image: {{ netbird_server_image }}
+    restart: unless-stopped
+    command: ["--config", "/etc/netbird/config.yaml"]
+    volumes:
+      - ./config.yaml:/etc/netbird/config.yaml:ro
+      - ./data:/var/lib/netbird
+    ports:
+      - "3478:3478/udp"
+    networks:
+      ingress:
+        aliases: [hou1-netbird-server]
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "3"}
+  dashboard:
+    image: {{ netbird_dashboard_image }}
+    restart: unless-stopped
+    env_file: [./dashboard.env]
+    networks:
+      ingress:
+        aliases: [hou1-netbird-dashboard]
+    logging:
+      driver: json-file
+      options: {max-size: "20m", max-file: "3"}
+networks:
+  ingress:
+    external: true
+    name: {{ netbird_ingress_network }}
