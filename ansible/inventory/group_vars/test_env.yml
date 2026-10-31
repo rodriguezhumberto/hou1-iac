@@ -10,6 +10,8 @@ DIRECTUS_TOKEN: "{{ TEST_DIRECTUS_TOKEN }}"
 VAPID_PUBLIC_KEY: "{{ TEST_VAPID_PUBLIC_KEY }}"
 VAPID_PRIVATE_KEY: "{{ TEST_VAPID_PRIVATE_KEY }}"
 VAPID_SUBJECT: "{{ TEST_VAPID_SUBJECT }}"
+STAFF_PASSWORD: "{{ TEST_STAFF_PASSWORD }}"
+STAFF_SESSION_SECRET: "{{ TEST_STAFF_SESSION_SECRET }}"
 
 ssl_domains:
   - { name: "test.{{ primary_domain }}", flags: "-d test.{{ primary_domain }} -d *.test.{{ primary_domain }} -d cms-test.{{ primary_domain }}" }

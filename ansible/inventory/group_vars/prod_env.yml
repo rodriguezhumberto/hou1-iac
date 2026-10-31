@@ -10,6 +10,8 @@ DIRECTUS_TOKEN: "{{ PROD_DIRECTUS_TOKEN }}"
 VAPID_PUBLIC_KEY: "{{ PROD_VAPID_PUBLIC_KEY }}"
 VAPID_PRIVATE_KEY: "{{ PROD_VAPID_PRIVATE_KEY }}"
 VAPID_SUBJECT: "{{ PROD_VAPID_SUBJECT }}"
+STAFF_PASSWORD: "{{ PROD_STAFF_PASSWORD }}"
+STAFF_SESSION_SECRET: "{{ PROD_STAFF_SESSION_SECRET }}"
 
 ssl_domains:
   - { name: "{{ secondary_domain }}", flags: "-d {{ secondary_domain }} -d www.{{ secondary_domain }}" }

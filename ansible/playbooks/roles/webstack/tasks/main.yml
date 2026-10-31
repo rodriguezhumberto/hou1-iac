@@ -78,6 +78,10 @@
       VAPID_PRIVATE_KEY={{ VAPID_PRIVATE_KEY }}
       VAPID_SUBJECT={{ VAPID_SUBJECT }}
 
+      # Staff app authentication
+      STAFF_PASSWORD={{ STAFF_PASSWORD }}
+      STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
+
 - name: Deploy Cloudflare API Credentials File
   copy:
     dest: "{{ app_directory }}/certbot/cloudflare.ini"
