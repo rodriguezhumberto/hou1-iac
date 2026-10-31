@@ -33,6 +33,7 @@
       - curl
       - gnupg
       - git
+      - cron
       - python3-docker
       - sqlite3
       - mtr-tiny
