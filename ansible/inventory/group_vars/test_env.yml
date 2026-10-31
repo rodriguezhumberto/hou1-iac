@@ -7,6 +7,9 @@ DIRECTUS_ADMIN_EMAIL: "{{ TEST_DIRECTUS_ADMIN_EMAIL }}"
 DIRECTUS_ADMIN_PASSWORD: "{{ TEST_DIRECTUS_ADMIN_PASSWORD }}"
 DIRECTUS_PUBLIC_URL: "{{ TEST_DIRECTUS_PUBLIC_URL }}"
 DIRECTUS_TOKEN: "{{ TEST_DIRECTUS_TOKEN }}"
+VAPID_PUBLIC_KEY: "{{ TEST_VAPID_PUBLIC_KEY }}"
+VAPID_PRIVATE_KEY: "{{ TEST_VAPID_PRIVATE_KEY }}"
+VAPID_SUBJECT: "{{ TEST_VAPID_SUBJECT }}"
 
 ssl_domains:
   - { name: "test.{{ primary_domain }}", flags: "-d test.{{ primary_domain }} -d *.test.{{ primary_domain }} -d cms-test.{{ primary_domain }}" }

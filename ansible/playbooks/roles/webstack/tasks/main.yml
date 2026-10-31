@@ -72,6 +72,12 @@
       DISCORD_WEBHOOK_URL={{ discord_webhook_url }}
       DISCORD_INTAKE_WEBHOOK_URL={{ discord_intake_webhook_url }}
 
+      # Web Push
+      PUBLIC_VAPID_PUBLIC_KEY={{ VAPID_PUBLIC_KEY }}
+      VAPID_PUBLIC_KEY={{ VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY={{ VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT={{ VAPID_SUBJECT }}
+
 - name: Deploy Cloudflare API Credentials File
   copy:
     dest: "{{ app_directory }}/certbot/cloudflare.ini"
