@@ -136,3 +136,14 @@
   command: docker compose up -d --build
   args:
     chdir: "{{ app_directory }}"
+
+- name: Recreate Nginx to render the updated configuration template
+  command: docker compose up -d --no-deps --force-recreate nginx
+  args:
+    chdir: "{{ app_directory }}"
+
+- name: Validate the running Nginx configuration
+  command: docker compose exec -T nginx nginx -t
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
