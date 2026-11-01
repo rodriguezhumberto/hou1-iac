@@ -50,6 +50,7 @@
       # Network Setup
       HOU1_VPN_IP={{ hou1_vpn_ip }}
       vpn_subnet={{ vpn_subnet }}
+      staff_vpn_subnet={{ staff_vpn_subnet }}
 
       # Directus Environment Variables
       DIRECTUS_LICENSE_KEY={{ DIRECTUS_LICENSE_KEY }}
@@ -63,6 +64,9 @@
       # Nginx Environment Mappings
       PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
       SECONDARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
+      STAFF_HOSTNAME={{ staff_domain }}
+      STAFF_CERT_DIR={{ staff_cert_dir }}
+      PUBLIC_SITE_ORIGIN={{ public_site_origin }}
 
       # for hCaptcha
       PUBLIC_HCAPTCHA_SITE_KEY={{ public_hcaptcha_site_key }}
@@ -90,15 +94,7 @@
       dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}
   no_log: true
 
-- name: Check if SSL certificates exist
-  stat:
-    path: "{{ app_directory }}/certbot/conf/live/{{ item.name }}/fullchain.pem"
-  register: cert_status
-  loop: "{{ ssl_domains | default([]) }}"
-  loop_control:
-    label: "Hidden Domain"
-
-- name: Obtain SSL Certificates via Cloudflare DNS-01
+- name: Obtain or update SSL certificates via Cloudflare DNS-01
   command: >
     docker run --rm
     -v {{ app_directory }}/certbot/conf:/etc/letsencrypt 
@@ -106,11 +102,12 @@
     certbot/dns-cloudflare certonly 
     -a dns-cloudflare
     -m {{ letsencrypt_email }} 
-    {{ item.item.flags }}
+    {{ item.flags }}
+    --expand
+    --keep-until-expiring
     --dns-cloudflare-credentials /cloudflare.ini
     --dns-cloudflare-propagation-seconds 20
-  when: not item.stat.exists
-  loop: "{{ cert_status.results | default([]) }}"
+  loop: "{{ ssl_domains | default([]) }}"
   loop_control:
     label: "Hidden Domain"
 
