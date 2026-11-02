@@ -23,7 +23,7 @@ def nameserver_body(value):
                         'nameservers', 'primary', 'search_domains_enabled')}
 
 
-def dns_plan(peers, groups, records, resolver_ip, domain, subnet, existing):
+def dns_plan(peers, groups, records, resolver_ip, domain, subnet, resolver_port, existing):
     domain_name(domain)
     network = IPv4Network(subnet)
 
@@ -61,7 +61,7 @@ def dns_plan(peers, groups, records, resolver_ip, domain, subnet, existing):
         raise AnsibleFilterError('Private DNS requires nonempty, unique records.')
     body = dict(name=NAME, description=MARKER, enabled=True,
                 groups=sorted([group_id('administrators'), group_id('staff')]),
-                domains=[domain], nameservers=[dict(ip=resolver_ip, ns_type='udp', port=53)],
+                domains=[domain], nameservers=[dict(ip=resolver_ip, ns_type='udp', port=resolver_port)],
                 primary=False, search_domains_enabled=True)
     matches = [n for n in existing if n['name'] == NAME]
     if len(matches) > 1 or (matches and matches[0]['description'] != MARKER):

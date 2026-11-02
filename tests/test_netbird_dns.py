@@ -34,13 +34,14 @@ class DnsTest(unittest.TestCase):
 
     def make_plan(self, existing=()):
         return plan(self.peers, self.groups, self.records, '100.90.0.1',
-                    'example.org', '100.90.0.0/16', existing)
+                    'example.org', '100.90.0.0/16', 1053, existing)
 
     def test_discovery_and_failures(self):
         result = self.make_plan()
         self.assertEqual({r['address'] for r in result['records']}, {'100.90.218.114'})
         self.assertEqual(result['body']['groups'], ['administrators', 'staff'])
         self.assertFalse(result['body']['primary'])
+        self.assertEqual(result['body']['nameservers'][0]['port'], 1053)
         self.assertTrue(result['body']['search_domains_enabled'])
         saved = dict(id='dns', **result['body'])
         saved['groups'].reverse()
@@ -114,7 +115,7 @@ class DnsTest(unittest.TestCase):
             variables = dict(netbird_management_url=f'http://127.0.0.1:{server.server_port}',
                              netbird_client_token=dict(token='fixture-token'),
                              netbird_dns_peers=dict(json=self.peers),
-                             netbird_client_groups=dict(json=self.groups),
+                    netbird_client_groups=dict(json=self.groups), netbird_dns_port=1053,
                              netbird_server_peer=self.peers[1], netbird_dns_domain='example.org',
                              netbird_dns_records=self.records)
 
@@ -131,8 +132,10 @@ class DnsTest(unittest.TestCase):
             self.assertIn('changed=0', result.stdout)
             self.assertEqual((state['posts'], state['puts']), (1, 0))
             state['nameservers'][0]['enabled'] = False
+            state['nameservers'][0]['nameservers'][0]['port'] = 53
             run()
             self.assertEqual((state['posts'], state['puts']), (1, 1))
+            self.assertEqual(state['nameservers'][0]['nameservers'][0]['port'], 1053)
             state['corrupt'] = True
             run(False)
         finally:
@@ -175,9 +178,10 @@ class DnsTest(unittest.TestCase):
                     port = reserve.getsockname()[1]
                 template = (ROLES / 'netbird_dns/templates/dnsmasq.conf.j2').read_text()
                 config = Template(template).render(
-                    netbird_server_peer=dict(ip='127.0.0.1'), netbird_dns_plan=self.make_plan(),
+                    netbird_server_peer=dict(ip='127.0.0.1'), netbird_dns_port=1053,
+                    netbird_dns_plan=self.make_plan(),
                     netbird_dns_upstreams=[f'127.0.0.1#{upstream.getsockname()[1]}'])
-                config = config.replace('port=53', f'port={port}')
+                config = config.replace('port=1053', f'port={port}')
                 config = config.replace('user=netbird-dns', 'user=' + pwd.getpwuid(os.getuid()).pw_name)
                 config = config.replace('group=netbird-dns', 'group=' + grp.getgrgid(os.getgid()).gr_name)
                 path = root / 'dnsmasq.conf'

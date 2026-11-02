@@ -13,7 +13,7 @@
 
     - name: Plan managed policies and identify the built-in default
       ansible.builtin.set_fact:
-        netbird_policy_plan: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_existing_policies.json) }}"
+        netbird_policy_plan: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_existing_policies.json, netbird_dns_port) }}"
 
     - name: Create or update managed policies
       ansible.builtin.uri:
@@ -44,7 +44,7 @@
       ansible.builtin.assert:
         that:
           - >-
-            not ((netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json)).managed |
+            not ((netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port)).managed |
                  selectattr('changed') | list | length)
 
     - name: Disable the built-in All-to-All policy after verifying replacements
@@ -75,7 +75,7 @@
       ansible.builtin.assert:
         that:
           - >-
-            not ((netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json)).managed |
+            not ((netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port)).managed |
                  selectattr('changed') | list | length)
           - >-
             not (netbird_effective_policies.json | selectattr('name', 'equalto', 'Default') |

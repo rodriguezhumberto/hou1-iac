@@ -55,3 +55,4 @@ netbird_dns_records:
   - {name: "staff-test.{{ primary_domain }}", peer_group: test-servers}
   - {name: "cms-test.{{ primary_domain }}", peer_group: test-servers}
 netbird_dns_upstreams: [1.1.1.1, 9.9.9.9]
+netbird_dns_port: 1053

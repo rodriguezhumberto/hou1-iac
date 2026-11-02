@@ -26,7 +26,7 @@ class PolicyTest(unittest.TestCase):
             self.assertEqual(len(policy['rules']), 3)
             for dns_rule, protocol in zip(policy['rules'][1:], ('tcp', 'udp')):
                 self.assertEqual(dns_rule['protocol'], protocol)
-                self.assertEqual(dns_rule['ports'], ['53'])
+                self.assertEqual(dns_rule['ports'], ['1053'])
                 self.assertEqual(dns_rule['sources'], policy['rules'][0]['sources'])
                 self.assertEqual(dns_rule['destinations'], ['prod-servers-id'])
                 self.assertFalse(dns_rule['bidirectional'])
@@ -54,6 +54,16 @@ class PolicyTest(unittest.TestCase):
         policies = deepcopy(self.desired)
         policies[1]['rules'].append(deepcopy(policies[1]['rules'][0]))
         self.assertTrue(plan(self.groups, policies)['managed'][1]['changed'])
+
+    def test_dns_port_is_configurable_and_old_port_is_replaced(self):
+        old = deepcopy(self.desired)
+        for policy in old:
+            for rule in policy['rules'][1:]:
+                rule['ports'] = ['53']
+        result = plan(self.groups, old, 1053)['managed']
+        self.assertTrue(all(p['changed'] for p in result))
+        for policy in plan(self.groups, [], 1054)['managed']:
+            self.assertEqual([r['ports'] for r in policy['body']['rules'][1:]], [['1054'], ['1054']])
 
     def test_name_conflicts_and_missing_groups_fail(self):
         for policies in [self.desired + [self.desired[0]],

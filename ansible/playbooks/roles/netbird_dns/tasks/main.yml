@@ -5,6 +5,8 @@
       - inventory_hostname in groups.get('netbird_control_plane', [])
       - netbird_server_group == 'prod-servers'
       - netbird_dns_upstreams | length > 0
+      - netbird_dns_port | int >= 1024
+      - netbird_dns_port | int <= 65535
       - netbird_dns_upstreams | ansible.utils.ipaddr('address') | length == netbird_dns_upstreams | length
 
 - name: Discover private records through the API
@@ -50,6 +52,17 @@
     direction: in
     interface: "{{ netbird_interface }}"
     src: "{{ netbird_subnet }}"
+    port: "{{ netbird_dns_port }}"
+    proto: "{{ item }}"
+  loop: [tcp, udp]
+
+- name: Remove the former private DNS allowance on NetBird's own listener port
+  community.general.ufw:
+    delete: true
+    rule: allow
+    direction: in
+    interface: "{{ netbird_interface }}"
+    src: "{{ netbird_subnet }}"
     port: '53'
     proto: "{{ item }}"
   loop: [tcp, udp]
@@ -64,16 +77,33 @@
     state: started
     daemon_reload: true
 
+- name: Wait for the private DNS listener
+  ansible.builtin.wait_for:
+    host: "{{ netbird_server_peer.ip }}"
+    port: "{{ netbird_dns_port }}"
+    timeout: 20
+
 - name: Verify each private record over UDP and TCP
-  ansible.builtin.command:
-    argv: >-
-      {{ ['dig', '@' ~ netbird_server_peer.ip, item.0.name, 'A', '+short',
-          '+time=2', '+tries=1'] + (['+tcp'] if item.1 == 'tcp' else []) }}
-  loop: "{{ netbird_dns_plan.records | product(['udp', 'tcp']) | list }}"
-  register: netbird_dns_query
-  changed_when: false
-  failed_when: netbird_dns_query.rc != 0 or netbird_dns_query.stdout | trim != item.0.address
-  no_log: true
+  block:
+    - name: Query the private resolver without logging record names
+      ansible.builtin.command:
+        argv: >-
+          {{ ['dig', '-p', netbird_dns_port | string, '@' ~ netbird_server_peer.ip, item.0.name, 'A', '+short',
+              '+time=2', '+tries=1'] + (['+tcp'] if item.1 == 'tcp' else []) }}
+      loop: "{{ netbird_dns_plan.records | product(['udp', 'tcp']) | list }}"
+      register: netbird_dns_query
+      changed_when: false
+      failed_when: netbird_dns_query.rc != 0 or netbird_dns_query.stdout | trim != item.0.address
+      no_log: true
+  rescue:
+    - name: Explain DNS verification failure without exposing records
+      ansible.builtin.fail:
+        msg: >-
+          Private DNS verification failed. Dig exit codes:
+          {{ netbird_dns_query.results | map(attribute='rc') | list }}.
+          Nonzero codes indicate a query or connection failure; zero with failure
+          indicates an unexpected answer. Check netbird-dns.service and the
+          listener on port {{ netbird_dns_port }}. DNS settings were not published.
 
 - name: Reconcile DNS access alongside existing application policies
   block:

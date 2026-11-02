@@ -26,7 +26,8 @@
         netbird_dns_plan: >-
           {{ netbird_dns_peers.json | netbird_dns_plan(
              netbird_client_groups.json, netbird_dns_records, netbird_server_peer.ip,
-             netbird_dns_domain, netbird_subnet, netbird_dns_existing.json) }}
+             netbird_dns_domain, netbird_subnet, netbird_dns_port,
+             netbird_dns_existing.json) }}
   delegate_to: localhost
   become: false
   no_log: true

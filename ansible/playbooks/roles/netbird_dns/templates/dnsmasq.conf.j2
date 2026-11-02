@@ -1,7 +1,7 @@
 # Managed by Ansible. Only the NetBird address serves DNS.
 listen-address={{ netbird_server_peer.ip }}
 bind-dynamic
-port=53
+port={{ netbird_dns_port }}
 user=netbird-dns
 group=netbird-dns
 pid-file=

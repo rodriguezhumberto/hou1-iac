@@ -23,7 +23,7 @@ def policy_body(policy):
     return body
 
 
-def policy_plan(groups, policies):
+def policy_plan(groups, policies, dns_port=1053):
     ids = {}
     for name in ('test-servers', 'prod-servers', 'administrators', 'staff', 'All'):
         matches = [g for g in groups if g['name'] == name]
@@ -41,7 +41,7 @@ def policy_plan(groups, policies):
             body['rules'].append(dict(
                 name=name + '-dns-' + protocol, description=MARKER, enabled=True,
                 action='accept', protocol=protocol, bidirectional=False,
-                sources=[ids[source]], destinations=[ids['prod-servers']], ports=['53']))
+                sources=[ids[source]], destinations=[ids['prod-servers']], ports=[str(dns_port)]))
         matches = [p for p in policies if p['name'] == name]
         if len(matches) > 1:
             raise AnsibleFilterError('Duplicate managed policy name: ' + name)

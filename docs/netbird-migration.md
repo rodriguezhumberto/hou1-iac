@@ -112,7 +112,7 @@ server creation and saving the Vault still requires this recovery procedure.
    | `hou1-administrators` | `administrators` | `test-servers`, `prod-servers` | TCP 22, 443 |
    | `hou1-staff` | `staff` | `test-servers`, `prod-servers` | TCP 443 |
 
-   Both policies also permit TCP/UDP 53 to `prod-servers` for private DNS.
+   Both policies also permit TCP/UDP 1053 to `prod-servers` for private DNS.
 
    Connections can be initiated from source to destination; reply traffic is
    allowed. Policies do not grant server-initiated access to staff devices.
@@ -196,8 +196,10 @@ repository contains variable references. For different names, override
 `netbird_dns_domain` and `netbird_dns_records` in Vault. Each record contains
 `name` and `peer_group` (`test-servers` or `prod-servers`).
 
-The resolver binds only to production's NetBird IP, with TCP/UDP 53 allowed on
-the NetBird interface. Non-overridden names forward to `netbird_dns_upstreams`
+The resolver binds only to production's NetBird IP on `netbird_dns_port` (1053),
+with TCP/UDP allowed on the NetBird interface. NetBird owns port 53; dnsmasq uses
+a separate port published in the nameserver API settings. Non-overridden names
+forward to `netbird_dns_upstreams`
 (Cloudflare and Quad9 by default). After testing every override over TCP and UDP,
 the playbook reconciles access policies and publishes `hou1-private-dns` through
 the API. Only `administrators` and `staff` receive this split-domain resolver;
