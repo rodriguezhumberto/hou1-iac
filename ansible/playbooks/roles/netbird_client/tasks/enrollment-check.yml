@@ -9,8 +9,8 @@
   ansible.builtin.assert:
     that:
       - >-
-        ((netbird_marker.content | b64decode | from_json).management_url | regex_replace('/$', '')) ==
-        (netbird_management_url | regex_replace('/$', ''))
+        ((netbird_marker.content | b64decode | from_json).management_url | netbird_endpoint) ==
+        (netbird_management_url | netbird_endpoint)
     fail_msg: The existing enrollment record belongs to another management server.
   when: netbird_marker_stat.stat.exists
 
@@ -19,6 +19,6 @@
     that:
       - >-
         not (netbird_before_status.netbirdIp | default('') | length) or
-        (netbird_before_status.management.url | regex_replace('/$', '')) ==
-        (netbird_management_url | regex_replace('/$', ''))
+        (netbird_before_status.management.url | netbird_endpoint) ==
+        (netbird_management_url | netbird_endpoint)
     fail_msg: This peer belongs to another management server. Migrate its identity explicitly.

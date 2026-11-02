@@ -89,6 +89,16 @@ class MigrationTest(unittest.TestCase):
             'netbird_interface_state': {'stdout': json.dumps([
                 {'addr_info': [{'local': '100.90.0.10'}]}])}}
         scenarios = [({}, True),
+            ({'netbird_before_status': {**status, 'management': {
+                  'url': 'https://NETBIRD.example.org:443/', 'connected': True}},
+              'netbird_after': {'stdout': json.dumps({**status, 'management': {
+                  'url': 'https://netbird.example.org:443', 'connected': True}})},
+              'netbird_marker': {'content': base64.b64encode(
+                  b'{"management_url":"https://NETBIRD.example.org:443/"}').decode()}}, True),
+            ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
+                  'url': 'https://netbird.example.org:8443', 'connected': True}})}}, False),
+            ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
+                  'url': 'http://netbird.example.org:443', 'connected': True}})}}, False),
             # A previously verified peer can reconnect without a setup key even
             # when the daemon initially reports no IP after restart.
             ({'netbird_before_status': {'netbirdIp': ''}}, True),
