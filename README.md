@@ -75,9 +75,10 @@ real hostname in protected variables and DNS, not tracked examples.
 
 This phase retains WireGuard fallback on both hosts. NetBird server and CLI are
 pinned to **0.82.0**; the separately versioned dashboard remains at v2.96.0.
-Owner-account bootstrap and WireGuard removal are deferred to the next issue.
-A fresh control plane cannot enroll clients until an owner and setup keys exist.
-Existing installations can use the client enrollment workflow below.
+The control-plane playbook bootstraps the initial owner once from the encrypted
+`netbird_owner_email`, `netbird_owner_name`, and `netbird_owner_password` variables.
+It queries setup state and never resets an existing owner's credentials. WireGuard
+removal remains deferred to the next issue.
 
 Install controller dependencies:
 
@@ -105,7 +106,11 @@ and encryption secrets under `/opt/hou1-netbird`. See the
 backup details. Deploying this service on production does not enroll or migrate
 the production client.
 
-Once owner setup and access policies are available, enable only the test client
+After deployment, sign in to the dashboard with that owner account and create
+least-privilege groups/policies and a one-off, non-ephemeral test setup key. Initial
+owner bootstrap does not generate a PAT or automate policies or enrollment keys.
+
+Once access policies and the setup key are available, enable only the test client
 in `test_env.yml` or protected test overrides:
 
 ```yaml
@@ -144,6 +149,14 @@ test validation succeeds, then enroll production with its own setup key and IP.
 Control-plane updates always use its dedicated playbook. Application updates keep
 the previously installed Compose override and mounts without managing the server
 stack. A shared Nginx restart can still interrupt NetBird ingress briefly.
+
+Owner bootstrap uses the container's private address from the production host;
+no new port is published. Proxy use and redirects are disabled for the credential
+request, and sensitive tasks use `no_log`. Setup token creation remains disabled.
+Keep all three owner variables in Vault, never in command-line extra variables.
+After bootstrap, the existing state makes subsequent runs skip owner creation;
+password rotation/recovery is a separate operation through NetBird.
+
 
 Offline validation (no live services are deployed):
 

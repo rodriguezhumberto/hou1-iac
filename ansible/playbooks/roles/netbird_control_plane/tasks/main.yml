@@ -235,6 +235,9 @@
   retries: 12
   delay: 5
 
+- name: Bootstrap the initial owner through the private container network
+  ansible.builtin.import_tasks: bootstrap.yml
+
 - name: Install a consistent local backup command
   ansible.builtin.template:
     src: backup.sh.j2
