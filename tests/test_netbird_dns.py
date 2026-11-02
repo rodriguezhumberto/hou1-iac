@@ -43,6 +43,7 @@ class DnsTest(unittest.TestCase):
         self.assertFalse(result['body']['primary'])
         self.assertEqual(result['body']['nameservers'][0]['port'], 1053)
         self.assertTrue(result['body']['search_domains_enabled'])
+        self.assertEqual(result['body']['domains'], sorted(r['name'] for r in self.records))
         saved = dict(id='dns', **result['body'])
         saved['groups'].reverse()
         self.assertFalse(self.make_plan([saved])['changed'])

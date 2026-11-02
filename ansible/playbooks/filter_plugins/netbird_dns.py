@@ -59,9 +59,13 @@ def dns_plan(peers, groups, records, resolver_ip, domain, subnet, resolver_port,
         resolved.append(dict(name=name, address=address(matches[0]['ip'])))
     if not resolved or len({r['name'] for r in resolved}) != len(resolved):
         raise AnsibleFilterError('Private DNS requires nonempty, unique records.')
+    # Use exact records instead of the apex domain. macOS may otherwise prefer
+    # a LAN resolver that advertises the same broad search domain.
+    private_domains = sorted(r['name'] for r in resolved)
     body = dict(name=NAME, description=MARKER, enabled=True,
                 groups=sorted([group_id('administrators'), group_id('staff')]),
-                domains=[domain], nameservers=[dict(ip=resolver_ip, ns_type='udp', port=resolver_port)],
+                domains=private_domains,
+                nameservers=[dict(ip=resolver_ip, ns_type='udp', port=resolver_port)],
                 primary=False, search_domains_enabled=True)
     matches = [n for n in existing if n['name'] == NAME]
     if len(matches) > 1 or (matches and matches[0]['description'] != MARKER):
