@@ -1,5 +1,8 @@
 ---
 - name: Restart WireGuard
-  systemd:
+  # Ansible connects over wg0. A blocking restart waits on the SSH channel
+  # that the restart intentionally interrupts and can hang the playbook.
+  ansible.builtin.systemd:
     name: wg-quick@wg0
     state: restarted
+    no_block: true
