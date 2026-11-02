@@ -2,6 +2,12 @@
 - name: Validate colocated control-plane settings
   ansible.builtin.assert:
     that:
+      - netbird_api_token_expire_days | int >= 1
+      - netbird_api_token_expire_days | int <= 365
+      - netbird_subnet is ansible.utils.ipv4
+      - "'/' in netbird_subnet"
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int >= 16
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int <= 28
       - netbird_server_image == 'netbirdio/netbird-server:' ~ netbird_version
       - netbird_domain is match('^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$')
       - >-

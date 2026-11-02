@@ -1,4 +1,12 @@
 ---
+- name: Load or preflight the encrypted controller token file
+  netbird_token_vault:
+    path: "{{ netbird_token_vault_file }}"
+    management_url: "{{ netbird_management_url }}"
+    vault_id: "{{ netbird_token_vault_id }}"
+  register: netbird_saved_token
+  no_log: true
+
 - name: Read the NetBird setup state over the private network
   ansible.builtin.uri:
     url: "{{ netbird_bootstrap_api_url }}/api/instance"
@@ -18,6 +26,19 @@
     that:
       - netbird_instance_state.json.setup_required is boolean
     fail_msg: Refusing bootstrap because the server did not return a valid setup state.
+
+- name: Require a saved token for an initialized instance
+  ansible.builtin.assert:
+    that: netbird_instance_state.json.setup_required or netbird_saved_token.exists
+    fail_msg: >-
+      The owner already exists but its API token Vault is missing. Restore the
+      encrypted file or save a replacement owner PAT using ansible-vault edit;
+      do not reset the owner. See docs/netbird-migration.md for recovery.
+
+- name: Refuse to reuse a previous installation's token for a new instance
+  ansible.builtin.assert:
+    that: not netbird_instance_state.json.setup_required or not netbird_saved_token.exists
+    fail_msg: A token exists for an uninitialized server. Restore server state or archive the old token Vault explicitly.
 
 - name: Require owner variables only while the instance is uninitialized
   ansible.builtin.assert:
@@ -39,13 +60,31 @@
       email: "{{ netbird_owner_email }}"
       name: "{{ netbird_owner_name }}"
       password: "{{ netbird_owner_password }}"
-      create_pat: false
+      create_pat: true
+      pat_expire_in: "{{ netbird_api_token_expire_days }}"
     status_code: 200
-    return_content: false
+    return_content: true
     use_proxy: false
     follow_redirects: none
   when: netbird_instance_state.json.setup_required
+  register: netbird_owner_setup
   changed_when: true
+  no_log: true
+
+- name: Persist the one-time token before further API operations
+  netbird_token_vault:
+    path: "{{ netbird_token_vault_file }}"
+    management_url: "{{ netbird_management_url }}"
+    vault_id: "{{ netbird_token_vault_id }}"
+    token: "{{ netbird_owner_setup.json.personal_access_token | default('') }}"
+  when: netbird_instance_state.json.setup_required
+  no_log: true
+
+- name: Select the saved API credential for this run
+  ansible.builtin.set_fact:
+    netbird_api_token: >-
+      {{ netbird_owner_setup.json.personal_access_token
+         if netbird_instance_state.json.setup_required else netbird_saved_token.token }}
   no_log: true
 
 - name: Verify the initial owner setup completed
@@ -64,3 +103,6 @@
   delay: 3
   when: netbird_instance_state.json.setup_required
   no_log: true
+
+- name: Configure the account using the persisted API token
+  ansible.builtin.import_tasks: account.yml

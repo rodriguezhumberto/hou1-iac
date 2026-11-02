@@ -56,11 +56,43 @@ ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
 ```
 
 This deploys the server and ingress without enrolling the production client.
-Owner creation uses the private container API; public `/api/setup` requests are
-blocked. Bootstrap creates no PAT and leaves existing owners unchanged. After an
-interrupted run, rerun the playbook: it checks setup state before creating an
-owner. Changing Vault credentials does not reset an existing account; use
-NetBird's account recovery or password change process.
+Owner creation uses the private container API; public `/api/setup` requests remain
+blocked. Bootstrap requests an owner PAT and saves it immediately to
+`ansible/vault/netbird-token.yml` on the controller, encrypted using the Vault
+password supplied to this run. Only ciphertext is written to disk (mode `0600`);
+the saved file is reused without rewriting it on subsequent runs.
+
+The API sets the shared account subnet to `netbird_subnet` (`100.90.0.0/16` by
+default), preserving other settings. A different range can be applied only before
+peers are enrolled; later address migrations require explicit operator action.
+Both client environments inherit this subnet. Check for overlap with other VPNs
+or carrier networks used by your devices before enrolling them.
+
+### Token storage and recovery
+
+Keep a protected backup of the encrypted token file alongside the server backup.
+It is separate from inventory and is not automatically committed. Its path can be
+overridden with `netbird_token_vault_file`; for named Vault credentials set
+`netbird_token_vault_id` and pass the matching `--vault-id` instead of
+`--ask-vault-pass`. The token has owner privileges and expires after
+`netbird_api_token_expire_days` (365 by default, maximum 365). Changing that setting
+does not renew an existing token.
+
+If the owner exists but the token file is missing, restore the file. If the PAT
+expired, was revoked, or was lost between creation and persistence, sign in as the
+owner, create a replacement PAT, and use `ansible-vault create` (missing file) or
+`ansible-vault edit` (existing file) to save this structure at the same path:
+
+```yaml
+netbird_management_url: https://netbird.YOUR_DOMAIN
+netbird_api_token: REPLACEMENT_PAT
+```
+
+Do not reset the owner or delete server state to recover a token. Rerun the
+playbook after recovery. Changing owner credentials in inventory does not reset
+an existing account; use NetBird's account recovery/password change process.
+The setup response cannot be recovered after it is lost, so a crash between
+server creation and saving the Vault still requires this recovery procedure.
 
 ## Enroll and validate clients
 
@@ -68,9 +100,9 @@ NetBird's account recovery or password change process.
    and CMS-editor groups. Allow administrators TCP 22/443 (optionally 3001 for
    Kuma) and editors TCP 443 to their server groups. Remove the default All-to-All
    policy after replacement rules exist; policies are additive.
-2. In test variables, set `netbird_enabled: true` and the actual account
-   `netbird_subnet`. Keep `management_vpn: wireguard` and `wireguard_enabled: true`.
-   Store a test-only, one-off, non-ephemeral `netbird_setup_key` in Vault.
+2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
+   and `wireguard_enabled: true`. Store a test-only, one-off, non-ephemeral
+   `TEST_NETBIRD_SETUP_KEY` in Vault; test variables map it to `netbird_setup_key`.
 3. From `ansible/`, enroll test:
 
    ```bash
@@ -81,7 +113,7 @@ NetBird's account recovery or password change process.
    port forwarding is unnecessary. NetBird uses UDP 51821 to avoid WireGuard's
    51820.
 4. Read the assigned address from the dashboard or `sudo netbird status`. Set
-   test `netbird_ip`, then run the full playbook:
+   `TEST_NETBIRD_IP` in Vault (mapped to `netbird_ip`), then run the full playbook:
 
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass
@@ -143,8 +175,8 @@ python3 -m unittest discover -s tests -v
 ```
 
 Tests cover inventory and migration guards, enrollment, SSH/CMS configuration,
-Compose/Nginx parsing, persistent secrets, and owner bootstrap against a local API
-fixture. They do not deploy services or replace the live access, relay, reboot and
+Compose/Nginx parsing, persistent secrets, encrypted token persistence, and account
+configuration against a local API fixture. They do not deploy services or replace the live access, relay, reboot and
 restore checks above.
 
 ## Sources

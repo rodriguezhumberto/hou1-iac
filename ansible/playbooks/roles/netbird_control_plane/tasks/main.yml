@@ -10,6 +10,13 @@
     that: not ansible_check_mode
     fail_msg: Use syntax-check and offline tests; control-plane initialization requires a real deployment.
 
+- name: Check controller Vault access before deploying the server
+  netbird_token_vault:
+    path: "{{ netbird_token_vault_file }}"
+    management_url: "{{ netbird_management_url }}"
+    vault_id: "{{ netbird_token_vault_id }}"
+  no_log: true
+
 - name: Check that the application has already been provisioned
   ansible.builtin.stat:
     path: "{{ app_directory }}/docker-compose.yml"

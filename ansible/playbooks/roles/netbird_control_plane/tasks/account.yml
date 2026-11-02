@@ -1,0 +1,94 @@
+---
+- name: Authenticate with the saved owner API token
+  block:
+    - name: Read the account settings
+      ansible.builtin.uri:
+        url: "{{ netbird_bootstrap_api_url }}/api/accounts"
+        headers:
+          Authorization: "Token {{ netbird_api_token }}"
+        use_proxy: false
+        follow_redirects: none
+        return_content: true
+        status_code: 200
+      register: netbird_accounts
+      no_log: true
+  rescue:
+    - name: Explain API credential recovery
+      ansible.builtin.fail:
+        msg: >-
+          Could not read NetBird account settings. Check server connectivity; if
+          the saved PAT is expired or revoked, replace netbird_api_token in the
+          controller Vault with a new owner PAT. Owner bootstrap is never repeated.
+
+- name: Configure the account subnet without changing enrolled peers
+  block:
+    - name: Require one account with valid settings
+      ansible.builtin.assert:
+        that:
+          - netbird_accounts.json is sequence
+          - netbird_accounts.json | length == 1
+          - netbird_accounts.json[0].id is match('^[a-zA-Z0-9_-]+$')
+          - netbird_accounts.json[0].settings is mapping
+
+    - name: Select the account
+      ansible.builtin.set_fact:
+        netbird_account: "{{ netbird_accounts.json[0] }}"
+
+    - name: Check peers before changing the subnet
+      ansible.builtin.uri:
+        url: "{{ netbird_bootstrap_api_url }}/api/peers"
+        headers:
+          Authorization: "Token {{ netbird_api_token }}"
+        use_proxy: false
+        follow_redirects: none
+        return_content: true
+        status_code: 200
+      register: netbird_account_peers
+      when: netbird_account.settings.network_range | default('') != netbird_subnet
+
+    - name: Refuse to renumber an account with enrolled peers
+      ansible.builtin.assert:
+        that:
+          - netbird_account_peers.json == []
+        fail_msg: Account subnet differs and peers exist. Migrate addresses explicitly before changing netbird_subnet.
+      when: netbird_account.settings.network_range | default('') != netbird_subnet
+
+    - name: Set the subnet while preserving other account settings
+      ansible.builtin.uri:
+        url: "{{ netbird_bootstrap_api_url }}/api/accounts/{{ netbird_account.id }}"
+        method: PUT
+        headers:
+          Authorization: "Token {{ netbird_api_token }}"
+        body_format: json
+        body:
+          settings: "{{ netbird_account.settings | combine({'network_range': netbird_subnet}) }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      when: netbird_account.settings.network_range | default('') != netbird_subnet
+      changed_when: true
+
+    - name: Read back the configured account
+      ansible.builtin.uri:
+        url: "{{ netbird_bootstrap_api_url }}/api/accounts"
+        headers:
+          Authorization: "Token {{ netbird_api_token }}"
+        use_proxy: false
+        follow_redirects: none
+        return_content: true
+        status_code: 200
+      register: netbird_account_after
+
+    - name: Verify the desired subnet
+      ansible.builtin.assert:
+        that:
+          - netbird_account_after.json | length == 1
+          - netbird_account_after.json[0].settings.network_range == netbird_subnet
+  no_log: true
+  rescue:
+    - name: Explain account configuration failure
+      ansible.builtin.fail:
+        msg: >-
+          Account configuration failed. Verify API availability and account settings.
+          A differing subnet with existing peers requires an explicit migration;
+          this playbook will not renumber enrolled peers. The token remains in Vault.

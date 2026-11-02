@@ -27,6 +27,7 @@ def run_play(variables, tasks, extra_args=(), inventory_source=None, hosts='loca
                   'ansible_python_interpreter': sys.executable}, tasks=tasks,
         )]))
         env = {**os.environ, 'ANSIBLE_ROLES_PATH': str(ROLES),
+               'ANSIBLE_ACTION_PLUGINS': str(ROOT / 'ansible/playbooks/action_plugins'),
                'ANSIBLE_NOCOLOR': '1', 'ANSIBLE_LOCALHOST_WARNING': 'False'}
         return subprocess.run(
             ['ansible-playbook', '-i', inventory, '-c', 'local', str(play), *extra_args],

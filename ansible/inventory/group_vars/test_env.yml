@@ -1,4 +1,11 @@
 hou1_vpn_ip: "10.10.0.10"
+# Enable after deploying the control plane and creating a test setup key.
+netbird_enabled: false
+management_vpn: wireguard
+netbird_setup_key: "{{ TEST_NETBIRD_SETUP_KEY | default('') }}"
+# Set after first enrollment, before running the security role.
+netbird_ip: "{{ TEST_NETBIRD_IP | default('') }}"
+
 certbot_mode: "dns"
 staff_domain: "staff-test.{{ primary_domain }}"
 staff_cert_dir: "test.{{ primary_domain }}"

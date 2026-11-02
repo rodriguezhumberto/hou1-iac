@@ -148,7 +148,7 @@ class ControlPlaneTest(unittest.TestCase):
             self.assertEqual(stack['services']['netbird-server']['ports'][0]['published'], '3478')
             self.assertNotIn('ports', stack['services']['dashboard'])
             self.assertNotIn('privileged', stack['services']['netbird-server'])
-            self.assertNotIn('NB_SETUP_PAT_ENABLED', stack['services']['netbird-server'].get('environment', {}))
+            self.assertEqual(stack['services']['netbird-server']['environment']['NB_SETUP_PAT_ENABLED'], 'true')
             # Compose must correctly merge a list-style app network with the
             # mapping-style override and retain all original ingress settings.
             base = {'services': {'nginx': {'image': 'nginx:alpine',
