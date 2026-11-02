@@ -153,8 +153,9 @@ server creation and saving the Vault still requires this recovery procedure.
    Reruns reuse peer identity, verify group membership, and repair missing
    membership while preserving other peers/resources. A peer already in the
    opposite environment group requires explicit correction.
-4. Read the assigned address from the dashboard or `sudo netbird status`. Set
-   `TEST_NETBIRD_IP` in Vault (mapped to `netbird_ip`), then run the full playbook:
+4. The client role reads the verified assigned address from `netbird status` and
+   the API, then exposes it to the later security role as `netbird_ip`. No address
+   needs to be stored in Vault or passed as an extra variable. Run the full playbook:
 
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass

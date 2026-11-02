@@ -97,6 +97,12 @@
 - name: Verify the enrolled peer address
   ansible.builtin.import_tasks: verify-address.yml
 
+- name: Use the verified API-assigned address for later roles
+  ansible.builtin.set_fact:
+    netbird_ip: "{{ (netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '') }}"
+    management_ip: "{{ (netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '') }}"
+  when: netbird_enabled | bool
+
 - name: Assign and verify the enrolled server group
   ansible.builtin.import_tasks: membership.yml
 
