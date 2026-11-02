@@ -35,13 +35,9 @@
           allow {{ netbird_subnet }};
       {% endif %}
 
-- name: Preserve the colocated control-plane ingress after application checkout
-  ansible.builtin.include_tasks:
-    file: "{{ role_path }}/../netbird_control_plane/tasks/app-ingress.yml"
-    apply:
-      tags: [deploy, webstack, ssl]
-  when: netbird_control_plane_enabled | bool
-
+# The dedicated control-plane playbook owns its untracked Compose override.
+# Git checkout preserves it; application deployments never render server config,
+# manage its stack, or open STUN ports. Existing Nginx mounts remain in effect.
 - name: Ensure database directory exists with open permissions for Astro container
   file:
     path: "{{ app_directory }}/database"

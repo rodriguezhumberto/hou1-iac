@@ -41,3 +41,9 @@ all:
             ansible_user: "{{ new_user }}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
             ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    # Same production host and prod_env/all Vault variables; no duplicate identity.
+    # Used only by the dedicated control-plane playbook.
+    netbird_control_plane:
+      hosts:
+        prod_hou1: {}

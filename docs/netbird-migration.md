@@ -1,265 +1,192 @@
-# Self-hosted NetBird on HOU1
+# Shared self-hosted NetBird with WireGuard fallback
 
-This PR hosts the NetBird control plane on the **same VPS** as the application.
-It preserves WireGuard as an independent SSH recovery path. The implementation
-is opt-in and has not been applied to a live server.
+## Current scope
 
-## Architecture and ownership
+One public control plane on the existing production host serves clients in both
+test and production. Client rollout starts in the home-network test environment;
+production client access stays on WireGuard until test validation succeeds.
+The control plane itself must run on the public production host first.
 
-- The existing application Nginx continues to publish TCP 80/443. A separate
-  public hostname, such as `netbird.example.com`, serves the NetBird dashboard,
-  API, embedded local-user identity provider, signal and WebSocket relay.
-- A separate Compose project, `hou1-netbird`, runs the combined NetBird server
-  and dashboard. Only UDP 3478 (STUN) is published by that project. Backend HTTP,
-  metrics and health ports are not published.
-- `/opt/hou1-netbird` holds configuration, persistent SQLite/identity data,
-  encryption secrets and ingress configuration. It is outside the application
-  checkout and is not removed by application Git updates or Compose rebuilds.
-- A dedicated external Docker network links application Nginx and the NetBird
-  backends. Nginx has a fixed address on it, which is the only trusted HTTP proxy
-  address in NetBird. It still belongs to its original application network.
-- A managed, untracked `docker-compose.override.yml` adds Nginx's network and
-  mounts. The role refuses to overwrite an application-tracked or operator-owned
-  override. Normal app deployments preserve the integration after checkout.
-- The stable Nginx include loads a directory-mounted configuration. Docker DNS
-  and variable upstreams allow Nginx to start while NetBird is offline and recover
-  after backend address changes. This avoids app ingress depending on successful
-  backend DNS resolution during Nginx startup.
-- No optional public NetBird resource proxy, separate Traefik, external identity
-  provider or second VPS is installed. An external OIDC provider can be connected
-  later; built-in user accounts are sufficient for browser enrollment.
+This phase provides deployment and enrollment support while retaining WireGuard
+fallback everywhere. Initial owner/account bootstrap and WireGuard removal are
+follow-up work. A fresh deployment serves the dashboard and discovery API but
+cannot enroll clients until owner setup, policies and setup keys are available.
+No live servers have been changed or tested by this PR.
 
-Server and dashboard images are pinned to NetBird 0.82.0 and dashboard v2.96.0.
-The server configuration follows the 0.82.0 combined-server installer schema.
-Review upgrades and back up state before changing these versions. Features such
-as some approval, provisioning and audit capabilities may require a self-hosted
-Enterprise license; the basic migration does not depend on those features.
+## Independent deployment targets
 
-## Deployment prerequisites
+- `netbird-control-plane.yml` targets the single `netbird_control_plane` inventory
+  member, `prod_hou1`. It is the same production host identity, inheriting the
+  existing production and all-host Vault variables. It always connects over that
+  host's WireGuard address, even after client inventory cutover.
+- `hou1.yml -e target_hosts=hou1_test` configures only test clients/application.
+- `hou1.yml -e target_hosts=hou1_prod` configures only production clients/application.
+- Application runs do not invoke the control-plane role, render server config,
+  update its Compose project or open STUN ports. They preserve the previously
+  installed untracked ingress override. Shared Nginx can still restart as part
+  of an application update, temporarily interrupting control-plane ingress.
+- Test must never be added to the control-plane group. The dedicated playbook
+  rejects non-production hosts, multiple members and the `target_hosts` override.
 
-1. Test provider browser/serial console or rescue access. Confirm it provides a
-   privileged shell despite disabled root/password SSH. Save known-good SSH,
-   WireGuard and firewall configuration outside the application checkout.
-2. Keep a WireGuard admin device and fresh SSH access to the existing VPS VPN
-   address. Colocated control-plane guards reject disabling WireGuard. An SSH
-   session inside tmux is useful but does not replace a working recovery path.
-3. Provision the application normally once before enabling the control plane.
-   Existing Compose, environment and certificate storage must already exist.
-4. Check resources: upstream quickstart specifies at least 1 CPU and 2 GB RAM for
-   NetBird alone. Add headroom for the existing application and relay traffic.
-   Confirm disk space and relay bandwidth as well as memory.
-5. Create a public DNS-only A record for a distinct NetBird hostname pointing to
-   this VPS. Avoid Cloudflare proxying. Add AAAA only if public IPv6 actually works.
-   This hostname must resolve and be reachable before a device can enroll; do not
-   depend on the VPN's private DNS to reach its own management service.
-6. Permit public TCP 80/443 and UDP 3478 at the provider firewall. The role adds
-   host UFW STUN access; existing public web rules remain. Audit effective Docker
-   forwarding rules because published ports do not use UFW INPUT alone.
-7. Ensure the existing Cloudflare DNS token can issue a certificate for the new
-   name. Control-plane issuance is DNS-01 and does not displace the web listener.
-8. Review `netbird_ingress_subnet` (default `172.30.80.0/29`) and Nginx's reserved
-   address (`172.30.80.2`) against existing networks. Change both before the first
-   deployment if they overlap another Docker/VPN/local network.
-9. Prepare an on-host rollback timer for changes to SSH/firewall/resolver settings.
-   It must run without SSH and restore known-good configuration. Validate its
-   actions, re-arm for risky phases, and cancel only after fresh access tests.
-   This PR does not install such a timer automatically.
+The default shared domain is `netbird.{{ primary_domain }}` and the management URL
+is `https://{{ netbird_domain }}`. The base domain comes from existing protected
+variables. No literal deployment hostname needs to be committed. Both clients
+use the same endpoint and account subnet, but distinct setup keys and peer IPs.
 
-## Commission the control plane before migrating clients
+## Production service design
 
-Set these values in the target environment's group vars:
+The existing application Nginx continues to publish TCP 80/443. The dedicated
+hostname serves the NetBird dashboard, API, embedded identity provider, native
+gRPC signal/management and WebSocket relay. A separate `hou1-netbird` Compose
+project runs the combined server and dashboard, publishing only UDP 3478 (STUN).
+Backend HTTP, metrics and health ports are not published.
 
-```yaml
-netbird_control_plane_enabled: true
-netbird_domain: netbird.YOUR_DOMAIN
-wireguard_enabled: true
-netbird_enabled: false
-```
+Configuration, SQLite/identity data and encryption secrets live under
+`/opt/hou1-netbird`, outside the app checkout. Keys are created once with private
+permissions; deployment refuses to generate replacements against existing data.
+The server and CLI are pinned to 0.82.0; APT preferences prevent unattended client
+upgrades. The dashboard uses its own release scheme and remains pinned to v2.96.0.
+Version changes should be reviewed and backed up separately from application work.
 
-The management URL is derived from this domain unless explicitly overridden.
-Use distinct hostnames if commissioning a separate test VPS. Keep the canonical
-hostname stable after users and devices have enrolled. Disabling the feature flag
-does not tear down existing containers, data, certificates or the managed override;
-removal is a separate recovery-tested operation.
+A dedicated external Docker network connects Nginx and the backends. Nginx has a
+fixed address trusted by NetBird. The managed, untracked
+`docker-compose.override.yml` preserves the original app network and mounts the
+NetBird configuration. Deployment refuses to replace an app-tracked or
+operator-owned override. A stable include and directory mount allow validated
+reloads, while Docker DNS/variable upstreams let Nginx start if NetBird is offline.
+No second public reverse proxy or optional public resource proxy is installed.
+
+A dedicated DNS-01 certificate uses the existing Cloudflare token and certificate
+store. The existing app renewal job renews it and reloads Nginx. Initial writes to
+`/api/setup` remain restricted to configured administrator CIDRs (WireGuard by
+default); this PR does not create owners or collect passwords. Do not open setup
+writes to the internet while bootstrap is deferred.
+
+## Before deploying the control plane
+
+1. Confirm privileged provider console/rescue access and fresh WireGuard SSH.
+   Preserve known-good SSH, WireGuard, firewall and application configuration.
+2. Confirm the production application is already provisioned. Its Nginx, Compose,
+   environment and certificate storage are prerequisites for integration.
+3. Create a DNS-only A record for the derived hostname pointing to production.
+   Do not proxy it through Cloudflare; add AAAA only if IPv6 works end to end.
+4. Permit public TCP 80/443 and UDP 3478 at the provider firewall. Verify egress
+   and the effective Docker/host firewall rules too; Docker publishes via forwarding.
+5. Check the Cloudflare token can issue a certificate for the hostname.
+6. Check capacity beyond the application workload: upstream specifies at least
+   1 CPU and 2 GB RAM for NetBird alone; allow disk and relay bandwidth headroom.
+7. Check the dedicated `172.30.80.0/29` network and reserved Nginx address
+   `172.30.80.2` do not overlap existing Docker, VPN or local networks.
+8. Prepare a tested on-host rollback timer for risky SSH/firewall/resolver changes.
+   This PR does not install the timer. Existing sessions or tmux do not replace
+   fresh access tests and console recovery.
 
 From `ansible/`:
 
 ```bash
-ansible-playbook playbooks/netbird-control-plane.yml -e target_hosts=hou1_test --ask-vault-pass
+ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
 ```
 
-The playbook installs Docker if needed, generates private encryption secrets only
-once, starts the separate stack, connects existing Nginx, checks its configuration
-and verifies `https://NETBIRD_DOMAIN/api/instance`. It briefly recreates Nginx when
-adding the network/mounts. Existing service traffic may see a short interruption.
-Routine control-plane config changes use the directory mount and a validated
-reload. Review shared-ingress changes in a maintenance window with WireGuard open.
+This deploys production ingress and the server only. It does not enroll production
+or change the selected application management VPN. The role checks Nginx syntax
+and the public HTTPS `/api/instance` endpoint. Initial integration can briefly
+recreate Nginx; use a maintenance window and keep WireGuard open.
 
-A dedicated DNS-01 certificate is stored alongside the existing certificates.
-The existing renewal job renews it too and reloads Nginx. The role uses the same
-`/cloudflare.ini` credential path in the issuance container and renewal config.
-Keep the application's Cloudflare credential valid for all managed names.
+The owner/bootstrap workflow is deferred. Keep clients disabled on a fresh
+installation until that workflow supplies accounts, policies and setup keys.
+No bootstrap credentials are requested or generated by Ansible.
 
-Open `https://NETBIRD_DOMAIN/setup` and create the first owner. Ansible deliberately
-does not collect or create that password or enable setup-time API token creation.
-POST `/api/setup` is restricted by Nginx before the first account exists, preventing
-an internet visitor from claiming the installation. Discovery and normal login
-remain public. The write allowlist defaults to the existing WireGuard subnet.
+## Test-first client validation
 
-For bootstrap, temporarily resolve the hostname to the VPS's WireGuard IP on your
-admin device (a local hosts entry), keeping its HTTPS hostname/certificate intact.
-Remove that entry after creating the owner so normal public DNS is used for
-subsequent enrollment. Alternatively set `netbird_bootstrap_allowed_cidrs` to your
-admin's public IPv4 `/32` before deploying. Never make the endpoint writable from
-all of the internet. Store the owner credentials and recovery information in your
-password manager, and verify later logins from a non-WireGuard device.
+When an owner and enrollment keys are available:
 
-Create local users, server groups, administrator/editor groups and one-off,
-non-ephemeral server setup keys. Define the replacement policies before removing
-the initial default All-to-All policy:
-
-- Administrators to the appropriate servers: TCP 22 and 443; add 3001 only for Kuma.
-- CMS editors to the appropriate servers: TCP 443 only.
-- Test access must not imply production access.
-
-NetBird policies are additive: a restrictive rule does not override All-to-All.
-Device offboarding requires revoking/removing its peer access; expiring or revoking
-its setup key only prevents new enrollments.
-
-## Existing dependencies addressed by the migration
-
-- Standard Ansible inventory currently uses production `10.10.0.1` and test
-  `10.10.0.10`. `management_vpn` selects WireGuard or the configured `netbird_ip`.
-- Existing SSH listens only on the WireGuard address. The updated security role
-  manages explicit private listeners, validates included SSH settings, and orders
-  SSH after the enabled VPN services with startup retries for late addresses.
-- WireGuard uses UDP 51820; the NetBird peer defaults to 51821 to avoid collision.
-  This is separate from the control plane's public STUN port 3478.
-- The common role previously overwrote and locked `/etc/resolv.conf`. With the
-  NetBird client enabled it unlocks and preserves it; server NetBird DNS management
-  is disabled. User clients still need managed private DNS for CMS access.
-- Application deployment updates the CMS Nginx allowlist and retains `deny all`.
-  Once NetBird is primary, the WireGuard CMS allowance is removed by default,
-  while SSH recovery can remain. The deployed template's expected original ACL
-  is checked before editing it; an upstream contract change stops deployment.
-- Kuma binds to the selected management IP. NetBird cutover moves that binding
-  without changing the legacy address needed by recovery WireGuard.
-- Application deployments explicitly recreate Nginx so its entrypoint renders
-  changed templates and replaces stale bind-mounted files after Git checkout.
-  Directus and Astro continue using their existing Docker network.
-
-## Client rollout and CMS routing
-
-1. Set `netbird_enabled: true` and the actual account `netbird_subnet`, leaving
-   `management_vpn: wireguard` and `wireguard_enabled: true`. The account CIDR is
-   assigned by NetBird; do not assume the example subnet or allow all CGNAT space.
-2. Store that environment's `netbird_setup_key` in Vault. Enroll over WireGuard:
+1. Create distinct `test-servers`, `prod-servers`, administrator and CMS editor
+   groups. Grant one-way TCP 22/443 (optionally 3001 for Kuma) to administrators
+   and TCP 443 to editors for the appropriate server groups. Remove the default
+   All-to-All policy after replacement rules exist; policies are additive.
+2. In test vars, enable `netbird_enabled`, set the actual shared `netbird_subnet`,
+   and store a test-only one-off non-ephemeral `netbird_setup_key` in Vault.
+   Leave `management_vpn: wireguard` and `wireguard_enabled: true`.
+3. Enroll from the existing home-network/WireGuard management path:
 
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --tags netbird --ask-vault-pass
    ```
 
-   Enrollment uses a root-only temporary key file, removes it even on failure,
-   and records verified enrollment for unattended reconnects. It rejects changing
-   the management endpoint for an existing peer and checks the real interface IP
-   and listening port. Subsequent runs do not need the consumed setup key.
-3. Read the peer IP in the dashboard or `netbird status`. Set `netbird_ip` for
-   that environment and run the full playbook while WireGuard remains primary.
-4. Install clients, select the self-hosted management URL and sign in through the
-   browser. Enroll two admin devices and a CMS-only test user. No subnet router or
-   exit node is needed for SSH and the CMS.
-5. Test fresh SSH to the NetBird IP using the existing user/key and an Ansible ping
-   over that address. Confirm fresh WireGuard SSH still works.
-6. Keep the current CMS HTTPS names and certificates. Distribute private records
-   resolving each CMS hostname to its server's NetBird IP using NetBird Custom
-   Zones or an internal DNS server. Avoid shadowing unrelated public site records
-   when defining a private zone. Check client OS/browser secure-DNS behavior.
-7. Before DNS cutover, test the intended TLS name against the new private address:
+   The home-network test environment needs outbound connectivity to the public
+   management/signal, relay and STUN services. No public port forwarding or
+   LAN-wide exposure is required. Direct NAT traversal or relay carries traffic.
+4. Read its assigned address in the dashboard or `netbird status`, set test
+   `netbird_ip`, and run the full test playbook. NetBird uses 51821, avoiding
+   WireGuard's UDP 51820. The client verifies its endpoint, interface IP and port.
+   Temporary key files are removed even on failure; verified identity is preserved.
+5. Install a client on an administrator device and select the self-hosted URL.
+   Test fresh SSH to the test NetBird IP with the existing OpenSSH user/key and
+   an Ansible ping over that IP. Verify fresh WireGuard SSH still works.
+6. Keep the current CMS HTTPS name and certificate. Distribute private DNS for
+   that name pointing to the test NetBird IP using Custom Zones or internal DNS.
+   Avoid shadowing unrelated public site records. Validate client/browser DNS.
+7. Test CMS login, assets, uploads and WebSockets; test an editor (CMS succeeds,
+   SSH denied), an unauthorized peer (CMS denied), and an external device without
+   VPN (CMS and SSH denied, including IPv6). Public websites must remain functional.
+   Inspect Nginx source addresses and effective NetBird/Docker forwarding rules;
+   UFW's host INPUT listing alone is insufficient. Do not allow a Docker gateway
+   source just to bypass the CMS ACL.
+8. Test client reconnect, relay fallback when direct UDP is blocked, and test
+   environment reboot recovery. Repeat access from outside the home network and
+   with legacy WireGuard disconnected on the client. Keep a separate device or
+   console available for recovery.
+9. Only then select `management_vpn: netbird` for test and repeat the full run.
+   Kuma's binding moves; WireGuard SSH remains, while its CMS allowance is removed
+   by default. Keep `wireguard_enabled: true`; this phase rejects disabling it.
+10. After sustained test use, enroll production separately and repeat validation.
+    Updating the control plane never implicitly opts the production client in.
 
-   ```bash
-   curl --resolve cms-test.example.com:443:NETBIRD_TEST_IP \
-     https://cms-test.example.com/admin/
-   ```
-
-   Substitute the actual address. Test login, assets, uploads and WebSockets in a
-   browser, then repeat using private DNS normally.
-8. Test an editor (CMS succeeds, SSH fails), an unauthorized NetBird peer (CMS
-   denied), and an external device with VPN disabled (CMS and SSH denied, including
-   public IPv6). Public sites and NetBird login/enrollment must keep working.
-   Inspect Nginx source addresses and effective NetBird/Docker firewall rules.
-   Docker HTTPS uses forwarding/DNAT; UFW's host INPUT rules alone do not establish
-   the editor/admin boundary. Never allow a Docker gateway address just to bypass
-   the CMS ACL: that can admit public traffic too.
-9. With provider recovery available, restart the control plane, client daemon and
-   VPS. Test fresh SSH, private DNS, CMS, Kuma and Ansible after reboot, plus client
-   reconnect and relay fallback on a network that blocks direct UDP. Shared Nginx
-   also waits for the application's health dependency; verify recovery from that
-   dependency being slow or unavailable.
-10. After several days of real use, set `management_vpn: netbird`, retain
-    `wireguard_enabled: true`, and run the full playbook. Verify Kuma's moved binding
-    and WireGuard's SSH-only recovery role. Cancel rollback only after fresh access
-    succeeds. Repeat the proven process on production.
-
-The generic migration still supports full WireGuard retirement if the control
-plane is later moved elsewhere. With colocated hosting enabled, disabling recovery
-WireGuard is rejected. Do not advertise the old VPN subnet, Docker networks or a
-default route just to reach services on this VPS.
+Initial account provisioning and eventual removal of WireGuard fallback belong
+to the next issue. Do not treat the deferred bootstrap as completed merely
+because the HTTPS discovery endpoint is healthy.
 
 ## Backup and recovery
 
-Run `/opt/hou1-netbird/backup.sh` as root over WireGuard or provider console before
-upgrades and on a regular operator-managed schedule. It takes an exclusive lock,
-requires a running NetBird server, stops only that server for SQLite consistency,
-archives its complete directory plus the application's certificate store, and
-restarts the server through an EXIT trap even if archiving fails. The peer daemon,
-dashboard, application and WireGuard are not stopped. Enrollment/policy changes
-and relayed connections can be interrupted during this pause.
+Run `/opt/hou1-netbird/backup.sh` as root over WireGuard or console before upgrades
+and on an operator-managed schedule. It locks, requires a running server, stops
+only `netbird-server` for SQLite consistency, archives its directory plus the
+certificate store, and restarts it through an EXIT trap even if archiving fails.
+The peer daemon, WireGuard and application are not stopped. Relayed connections
+and enrollment/policy changes can be interrupted while the server is paused.
 
-Root-only archives are written under `/var/backups/hou1-netbird`. They contain
-private keys, secrets, identity data and certificate material. Transfer them to
-encrypted off-host storage with an appropriate retention policy. Off-host upload,
-retention and scheduling are not automated by this PR; do not treat local copies
-as recovery from disk or VPS loss.
+Archives under `/var/backups/hou1-netbird` contain keys, identities and secrets.
+Transfer them to encrypted off-host storage with a retention policy. Scheduling,
+retention and off-host upload remain operator-managed; local copies do not cover
+VPS/disk loss.
 
-To restore:
+For restore, connect through WireGuard or console, preserve failed state, stop the
+NetBird project, and stage a trusted archive privately. Restore the original server
+directory including `secrets.json`, `config.yaml` and `data` with original
+permissions. Never replace encryption keys for existing state. Restore the
+NetBird certificate lineage from the archive's `conf/` into the app certificate
+store, preserving symlinks and avoiding rollback of unrelated newer certificates.
+Restore canonical public DNS if the host changed; do not run competing live copies
+of the same server identity. Re-run the dedicated playbook with compatible pinned
+versions and test enrolled devices/policies. Validate restoration in isolation
+before relying on the backup. Back up WireGuard and client peer state separately.
 
-1. Use WireGuard or provider console. Preserve any failed state for diagnosis.
-2. Stop the NetBird Compose project without deleting data or changing secrets.
-3. Extract a trusted archive into a root-only staging directory. Restore the
-   original server directory, including `secrets.json`, `config.yaml` and `data`,
-   to the configured control-plane path with original permissions. Never generate
-   replacement encryption keys against existing server data.
-4. The archive also contains `conf/`, the certificate store. Restore the required
-   NetBird certificate lineage into the application's `certbot/conf` location,
-   preserving its archive/live symlinks. Avoid rolling back unrelated application
-   certificates that are already valid and newer.
-5. Restore public DNS to the canonical hostname/address if the host changed. Do
-   not run a second live server with a competing copy of the same identity.
-6. Re-run the control-plane playbook using the backed-up compatible image versions,
-   validate Nginx and endpoint access, then test enrolled devices and policies.
-7. Test this procedure on an isolated replacement instance before relying on it.
-   Back up the client peer state and WireGuard recovery configuration separately.
-
-If NetBird fails, connect through WireGuard to fix the stack, public DNS, TLS or
-Nginx. If shared host networking or the whole VPS fails, use provider console or
-rescue. Do not assume an existing peer connection survives control-plane outage,
-expired login, a relay outage or reboot. A separate Compose project does not remove
-the shared VPS/Nginx failure dependency.
+One VPS and shared Nginx remain a common failure dependency. If NetBird fails,
+repair it through WireGuard. If shared host networking or the whole host fails,
+use provider console/rescue. Do not assume peer connectivity survives a control-
+plane outage, expired login, relay outage or reboot.
 
 ## Validation and sources
 
-Offline tests render the actual Ansible templates, parse/merge Compose without a
-Docker daemon, validate Nginx with a temporary certificate, test persistent secret
-generation, and exercise VPN/colocation guards. Live servers, production drift,
-provider console, Docker policy behavior, end-user enrollment and restore/reboot
-recovery have not been tested. No server has been changed by preparing this PR.
-
-Official sources consulted:
+Offline tests exercise actual inventory targeting, shared endpoint derivation,
+WireGuard guards, enrollment identity checks, SSH/CMS stages, Compose merging,
+Nginx syntax and persistent secrets. Live enrollment, production drift, provider
+console, effective Docker policies, relay/reboot behavior and restore remain
+rollout checks. No live connectivity or deployment claims follow from parser tests.
 
 - [Combined-server installer, pinned 0.82.0](https://github.com/netbirdio/netbird/blob/v0.82.0/infrastructure_files/getting-started.sh)
-- [Current self-hosted quickstart](https://docs.netbird.io/selfhosted/selfhosted-quickstart)
+- [Self-hosted quickstart](https://docs.netbird.io/selfhosted/selfhosted-quickstart)
 - [External reverse proxy configuration](https://docs.netbird.io/selfhosted/external-reverse-proxy)
-- [Setup API and initial-owner bootstrap](https://docs.netbird.io/selfhosted/automated-setup)
 - [Linux installation and enrollment](https://docs.netbird.io/get-started/install/linux)
 - [Access control](https://docs.netbird.io/manage/access-control)
 - [Setup keys](https://docs.netbird.io/manage/peers/register-machines-using-setup-keys)

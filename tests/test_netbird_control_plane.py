@@ -17,15 +17,14 @@ ROLES = migration.ROLES
 
 
 class ControlPlaneTest(unittest.TestCase):
-    def run_play(self, variables, tasks, extra_args=()):
-        return migration.MigrationTest.run_play(self, variables, tasks, extra_args)
+    def run_play(self, variables, tasks, extra_args=(), inventory_source=None, hosts='localhost'):
+        return migration.MigrationTest.run_play(self, variables, tasks, extra_args, inventory_source, hosts)
 
     def variables(self, directory):
         return {
-            'netbird_control_plane_enabled': True,
             'netbird_domain': 'netbird.example.org',
             'netbird_management_url': 'https://netbird.example.org',
-            'primary_domain': 'example.org', 'secondary_domain': 'example.net',
+            'primary_domain': 'example.org', 'new_user': 'test-user', 'secondary_domain': 'example.net',
             'app_directory': directory + '/app',
             'netbird_control_plane_directory': directory + '/server',
             'netbird_backup_directory': directory + '/backups',
@@ -42,10 +41,10 @@ class ControlPlaneTest(unittest.TestCase):
                 ({'netbird_server_image': 'netbirdio/netbird-server:latest'}, False)]:
             with self.subTest(overrides=overrides):
                 result = self.run_play({**self.variables('/tmp/hou1-test'), **overrides}, [
-                    {'ansible.builtin.import_role': {'name': 'vpn_config'}}])
+                    {'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/validate.yml')}])
                 self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
 
-    def test_colocation_recovery_guard_cannot_be_bypassed_by_deploy_tag(self):
+    def test_recovery_guard_cannot_be_bypassed_by_deploy_tag(self):
         variables = {**self.variables('/tmp/hou1-test'),
                      **migration.MigrationTest.netbird_vars(),
                      'wireguard_enabled': False, 'management_vpn': 'netbird'}
@@ -53,7 +52,56 @@ class ControlPlaneTest(unittest.TestCase):
             {'ansible.builtin.import_role': {'name': 'vpn_config'}, 'tags': ['always']}],
             extra_args=['--tags', 'deploy'])
         self.assertNotEqual(result.returncode, 0)
-        self.assertIn('Keep WireGuard SSH recovery enabled', result.stdout)
+        self.assertIn('Keep wireguard_enabled=true', result.stdout)
+
+    def test_shared_inventory_and_production_only_target(self):
+        inventory = yaml.safe_load((migration.ROOT / 'ansible/inventory/inventory.yml').read_text())
+        # Copy the real group variable files without loading encrypted secrets.
+        children = inventory['all']['children']
+        for group in ['test_env', 'prod_env']:
+            children[group]['vars'] = yaml.safe_load(
+                (migration.ROOT / ('ansible/inventory/group_vars/' + group + '.yml')).read_text())
+        # The production identity is reused, not duplicated under a new alias.
+        self.assertEqual(list(children['netbird_control_plane']['hosts']), ['prod_hou1'])
+        self.assertIn('prod_hou1', children['prod_env']['children']['hou1_prod']['hosts'])
+        tasks = [
+            {'ansible.builtin.assert': {'that': [
+                "netbird_domain == 'netbird.example.org'",
+                "netbird_management_url == 'https://netbird.example.org'",
+                "netbird_package_version == '0.82.0'",
+                "netbird_server_image == 'netbirdio/netbird-server:0.82.0'",
+                "wireguard_enabled | bool",
+                "(inventory_hostname == 'prod_hou1') == ('netbird_control_plane' in group_names)",
+            ]}},
+        ]
+        result = self.run_play({'primary_domain': 'example.org', 'new_user': 'test-user',
+            'hou1_vpn_ip': '{{ "10.10.0.1" if inventory_hostname == "prod_hou1" else "10.10.0.10" }}'},
+            tasks, inventory_source=inventory, hosts='hou1_prod:hou1_test')
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        target_tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/target.yml')}]
+        for hosts, overrides, valid in [
+                ('netbird_control_plane', {}, True), ('hou1_test', {}, False),
+                ('netbird_control_plane', {'target_hosts': 'hou1_test'}, False)]:
+            with self.subTest(hosts=hosts, overrides=overrides):
+                result = self.run_play(overrides, target_tasks, inventory_source=inventory, hosts=hosts)
+                self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
+
+    def test_application_runs_do_not_deploy_control_plane(self):
+        app_play = yaml.safe_load((migration.ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]
+        self.assertNotIn('netbird_control_plane', [item['role'] for item in app_play['roles']])
+        self.assertNotIn('post_tasks', app_play)  # No WireGuard retirement.
+        control_play = yaml.safe_load(
+            (migration.ROOT / 'ansible/playbooks/netbird-control-plane.yml').read_text())[0]
+        self.assertEqual(control_play['hosts'], 'netbird_control_plane')
+        self.assertEqual(control_play['vars']['ansible_host'], '{{ hou1_vpn_ip }}')
+        # Real Ansible task expansion catches role/include changes as well.
+        result = self.run_play({'netbird_enabled': True, 'primary_domain': 'example.org'}, [
+            {'ansible.builtin.import_role': {'name': 'webstack'}},
+        ], extra_args=['--list-tasks'])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertNotIn('netbird_control_plane', result.stdout)
+        self.assertNotIn('STUN', result.stdout)
+        self.assertNotIn('combined server', result.stdout)
 
     def test_secret_generation_is_persistent_and_private(self):
         generator = ROLES / 'netbird_control_plane/files/create-secrets.py'

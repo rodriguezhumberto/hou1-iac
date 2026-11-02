@@ -1,21 +1,21 @@
 ---
 # Included with the always tag so targeted runs cannot bypass migration guards.
-- name: Validate VPN rollout stage
+- name: Keep WireGuard recovery throughout this migration stage
   ansible.builtin.assert:
     that:
+      - wireguard_enabled | bool
       - management_vpn in ['wireguard', 'netbird']
-      - wireguard_enabled | bool or netbird_enabled | bool
-      - management_vpn != 'wireguard' or wireguard_enabled | bool
       - management_vpn != 'netbird' or netbird_enabled | bool
-      - wireguard_enabled | bool or management_vpn == 'netbird'
-      - wireguard_enabled | bool or ansible_host != hou1_vpn_ip
     fail_msg: >-
-      Select an enabled management VPN. Retire WireGuard only after switching
-      inventory to NetBird and verifying fresh SSH, CMS and reboot recovery.
+      Keep wireguard_enabled=true for SSH recovery. Bootstrap and WireGuard
+      retirement belong to the next issue; select NetBird management only after
+      fresh SSH and reboot recovery checks.
 
 - name: Validate self-hosted NetBird configuration
   ansible.builtin.assert:
     that:
+      - netbird_version == '0.82.0'
+      - netbird_package_version == netbird_version
       - netbird_management_url is match('^https://[^/]+/?$')
       - (netbird_management_url | urlsplit('hostname')) not in ['api.netbird.io', 'app.netbird.io']
       - netbird_subnet is ansible.utils.ipv4
@@ -36,10 +36,3 @@
       - netbird_ip is ansible.utils.in_network(netbird_subnet)
     fail_msg: Set netbird_ip to this server's enrolled NetBird address before selecting it as primary.
   when: management_vpn == 'netbird'
-
-- name: Validate the colocated control plane for targeted runs too
-  ansible.builtin.include_tasks:
-    file: "{{ role_path }}/../netbird_control_plane/tasks/validate.yml"
-    apply:
-      tags: [always]
-  when: netbird_control_plane_enabled | bool

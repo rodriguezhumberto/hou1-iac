@@ -1,4 +1,7 @@
 ---
+- name: Validate the dedicated production target
+  ansible.builtin.import_tasks: target.yml
+
 - name: Validate control-plane inputs
   ansible.builtin.import_tasks: validate.yml
 
@@ -15,7 +18,7 @@
 - name: Require the existing application ingress before colocating NetBird
   ansible.builtin.assert:
     that: netbird_application_compose.stat.exists
-    fail_msg: Deploy the application once with netbird_control_plane_enabled=false first.
+    fail_msg: Deploy the production application with hou1.yml before running the dedicated control-plane playbook.
 
 - name: Create persistent control-plane directories outside the application checkout
   ansible.builtin.file:

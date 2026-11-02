@@ -62,14 +62,22 @@ ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --skip-tags "dep
 ```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test deploy_branch=cms" --ask-vault-pass
 ```
-### NetBird migration (self-hosted)
+### NetBird: shared control plane, test-first clients
 
-The playbook supports staged replacement of the existing WireGuard connection.
-Defaults retain WireGuard until NetBird and its access policies are ready.
-The control plane runs on the same VPS in its own Compose project, with the
-existing application Nginx serving HTTPS. Its data lives outside the app checkout;
-only STUN adds a public port (UDP 3478). No second VPS or external identity
-provider is required.
+The dedicated control-plane playbook targets only the public production host in
+`netbird_control_plane`. That group reuses `prod_hou1` and its existing Vault
+variables. Test and production application runs configure clients only; they do
+not deploy or update the control plane.
+
+The shared hostname is `netbird.{{ primary_domain }}`, derived from the existing
+Vault-backed website domain. Its URL is the same for both environments. Keep the
+real hostname in protected variables and DNS, not tracked examples.
+
+This phase retains WireGuard fallback on both hosts. NetBird server and CLI are
+pinned to **0.82.0**; the separately versioned dashboard remains at v2.96.0.
+Owner-account bootstrap and WireGuard removal are deferred to the next issue.
+A fresh control plane cannot enroll clients until an owner and setup keys exist.
+Existing installations can use the client enrollment workflow below.
 
 Install controller dependencies:
 
@@ -78,123 +86,70 @@ python3 -m pip install -r requirements-dev.txt
 ansible-galaxy collection install -r ansible/requirements.yml
 ```
 
-First deploy the existing app normally, keeping the new flags disabled. Then
-follow [the same-VPS deployment and recovery runbook](docs/netbird-migration.md).
-Create a DNS-only public A record for the control-plane hostname pointing to
-HOU1. Do not proxy it through Cloudflare or make it depend on NetBird's own DNS.
-Keep provider console access and the existing WireGuard client.
+First deploy the production application normally, if not already provisioned.
+Create a DNS-only A record for the shared hostname pointing to the public
+production host, and permit public TCP 80/443 and UDP 3478. Check provider-console
+and WireGuard SSH recovery access before changing shared ingress.
 
-Enable the control plane in the relevant environment file first:
-
-```yaml
-netbird_control_plane_enabled: true
-netbird_domain: netbird.YOUR_DOMAIN
-wireguard_enabled: true
-netbird_enabled: false
-```
-
-Use a different hostname for a test VPS. The role derives
-`netbird_management_url` from this hostname, generates persistent server secrets
-once, obtains a dedicated DNS-01 certificate using the existing Cloudflare token,
-and connects Nginx through a dedicated external Docker network. Review the
-`netbird_ingress_subnet` default for conflicts before deployment.
-
-From `ansible/`, provision the control plane over the existing WireGuard path:
+From `ansible/`, deploy the control plane explicitly over production WireGuard:
 
 ```bash
-ansible-playbook playbooks/netbird-control-plane.yml -e target_hosts=hou1_test --ask-vault-pass
+ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
 ```
 
-Create the initial owner account at `https://netbird.YOUR_DOMAIN/setup`.
-Writes to `/api/setup` are restricted to `netbird_bootstrap_allowed_cidrs`, which
-defaults to the existing WireGuard subnet. To bootstrap through WireGuard, use a
-temporary local hosts-file entry resolving this hostname to the VPS WireGuard IP;
-remove the entry afterward so enrollment uses public DNS. Alternatively configure
-your administrator's public IPv4 `/32` before deployment. Normal discovery and
-login stay public. Keep the initial owner password in your password manager;
-Ansible does not create an owner or output credentials.
+Do not supply `target_hosts` to that playbook. The target is fixed to
+`netbird_control_plane`; it rejects non-production or multiple hosts. It shares
+Nginx with the production app, but keeps its own Compose project, persistent state,
+and encryption secrets under `/opt/hou1-netbird`. See the
+[deployment and recovery runbook](docs/netbird-migration.md) for ingress, TLS and
+backup details. Deploying this service on production does not enroll or migrate
+the production client.
 
-Create users, groups, explicit access policies, and one-off server setup keys in
-the dashboard. Disable the default All-to-All policy. Now enable the clients:
-
-Set the following per-environment values in `ansible/inventory/group_vars/test_env.yml`
-first, then repeat in `prod_env.yml` after testing. Example addresses are placeholders;
-use the actual subnet allocated by your self-hosted instance:
+Once owner setup and access policies are available, enable only the test client
+in `test_env.yml` or protected test overrides:
 
 ```yaml
 netbird_enabled: true
-netbird_management_url: https://netbird.YOUR_DOMAIN
-netbird_subnet: 100.90.0.0/16
-# Leave management_vpn at wireguard for the initial parallel rollout.
+netbird_subnet: 100.90.0.0/16  # Replace with the actual shared account subnet.
 wireguard_enabled: true
 management_vpn: wireguard
 ```
 
-Store that environment's one-off, non-ephemeral `netbird_setup_key` in Ansible
-Vault (use separate test/prod variables or files). Never pass the key with `-e`
-on the command line. Enrollment uses a temporary root-only key file, removes it
-even on failure, and preserves the existing peer identity on subsequent runs.
-The role refuses to switch an enrolled peer to a different management server.
-Server DNS management is deliberately disabled; enable private CMS DNS on user
-clients through the self-hosted dashboard. Existing resolver configuration is
-unlocked and preserved when NetBird is enabled.
-
-From `ansible/`, enroll over the old WireGuard connection:
+Store a one-off, non-ephemeral `netbird_setup_key` in the test environment's Vault
+variables. Do not put it on the command line. Both environments inherit the shared
+management URL; do not deploy another control plane on the test environment.
+The test environment needs outbound internet access; public inbound exposure,
+LAN-wide exposure and router port forwarding are not enrollment prerequisites.
 
 ```bash
 ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --tags netbird --ask-vault-pass
 ```
 
-Read the enrolled address from the self-hosted dashboard or `sudo netbird status`.
-Set `netbird_ip` for that environment, then run the full playbook while keeping
-`management_vpn: wireguard`. This adds both private SSH listeners and both CMS
-subnets. NetBird uses UDP 51821 to avoid the existing WireGuard port. Configure
-NetBird policies for administrators (TCP 22/443) and editors (TCP 443), replacing
-the default All-to-All policy. The deployed app template is patched after each
-checkout; deployment stops if the expected CMS allowlist has changed upstream.
+Read the assigned IP in the dashboard or `sudo netbird status`, set `netbird_ip`
+for test, and run the full test playbook while keeping WireGuard primary:
 
-Verify fresh SSH, CMS, private DNS, unauthorized-user denial, and reboot recovery
-using the runbook. Set `management_vpn: netbird` and verify Ansible connects over
-it. This also moves Uptime Kuma's private binding on the next deployment.
+```bash
+ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass
+```
 
-For this same-VPS topology, keep `wireguard_enabled: true` after the parallel
-trial. The guards reject disabling it while the colocated control plane is
-enabled: it is the independent SSH recovery path if the NetBird stack or shared
-Nginx fails. Deploy application updates normally with the existing playbook; its
-Compose override preserves control-plane ingress after checkout.
+Verify fresh NetBird SSH, CMS/private DNS, unauthorized-peer denial, relay fallback,
+reboot recovery, and continued WireGuard SSH. Test client access while disconnected
+from the home network and legacy VPN. Only after that, set
+`management_vpn: netbird` for test and repeat the full run. This also moves Kuma's
+binding. WireGuard SSH stays available, while its CMS allowance is removed by
+default when NetBird becomes primary. Leave `wireguard_enabled: true`; disabling
+it is rejected during this phase. Keep production client settings unchanged until
+test validation succeeds, then enroll production with its own setup key and IP.
 
-For installations that later move the control plane elsewhere, the full
-playbook still supports `wireguard_enabled: false`: it removes legacy access,
-verifies a fresh NetBird Ansible connection, and only then stops the old VPN.
-Tagged runs never stop it. The old configuration is retained for console recovery.
+Control-plane updates always use its dedicated playbook. Application updates keep
+the previously installed Compose override and mounts without managing the server
+stack. A shared Nginx restart can still interrupt NetBird ingress briefly.
 
-To retain WireGuard as an SSH recovery path, leave `wireguard_enabled: true`.
-After `management_vpn: netbird`, the WireGuard CMS allowance is removed by
-default while its SSH recovery path remains. Set `wireguard_cms_enabled`
-explicitly only if you need to extend CMS coexistence. NetBird interface/firewall
-policies must be tested with Docker forwarding; host UFW rules alone do not establish CMS authorization.
-
-For rollback, reconnect through WireGuard if it is still active, restore the
-previous variables/revision, and run the relevant roles. If WireGuard was stopped,
-use the provider console to restore its known-good configuration and rules before
-attempting to reconnect. Automated rollback timers are an operator prerequisite
-from the runbook, not installed by this PR.
-
-Offline validation (does not touch any server):
+Offline validation (no live services are deployed):
 
 ```bash
 ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
 ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
-# Tests also require Nginx >=1.25.1, OpenSSL and Docker Compose (no servers are started).
+# Requires Nginx >=1.25.1, OpenSSL and Docker Compose for parser validation.
 python3 -m unittest discover -s tests -v
 ```
-
-NetBird enrollment intentionally rejects Ansible check mode because package
-installation, registration, and actual address checks require a real host.
-
-Control-plane backups are manual: run `/opt/hou1-netbird/backup.sh` as root over
-WireGuard or the provider console. It briefly stops only `netbird-server`, archives
-its persistent data, encryption secrets, configuration and certificate state, and
-restarts it even if archiving fails. Copy the root-only archive to encrypted
-off-host storage; retention and off-host upload are operator-managed. Test restore
-before relying on NetBird for routine access. See the runbook for restore steps.

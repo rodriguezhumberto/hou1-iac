@@ -24,9 +24,20 @@
     filename: netbird
     state: present
 
+- name: Keep unattended system upgrades on the tested NetBird release
+  ansible.builtin.copy:
+    dest: /etc/apt/preferences.d/netbird
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      Package: netbird
+      Pin: version {{ netbird_package_version }}
+      Pin-Priority: 1001
+
 - name: Install the NetBird CLI
   ansible.builtin.apt:
-    name: "{{ 'netbird=' ~ netbird_package_version if netbird_package_version | length else 'netbird' }}"
+    name: "netbird={{ netbird_package_version }}"
     state: present
     update_cache: true
 

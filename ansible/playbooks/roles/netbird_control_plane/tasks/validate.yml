@@ -2,6 +2,8 @@
 - name: Validate colocated control-plane settings
   ansible.builtin.assert:
     that:
+      - netbird_version == '0.82.0'
+      - netbird_server_image == 'netbirdio/netbird-server:' ~ netbird_version
       - netbird_domain is match('^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$')
       - >-
         netbird_domain not in [primary_domain, secondary_domain,

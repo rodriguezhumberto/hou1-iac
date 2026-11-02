@@ -20,19 +20,24 @@ DEFAULTS = yaml.safe_load((ROOT / 'ansible/inventory/group_vars/all/vars.yml').r
 
 
 class MigrationTest(unittest.TestCase):
-    def run_play(self, variables, tasks, extra_args=()):
+    def run_play(self, variables, tasks, extra_args=(), inventory_source=None, hosts='localhost'):
         with tempfile.TemporaryDirectory() as directory:
             play = Path(directory) / 'play.yml'
+            inventory = 'localhost,'
+            if inventory_source is not None:
+                inventory_file = Path(directory) / 'inventory.yml'
+                inventory_file.write_text(yaml.safe_dump(inventory_source))
+                inventory = str(inventory_file)
             play.write_text(yaml.safe_dump([dict(
-                hosts='localhost', gather_facts=False,
-                vars={**DEFAULTS, 'hou1_vpn_ip': '10.10.0.10',
+                hosts=hosts, gather_facts=False,
+                vars={**DEFAULTS, 'new_user': 'test-user', 'hou1_vpn_ip': '10.10.0.10',
                       'ansible_host': '100.90.0.10', **variables,
                       'ansible_python_interpreter': sys.executable}, tasks=tasks,
             )]))
             env = {**os.environ, 'ANSIBLE_ROLES_PATH': str(ROLES),
                    'ANSIBLE_NOCOLOR': '1', 'ANSIBLE_LOCALHOST_WARNING': 'False'}
             return subprocess.run(
-                ['ansible-playbook', '-i', 'localhost,', '-c', 'local', str(play), *extra_args],
+                ['ansible-playbook', '-i', inventory, '-c', 'local', str(play), *extra_args],
                 env=env, text=True, capture_output=True, timeout=40,
             )
 
@@ -47,9 +52,12 @@ class MigrationTest(unittest.TestCase):
         scenarios = [
             ({}, True),
             (nb, True),
-            ({**nb, 'management_vpn': 'netbird', 'wireguard_enabled': False}, True),
+            ({**nb, 'management_vpn': 'netbird'}, True),
+            ({**nb, 'management_vpn': 'netbird', 'wireguard_enabled': False}, False),
             ({'wireguard_enabled': False}, False),
             ({'management_vpn': 'netbird'}, False),
+            ({**nb, 'netbird_version': '0.83.0'}, False),
+            ({**nb, 'netbird_package_version': '0.81.0'}, False),
             ({**nb, 'netbird_wireguard_port': 51820}, False),
             ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, False),
             ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, False),
@@ -85,12 +93,6 @@ class MigrationTest(unittest.TestCase):
                 'ssh_config_before': {'content': '{{ first_render | b64encode }}'}}},
             {'ansible.builtin.assert': {'that': [
                 "lookup('template', '" + template + "') == first_render"]}},
-            {'ansible.builtin.set_fact': {'wireguard_enabled': False}},
-            {'ansible.builtin.set_fact': {
-                'final_render': "{{ lookup('template', '" + template + "') }}"}},
-            {'ansible.builtin.assert': {'that': [
-                "'ListenAddress 10.10.0.10' not in final_render",
-                "'ListenAddress 100.90.0.10' in final_render"]}},
         ]
         result = self.run_play(self.netbird_vars(), tasks)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -157,7 +159,7 @@ class MigrationTest(unittest.TestCase):
 }
 '''
         for nb, wg, primary in [(False, True, 'wireguard'), (True, True, 'wireguard'),
-                                (True, True, 'netbird'), (True, False, 'netbird')]:
+                                (True, True, 'netbird')]:
             with self.subTest(netbird=nb, wireguard=wg), tempfile.TemporaryDirectory() as directory:
                 nginx = Path(directory) / 'nginx'
                 nginx.mkdir()

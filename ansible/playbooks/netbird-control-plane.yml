@@ -1,15 +1,14 @@
 ---
-- name: Deploy NetBird beside the existing HOU1 application
-  hosts: "{{ target_hosts | default('hou1_prod') }}"
+- name: Deploy the shared NetBird control plane on the public production host
+  hosts: netbird_control_plane
   become: true
+  vars:
+    # Use the independent recovery VPN even after application inventory cutover.
+    ansible_host: "{{ hou1_vpn_ip }}"
   pre_tasks:
-    - name: Require explicit control-plane enablement
-      ansible.builtin.assert:
-        that: netbird_control_plane_enabled | bool
-        fail_msg: Set netbird_control_plane_enabled=true in this host's environment configuration first.
-    - name: Validate VPN and colocated control-plane configuration
-      ansible.builtin.import_role:
-        name: vpn_config
+    - name: Require the dedicated production target before any host changes
+      ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
+      tags: [always]
   roles:
     - role: docker
     - role: netbird_control_plane
