@@ -46,4 +46,4 @@ netbird_groups:
   - test-servers
   - prod-servers
   - administrators
-  - cms-editors
+  - staff

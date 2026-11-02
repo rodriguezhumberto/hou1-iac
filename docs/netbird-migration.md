@@ -98,12 +98,14 @@ server creation and saving the Vault still requires this recovery procedure.
 ## Enroll and validate clients
 
 1. The control-plane playbook creates `test-servers`, `prod-servers`,
-   `administrators`, and `cms-editors` through the API (`netbird_groups` configures
+   `administrators`, and `staff` through the API (`netbird_groups` configures
    the names). Existing groups and peer membership are preserved; removing a name
    from this list does not delete its group. Rerun the control-plane playbook to
    add groups to an existing installation.
    In the dashboard, assign peers and configure policies: allow administrators
-   TCP 22/443 (optionally 3001 for Kuma) and editors TCP 443 to their server groups.
+   TCP 22/443 (optionally 3001 for Kuma) and staff TCP 443 to their server groups.
+   HTTPS access includes the CMS and staff pages; CMS credentials still control
+   editing privileges inside the application.
    Remove the default All-to-All policy after replacement rules exist; policies
    are additive. Group creation alone does not restrict access.
 2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
@@ -130,7 +132,7 @@ server creation and saving the Vault still requires this recovery procedure.
    session or console available.
 6. Point private DNS for the existing CMS hostname at the NetBird IP, retaining
    its HTTPS name and certificate. Check DNS, login, assets, uploads and WebSockets.
-   Verify editors can access CMS but not SSH, unauthorized peers cannot access
+   Verify staff can access CMS but not SSH, unauthorized peers cannot access
    CMS, and non-VPN devices cannot access CMS or SSH, including over IPv6.
    Public websites must keep working. Check actual Nginx source addresses and
    Docker/NetBird rules; UFW INPUT rules alone do not cover forwarded traffic.

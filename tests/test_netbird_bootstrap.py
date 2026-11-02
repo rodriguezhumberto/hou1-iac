@@ -156,7 +156,7 @@ class BootstrapTest(unittest.TestCase):
                 self.assertEqual(len(state['puts']), 1)
                 self.assertEqual(state['group_posts'], [
                     {'name': name, 'peers': []}
-                    for name in ['prod-servers', 'administrators', 'cms-editors']])
+                    for name in ['prod-servers', 'administrators', 'staff']])
                 self.assertEqual(state['groups'][1]['peers'], [{'id': 'existing-peer'}])
                 groups_before_repeat = list(state['groups'])
                 self.assertEqual(list(path.parent.iterdir()), [path])
@@ -174,7 +174,7 @@ class BootstrapTest(unittest.TestCase):
                 self.assertIn('duplicate names', run(False))
                 self.assertEqual(len(state['group_posts']), 3)
                 state['groups'].pop()
-                state['groups'] = [g for g in state['groups'] if g['name'] != 'cms-editors']
+                state['groups'] = [g for g in state['groups'] if g['name'] != 'staff']
                 state['reject_groups'] = True
                 self.assertIn('Could not provision NetBird groups', run(False))
                 self.assertEqual(path.read_bytes(), encrypted)
