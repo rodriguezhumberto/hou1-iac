@@ -33,7 +33,7 @@
       - netbird_bootstrap_container.exists
       - netbird_ingress_network in netbird_bootstrap_container.container.NetworkSettings.Networks
       - netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress is ansible.utils.ipv4
-      - netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress is ansible.utils.in_network(netbird_ingress_subnet)
+      - ([netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
     fail_msg: NetBird is not reachable on its expected private Docker network.
 
 - name: Select the private API for owner bootstrap
