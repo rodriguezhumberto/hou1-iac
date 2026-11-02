@@ -129,6 +129,7 @@
     name: "{{ netbird_ingress_network }}"
     ipam_config:
       - subnet: "{{ netbird_ingress_subnet }}"
+        iprange: "{{ netbird_ingress_dynamic_range }}"
 
 - name: Prepare DNS challenge credentials for the NetBird certificate
   ansible.builtin.copy:

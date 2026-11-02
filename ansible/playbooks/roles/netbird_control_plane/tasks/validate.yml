@@ -30,6 +30,10 @@
       - netbird_ingress_proxy_ip is ansible.utils.ipv4
       - "'/' not in netbird_ingress_proxy_ip"
       - ([netbird_ingress_proxy_ip] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
+      - netbird_ingress_dynamic_range is ansible.utils.ipv4
+      - "'/' in netbird_ingress_dynamic_range"
+      - ([netbird_ingress_dynamic_range] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
+      - ([netbird_ingress_proxy_ip] | ansible.utils.ipaddr(netbird_ingress_dynamic_range) | length) == 0
       - netbird_server_image is match('^netbirdio/netbird-server:[0-9]+\.[0-9]+\.[0-9]+$')
       - netbird_dashboard_image is match('^netbirdio/dashboard:v[0-9]+\.[0-9]+\.[0-9]+$')
     fail_msg: >-

@@ -31,6 +31,8 @@ netbird_dashboard_image: netbirdio/dashboard:v2.96.0
 netbird_certbot_image: certbot/dns-cloudflare:v5.1.0
 netbird_ingress_network: hou1-netbird-ingress
 netbird_ingress_subnet: 172.30.80.0/29
+# Keep automatically assigned backend addresses away from Nginx's fixed IP.
+netbird_ingress_dynamic_range: 172.30.80.4/30
 netbird_ingress_proxy_ip: 172.30.80.2
 netbird_backup_directory: /var/backups/hou1-netbird
 

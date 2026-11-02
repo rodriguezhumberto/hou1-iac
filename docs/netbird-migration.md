@@ -37,7 +37,8 @@ Before deploying:
 4. Check the Cloudflare token can issue the certificate. Allow capacity beyond
    the app workload (at least 1 CPU and 2 GB RAM for NetBird, plus relay bandwidth).
 5. Check `172.30.80.0/29` and the reserved Nginx address `172.30.80.2` do not
-   overlap existing Docker, VPN or local networks.
+   overlap existing Docker, VPN or local networks. Backend containers allocate
+   dynamically from `172.30.80.4/30`, leaving the Nginx address outside that pool.
 6. Store `netbird_owner_email`, `netbird_owner_name`, and `netbird_owner_password`
    in Vault. NetBird accepts passwords of 8–72 bytes. Never pass credentials on
    the command line.
@@ -138,6 +139,21 @@ server creation and saving the Vault still requires this recovery procedure.
    then repeat these checks. Control-plane deployment never opts clients in.
 
 ## Backup and recovery
+
+If an earlier deployment created the ingress network without a dynamic range,
+recreate it once before rerunning the updated playbook. On production, stop the
+NetBird project and remove the Nginx container and ingress network:
+
+```bash
+sudo docker compose -p hou1-netbird -f /opt/hou1-netbird/compose.yaml down
+cd /srv/pearlandpaws.com
+sudo docker compose rm --stop --force nginx
+sudo docker network rm hou1-netbird-ingress
+```
+
+Then rerun `netbird-control-plane.yml` from the controller. This interrupts Nginx
+until the playbook recreates it; persistent NetBird and application data remain.
+Use your configured application directory if different from the example.
 
 Run `/opt/hou1-netbird/backup.sh` as root over WireGuard or console before upgrades
 and on an operator-managed schedule. It pauses the server for a consistent SQLite
