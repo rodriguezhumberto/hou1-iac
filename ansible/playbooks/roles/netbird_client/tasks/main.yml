@@ -100,6 +100,14 @@
 - name: Assign and verify the enrolled server group
   ansible.builtin.import_tasks: membership.yml
 
+- name: Create the enrollment record directory
+  ansible.builtin.file:
+    path: "{{ netbird_enrollment_marker | dirname }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
 - name: Record verified enrollment for unattended reconnects after daemon restarts
   ansible.builtin.copy:
     dest: "{{ netbird_enrollment_marker }}"
