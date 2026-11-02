@@ -102,12 +102,28 @@ server creation and saving the Vault still requires this recovery procedure.
    the names). Existing groups and peer membership are preserved; removing a name
    from this list does not delete its group. Rerun the control-plane playbook to
    add groups to an existing installation.
-   In the dashboard, assign peers and configure policies: allow administrators
-   TCP 22/443 (optionally 3001 for Kuma) and staff TCP 443 to their server groups.
-   HTTPS access includes the CMS and staff pages; CMS credentials still control
-   editing privileges inside the application.
-   Remove the default All-to-All policy after replacement rules exist; policies
-   are additive. Group creation alone does not restrict access.
+   It also reconciles these policies, identified by their `hou1-` names and
+   `Managed by hou1-iac.` descriptions:
+
+   | Policy | Source group | Destination groups | Allowed ports |
+   | --- | --- | --- | --- |
+   | `hou1-administrators` | `administrators` | `test-servers`, `prod-servers` | TCP 22, 443 |
+   | `hou1-staff` | `staff` | `test-servers`, `prod-servers` | TCP 443 |
+
+   Connections can be initiated from source to destination; reply traffic is
+   allowed. Policies do not grant server-initiated access to staff devices.
+   After verifying these replacements, the playbook disables the built-in
+   All-to-All `Default` policy. Other policies remain untouched and can grant
+   additional access. Duplicate managed names, operator-owned name conflicts,
+   and customized enabled `Default` policies stop reconciliation for review.
+   The required group names above must remain available in `netbird_groups`.
+
+   Assign your device to `administrators` and staff devices to `staff`. Associate
+   server enrollment keys with `test-servers` or `prod-servers`. Empty groups
+   grant no access. Network groups describe peers/devices, not CMS user accounts.
+   HTTPS allows staff to reach the CMS; application credentials control editing.
+   Staff-page Nginx restrictions and private DNS must also allow the NetBird path.
+   TCP 3001 (Kuma) and ICMP ping are not granted by these policies.
 2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
    and `wireguard_enabled: true`. Store a test-only, one-off, non-ephemeral
    `TEST_NETBIRD_SETUP_KEY` in Vault; test variables map it to `netbird_setup_key`.

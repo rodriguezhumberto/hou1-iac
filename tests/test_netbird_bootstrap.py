@@ -1,4 +1,5 @@
 """Exercise bootstrap, encrypted persistence and account updates through Ansible."""
+from copy import deepcopy
 import json
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
@@ -18,6 +19,15 @@ class BootstrapTest(unittest.TestCase):
         state = {}
 
         class Handler(BaseHTTPRequestHandler):
+            def policy_response(self, policy):
+                response = deepcopy(policy)
+                response.setdefault('source_posture_checks', None)
+                for rule in response['rules']:
+                    rule.setdefault('id', 'fixture-rule')
+                    for key in ('sources', 'destinations'):
+                        rule[key] = [{'id': group, 'name': 'fixture-group'} for group in rule[key]]
+                return response
+
             def reply(self, status, body):
                 self.send_response(status)
                 self.send_header('Content-Type', 'application/json')
@@ -37,11 +47,25 @@ class BootstrapTest(unittest.TestCase):
                     self.reply(200, state['peers'])
                 elif self.path == '/api/groups':
                     self.reply(200, state['groups'])
+                elif self.path == '/api/policies':
+                    self.reply(200, [self.policy_response(p) for p in state['policies']])
                 else:
                     self.reply(404, {})
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path == '/api/policies':
+                    if self.headers.get('Authorization') != 'Token ' + token:
+                        self.reply(401, {})
+                        return
+                    if state.get('reject_policies') and body['name'] == 'hou1-staff':
+                        self.reply(500, {})
+                        return
+                    policy = {'id': 'policy-' + body['name'], **body}
+                    state['policies'].append(policy)
+                    state['policy_posts'].append(body)
+                    self.reply(200, self.policy_response(policy))
+                    return
                 if self.path == '/api/groups':
                     if self.headers.get('Authorization') != 'Token ' + token:
                         self.reply(401, {})
@@ -73,6 +97,13 @@ class BootstrapTest(unittest.TestCase):
                     self.reply(401, {})
                     return
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path.startswith('/api/policies/'):
+                    policy_id = self.path.rsplit('/', 1)[1]
+                    policy = next(p for p in state['policies'] if p['id'] == policy_id)
+                    policy.update(body)
+                    state['policy_puts'].append(policy_id)
+                    self.reply(200, self.policy_response(policy))
+                    return
                 state['puts'].append(body)
                 state['settings'] = body['settings']
                 self.reply(200, {'id': 'fixture-account', 'settings': state['settings']})
@@ -106,6 +137,12 @@ class BootstrapTest(unittest.TestCase):
                                           'peers': [{'id': 'existing-peer'}]},
                                          {'id': 'custom', 'name': 'custom', 'peers': []}],
                                  group_posts=[],
+                                 policies=[{'id': 'default', 'name': 'Default', 'enabled': True,
+                                            'description': 'This is a default policy that allows connections between all the resources',
+                                            'rules': [{'name': 'Default', 'description': '', 'enabled': True,
+                                                       'action': 'accept', 'protocol': 'all', 'bidirectional': True,
+                                                       'sources': ['all'], 'destinations': ['all']}]}],
+                                 policy_posts=[], policy_puts=[],
                                  settings={'network_range': '100.80.0.0/16',
                                            'peer_login_expiration': 86400,
                                            'peer_login_expiration_enabled': True},
@@ -139,8 +176,13 @@ class BootstrapTest(unittest.TestCase):
                 self.assertEqual(len(state['posts']), 1)  # Never blindly retry setup.
                 self.assertFalse(path.exists())
 
-                reset()
-                run(True, owner)
+                reset(reject_policies=True)
+                self.assertIn('policy reconciliation failed', run(False, owner))
+                self.assertTrue(path.exists())
+                self.assertTrue(state['policies'][0]['enabled'])
+                self.assertEqual(len(state['policy_posts']), 1)
+                state['reject_policies'] = False
+                run(True)
                 self.assertEqual(state['posts'], [{
                     'email': owner['netbird_owner_email'], 'name': owner['netbird_owner_name'],
                     'password': owner['netbird_owner_password'], 'create_pat': True, 'pat_expire_in': 365}])
@@ -159,6 +201,9 @@ class BootstrapTest(unittest.TestCase):
                     for name in ['prod-servers', 'administrators', 'staff']])
                 self.assertEqual(state['groups'][1]['peers'], [{'id': 'existing-peer'}])
                 groups_before_repeat = list(state['groups'])
+                self.assertEqual(len(state['policy_posts']), 2)
+                self.assertEqual(state['policy_puts'], ['default'])
+                self.assertFalse(state['policies'][0]['enabled'])
                 self.assertEqual(list(path.parent.iterdir()), [path])
 
                 run(True)  # No owner credentials required; encrypted file is unchanged.
@@ -167,7 +212,17 @@ class BootstrapTest(unittest.TestCase):
                 self.assertEqual(len(state['puts']), 1)
                 self.assertEqual(len(state['group_posts']), 3)
                 self.assertEqual(state['groups'], groups_before_repeat)
+                self.assertEqual(len(state['policy_posts']), 2)
+                self.assertEqual(state['policy_puts'], ['default'])
                 self.assertTrue(all(auth == 'Token ' + token for auth in state['auth']))
+
+                # Repair changed managed permissions via PUT without recreating policies.
+                staff_policy = next(p for p in state['policies'] if p['name'] == 'hou1-staff')
+                staff_policy['rules'][0]['ports'].append('22')
+                run(True)
+                self.assertEqual(state['policy_puts'], ['default', staff_policy['id']])
+                self.assertEqual(staff_policy['rules'][0]['ports'], ['443'])
+                self.assertEqual(len(state['policy_posts']), 2)
 
                 # Reject duplicate names before any further group creation.
                 state['groups'].append({'id': 'duplicate', 'name': 'test-servers', 'peers': []})

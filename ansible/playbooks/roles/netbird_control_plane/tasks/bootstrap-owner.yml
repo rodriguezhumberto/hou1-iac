@@ -109,3 +109,6 @@
 
 - name: Provision the configured groups using the persisted API token
   ansible.builtin.import_tasks: groups.yml
+
+- name: Configure administrator and staff access policies
+  ansible.builtin.import_tasks: policies.yml
