@@ -19,17 +19,19 @@ class PolicyTest(unittest.TestCase):
                         for i, item in enumerate(plan(self.groups, [])['managed'])]
 
     def test_access_and_response_normalization(self):
-        admin, staff = self.desired
+        admin, staff = self.desired[:2]
         self.assertEqual(admin['rules'][0]['ports'], ['22', '443'])
         self.assertEqual(staff['rules'][0]['ports'], ['443'])
         for policy in self.desired:
-            self.assertEqual(len(policy['rules']), 3)
-            for dns_rule, protocol in zip(policy['rules'][1:], ('tcp', 'udp')):
-                self.assertEqual(dns_rule['protocol'], protocol)
-                self.assertEqual(dns_rule['ports'], ['1053'])
-                self.assertEqual(dns_rule['sources'], policy['rules'][0]['sources'])
-                self.assertEqual(dns_rule['destinations'], ['prod-servers-id'])
-                self.assertFalse(dns_rule['bidirectional'])
+            self.assertEqual(len(policy['rules']), 1)
+        for policy, protocol in zip(self.desired[2:], ('tcp', 'udp')):
+            rule = policy['rules'][0]
+            self.assertEqual(rule['protocol'], protocol)
+            self.assertEqual(rule['ports'], ['1053'])
+            self.assertEqual(rule['sources'], ['administrators-id', 'staff-id'])
+            self.assertEqual(rule['destinations'], ['prod-servers-id'])
+            self.assertFalse(rule['bidirectional'])
+        for policy in self.desired[:2]:
             rule = policy['rules'][0]
             self.assertFalse(rule['bidirectional'])
             self.assertEqual(rule['protocol'], 'tcp')
@@ -57,13 +59,28 @@ class PolicyTest(unittest.TestCase):
 
     def test_dns_port_is_configurable_and_old_port_is_replaced(self):
         old = deepcopy(self.desired)
-        for policy in old:
-            for rule in policy['rules'][1:]:
-                rule['ports'] = ['53']
+        for policy in old[2:]:
+            policy['rules'][0]['ports'] = ['53']
         result = plan(self.groups, old, 1053)['managed']
+        self.assertFalse(any(p['changed'] for p in result[:2]))
+        self.assertTrue(all(p['changed'] for p in result[2:]))
+        for policy in plan(self.groups, [], 1054)['managed'][2:]:
+            self.assertEqual(policy['body']['rules'][0]['ports'], ['1054'])
+
+    def test_legacy_multi_rule_policies_are_replaced_without_assuming_missing_sources(self):
+        old = deepcopy(self.desired[:2])
+        for policy in old:
+            for dns in self.desired[2:]:
+                rule = deepcopy(dns['rules'][0])
+                rule['sources'] = None  # NetBird 0.82 omits the repeated source group.
+                policy['rules'].append(rule)
+        result = plan(self.groups, old)['managed']
         self.assertTrue(all(p['changed'] for p in result))
-        for policy in plan(self.groups, [], 1054)['managed']:
-            self.assertEqual([r['ports'] for r in policy['body']['rules'][1:]], [['1054'], ['1054']])
+        self.assertEqual([p['id'] for p in result[:2]], [p['id'] for p in old])
+        self.assertTrue(all(len(p['body']['rules']) == 1 for p in result))
+        broken = deepcopy(self.desired)
+        broken[0]['rules'][0]['sources'] = None
+        self.assertTrue(plan(self.groups, broken)['managed'][0]['changed'])
 
     def test_name_conflicts_and_missing_groups_fail(self):
         for policies in [self.desired + [self.desired[0]],
@@ -75,7 +92,7 @@ class PolicyTest(unittest.TestCase):
         unrelated = {'id': 'custom', 'name': 'custom', 'enabled': True, 'rules': []}
         before = deepcopy(unrelated)
         result = plan(self.groups, self.desired + [unrelated])
-        self.assertEqual(len(result['managed']), 2)
+        self.assertEqual(len(result['managed']), 4)
         self.assertEqual(unrelated, before)
 
     def test_customized_default_is_not_disabled(self):

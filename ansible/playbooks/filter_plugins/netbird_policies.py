@@ -1,5 +1,6 @@
-"""Translate API policy responses and plan the two managed access policies."""
+"""Translate API policy responses and plan managed application and DNS access."""
 from copy import deepcopy
+import json
 
 from ansible.errors import AnsibleFilterError
 
@@ -20,6 +21,7 @@ def policy_body(policy):
                 del rule[key]
         if 'ports' in rule:
             rule['ports'] = sorted(rule['ports'])
+    body['rules'].sort(key=lambda rule: json.dumps(rule, sort_keys=True))
     return body
 
 
@@ -30,18 +32,24 @@ def policy_plan(groups, policies, dns_port=1053):
         if len(matches) != 1:
             raise AnsibleFilterError('Policies require exactly one group named ' + name)
         ids[name] = matches[0]['id']
-    plan = []
+    desired = []
     for source, ports in [('administrators', ['22', '443']), ('staff', ['443'])]:
         name = 'hou1-' + source
-        body = dict(name=name, description=MARKER, enabled=True, source_posture_checks=[], rules=[dict(
+        desired.append(dict(name=name, description=MARKER, enabled=True, source_posture_checks=[], rules=[dict(
             name=name, description=MARKER, enabled=True, action='accept', protocol='tcp',
             bidirectional=False, sources=[ids[source]],
-            destinations=sorted([ids['test-servers'], ids['prod-servers']]), ports=ports)])
-        for protocol in ('tcp', 'udp'):
-            body['rules'].append(dict(
-                name=name + '-dns-' + protocol, description=MARKER, enabled=True,
-                action='accept', protocol=protocol, bidirectional=False,
-                sources=[ids[source]], destinations=[ids['prod-servers']], ports=[str(dns_port)]))
+            destinations=sorted([ids['test-servers'], ids['prod-servers']]), ports=ports)]))
+    # NetBird 0.82 omits repeated source groups in multi-rule API responses.
+    # Single-rule policies keep readback verification reliable without inferring access.
+    for protocol in ('tcp', 'udp'):
+        name = 'hou1-dns-' + protocol
+        desired.append(dict(name=name, description=MARKER, enabled=True, source_posture_checks=[], rules=[dict(
+            name=name, description=MARKER, enabled=True, action='accept', protocol=protocol,
+            bidirectional=False, sources=sorted([ids['administrators'], ids['staff']]),
+            destinations=[ids['prod-servers']], ports=[str(dns_port)])]))
+    plan = []
+    for body in desired:
+        name = body['name']
         matches = [p for p in policies if p['name'] == name]
         if len(matches) > 1:
             raise AnsibleFilterError('Duplicate managed policy name: ' + name)
@@ -49,7 +57,7 @@ def policy_plan(groups, policies, dns_port=1053):
         if existing and existing.get('description') != MARKER:
             raise AnsibleFilterError('Policy name is already operator-owned: ' + name)
         plan.append(dict(body=body, id=existing['id'] if existing else None,
-                         changed=not existing or policy_body(existing) != body))
+                         changed=not existing or policy_body(existing) != policy_body(body)))
 
     # Identify the upstream default by its all-groups rule. Its description can
     # vary between NetBird releases and deployments, so it is not a safety key.

@@ -22,10 +22,18 @@ class BootstrapTest(unittest.TestCase):
             def policy_response(self, policy):
                 response = deepcopy(policy)
                 response.setdefault('source_posture_checks', None)
+                # Match NetBird 0.82's policy-wide group cache: repeated source
+                # groups disappear from later rules in a multi-rule response.
+                seen = set()
                 for rule in response['rules']:
                     rule.setdefault('id', 'fixture-rule')
-                    for key in ('sources', 'destinations'):
-                        rule[key] = [{'id': group, 'name': 'fixture-group'} for group in rule[key]]
+                    sources = rule['sources']
+                    rule['sources'] = [{'id': group, 'name': 'fixture-group'}
+                                       for group in sources if group not in seen] or None
+                    seen.update(sources)
+                    destinations = rule['destinations']
+                    rule['destinations'] = [{'id': group, 'name': 'fixture-group'} for group in destinations]
+                    seen.update(destinations)
                 return response
 
             def reply(self, status, body):
@@ -180,7 +188,7 @@ class BootstrapTest(unittest.TestCase):
                 self.assertIn('policy reconciliation failed', run(False, owner))
                 self.assertTrue(path.exists())
                 self.assertTrue(state['policies'][0]['enabled'])
-                self.assertEqual(len(state['policy_posts']), 1)
+                self.assertEqual(len(state['policy_posts']), 3)
                 state['reject_policies'] = False
                 run(True)
                 self.assertEqual(state['posts'], [{
@@ -201,7 +209,7 @@ class BootstrapTest(unittest.TestCase):
                     for name in ['prod-servers', 'administrators', 'staff']])
                 self.assertEqual(state['groups'][1]['peers'], [{'id': 'existing-peer'}])
                 groups_before_repeat = list(state['groups'])
-                self.assertEqual(len(state['policy_posts']), 2)
+                self.assertEqual(len(state['policy_posts']), 4)
                 self.assertEqual(state['policy_puts'], ['default'])
                 self.assertFalse(state['policies'][0]['enabled'])
                 self.assertEqual(list(path.parent.iterdir()), [path])
@@ -212,7 +220,7 @@ class BootstrapTest(unittest.TestCase):
                 self.assertEqual(len(state['puts']), 1)
                 self.assertEqual(len(state['group_posts']), 3)
                 self.assertEqual(state['groups'], groups_before_repeat)
-                self.assertEqual(len(state['policy_posts']), 2)
+                self.assertEqual(len(state['policy_posts']), 4)
                 self.assertEqual(state['policy_puts'], ['default'])
                 self.assertTrue(all(auth == 'Token ' + token for auth in state['auth']))
 
@@ -222,7 +230,7 @@ class BootstrapTest(unittest.TestCase):
                 run(True)
                 self.assertEqual(state['policy_puts'], ['default', staff_policy['id']])
                 self.assertEqual(staff_policy['rules'][0]['ports'], ['443'])
-                self.assertEqual(len(state['policy_posts']), 2)
+                self.assertEqual(len(state['policy_posts']), 4)
 
                 # Reject duplicate names before any further group creation.
                 state['groups'].append({'id': 'duplicate', 'name': 'test-servers', 'peers': []})

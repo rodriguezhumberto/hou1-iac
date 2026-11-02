@@ -1,5 +1,5 @@
 ---
-- name: Reconcile administrator and staff network policies
+- name: Reconcile administrator, staff and DNS network policies
   block:
     - name: Read existing policies
       ansible.builtin.uri:
@@ -83,6 +83,7 @@
   no_log: true
   rescue:
     - name: Explain policy reconciliation failure
+      no_log: false
       ansible.builtin.fail:
         msg: >-
           NetBird policy reconciliation failed. Check API access, required group names,

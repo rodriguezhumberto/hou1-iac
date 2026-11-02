@@ -111,8 +111,12 @@ server creation and saving the Vault still requires this recovery procedure.
    | --- | --- | --- | --- |
    | `hou1-administrators` | `administrators` | `test-servers`, `prod-servers` | TCP 22, 443 |
    | `hou1-staff` | `staff` | `test-servers`, `prod-servers` | TCP 443 |
+   | `hou1-dns-tcp` | `administrators`, `staff` | `prod-servers` | TCP 1053 |
+   | `hou1-dns-udp` | `administrators`, `staff` | `prod-servers` | UDP 1053 |
 
-   Both policies also permit TCP/UDP 1053 to `prod-servers` for private DNS.
+   Each policy has one rule: NetBird 0.82 omits repeated source groups when
+   returning multi-rule policies, preventing reliable readback verification.
+   Reruns migrate earlier DNS rules into the dedicated policies above.
 
    Connections can be initiated from source to destination; reply traffic is
    allowed. Policies do not grant server-initiated access to staff devices.
