@@ -115,6 +115,12 @@
         validate: /usr/sbin/sshd -t -f %s
       notify: Reload SSH
 
+    - name: Reload the running SSH daemon for NetBird listeners
+      ansible.builtin.systemd:
+        name: ssh
+        state: reloaded
+      when: netbird_enabled | bool
+
     - name: Read the effective SSH configuration including provider overrides
       ansible.builtin.command: /usr/sbin/sshd -T
       register: ssh_effective_config
@@ -123,6 +129,20 @@
 
     - name: Verify private SSH listeners
       ansible.builtin.import_tasks: verify-listeners.yml
+
+    - name: Read the active SSH sockets
+      ansible.builtin.command: ss -Hln 'sport = :22'
+      register: ssh_active_listeners
+      changed_when: false
+      when: netbird_enabled | bool
+
+    - name: Verify the running daemon listens on the NetBird address
+      ansible.builtin.assert:
+        that: "(netbird_ip ~ ':22') in ssh_active_listeners.stdout"
+        fail_msg: >-
+          SSH configuration contains the NetBird listener, but the running daemon
+          does not. Check systemctl status ssh and reload ssh before continuing.
+      when: netbird_enabled | bool
   rescue:
     - name: Restore SSH configuration after invalid listener change
       ansible.builtin.copy:
