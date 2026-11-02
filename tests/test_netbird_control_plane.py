@@ -34,6 +34,8 @@ class ControlPlaneTest(unittest.TestCase):
                 ({'netbird_ingress_proxy_ip': '192.168.99.2'}, False),
                 ({'netbird_ingress_dynamic_range': '172.30.80.0/29'}, False),
                 ({'netbird_ingress_dynamic_range': '172.30.81.0/30'}, False),
+                ({'netbird_groups': ['test-servers', 'test-servers']}, False),
+                ({'netbird_groups': ['All']}, False),
                 ({'netbird_server_image': 'netbirdio/netbird-server:latest'}, False)]:
             with self.subTest(overrides=overrides):
                 result = run_play({**self.variables('/tmp/hou1-test'), **overrides}, [

@@ -97,10 +97,15 @@ server creation and saving the Vault still requires this recovery procedure.
 
 ## Enroll and validate clients
 
-1. Sign in to the dashboard. Create test-server, production-server, administrator
-   and CMS-editor groups. Allow administrators TCP 22/443 (optionally 3001 for
-   Kuma) and editors TCP 443 to their server groups. Remove the default All-to-All
-   policy after replacement rules exist; policies are additive.
+1. The control-plane playbook creates `test-servers`, `prod-servers`,
+   `administrators`, and `cms-editors` through the API (`netbird_groups` configures
+   the names). Existing groups and peer membership are preserved; removing a name
+   from this list does not delete its group. Rerun the control-plane playbook to
+   add groups to an existing installation.
+   In the dashboard, assign peers and configure policies: allow administrators
+   TCP 22/443 (optionally 3001 for Kuma) and editors TCP 443 to their server groups.
+   Remove the default All-to-All policy after replacement rules exist; policies
+   are additive. Group creation alone does not restrict access.
 2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
    and `wireguard_enabled: true`. Store a test-only, one-off, non-ephemeral
    `TEST_NETBIRD_SETUP_KEY` in Vault; test variables map it to `netbird_setup_key`.

@@ -35,11 +35,25 @@ class BootstrapTest(unittest.TestCase):
                     self.reply(200, [{'id': 'fixture-account', 'settings': state['settings']}])
                 elif self.path == '/api/peers':
                     self.reply(200, state['peers'])
+                elif self.path == '/api/groups':
+                    self.reply(200, state['groups'])
                 else:
                     self.reply(404, {})
 
             def do_POST(self):
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path == '/api/groups':
+                    if self.headers.get('Authorization') != 'Token ' + token:
+                        self.reply(401, {})
+                        return
+                    if state.get('reject_groups'):
+                        self.reply(500, {})
+                        return
+                    state['group_posts'].append(body)
+                    group = {'id': 'group-' + body['name'], **body}
+                    state['groups'].append(group)
+                    self.reply(200, group)
+                    return
                 state['posts'].append(body)
                 if state['reject']:
                     self.reply(500, {})
@@ -87,6 +101,11 @@ class BootstrapTest(unittest.TestCase):
                 def reset(**overrides):
                     state.clear()
                     state.update(required=True, posts=[], puts=[], auth=[], peers=[],
+                                 groups=[{'id': 'all', 'name': 'All', 'peers': []},
+                                         {'id': 'existing', 'name': 'test-servers',
+                                          'peers': [{'id': 'existing-peer'}]},
+                                         {'id': 'custom', 'name': 'custom', 'peers': []}],
+                                 group_posts=[],
                                  settings={'network_range': '100.80.0.0/16',
                                            'peer_login_expiration': 86400,
                                            'peer_login_expiration_enabled': True},
@@ -135,13 +154,33 @@ class BootstrapTest(unittest.TestCase):
                 self.assertTrue(state['settings']['peer_login_expiration_enabled'])
                 self.assertEqual(state['settings']['peer_login_expiration'], 86400)
                 self.assertEqual(len(state['puts']), 1)
+                self.assertEqual(state['group_posts'], [
+                    {'name': name, 'peers': []}
+                    for name in ['prod-servers', 'administrators', 'cms-editors']])
+                self.assertEqual(state['groups'][1]['peers'], [{'id': 'existing-peer'}])
+                groups_before_repeat = list(state['groups'])
                 self.assertEqual(list(path.parent.iterdir()), [path])
 
                 run(True)  # No owner credentials required; encrypted file is unchanged.
                 self.assertEqual(path.read_bytes(), encrypted)
                 self.assertEqual(len(state['posts']), 1)
                 self.assertEqual(len(state['puts']), 1)
+                self.assertEqual(len(state['group_posts']), 3)
+                self.assertEqual(state['groups'], groups_before_repeat)
                 self.assertTrue(all(auth == 'Token ' + token for auth in state['auth']))
+
+                # Reject duplicate names before any further group creation.
+                state['groups'].append({'id': 'duplicate', 'name': 'test-servers', 'peers': []})
+                self.assertIn('duplicate names', run(False))
+                self.assertEqual(len(state['group_posts']), 3)
+                state['groups'].pop()
+                state['groups'] = [g for g in state['groups'] if g['name'] != 'cms-editors']
+                state['reject_groups'] = True
+                self.assertIn('Could not provision NetBird groups', run(False))
+                self.assertEqual(path.read_bytes(), encrypted)
+                state['reject_groups'] = False
+                run(True)
+                self.assertEqual(len(state['group_posts']), 4)
 
                 state['settings']['network_range'] = '100.80.0.0/16'
                 state['peers'] = [{'id': 'enrolled-peer'}]

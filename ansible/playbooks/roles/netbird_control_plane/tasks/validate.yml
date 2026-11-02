@@ -2,6 +2,12 @@
 - name: Validate colocated control-plane settings
   ansible.builtin.assert:
     that:
+      - netbird_groups is sequence and netbird_groups is not string and netbird_groups is not mapping
+      - netbird_groups | length > 0
+      - netbird_groups | unique | length == netbird_groups | length
+      - netbird_groups | select('string') | list | length == netbird_groups | length
+      - netbird_groups | map('trim') | reject('equalto', '') | list | length == netbird_groups | length
+      - "'All' not in netbird_groups"
       - netbird_api_token_expire_days | int >= 1
       - netbird_api_token_expire_days | int <= 365
       - netbird_subnet is ansible.utils.ipv4
