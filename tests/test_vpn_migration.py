@@ -33,7 +33,7 @@ class MigrationTest(unittest.TestCase):
         ]
         for variables, valid in scenarios:
             with self.subTest(variables=variables):
-                result = run_play(variables, [{'ansible.builtin.import_role': {'name': 'vpn_config'}}])
+                result = run_play(variables, [{'ansible.builtin.import_role': {'name': 'management_vpn'}}])
                 self.assertEqual(result.returncode == 0, valid,
                                  result.stdout + result.stderr)
 
@@ -76,7 +76,7 @@ class MigrationTest(unittest.TestCase):
                                  result.stdout + result.stderr)
 
     def test_enrollment_identity_and_address_guards(self):
-        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird/tasks' / name)}
+        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks' / name)}
                  for name in ['enrollment-check.yml', 'verify-connection.yml', 'verify-address.yml']]
         status = {'management': {'url': 'https://netbird.example.org', 'connected': True},
                   'wireguardPort': 51821, 'netbirdIp': '100.90.0.10/16'}

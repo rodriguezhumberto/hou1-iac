@@ -6,7 +6,7 @@
   pre_tasks:
     - name: Validate VPN configuration for every run, including tagged runs
       ansible.builtin.import_role:
-        name: vpn_config
+        name: management_vpn
       tags: [always]
 
   roles:
@@ -19,7 +19,7 @@
     - role: docker
       tags: ['docker']
 
-    - role: netbird
+    - role: netbird_client
       tags: ['netbird', 'network']
       when: netbird_enabled | bool
 

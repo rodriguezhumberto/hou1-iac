@@ -43,7 +43,7 @@ class ControlPlaneTest(unittest.TestCase):
                      **netbird_vars(),
                      'wireguard_enabled': False, 'management_vpn': 'netbird'}
         result = run_play(variables, [
-            {'ansible.builtin.import_role': {'name': 'vpn_config'}, 'tags': ['always']}],
+            {'ansible.builtin.import_role': {'name': 'management_vpn'}, 'tags': ['always']}],
             extra_args=['--tags', 'deploy'])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Keep wireguard_enabled=true', result.stdout)
