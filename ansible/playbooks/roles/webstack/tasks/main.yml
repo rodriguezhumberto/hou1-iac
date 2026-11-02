@@ -84,6 +84,7 @@
       # Network Setup
       HOU1_VPN_IP={{ management_ip }}
       vpn_subnet={{ vpn_subnet }}
+      staff_vpn_subnet={{ staff_vpn_subnet }}
 
       # Directus Environment Variables
       DIRECTUS_LICENSE_KEY={{ DIRECTUS_LICENSE_KEY }}
@@ -97,14 +98,23 @@
       # Nginx Environment Mappings
       PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
       SECONDARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
+      STAFF_HOSTNAME={{ staff_domain }}
+      STAFF_CERT_DIR={{ staff_cert_dir }}
+      PUBLIC_SITE_ORIGIN={{ public_site_origin }}
 
       # for hCaptcha
       PUBLIC_HCAPTCHA_SITE_KEY={{ public_hcaptcha_site_key }}
       HCAPTCHA_SECRET_KEY={{ hcaptcha_secret_key }}
 
-      # For Discord Webhooks
-      DISCORD_WEBHOOK_URL={{ discord_webhook_url }}
-      DISCORD_INTAKE_WEBHOOK_URL={{ discord_intake_webhook_url }}
+      # Web Push
+      PUBLIC_VAPID_PUBLIC_KEY={{ VAPID_PUBLIC_KEY }}
+      VAPID_PUBLIC_KEY={{ VAPID_PUBLIC_KEY }}
+      VAPID_PRIVATE_KEY={{ VAPID_PRIVATE_KEY }}
+      VAPID_SUBJECT={{ VAPID_SUBJECT }}
+
+      # Staff app authentication
+      STAFF_PASSWORD={{ STAFF_PASSWORD }}
+      STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
@@ -114,15 +124,7 @@
       dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}
   no_log: true
 
-- name: Check if SSL certificates exist
-  stat:
-    path: "{{ app_directory }}/certbot/conf/live/{{ item.name }}/fullchain.pem"
-  register: cert_status
-  loop: "{{ ssl_domains | default([]) }}"
-  loop_control:
-    label: "Hidden Domain"
-
-- name: Obtain SSL Certificates via Cloudflare DNS-01
+- name: Obtain or update SSL certificates via Cloudflare DNS-01
   command: >
     docker run --rm
     -v {{ app_directory }}/certbot/conf:/etc/letsencrypt 
@@ -130,11 +132,12 @@
     certbot/dns-cloudflare certonly 
     -a dns-cloudflare
     -m {{ letsencrypt_email }} 
-    {{ item.item.flags }}
+    {{ item.flags }}
+    --expand
+    --keep-until-expiring
     --dns-cloudflare-credentials /cloudflare.ini
     --dns-cloudflare-propagation-seconds 20
-  when: not item.stat.exists
-  loop: "{{ cert_status.results | default([]) }}"
+  loop: "{{ ssl_domains | default([]) }}"
   loop_control:
     label: "Hidden Domain"
 

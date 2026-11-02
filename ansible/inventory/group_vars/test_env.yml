@@ -1,5 +1,8 @@
 hou1_vpn_ip: "10.10.0.10"
 certbot_mode: "dns"
+staff_domain: "staff-test.{{ primary_domain }}"
+staff_cert_dir: "test.{{ primary_domain }}"
+public_site_origin: "https://test.{{ primary_domain }}"
 
 DIRECTUS_KEY: "{{ TEST_DIRECTUS_KEY }}"
 DIRECTUS_SECRET: "{{ TEST_DIRECTUS_SECRET }}"
@@ -7,6 +10,11 @@ DIRECTUS_ADMIN_EMAIL: "{{ TEST_DIRECTUS_ADMIN_EMAIL }}"
 DIRECTUS_ADMIN_PASSWORD: "{{ TEST_DIRECTUS_ADMIN_PASSWORD }}"
 DIRECTUS_PUBLIC_URL: "{{ TEST_DIRECTUS_PUBLIC_URL }}"
 DIRECTUS_TOKEN: "{{ TEST_DIRECTUS_TOKEN }}"
+VAPID_PUBLIC_KEY: "{{ TEST_VAPID_PUBLIC_KEY }}"
+VAPID_PRIVATE_KEY: "{{ TEST_VAPID_PRIVATE_KEY }}"
+VAPID_SUBJECT: "{{ TEST_VAPID_SUBJECT }}"
+STAFF_PASSWORD: "{{ TEST_STAFF_PASSWORD }}"
+STAFF_SESSION_SECRET: "{{ TEST_STAFF_SESSION_SECRET }}"
 
 ssl_domains:
-  - { name: "test.{{ primary_domain }}", flags: "-d test.{{ primary_domain }} -d *.test.{{ primary_domain }} -d cms-test.{{ primary_domain }}" }
+  - { name: "test.{{ primary_domain }}", flags: "-d test.{{ primary_domain }} -d *.test.{{ primary_domain }} -d cms-test.{{ primary_domain }} -d {{ staff_domain }}" }
