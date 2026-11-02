@@ -10,30 +10,8 @@
 
 # The application template currently has one legacy VPN allow directive. Manage
 # the CIDRs here after every checkout so deployment cannot restore the old ACL.
-- name: Read the application's CMS ingress template
-  ansible.builtin.slurp:
-    src: "{{ app_directory }}/nginx/nginx.conf.template"
-  register: cms_nginx_template
-
-- name: Verify the expected CMS restriction exists before updating it
-  ansible.builtin.assert:
-    that:
-      - >-
-        (cms_nginx_template.content | b64decode |
-         regex_findall('(?m)^ *allow \${vpn_subnet}; *$') | length) == 1
-    fail_msg: The application CMS allowlist template changed. Review ingress before deploying.
-
-- name: Replace the CMS allowlist with enabled VPN subnets
-  ansible.builtin.replace:
-    path: "{{ app_directory }}/nginx/nginx.conf.template"
-    regexp: '(?m)^ *allow \${vpn_subnet}; *$'
-    replace: |
-      {% if wireguard_cms_enabled | bool %}
-          allow {{ vpn_subnet }};
-      {% endif %}
-      {% if netbird_enabled | bool %}
-          allow {{ netbird_subnet }};
-      {% endif %}
+- name: Configure CMS access for enabled VPNs
+  ansible.builtin.import_tasks: cms-acl.yml
 
 # The dedicated control-plane playbook owns its untracked Compose override.
 # Git checkout preserves it; application deployments never render server config,

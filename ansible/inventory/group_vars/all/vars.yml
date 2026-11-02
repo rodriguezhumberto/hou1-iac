@@ -10,7 +10,7 @@ wireguard_enabled: true
 netbird_enabled: false
 management_vpn: wireguard
 # Keep WireGuard for SSH recovery without CMS access after management cutover.
-wireguard_cms_enabled: "{{ wireguard_enabled | bool and management_vpn == 'wireguard' }}"
+wireguard_cms_enabled: "{{ management_vpn == 'wireguard' }}"
 netbird_management_url: "https://{{ netbird_domain }}"
 netbird_subnet: ""
 netbird_ip: ""
@@ -18,7 +18,6 @@ netbird_interface: wt0
 netbird_wireguard_port: 51821
 # Shared server/client release; the dashboard has its own version scheme.
 netbird_version: "0.82.0"
-netbird_package_version: "{{ netbird_version }}"
 netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
 management_ip: "{{ netbird_ip if management_vpn == 'netbird' else hou1_vpn_ip }}"
 
@@ -33,5 +32,4 @@ netbird_certbot_image: certbot/dns-cloudflare:v5.1.0
 netbird_ingress_network: hou1-netbird-ingress
 netbird_ingress_subnet: 172.30.80.0/29
 netbird_ingress_proxy_ip: 172.30.80.2
-netbird_bootstrap_allowed_cidrs: "{{ [vpn_subnet] }}"
 netbird_backup_directory: /var/backups/hou1-netbird

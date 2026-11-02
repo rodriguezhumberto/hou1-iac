@@ -7,15 +7,14 @@
       - management_vpn in ['wireguard', 'netbird']
       - management_vpn != 'netbird' or netbird_enabled | bool
     fail_msg: >-
-      Keep wireguard_enabled=true for SSH recovery. Bootstrap and WireGuard
-      retirement belong to the next issue; select NetBird management only after
+      Keep wireguard_enabled=true for SSH recovery. WireGuard retirement
+      belongs to the next issue; select NetBird management only after
       fresh SSH and reboot recovery checks.
 
 - name: Validate self-hosted NetBird configuration
   ansible.builtin.assert:
     that:
       - netbird_version == '0.82.0'
-      - netbird_package_version == netbird_version
       - netbird_management_url is match('^https://[^/]+/?$')
       - (netbird_management_url | urlsplit('hostname')) not in ['api.netbird.io', 'app.netbird.io']
       - netbird_subnet is ansible.utils.ipv4

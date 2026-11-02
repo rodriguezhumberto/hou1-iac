@@ -11,15 +11,10 @@ import unittest
 
 import yaml
 
-import test_vpn_migration as migration
-
-ROLES = migration.ROLES
+from helpers import ROOT, ROLES, netbird_vars, run_play
 
 
 class ControlPlaneTest(unittest.TestCase):
-    def run_play(self, variables, tasks, extra_args=(), inventory_source=None, hosts='localhost'):
-        return migration.MigrationTest.run_play(self, variables, tasks, extra_args, inventory_source, hosts)
-
     def variables(self, directory):
         return {
             'netbird_domain': 'netbird.example.org',
@@ -36,31 +31,30 @@ class ControlPlaneTest(unittest.TestCase):
     def test_colocation_guards(self):
         for overrides, valid in [({}, True), ({'wireguard_enabled': False}, False),
                 ({'netbird_domain': 'example.org'}, False),
-                ({'netbird_bootstrap_allowed_cidrs': ['0.0.0.0/0']}, False),
                 ({'netbird_ingress_proxy_ip': '192.168.99.2'}, False),
                 ({'netbird_server_image': 'netbirdio/netbird-server:latest'}, False)]:
             with self.subTest(overrides=overrides):
-                result = self.run_play({**self.variables('/tmp/hou1-test'), **overrides}, [
+                result = run_play({**self.variables('/tmp/hou1-test'), **overrides}, [
                     {'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/validate.yml')}])
                 self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
 
     def test_recovery_guard_cannot_be_bypassed_by_deploy_tag(self):
         variables = {**self.variables('/tmp/hou1-test'),
-                     **migration.MigrationTest.netbird_vars(),
+                     **netbird_vars(),
                      'wireguard_enabled': False, 'management_vpn': 'netbird'}
-        result = self.run_play(variables, [
+        result = run_play(variables, [
             {'ansible.builtin.import_role': {'name': 'vpn_config'}, 'tags': ['always']}],
             extra_args=['--tags', 'deploy'])
         self.assertNotEqual(result.returncode, 0)
         self.assertIn('Keep wireguard_enabled=true', result.stdout)
 
     def test_shared_inventory_and_production_only_target(self):
-        inventory = yaml.safe_load((migration.ROOT / 'ansible/inventory/inventory.yml').read_text())
+        inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
         # Copy the real group variable files without loading encrypted secrets.
         children = inventory['all']['children']
         for group in ['test_env', 'prod_env']:
             children[group]['vars'] = yaml.safe_load(
-                (migration.ROOT / ('ansible/inventory/group_vars/' + group + '.yml')).read_text())
+                (ROOT / ('ansible/inventory/group_vars/' + group + '.yml')).read_text())
         # The production identity is reused, not duplicated under a new alias.
         self.assertEqual(list(children['netbird_control_plane']['hosts']), ['prod_hou1'])
         self.assertIn('prod_hou1', children['prod_env']['children']['hou1_prod']['hosts'])
@@ -68,13 +62,12 @@ class ControlPlaneTest(unittest.TestCase):
             {'ansible.builtin.assert': {'that': [
                 "netbird_domain == 'netbird.example.org'",
                 "netbird_management_url == 'https://netbird.example.org'",
-                "netbird_package_version == '0.82.0'",
-                "netbird_server_image == 'netbirdio/netbird-server:0.82.0'",
+                "netbird_server_image == 'netbirdio/netbird-server:' ~ netbird_version",
                 "wireguard_enabled | bool",
                 "(inventory_hostname == 'prod_hou1') == ('netbird_control_plane' in group_names)",
             ]}},
         ]
-        result = self.run_play({'primary_domain': 'example.org', 'new_user': 'test-user',
+        result = run_play({'primary_domain': 'example.org', 'new_user': 'test-user',
             'hou1_vpn_ip': '{{ "10.10.0.1" if inventory_hostname == "prod_hou1" else "10.10.0.10" }}'},
             tasks, inventory_source=inventory, hosts='hou1_prod:hou1_test')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -83,19 +76,19 @@ class ControlPlaneTest(unittest.TestCase):
                 ('netbird_control_plane', {}, True), ('hou1_test', {}, False),
                 ('netbird_control_plane', {'target_hosts': 'hou1_test'}, False)]:
             with self.subTest(hosts=hosts, overrides=overrides):
-                result = self.run_play(overrides, target_tasks, inventory_source=inventory, hosts=hosts)
+                result = run_play(overrides, target_tasks, inventory_source=inventory, hosts=hosts)
                 self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
 
     def test_application_runs_do_not_deploy_control_plane(self):
-        app_play = yaml.safe_load((migration.ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]
+        app_play = yaml.safe_load((ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]
         self.assertNotIn('netbird_control_plane', [item['role'] for item in app_play['roles']])
         self.assertNotIn('post_tasks', app_play)  # No WireGuard retirement.
         control_play = yaml.safe_load(
-            (migration.ROOT / 'ansible/playbooks/netbird-control-plane.yml').read_text())[0]
+            (ROOT / 'ansible/playbooks/netbird-control-plane.yml').read_text())[0]
         self.assertEqual(control_play['hosts'], 'netbird_control_plane')
         self.assertEqual(control_play['vars']['ansible_host'], '{{ hou1_vpn_ip }}')
         # Real Ansible task expansion catches role/include changes as well.
-        result = self.run_play({'netbird_enabled': True, 'primary_domain': 'example.org'}, [
+        result = run_play({'netbird_enabled': True, 'primary_domain': 'example.org'}, [
             {'ansible.builtin.import_role': {'name': 'webstack'}},
         ], extra_args=['--list-tasks'])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -137,7 +130,7 @@ class ControlPlaneTest(unittest.TestCase):
                 'dest': str(paths / name),
                 'content': "{{ lookup('template', '" + str(ROLES / 'netbird_control_plane/templates' / (name + '.j2')) + "') }}",
             }} for name in templates]
-            result = self.run_play(self.variables(directory), tasks)
+            result = run_play(self.variables(directory), tasks)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             config = yaml.safe_load((paths / 'config.yaml').read_text())['server']
             self.assertEqual(config['store']['engine'], 'sqlite')
@@ -179,8 +172,7 @@ class ControlPlaneTest(unittest.TestCase):
                 '-days', '1', '-subj', '/CN=netbird.example.org'],
                 check=True, capture_output=True)
             ingress = (paths / 'nginx.conf').read_text()
-            self.assertIn('limit_except GET', ingress)
-            self.assertIn('allow 10.10.0.0/24;', ingress)
+            self.assertRegex(ingress, r'location = /api/setup \{\s*return 403;\s*\}')
             self.assertIn('grpc_pass grpc://$netbird_server;', ingress)
             self.assertIn('proxy_set_header Upgrade $http_upgrade;', ingress)
             self.assertIn('location ^~ /api/setup/', ingress)

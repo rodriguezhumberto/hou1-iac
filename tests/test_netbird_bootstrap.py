@@ -4,18 +4,12 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import threading
 import unittest
 
-import yaml
-
-import test_vpn_migration as migration
+from helpers import ROLES, run_play
 
 
 class BootstrapTest(unittest.TestCase):
     def test_owner_creation_repeat_run_and_failure_handling(self):
-        tasks = yaml.safe_load((migration.ROLES / 'netbird_control_plane/tasks/bootstrap.yml').read_text())
-        first_api_task = next(i for i, task in enumerate(tasks)
-                              if task['name'].startswith('Read the NetBird setup state'))
-        # Skip Docker discovery only. The production role supplies the private URL.
-        api_tasks = tasks[first_api_task:]
+        api_tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/bootstrap-owner.yml')}]
         state = {'setup_required': True, 'posts': [], 'reject': False}
 
         class Handler(BaseHTTPRequestHandler):
@@ -61,7 +55,7 @@ class BootstrapTest(unittest.TestCase):
             for required, secrets, reject, valid, post_count in scenarios:
                 with self.subTest(required=required, reject=reject, post_count=post_count):
                     state.update(setup_required=required, posts=[], reject=reject)
-                    result = migration.MigrationTest.run_play(self, {**base, **secrets}, api_tasks)
+                    result = run_play({**base, **secrets}, api_tasks)
                     self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
                     self.assertEqual(len(state['posts']), post_count)
                     self.assertNotIn(owner['netbird_owner_password'], result.stdout + result.stderr)

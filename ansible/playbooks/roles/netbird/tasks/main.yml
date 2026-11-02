@@ -32,12 +32,12 @@
     mode: '0644'
     content: |
       Package: netbird
-      Pin: version {{ netbird_package_version }}
+      Pin: version {{ netbird_version }}
       Pin-Priority: 1001
 
 - name: Install the NetBird CLI
   ansible.builtin.apt:
-    name: "netbird={{ netbird_package_version }}"
+    name: "netbird={{ netbird_version }}"
     state: present
     update_cache: true
 
@@ -68,37 +68,8 @@
   register: netbird_marker
   when: netbird_marker_stat.stat.exists
 
-- name: Decide whether first enrollment is required
-  ansible.builtin.set_fact:
-    netbird_needs_enrollment: >-
-      {{ not netbird_marker_stat.stat.exists and
-         not (netbird_before_status.netbirdIp | default('') | length) }}
-
-- name: Refuse to change the recorded enrollment endpoint
-  ansible.builtin.assert:
-    that:
-      - >-
-        ((netbird_marker.content | b64decode | from_json).management_url | regex_replace('/$', '')) ==
-        (netbird_management_url | regex_replace('/$', ''))
-    fail_msg: The existing enrollment record belongs to another management server.
-  when: netbird_marker_stat.stat.exists
-
-- name: Refuse to move an enrolled peer to another management server
-  ansible.builtin.assert:
-    that:
-      - >-
-        not (netbird_before_status.netbirdIp | default('') | length) or
-        (netbird_before_status.management.url | regex_replace('/$', '')) ==
-        (netbird_management_url | regex_replace('/$', ''))
-    fail_msg: This peer belongs to another management server. Migrate its identity explicitly.
-
-- name: Require a setup key only for first enrollment
-  ansible.builtin.assert:
-    that:
-      - netbird_setup_key | default('') | length > 0
-    fail_msg: Supply a one-off non-ephemeral setup key through Ansible Vault for first enrollment.
-  when: netbird_needs_enrollment | bool
-  no_log: true
+- name: Check existing enrollment and required credentials
+  ansible.builtin.import_tasks: enrollment-check.yml
 
 - name: Configure and connect the persistent peer
   block:
@@ -150,13 +121,8 @@
   retries: 12
   delay: 5
 
-- name: Verify the management server and actual listening port
-  ansible.builtin.assert:
-    that:
-      - >-
-        ((netbird_after.stdout | from_json).management.url | regex_replace('/$', '')) ==
-        (netbird_management_url | regex_replace('/$', ''))
-      - (netbird_after.stdout | from_json).wireguardPort | int == netbird_wireguard_port | int
+- name: Verify the connected management server and port
+  ansible.builtin.import_tasks: verify-connection.yml
 
 - name: Read the NetBird interface address
   ansible.builtin.command:
@@ -164,17 +130,8 @@
   register: netbird_interface_state
   changed_when: false
 
-- name: Verify the peer belongs to the configured subnet
-  ansible.builtin.assert:
-    that:
-      - >-
-        ((netbird_interface_state.stdout | from_json | first).addr_info |
-         map(attribute='local') | select('ansible.utils.in_network', netbird_subnet) | list | length) > 0
-      - >-
-        not (netbird_ip | length) or netbird_ip in
-        ((netbird_interface_state.stdout | from_json | first).addr_info | map(attribute='local') | list)
-    fail_msg: The actual peer address does not match netbird_subnet/netbird_ip. Do not cut over inventory.
-
+- name: Verify the enrolled peer address
+  ansible.builtin.import_tasks: verify-address.yml
 
 - name: Record verified enrollment for unattended reconnects after daemon restarts
   ansible.builtin.copy:

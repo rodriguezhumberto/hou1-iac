@@ -1,0 +1,11 @@
+---
+- name: Verify the peer belongs to the configured subnet
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((netbird_interface_state.stdout | from_json | first).addr_info |
+         map(attribute='local') | select('ansible.utils.in_network', netbird_subnet) | list | length) > 0
+      - >-
+        not (netbird_ip | length) or netbird_ip in
+        ((netbird_interface_state.stdout | from_json | first).addr_info | map(attribute='local') | list)
+    fail_msg: The actual peer address does not match netbird_subnet/netbird_ip. Do not cut over inventory.

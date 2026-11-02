@@ -26,19 +26,11 @@ server {
     client_header_timeout 1d;
     client_body_timeout 1d;
 
-    # Unauthenticated creation of the first owner is restricted even before
-    # an owner exists. The separate /api/instance discovery route stays public.
+    # Owner creation is performed through the server's private Docker network.
+    # Never expose the unauthenticated setup endpoint through public ingress.
     location = /api/setup {
-        limit_except GET {
-{% for cidr in netbird_bootstrap_allowed_cidrs %}
-            allow {{ cidr }};
-{% endfor %}
-            deny all;
-        }
-        proxy_pass http://$netbird_server;
-{{ headers() }}
+        return 403;
     }
-    # Reject alternate spellings that could bypass the exact bootstrap ACL.
     location ^~ /api/setup/ { return 403; }
 
     location ~ ^/(relay|ws-proxy/) {

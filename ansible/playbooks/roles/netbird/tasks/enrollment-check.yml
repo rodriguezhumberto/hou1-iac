@@ -1,0 +1,32 @@
+---
+- name: Decide whether first enrollment is required
+  ansible.builtin.set_fact:
+    netbird_needs_enrollment: >-
+      {{ not netbird_marker_stat.stat.exists and
+         not (netbird_before_status.netbirdIp | default('') | length) }}
+
+- name: Refuse to change the recorded enrollment endpoint
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((netbird_marker.content | b64decode | from_json).management_url | regex_replace('/$', '')) ==
+        (netbird_management_url | regex_replace('/$', ''))
+    fail_msg: The existing enrollment record belongs to another management server.
+  when: netbird_marker_stat.stat.exists
+
+- name: Refuse to move an enrolled peer to another management server
+  ansible.builtin.assert:
+    that:
+      - >-
+        not (netbird_before_status.netbirdIp | default('') | length) or
+        (netbird_before_status.management.url | regex_replace('/$', '')) ==
+        (netbird_management_url | regex_replace('/$', ''))
+    fail_msg: This peer belongs to another management server. Migrate its identity explicitly.
+
+- name: Require a setup key only for first enrollment
+  ansible.builtin.assert:
+    that:
+      - netbird_setup_key | default('') | length > 0
+    fail_msg: Supply a one-off non-ephemeral setup key through Ansible Vault for first enrollment.
+  when: netbird_needs_enrollment | bool
+  no_log: true

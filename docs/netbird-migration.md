@@ -1,215 +1,153 @@
-# Shared self-hosted NetBird with WireGuard fallback
+# NetBird deployment and recovery
 
-## Current scope
+One control plane on production serves both environments. Enroll and validate test
+clients before production. WireGuard remains enabled for SSH recovery throughout
+this migration.
 
-One public control plane on the existing production host serves clients in both
-test and production. Client rollout starts in the home-network test environment;
-production client access stays on WireGuard until test validation succeeds.
-The control plane itself must run on the public production host first.
+## Deployment layout
 
-This phase provides deployment and enrollment support while retaining WireGuard
-fallback everywhere. The dedicated playbook creates the initial owner once using
-Vault-protected email, display name and password; WireGuard removal remains
-follow-up work. Policies and setup keys are then created through the dashboard
-before enrolling clients.
-No live servers have been changed or tested by this PR.
+- `netbird-control-plane.yml` targets only `prod_hou1` in the
+  `netbird_control_plane` group, always over WireGuard. Do not pass `target_hosts`.
+- `hou1.yml` manages application deployments and clients. It does not update the
+  control plane. Both environments use `https://netbird.{{ primary_domain }}`.
+- The separate `hou1-netbird` Compose project stores configuration, encryption
+  secrets and SQLite data in `/opt/hou1-netbird`. Never regenerate keys for
+  existing data.
+- Application Nginx serves HTTPS through a dedicated Docker network and a managed
+  `docker-compose.override.yml`. Deployments refuse to overwrite an app-owned or
+  operator-owned override. App updates can briefly interrupt shared Nginx ingress.
+- NetBird publishes UDP 3478 for STUN; backend HTTP, metrics and health ports stay
+  private. DNS-01 certificates use the existing Cloudflare token and certificate
+  store, with renewal handled by the app's renewal job.
+- `netbird_version` pins both server and CLI; APT preferences prevent unattended
+  client upgrades. Dashboard and Certbot images have separate pins. Review and
+  back up before changing versions.
 
-## Independent deployment targets
+## Deploy the control plane
 
-- `netbird-control-plane.yml` targets the single `netbird_control_plane` inventory
-  member, `prod_hou1`. It is the same production host identity, inheriting the
-  existing production and all-host Vault variables. It always connects over that
-  host's WireGuard address, even after client inventory cutover.
-- `hou1.yml -e target_hosts=hou1_test` configures only test clients/application.
-- `hou1.yml -e target_hosts=hou1_prod` configures only production clients/application.
-- Application runs do not invoke the control-plane role, render server config,
-  update its Compose project or open STUN ports. They preserve the previously
-  installed untracked ingress override. Shared Nginx can still restart as part
-  of an application update, temporarily interrupting control-plane ingress.
-- Test must never be added to the control-plane group. The dedicated playbook
-  rejects non-production hosts, multiple members and the `target_hosts` override.
+Before deploying:
 
-The default shared domain is `netbird.{{ primary_domain }}` and the management URL
-is `https://{{ netbird_domain }}`. The base domain comes from existing protected
-variables. No literal deployment hostname needs to be committed. Both clients
-use the same endpoint and account subnet, but distinct setup keys and peer IPs.
+1. Verify fresh WireGuard SSH and provider-console access. Preserve working SSH,
+   firewall and application configuration; prepare rollback for network changes.
+2. Provision the production application first; its Nginx and certificate store
+   are required. Allow a brief Nginx interruption during initial integration.
+3. Create a DNS-only A record for the NetBird hostname pointing to production.
+   Add AAAA only if IPv6 works end to end. Permit TCP 80/443 and UDP 3478 at the
+   provider firewall, and verify Docker forwarding rules and outbound access.
+4. Check the Cloudflare token can issue the certificate. Allow capacity beyond
+   the app workload (at least 1 CPU and 2 GB RAM for NetBird, plus relay bandwidth).
+5. Check `172.30.80.0/29` and the reserved Nginx address `172.30.80.2` do not
+   overlap existing Docker, VPN or local networks.
+6. Store `netbird_owner_email`, `netbird_owner_name`, and `netbird_owner_password`
+   in Vault. NetBird accepts passwords of 8–72 bytes. Never pass credentials on
+   the command line.
 
-## Production service design
+From the repository root, install controller dependencies:
 
-The existing application Nginx continues to publish TCP 80/443. The dedicated
-hostname serves the NetBird dashboard, API, embedded identity provider, native
-gRPC signal/management and WebSocket relay. A separate `hou1-netbird` Compose
-project runs the combined server and dashboard, publishing only UDP 3478 (STUN).
-Backend HTTP, metrics and health ports are not published.
+```bash
+python3 -m pip install -r requirements-dev.txt
+ansible-galaxy collection install -r ansible/requirements.yml
+```
 
-Configuration, SQLite/identity data and encryption secrets live under
-`/opt/hou1-netbird`, outside the app checkout. Keys are created once with private
-permissions; deployment refuses to generate replacements against existing data.
-The server and CLI are pinned to 0.82.0; APT preferences prevent unattended client
-upgrades. The dashboard uses its own release scheme and remains pinned to v2.96.0.
-Version changes should be reviewed and backed up separately from application work.
-
-A dedicated external Docker network connects Nginx and the backends. Nginx has a
-fixed address trusted by NetBird. The managed, untracked
-`docker-compose.override.yml` preserves the original app network and mounts the
-NetBird configuration. Deployment refuses to replace an app-tracked or
-operator-owned override. A stable include and directory mount allow validated
-reloads, while Docker DNS/variable upstreams let Nginx start if NetBird is offline.
-No second public reverse proxy or optional public resource proxy is installed.
-
-A dedicated DNS-01 certificate uses the existing Cloudflare token and certificate
-store. The existing app renewal job renews it and reloads Nginx. Public writes to
-`/api/setup` remain restricted to configured administrator CIDRs (WireGuard by
-default). Automated owner creation bypasses that public ingress by using the
-server's private Docker network address from the production host. No additional
-listener is published and no PAT creation flag is enabled.
-
-## Before deploying the control plane
-
-1. Confirm privileged provider console/rescue access and fresh WireGuard SSH.
-   Preserve known-good SSH, WireGuard, firewall and application configuration.
-2. Confirm the production application is already provisioned. Its Nginx, Compose,
-   environment and certificate storage are prerequisites for integration.
-3. Create a DNS-only A record for the derived hostname pointing to production.
-   Do not proxy it through Cloudflare; add AAAA only if IPv6 works end to end.
-4. Permit public TCP 80/443 and UDP 3478 at the provider firewall. Verify egress
-   and the effective Docker/host firewall rules too; Docker publishes via forwarding.
-5. Check the Cloudflare token can issue a certificate for the hostname.
-6. Check capacity beyond the application workload: upstream specifies at least
-   1 CPU and 2 GB RAM for NetBird alone; allow disk and relay bandwidth headroom.
-7. Check the dedicated `172.30.80.0/29` network and reserved Nginx address
-   `172.30.80.2` do not overlap existing Docker, VPN or local networks.
-8. Prepare a tested on-host rollback timer for risky SSH/firewall/resolver changes.
-   This PR does not install the timer. Existing sessions or tmux do not replace
-   fresh access tests and console recovery.
-
-From `ansible/`:
+From `ansible/`, deploy:
 
 ```bash
 ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
 ```
 
-This deploys production ingress and the server only. It does not enroll production
-or change the selected application management VPN. The role checks Nginx syntax
-and the public HTTPS `/api/instance` endpoint. Initial integration can briefly
-recreate Nginx; use a maintenance window and keep WireGuard open.
+This deploys the server and ingress without enrolling the production client.
+Owner creation uses the private container API; public `/api/setup` requests are
+blocked. Bootstrap creates no PAT and leaves existing owners unchanged. After an
+interrupted run, rerun the playbook: it checks setup state before creating an
+owner. Changing Vault credentials does not reset an existing account; use
+NetBird's account recovery or password change process.
 
-Owner bootstrap runs after the server and public ingress are healthy. It locates
-exactly one running server container, validates its address on the dedicated
-Docker network, then checks `/api/instance` directly. Only an explicit boolean
-`setup_required: true` permits POST `/api/setup`. The request contains these
-Vault variables:
+## Enroll and validate clients
 
-- `netbird_owner_email`
-- `netbird_owner_name`
-- `netbird_owner_password` (NetBird accepts 8–72 bytes)
-
-Credential validation, creation and confirmation use `no_log`. Requests disable
-proxies and redirects; secrets never appear in shell arguments, Compose
-configuration or tracked plaintext. The API is used inside the same host's Docker
-bridge; all controller-to-host communication still uses SSH over WireGuard.
-`create_pat` is explicitly false, so no one-time API token is created or stored.
-
-Creation is not blindly retried. After a partial/interrupted run, re-run the
-playbook: it checks state again and skips creation if an owner already exists.
-Completed installations do not require owner variables for subsequent runs and
-changing Vault values does not reset the existing account. Password rotation or
-recovery must use NetBird's supported process. A malformed setup response fails
-before credentials are sent.
-
-Sign in to the public dashboard after bootstrap to configure groups, policies
-and one-off server setup keys; those provisioning steps are not automated here.
-Keep clients disabled until the policies and keys are ready.
-
-## Test-first client validation
-
-After owner bootstrap, create enrollment keys and policies:
-
-1. Create distinct `test-servers`, `prod-servers`, administrator and CMS editor
-   groups. Grant one-way TCP 22/443 (optionally 3001 for Kuma) to administrators
-   and TCP 443 to editors for the appropriate server groups. Remove the default
-   All-to-All policy after replacement rules exist; policies are additive.
-2. In test vars, enable `netbird_enabled`, set the actual shared `netbird_subnet`,
-   and store a test-only one-off non-ephemeral `netbird_setup_key` in Vault.
-   Leave `management_vpn: wireguard` and `wireguard_enabled: true`.
-3. Enroll from the existing home-network/WireGuard management path:
+1. Sign in to the dashboard. Create test-server, production-server, administrator
+   and CMS-editor groups. Allow administrators TCP 22/443 (optionally 3001 for
+   Kuma) and editors TCP 443 to their server groups. Remove the default All-to-All
+   policy after replacement rules exist; policies are additive.
+2. In test variables, set `netbird_enabled: true` and the actual account
+   `netbird_subnet`. Keep `management_vpn: wireguard` and `wireguard_enabled: true`.
+   Store a test-only, one-off, non-ephemeral `netbird_setup_key` in Vault.
+3. From `ansible/`, enroll test:
 
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --tags netbird --ask-vault-pass
    ```
 
-   The home-network test environment needs outbound connectivity to the public
-   management/signal, relay and STUN services. No public port forwarding or
-   LAN-wide exposure is required. Direct NAT traversal or relay carries traffic.
-4. Read its assigned address in the dashboard or `netbird status`, set test
-   `netbird_ip`, and run the full test playbook. NetBird uses 51821, avoiding
-   WireGuard's UDP 51820. The client verifies its endpoint, interface IP and port.
-   Temporary key files are removed even on failure; verified identity is preserved.
-5. Install a client on an administrator device and select the self-hosted URL.
-   Test fresh SSH to the test NetBird IP with the existing OpenSSH user/key and
-   an Ansible ping over that IP. Verify fresh WireGuard SSH still works.
-6. Keep the current CMS HTTPS name and certificate. Distribute private DNS for
-   that name pointing to the test NetBird IP using Custom Zones or internal DNS.
-   Avoid shadowing unrelated public site records. Validate client/browser DNS.
-7. Test CMS login, assets, uploads and WebSockets; test an editor (CMS succeeds,
-   SSH denied), an unauthorized peer (CMS denied), and an external device without
-   VPN (CMS and SSH denied, including IPv6). Public websites must remain functional.
-   Inspect Nginx source addresses and effective NetBird/Docker forwarding rules;
-   UFW's host INPUT listing alone is insufficient. Do not allow a Docker gateway
-   source just to bypass the CMS ACL.
-8. Test client reconnect, relay fallback when direct UDP is blocked, and test
-   environment reboot recovery. Repeat access from outside the home network and
-   with legacy WireGuard disconnected on the client. Keep a separate device or
-   console available for recovery.
-9. Only then select `management_vpn: netbird` for test and repeat the full run.
-   Kuma's binding moves; WireGuard SSH remains, while its CMS allowance is removed
-   by default. Keep `wireguard_enabled: true`; this phase rejects disabling it.
-10. After sustained test use, enroll production separately and repeat validation.
-    Updating the control plane never implicitly opts the production client in.
+   Test needs outbound connectivity to management, relay and STUN; home-router
+   port forwarding is unnecessary. NetBird uses UDP 51821 to avoid WireGuard's
+   51820.
+4. Read the assigned address from the dashboard or `sudo netbird status`. Set
+   test `netbird_ip`, then run the full playbook:
 
-Eventual removal of WireGuard fallback belongs to the next issue. Initial owner
-creation is verified independently of public HTTPS health; it does not prove that
-end-user enrollment or access policies have been validated.
+   ```bash
+   ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass
+   ```
+
+5. Connect an administrator device to the self-hosted endpoint. Verify fresh SSH
+   and Ansible access over NetBird and continued WireGuard SSH. Keep a recovery
+   session or console available.
+6. Point private DNS for the existing CMS hostname at the NetBird IP, retaining
+   its HTTPS name and certificate. Check DNS, login, assets, uploads and WebSockets.
+   Verify editors can access CMS but not SSH, unauthorized peers cannot access
+   CMS, and non-VPN devices cannot access CMS or SSH, including over IPv6.
+   Public websites must keep working. Check actual Nginx source addresses and
+   Docker/NetBird rules; UFW INPUT rules alone do not cover forwarded traffic.
+7. Test reconnects, relay fallback with direct UDP blocked, and server reboot.
+   Repeat access from outside the home network with WireGuard disconnected on
+   the test client.
+8. Set `management_vpn: netbird` and repeat the full run. Kuma's binding moves;
+   WireGuard SSH remains, while its CMS allowance is removed by default. Disabling
+   WireGuard is rejected during this phase.
+9. After sustained test use, enroll production with its own setup key and peer IP,
+   then repeat these checks. Control-plane deployment never opts clients in.
 
 ## Backup and recovery
 
 Run `/opt/hou1-netbird/backup.sh` as root over WireGuard or console before upgrades
-and on an operator-managed schedule. It locks, requires a running server, stops
-only `netbird-server` for SQLite consistency, archives its directory plus the
-certificate store, and restarts it through an EXIT trap even if archiving fails.
-The peer daemon, WireGuard and application are not stopped. Relayed connections
-and enrollment/policy changes can be interrupted while the server is paused.
+and on an operator-managed schedule. It pauses the server for a consistent SQLite
+backup, archives its directory and certificate store, and restarts the server even
+if archiving fails. Relay and enrollment traffic may be interrupted.
 
-Archives under `/var/backups/hou1-netbird` contain keys, identities and secrets.
-Transfer them to encrypted off-host storage with a retention policy. Scheduling,
-retention and off-host upload remain operator-managed; local copies do not cover
-VPS/disk loss.
+Archives in `/var/backups/hou1-netbird` contain secrets. Transfer them to encrypted
+off-host storage and manage retention; scheduling and off-host upload are not
+provided by the playbook. Back up WireGuard and client peer state separately.
 
-For restore, connect through WireGuard or console, preserve failed state, stop the
-NetBird project, and stage a trusted archive privately. Restore the original server
-directory including `secrets.json`, `config.yaml` and `data` with original
-permissions. Never replace encryption keys for existing state. Restore the
-NetBird certificate lineage from the archive's `conf/` into the app certificate
-store, preserving symlinks and avoiding rollback of unrelated newer certificates.
-Restore canonical public DNS if the host changed; do not run competing live copies
-of the same server identity. Re-run the dedicated playbook with compatible pinned
-versions and test enrolled devices/policies. Validate restoration in isolation
-before relying on the backup. Back up WireGuard and client peer state separately.
+To restore:
 
-One VPS and shared Nginx remain a common failure dependency. If NetBird fails,
-repair it through WireGuard. If shared host networking or the whole host fails,
-use provider console/rescue. Do not assume peer connectivity survives a control-
-plane outage, expired login, relay outage or reboot.
+1. Connect over WireGuard or console, preserve failed state, and stop the NetBird
+   project. Stage a trusted backup privately.
+2. Restore `/opt/hou1-netbird`, including the original `secrets.json`, `config.yaml`
+   and `data`, with original permissions. Never replace encryption keys.
+3. Restore the NetBird certificate lineage from the archive's `conf/` into the app
+   certificate store. Preserve symlinks and unrelated newer certificates.
+4. Restore DNS if the host changed. Do not run competing copies of the same server
+   identity. Rerun the dedicated playbook with compatible pinned versions and
+   validate enrolled devices and policies.
 
-## Validation and sources
+Test restoration in isolation before relying on backups. Use WireGuard to repair
+NetBird and provider console/rescue for host failure. Shared Nginx and the VPS are
+common dependencies; peer connectivity is not guaranteed during an outage.
 
-Offline tests exercise actual inventory targeting, shared endpoint derivation,
-WireGuard guards, enrollment identity checks, SSH/CMS stages, Compose merging,
-Nginx syntax, persistent secrets and real Ansible bootstrap URI tasks against a
-local API fixture (first-run creation, repeat runs, malformed state, failures and
-secret-output suppression). Live enrollment, production drift, provider
-console, effective Docker policies, relay/reboot behavior and restore remain
-rollout checks. No live connectivity or deployment claims follow from parser tests.
+## Offline validation
+
+From the repository root (requires Nginx >=1.25.1, OpenSSL and Docker Compose):
+
+```bash
+ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
+ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
+python3 -m unittest discover -s tests -v
+```
+
+Tests cover inventory and migration guards, enrollment, SSH/CMS configuration,
+Compose/Nginx parsing, persistent secrets, and owner bootstrap against a local API
+fixture. They do not deploy services or replace the live access, relay, reboot and
+restore checks above.
+
+## Sources
 
 - [Combined-server installer, pinned 0.82.0](https://github.com/netbirdio/netbird/blob/v0.82.0/infrastructure_files/getting-started.sh)
 - [Self-hosted quickstart](https://docs.netbird.io/selfhosted/selfhosted-quickstart)

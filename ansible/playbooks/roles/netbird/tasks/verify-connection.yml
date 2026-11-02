@@ -1,0 +1,8 @@
+---
+- name: Verify the management server and actual listening port
+  ansible.builtin.assert:
+    that:
+      - >-
+        ((netbird_after.stdout | from_json).management.url | regex_replace('/$', '')) ==
+        (netbird_management_url | regex_replace('/$', ''))
+      - (netbird_after.stdout | from_json).wireguardPort | int == netbird_wireguard_port | int

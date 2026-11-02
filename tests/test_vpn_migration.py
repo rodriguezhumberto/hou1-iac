@@ -5,50 +5,16 @@ No VPS, VPN enrollment, credentials, or Docker daemon is used.
 """
 import base64
 import json
-import os
 from pathlib import Path
-import subprocess
-import sys
 import tempfile
 import unittest
 
-import yaml
-
-ROOT = Path(__file__).resolve().parents[1]
-ROLES = ROOT / 'ansible/playbooks/roles'
-DEFAULTS = yaml.safe_load((ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
+from helpers import ROLES, netbird_vars, run_play
 
 
 class MigrationTest(unittest.TestCase):
-    def run_play(self, variables, tasks, extra_args=(), inventory_source=None, hosts='localhost'):
-        with tempfile.TemporaryDirectory() as directory:
-            play = Path(directory) / 'play.yml'
-            inventory = 'localhost,'
-            if inventory_source is not None:
-                inventory_file = Path(directory) / 'inventory.yml'
-                inventory_file.write_text(yaml.safe_dump(inventory_source))
-                inventory = str(inventory_file)
-            play.write_text(yaml.safe_dump([dict(
-                hosts=hosts, gather_facts=False,
-                vars={**DEFAULTS, 'new_user': 'test-user', 'hou1_vpn_ip': '10.10.0.10',
-                      'ansible_host': '100.90.0.10', **variables,
-                      'ansible_python_interpreter': sys.executable}, tasks=tasks,
-            )]))
-            env = {**os.environ, 'ANSIBLE_ROLES_PATH': str(ROLES),
-                   'ANSIBLE_NOCOLOR': '1', 'ANSIBLE_LOCALHOST_WARNING': 'False'}
-            return subprocess.run(
-                ['ansible-playbook', '-i', inventory, '-c', 'local', str(play), *extra_args],
-                env=env, text=True, capture_output=True, timeout=40,
-            )
-
-    @staticmethod
-    def netbird_vars():
-        return dict(netbird_enabled=True,
-                    netbird_management_url='https://netbird.example.org',
-                    netbird_subnet='100.90.0.0/16', netbird_ip='100.90.0.10')
-
     def test_rollout_guards(self):
-        nb = self.netbird_vars()
+        nb = netbird_vars()
         scenarios = [
             ({}, True),
             (nb, True),
@@ -57,7 +23,6 @@ class MigrationTest(unittest.TestCase):
             ({'wireguard_enabled': False}, False),
             ({'management_vpn': 'netbird'}, False),
             ({**nb, 'netbird_version': '0.83.0'}, False),
-            ({**nb, 'netbird_package_version': '0.81.0'}, False),
             ({**nb, 'netbird_wireguard_port': 51820}, False),
             ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, False),
             ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, False),
@@ -68,7 +33,7 @@ class MigrationTest(unittest.TestCase):
         ]
         for variables, valid in scenarios:
             with self.subTest(variables=variables):
-                result = self.run_play(variables, [{'ansible.builtin.import_role': {'name': 'vpn_config'}}])
+                result = run_play(variables, [{'ansible.builtin.import_role': {'name': 'vpn_config'}}])
                 self.assertEqual(result.returncode == 0, valid,
                                  result.stdout + result.stderr)
 
@@ -94,36 +59,28 @@ class MigrationTest(unittest.TestCase):
             {'ansible.builtin.assert': {'that': [
                 "lookup('template', '" + template + "') == first_render"]}},
         ]
-        result = self.run_play(self.netbird_vars(), tasks)
+        result = run_play(netbird_vars(), tasks)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_effective_ssh_listener_guard(self):
-        task = next(task for task in yaml.safe_load(
-            (ROLES / 'security/tasks/main.yml').read_text())[-1]['block']
-            if task['name'].startswith('Reject listeners'))
+        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'security/tasks/verify-listeners.yml')}]
         for listeners, valid in [
             (['listenaddress 10.10.0.10:22', 'listenaddress 100.90.0.10:22'], True),
             (['listenaddress 0.0.0.0:22'], False),
             (['listenaddress [::]:22'], False),
         ]:
             with self.subTest(listeners=listeners):
-                result = self.run_play({**self.netbird_vars(),
-                    'ssh_effective_config': {'stdout_lines': listeners}}, [task])
+                result = run_play({**netbird_vars(),
+                    'ssh_effective_config': {'stdout_lines': listeners}}, tasks)
                 self.assertEqual(result.returncode == 0, valid,
                                  result.stdout + result.stderr)
 
     def test_enrollment_identity_and_address_guards(self):
-        role = yaml.safe_load((ROLES / 'netbird/tasks/main.yml').read_text())
-        names = ['Decide whether first enrollment is required',
-                 'Refuse to change the recorded enrollment endpoint',
-                 'Refuse to move an enrolled peer to another management server',
-                 'Require a setup key only for first enrollment',
-                 'Verify the management server and actual listening port',
-                 'Verify the peer belongs to the configured subnet']
-        tasks = [task for task in role if task['name'] in names]
+        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird/tasks' / name)}
+                 for name in ['enrollment-check.yml', 'verify-connection.yml', 'verify-address.yml']]
         status = {'management': {'url': 'https://netbird.example.org', 'connected': True},
                   'wireguardPort': 51821, 'netbirdIp': '100.90.0.10/16'}
-        variables = {**self.netbird_vars(),
+        variables = {**netbird_vars(),
             'netbird_before_status': status,
             'netbird_marker_stat': {'stat': {'exists': True}},
             'netbird_marker': {'content': base64.b64encode(
@@ -145,13 +102,12 @@ class MigrationTest(unittest.TestCase):
             ({'netbird_ip': '100.90.0.11'}, False)]
         for overrides, valid in scenarios:
             with self.subTest(overrides=overrides):
-                result = self.run_play({**variables, **overrides}, tasks)
+                result = run_play({**variables, **overrides}, tasks)
                 self.assertEqual(result.returncode == 0, valid,
                                  result.stdout + result.stderr)
 
     def test_cms_allowlist_for_each_stage(self):
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
-        acl_tasks = tasks[1:4]
+        acl_tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')}]
         source = '''server {
     server_name cms.example.org;
     allow ${vpn_subnet};
@@ -165,10 +121,10 @@ class MigrationTest(unittest.TestCase):
                 nginx.mkdir()
                 template = nginx / 'nginx.conf.template'
                 template.write_text(source)
-                variables = {**self.netbird_vars(), 'netbird_enabled': nb,
+                variables = {**netbird_vars(), 'netbird_enabled': nb,
                              'wireguard_enabled': wg, 'management_vpn': primary,
                              'app_directory': directory}
-                result = self.run_play(variables, acl_tasks)
+                result = run_play(variables, acl_tasks)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                 rendered = template.read_text()
                 self.assertEqual('allow 100.90.0.0/16;' in rendered, nb)
@@ -177,14 +133,14 @@ class MigrationTest(unittest.TestCase):
                 self.assertNotIn('${vpn_subnet}', rendered)
 
     def test_changed_application_template_fails_closed(self):
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[1:4]
+        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')}]
         with tempfile.TemporaryDirectory() as directory:
             nginx = Path(directory) / 'nginx'
             nginx.mkdir()
             template = nginx / 'nginx.conf.template'
             original = 'server { deny all; }\n'
             template.write_text(original)
-            result = self.run_play({**self.netbird_vars(), 'app_directory': directory}, tasks)
+            result = run_play({**netbird_vars(), 'app_directory': directory}, tasks)
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(template.read_text(), original)
 

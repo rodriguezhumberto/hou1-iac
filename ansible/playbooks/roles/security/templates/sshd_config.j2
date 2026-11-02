@@ -1,7 +1,5 @@
 # BEGIN ANSIBLE VPN LISTENERS
-{% if wireguard_enabled | bool %}
 ListenAddress {{ hou1_vpn_ip }}
-{% endif %}
 {% if netbird_enabled | bool %}
 ListenAddress {{ netbird_ip }}
 {% endif %}

@@ -25,7 +25,6 @@
     rule: allow
     port: '51820'
     proto: udp
-    delete: "{{ not (wireguard_enabled | bool) }}"
 
 - name: Manage SSH access through WireGuard
   community.general.ufw:
@@ -35,7 +34,6 @@
     port: '22'
     proto: tcp
     src: "{{ vpn_subnet }}"
-    delete: "{{ not (wireguard_enabled | bool) }}"
 
 - name: Allow SSH through NetBird
   community.general.ufw:
@@ -77,7 +75,7 @@
     mode: '0644'
     content: |
       [Unit]
-      After={{ 'wg-quick@wg0.service ' if wireguard_enabled | bool else '' }}{{ 'netbird.service' if netbird_enabled | bool else '' }}
+      After=wg-quick@wg0.service {{ 'netbird.service' if netbird_enabled | bool else '' }}
       StartLimitIntervalSec=0
       [Service]
       Restart=on-failure
@@ -90,7 +88,7 @@
   when: ssh_vpn_unit.changed
 
 # Explicit addresses avoid exposing SSH publicly even if another firewall tool
-# changes its rules. Leave wg0 listening throughout the dual-VPN stage.
+# changes its rules. WireGuard remains the recovery path for this migration.
 - name: Require a known peer address before changing SSH listeners
   ansible.builtin.assert:
     that:
@@ -123,16 +121,8 @@
       changed_when: false
       check_mode: false
 
-    - name: Reject listeners outside the selected private VPN addresses
-      ansible.builtin.assert:
-        that:
-          - >-
-            (ssh_effective_config.stdout_lines | select('match', '^listenaddress ') |
-             map('regex_replace', '^listenaddress (.*):[0-9]+$', '\\1') | list |
-             difference(([hou1_vpn_ip] if wireguard_enabled | bool else []) +
-                        ([netbird_ip] if netbird_enabled | bool else [])) | length) == 0
-        fail_msg: An included SSH configuration exposes an unexpected listener. Remove that override first.
-      when: not ansible_check_mode
+    - name: Verify private SSH listeners
+      ansible.builtin.import_tasks: verify-listeners.yml
   rescue:
     - name: Restore SSH configuration after invalid listener change
       ansible.builtin.copy:

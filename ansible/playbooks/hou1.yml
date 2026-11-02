@@ -15,7 +15,6 @@
       
     - role: wireguard
       tags: ['wireguard', 'network']
-      when: wireguard_enabled | bool
 
     - role: docker
       tags: ['docker']

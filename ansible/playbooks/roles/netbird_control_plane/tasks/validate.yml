@@ -2,7 +2,6 @@
 - name: Validate colocated control-plane settings
   ansible.builtin.assert:
     that:
-      - netbird_version == '0.82.0'
       - netbird_server_image == 'netbirdio/netbird-server:' ~ netbird_version
       - netbird_domain is match('^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$')
       - >-
@@ -25,18 +24,8 @@
       - netbird_ingress_proxy_ip is ansible.utils.ipv4
       - "'/' not in netbird_ingress_proxy_ip"
       - netbird_ingress_proxy_ip is ansible.utils.in_network(netbird_ingress_subnet)
-      - netbird_bootstrap_allowed_cidrs | length > 0
       - netbird_server_image is match('^netbirdio/netbird-server:[0-9]+\.[0-9]+\.[0-9]+$')
       - netbird_dashboard_image is match('^netbirdio/dashboard:v[0-9]+\.[0-9]+\.[0-9]+$')
     fail_msg: >-
       Set a distinct public NetBird domain, private ingress network and pinned
       images. Keep WireGuard SSH recovery enabled for the colocated control plane.
-
-- name: Validate bootstrap write access restrictions
-  ansible.builtin.assert:
-    that:
-      - item is ansible.utils.ipv4
-      - "'/' in item"
-      - item | ansible.utils.ipaddr('prefix') | int >= 8
-    fail_msg: Bootstrap CIDRs must be explicit IPv4 networks; never allow the whole internet.
-  loop: "{{ netbird_bootstrap_allowed_cidrs }}"
