@@ -22,11 +22,3 @@
         (netbird_before_status.management.url | regex_replace('/$', '')) ==
         (netbird_management_url | regex_replace('/$', ''))
     fail_msg: This peer belongs to another management server. Migrate its identity explicitly.
-
-- name: Require a setup key only for first enrollment
-  ansible.builtin.assert:
-    that:
-      - netbird_setup_key | default('') | length > 0
-    fail_msg: Supply a one-off non-ephemeral setup key through Ansible Vault for first enrollment.
-  when: netbird_needs_enrollment | bool
-  no_log: true

@@ -1,8 +1,8 @@
 hou1_vpn_ip: "10.10.0.10"
-# Enable after deploying the control plane and creating a test setup key.
+# Enable after deploying the control plane, groups and policies.
 netbird_enabled: false
 management_vpn: wireguard
-netbird_setup_key: "{{ TEST_NETBIRD_SETUP_KEY | default('') }}"
+netbird_server_group: test-servers
 # Set after first enrollment, before running the security role.
 netbird_ip: "{{ TEST_NETBIRD_IP | default('') }}"
 

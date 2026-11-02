@@ -14,6 +14,7 @@
 - name: Validate self-hosted NetBird configuration
   ansible.builtin.assert:
     that:
+      - netbird_server_group | default('') in ['test-servers', 'prod-servers']
       - netbird_version == '0.82.0'
       - netbird_management_url is match('^https://[^/]+/?$')
       - (netbird_management_url | urlsplit('hostname')) not in ['api.netbird.io', 'app.netbird.io']

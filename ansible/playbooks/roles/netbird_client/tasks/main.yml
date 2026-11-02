@@ -4,6 +4,9 @@
     that: not ansible_check_mode
     fail_msg: NetBird enrollment cannot run in check mode. Use syntax-check and the offline validation suite instead.
 
+- name: Prepare controller API access and the environment group
+  ansible.builtin.import_tasks: api-context.yml
+
 - name: Install NetBird repository prerequisites
   ansible.builtin.apt:
     name: [ca-certificates, curl, gnupg]
@@ -72,46 +75,7 @@
   ansible.builtin.import_tasks: enrollment-check.yml
 
 - name: Configure and connect the persistent peer
-  block:
-    - name: Create a temporary enrollment key file
-      ansible.builtin.tempfile:
-        state: file
-        prefix: netbird-enrollment-
-      register: netbird_key_file
-      when: netbird_needs_enrollment | bool
-
-    - name: Write the one-off key without exposing it in process arguments
-      ansible.builtin.copy:
-        dest: "{{ netbird_key_file.path }}"
-        content: "{{ netbird_setup_key }}"
-        owner: root
-        group: root
-        mode: '0600'
-      when: netbird_needs_enrollment | bool
-      no_log: true
-
-    - name: Connect to the self-hosted management server
-      ansible.builtin.command:
-        argv: >-
-          {{ ['timeout', '90', 'netbird', 'up',
-              '--management-url', netbird_management_url,
-              '--interface-name', netbird_interface,
-              '--wireguard-port', netbird_wireguard_port | string,
-              '--disable-dns', '--no-browser'] +
-             (['--setup-key-file', netbird_key_file.path]
-              if netbird_needs_enrollment | bool else []) }}
-      register: netbird_up
-      changed_when: >-
-        not (netbird_before_status.management.connected | default(false)) or
-        netbird_before_status.wireguardPort | default(0) | int != netbird_wireguard_port | int
-      no_log: true
-  always:
-    - name: Remove the temporary enrollment key even on failure
-      ansible.builtin.file:
-        path: "{{ netbird_key_file.path }}"
-        state: absent
-      when: netbird_key_file.path is defined
-      no_log: true
+  ansible.builtin.import_tasks: connect.yml
 
 - name: Wait for the enrolled peer to connect
   ansible.builtin.command: netbird status --json
@@ -132,6 +96,9 @@
 
 - name: Verify the enrolled peer address
   ansible.builtin.import_tasks: verify-address.yml
+
+- name: Assign and verify the enrolled server group
+  ansible.builtin.import_tasks: membership.yml
 
 - name: Record verified enrollment for unattended reconnects after daemon restarts
   ansible.builtin.copy:

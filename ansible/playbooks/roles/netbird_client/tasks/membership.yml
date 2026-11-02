@@ -1,0 +1,83 @@
+---
+- name: Reconcile the server's environment group
+  block:
+    - name: Find the peer by its verified NetBird address
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/peers"
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      register: netbird_client_peers
+      until: >-
+        netbird_client_peers.json | default([]) |
+        selectattr('ip', 'equalto', (netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) |
+        list | length == 1
+      retries: 6
+      delay: 2
+
+    - name: Select the enrolled peer
+      ansible.builtin.set_fact:
+        netbird_server_peer: >-
+          {{ netbird_client_peers.json |
+             selectattr('ip', 'equalto', (netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) | first }}
+
+    - name: Refuse to assign a server already in the opposite environment
+      ansible.builtin.assert:
+        that:
+          - >-
+            ('prod-servers' if netbird_server_group == 'test-servers' else 'test-servers')
+            not in (netbird_server_peer.groups | map(attribute='name') | list)
+
+    - name: Read current group membership immediately before updating it
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups/{{ netbird_server_group_id }}"
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      register: netbird_server_group_before
+
+    - name: Add the peer while preserving other peers and resources
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups/{{ netbird_server_group_id }}"
+        method: PUT
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        body_format: json
+        body:
+          name: "{{ netbird_server_group }}"
+          peers: "{{ (netbird_server_group_before.json.peers | map(attribute='id') | list) + [netbird_server_peer.id] }}"
+          resources: "{{ netbird_server_group_before.json.resources | default([]) }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      when: netbird_server_peer.id not in (netbird_server_group_before.json.peers | map(attribute='id') | list)
+      changed_when: true
+
+    - name: Read back the environment group
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups/{{ netbird_server_group_id }}"
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      register: netbird_server_group_after
+
+    - name: Verify the server has the expected group membership
+      ansible.builtin.assert:
+        that:
+          - netbird_server_peer.id in (netbird_server_group_after.json.peers | map(attribute='id') | list)
+  delegate_to: localhost
+  become: false
+  no_log: true
+  rescue:
+    - name: Explain peer membership failure
+      ansible.builtin.fail:
+        msg: >-
+          Could not verify the enrolled server's environment group. Check API access
+          and peer membership in the dashboard. Peers in the opposite environment
+          require explicit correction; the playbook will not move them silently.

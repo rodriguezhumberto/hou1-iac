@@ -118,15 +118,17 @@ server creation and saving the Vault still requires this recovery procedure.
    and customized enabled `Default` policies stop reconciliation for review.
    The required group names above must remain available in `netbird_groups`.
 
-   Assign your device to `administrators` and staff devices to `staff`. Associate
-   server enrollment keys with `test-servers` or `prod-servers`. Empty groups
+   Assign your device to `administrators` and staff devices to `staff`. Server
+   enrollment assigns its environment group automatically. Empty groups
    grant no access. Network groups describe peers/devices, not CMS user accounts.
    HTTPS allows staff to reach the CMS; application credentials control editing.
    Staff-page Nginx restrictions and private DNS must also allow the NetBird path.
    TCP 3001 (Kuma) and ICMP ping are not granted by these policies.
 2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
-   and `wireguard_enabled: true`. Store a test-only, one-off, non-ephemeral
-   `TEST_NETBIRD_SETUP_KEY` in Vault; test variables map it to `netbird_setup_key`.
+   and `wireguard_enabled: true`. Run from the controller that holds
+   `ansible/vault/netbird-token.yml` and supply its Vault password. No manual setup
+   key is required. Test and production variables select `test-servers` and
+   `prod-servers`, respectively.
 3. From `ansible/`, enroll test:
 
    ```bash
@@ -135,7 +137,14 @@ server creation and saving the Vault still requires this recovery procedure.
 
    Test needs outbound connectivity to management, relay and STUN; home-router
    port forwarding is unnecessary. NetBird uses UDP 51821 to avoid WireGuard's
-   51820.
+   51820. The controller creates a one-off, non-ephemeral setup key with the
+   environment's auto-group and a ten-minute lifetime. The key is passed through a
+   root-only temporary file and deleted from the API after the connection attempt;
+   the temporary file is also removed on failure. A controller crash can leave an
+   unused key until expiration. The administrator PAT stays on the controller.
+   Reruns reuse peer identity, verify group membership, and repair missing
+   membership while preserving other peers/resources. A peer already in the
+   opposite environment group requires explicit correction.
 4. Read the assigned address from the dashboard or `sudo netbird status`. Set
    `TEST_NETBIRD_IP` in Vault (mapped to `netbird_ip`), then run the full playbook:
 
@@ -158,7 +167,7 @@ server creation and saving the Vault still requires this recovery procedure.
 8. Set `management_vpn: netbird` and repeat the full run. Kuma's binding moves;
    WireGuard SSH remains, while its CMS allowance is removed by default. Disabling
    WireGuard is rejected during this phase.
-9. After sustained test use, enroll production with its own setup key and peer IP,
+9. After sustained test use, enable and enroll production with its own peer IP,
    then repeat these checks. Control-plane deployment never opts clients in.
 
 ## Backup and recovery

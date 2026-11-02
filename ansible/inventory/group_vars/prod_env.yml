@@ -1,4 +1,5 @@
 hou1_vpn_ip: "10.10.0.1"
+netbird_server_group: prod-servers
 certbot_mode: "http"
 staff_domain: "staff.{{ primary_domain }}"
 staff_cert_dir: "{{ primary_domain }}"

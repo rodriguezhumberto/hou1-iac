@@ -93,10 +93,7 @@ class MigrationTest(unittest.TestCase):
             # when the daemon initially reports no IP after restart.
             ({'netbird_before_status': {'netbirdIp': ''}}, True),
             ({'netbird_before_status': {'netbirdIp': ''},
-              'netbird_marker_stat': {'stat': {'exists': False}}}, False),
-            ({'netbird_before_status': {'netbirdIp': ''},
-              'netbird_marker_stat': {'stat': {'exists': False}},
-              'netbird_setup_key': 'offline-test-key'}, True),
+              'netbird_marker_stat': {'stat': {'exists': False}}}, True),
             ({'netbird_management_url': 'https://another.example.org'}, False),
             ({'netbird_subnet': '100.91.0.0/16'}, False),
             ({'netbird_ip': '100.90.0.11'}, False)]

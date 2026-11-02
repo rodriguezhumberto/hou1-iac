@@ -37,6 +37,6 @@ def run_play(variables, tasks, extra_args=(), inventory_source=None, hosts='loca
 
 
 def netbird_vars():
-    return dict(netbird_enabled=True,
+    return dict(netbird_enabled=True, netbird_server_group='test-servers',
                 netbird_management_url='https://netbird.example.org',
                 netbird_subnet='100.90.0.0/16', netbird_ip='100.90.0.10')
