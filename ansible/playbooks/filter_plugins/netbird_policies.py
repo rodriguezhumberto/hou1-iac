@@ -4,7 +4,6 @@ from copy import deepcopy
 from ansible.errors import AnsibleFilterError
 
 MARKER = 'Managed by hou1-iac.'
-DEFAULT_DESCRIPTION = 'This is a default policy that allows connections between all the resources'
 
 
 def policy_body(policy):
@@ -47,20 +46,23 @@ def policy_plan(groups, policies):
         plan.append(dict(body=body, id=existing['id'] if existing else None,
                          changed=not existing or policy_body(existing) != body))
 
-    # Identify the upstream default by its full shape, never by name alone.
+    # Identify the upstream default by its all-groups rule. Its description can
+    # vary between NetBird releases and deployments, so it is not a safety key.
     defaults = [p for p in policies if p['name'] == 'Default']
     if len(defaults) > 1:
         raise AnsibleFilterError('Multiple Default policies; review them in the dashboard.')
     default = defaults[0] if defaults else None
     if default and default['enabled']:
         rules = default['rules']
-        if (default.get('description') != DEFAULT_DESCRIPTION or len(rules) != 1 or
+        normalized = policy_body(default)
+        default_rule = normalized['rules'][0] if len(normalized.get('rules', [])) == 1 else {}
+        if (len(rules) != 1 or
                 rules[0].get('name') != 'Default' or
-                any(policy_body(default)['rules'][0].get(key) != value for key, value in {
+                any(default_rule.get(key) != value for key, value in {
                     'enabled': True, 'action': 'accept', 'protocol': 'all', 'bidirectional': True,
                     'sources': [ids['All']], 'destinations': [ids['All']],
                 }.items()) or rules[0].get('ports') or rules[0].get('port_ranges') or
-                default.get('source_posture_checks')):
+                normalized.get('source_posture_checks')):
             raise AnsibleFilterError('Default policy was customized; review and disable it explicitly.')
     return dict(managed=plan, default=default)
 

@@ -63,12 +63,12 @@ class PolicyTest(unittest.TestCase):
 
     def test_customized_default_is_not_disabled(self):
         default = {'id': 'default', 'name': 'Default', 'enabled': True,
-                   'description': MODULE['DEFAULT_DESCRIPTION'],
+                   'description': 'This is the default policy',
                    'rules': [{'name': 'Default', 'enabled': True, 'action': 'accept',
                               'protocol': 'all', 'bidirectional': True,
                               'sources': ['All-id'], 'destinations': ['All-id']}]}
         self.assertEqual(plan(self.groups, [default])['default'], default)
-        for change in [{'description': 'Customized'}, {'rules': []}]:
+        for change in [{'rules': []}]:
             with self.assertRaises(AnsibleFilterError):
                 plan(self.groups, [dict(default, **change)])
         changed = deepcopy(default)
