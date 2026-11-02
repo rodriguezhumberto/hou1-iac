@@ -160,7 +160,8 @@ class DnsTest(unittest.TestCase):
                     data, remote = upstream.recvfrom(4096)
                 except socket.timeout:
                     continue
-                response = data[:2] + struct.pack('!5H', 0x8180, 1, 1, 0, 0) + data[12:]
+                question_end = data.index(b'\0', 12) + 5
+                response = data[:2] + struct.pack('!5H', 0x8180, 1, 1, 0, 0) + data[12:question_end]
                 response += b'\xc0\x0c' + struct.pack('!2HIH', 1, 1, 60, 4) + socket.inet_aton('192.0.2.10')
                 upstream.sendto(response, remote)
 
@@ -199,7 +200,9 @@ class DnsTest(unittest.TestCase):
                         self.fail('Resolver did not start')
                     for name, qtype, expected in [('test.example.org', 1, '100.90.218.114'),
                                                   ('staff-test.example.org', 1, '100.90.218.114'),
-                                                  ('cms-test.example.org', 1, '100.90.218.114')]:
+                                                  ('cms-test.example.org', 1, '100.90.218.114'),
+                                                  ('test.example.org', 28, None),
+                                                  ('public.example.org', 1, '192.0.2.10')]:
                         for protocol in ('udp', 'tcp'):
                             data = query(name, qtype)
                             with socket.socket(type=socket.SOCK_DGRAM if protocol == 'udp' else socket.SOCK_STREAM) as sock:
@@ -215,7 +218,10 @@ class DnsTest(unittest.TestCase):
                                     while len(response) < length:
                                         response += sock.recv(length - len(response))
                             self.assertEqual(response[3] & 15, 0)
-                            self.assertIn(socket.inet_aton(expected), response)
+                            if expected:
+                                self.assertIn(socket.inet_aton(expected), response)
+                            else:
+                                self.assertEqual(struct.unpack('!H', response[6:8])[0], 0)
                 finally:
                     process.terminate()
                     process.communicate(timeout=5)
