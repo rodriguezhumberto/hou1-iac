@@ -3,6 +3,9 @@
   ansible.builtin.assert:
     that:
       - >-
+        ((netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) in
+        ((netbird_interface_state.stdout | from_json | first).addr_info | map(attribute='local') | list)
+      - >-
         ((netbird_interface_state.stdout | from_json | first).addr_info |
          map(attribute='local') | list | ansible.utils.ipaddr(netbird_subnet) | length) > 0
       - >-

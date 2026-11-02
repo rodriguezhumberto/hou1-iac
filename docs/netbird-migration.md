@@ -132,8 +132,8 @@ server creation and saving the Vault still requires this recovery procedure.
    HTTPS allows staff to reach the CMS; application credentials control editing.
    Staff-page Nginx restrictions and private DNS must also allow the NetBird path.
    TCP 3001 (Kuma) and ICMP ping are not granted by these policies.
-2. In test variables, set `netbird_enabled: true`. Keep `management_vpn: wireguard`
-   and `wireguard_enabled: true`. Run from the controller that holds
+2. Test variables enable `netbird_enabled` by default. Keep
+   `management_vpn: wireguard` and `wireguard_enabled: true`. Run from the controller that holds
    `ansible/vault/netbird-token.yml` and supply its Vault password. No manual setup
    key is required. Test and production variables select `test-servers` and
    `prod-servers`, respectively.
@@ -160,6 +160,11 @@ server creation and saving the Vault still requires this recovery procedure.
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass
    ```
+
+   Staff ingress uses `netbird_subnet` automatically when NetBird is enabled;
+   other environments keep their WireGuard subnet. Security/SSH tagged runs
+   also run the client role to discover the address. Management bindings continue
+   to follow `management_vpn`; discovering an address does not switch VPNs.
 
 5. Connect an administrator device to the self-hosted endpoint. Verify fresh SSH
    and Ansible access over NetBird and continued WireGuard SSH. Keep a recovery

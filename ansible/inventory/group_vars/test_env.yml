@@ -1,10 +1,8 @@
 hou1_vpn_ip: "10.10.0.10"
-# Enable after deploying the control plane, groups and policies.
-netbird_enabled: false
+# Enrolled and verified; retain WireGuard as the management/recovery path.
+netbird_enabled: true
 management_vpn: wireguard
 netbird_server_group: test-servers
-# Set after first enrollment, before running the security role.
-netbird_ip: "{{ TEST_NETBIRD_IP | default('') }}"
 
 certbot_mode: "dns"
 staff_domain: "staff-test.{{ primary_domain }}"

@@ -1,7 +1,7 @@
 new_user_public_key: "{{ users_public_ssh }}"
 hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
 vpn_subnet: "10.10.0.0/24"
-staff_vpn_subnet: "{{ vpn_subnet }}"
+staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
 
 ansible_python_interpreter: /usr/bin/python3.11
 

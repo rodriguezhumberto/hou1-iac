@@ -20,7 +20,7 @@
       tags: ['docker']
 
     - role: netbird_client
-      tags: ['netbird', 'network']
+      tags: ['netbird', 'network', 'security', 'ufw', 'ssh']
       when: netbird_enabled | bool
 
     - role: security

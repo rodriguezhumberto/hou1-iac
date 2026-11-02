@@ -1,22 +1,43 @@
-"""The client role promotes its verified address for later security tasks."""
-from pathlib import Path
+"""Exercise address discovery with the actual SSH template and VPN defaults."""
+import base64
+import json
 import unittest
 import yaml
 
-from helpers import ROLES
+from helpers import ROLES, run_play
 
 
 class RuntimeAddressTest(unittest.TestCase):
-    def test_main_sets_verified_address_before_security(self):
-        tasks = yaml.safe_load((ROLES / 'netbird_client/tasks/main.yml').read_text())
-        names = [task.get('name') for task in tasks]
-        self.assertLess(names.index('Verify the enrolled peer address'),
-                        names.index('Use the verified API-assigned address for later roles'))
-        task = next(task for task in tasks if task.get('name') == 'Use the verified API-assigned address for later roles')
-        self.assertIn('netbird_ip', task['ansible.builtin.set_fact'])
-        self.assertIn('management_ip', task['ansible.builtin.set_fact'])
-        self.assertEqual(task['when'], 'netbird_enabled | bool')
+    def test_discovered_address_configures_ssh_without_switching_management(self):
+        main = yaml.safe_load((ROLES / 'netbird_client/tasks/main.yml').read_text())
+        promote = next(t for t in main if t.get('name') ==
+                       'Use the verified API-assigned address for later roles')
+        template = str(ROLES / 'security/templates/sshd_config.j2')
+        variables = dict(netbird_enabled=True, netbird_ip='',
+                         netbird_after={'stdout': json.dumps({'netbirdIp': '100.90.0.23/16'})},
+                         netbird_interface_state={'stdout': json.dumps([
+                             {'addr_info': [{'local': '100.90.0.23'}]}])},
+                         netbird_server_peer={'ip': '100.90.0.23'},
+                         ssh_config_before={'content': base64.b64encode(b'Port 22\n').decode()})
+        tasks = [
+            {'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks/verify-address.yml')},
+            promote,
+            {'ansible.builtin.set_fact': {'rendered': "{{ lookup('template', '" + template + "') }}"}},
+            {'ansible.builtin.assert': {'that': [
+                "netbird_ip == '100.90.0.23'",
+                "'ListenAddress 100.90.0.23' in rendered",
+                "'ListenAddress 10.10.0.10' in rendered",
+                "management_ip == '10.10.0.10'",
+                "staff_vpn_subnet == '100.90.0.0/16'",
+            ]}},
+        ]
+        result = run_play(variables, tasks)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        variables['netbird_after']['stdout'] = json.dumps({'netbirdIp': '100.90.0.24/16'})
+        result = run_play(variables, tasks)
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
 
-
-if __name__ == '__main__':
-    unittest.main()
+    def test_wireguard_staff_default_is_preserved_when_netbird_disabled(self):
+        result = run_play({}, [{'ansible.builtin.assert': {'that': [
+            'staff_vpn_subnet == vpn_subnet']}}])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
