@@ -1,0 +1,90 @@
+---
+- name: Require the enrolled production control-plane host
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get('netbird_control_plane', [])
+      - netbird_server_group == 'prod-servers'
+      - netbird_dns_upstreams | length > 0
+      - netbird_dns_upstreams | ansible.utils.ipaddr('address') | length == netbird_dns_upstreams | length
+
+- name: Discover private records through the API
+  ansible.builtin.import_tasks: discover.yml
+
+- name: Install the resolver binary and DNS verification tool
+  ansible.builtin.apt:
+    name: [dnsmasq-base, dnsutils]
+    state: present
+    update_cache: true
+
+- name: Create the unprivileged resolver account
+  ansible.builtin.user:
+    name: netbird-dns
+    system: true
+    create_home: false
+    home: /nonexistent
+    shell: /usr/sbin/nologin
+
+- name: Configure private DNS without logging hostnames
+  ansible.builtin.template:
+    src: dnsmasq.conf.j2
+    dest: /etc/netbird-dns.conf
+    owner: root
+    group: root
+    mode: '0600'
+    validate: /usr/sbin/dnsmasq --test --conf-file=%s
+  no_log: true
+  notify: Restart private DNS
+
+- name: Install the private resolver service
+  ansible.builtin.template:
+    src: netbird-dns.service.j2
+    dest: /etc/systemd/system/netbird-dns.service
+    owner: root
+    group: root
+    mode: '0644'
+  notify: Restart private DNS
+
+- name: Allow private DNS through the host firewall
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: "{{ netbird_interface }}"
+    src: "{{ netbird_subnet }}"
+    port: '53'
+    proto: "{{ item }}"
+  loop: [tcp, udp]
+
+- name: Apply resolver changes before distributing DNS settings
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable and start private DNS
+  ansible.builtin.systemd:
+    name: netbird-dns
+    enabled: true
+    state: started
+    daemon_reload: true
+
+- name: Verify each private record over UDP and TCP
+  ansible.builtin.command:
+    argv: >-
+      {{ ['dig', '@' ~ netbird_server_peer.ip, item.0.name, 'A', '+short',
+          '+time=2', '+tries=1'] + (['+tcp'] if item.1 == 'tcp' else []) }}
+  loop: "{{ netbird_dns_plan.records | product(['udp', 'tcp']) | list }}"
+  register: netbird_dns_query
+  changed_when: false
+  failed_when: netbird_dns_query.rc != 0 or netbird_dns_query.stdout | trim != item.0.address
+  no_log: true
+
+- name: Reconcile DNS access alongside existing application policies
+  block:
+    - name: Apply and verify managed policies through the controller
+      ansible.builtin.import_tasks: ../../netbird_control_plane/tasks/policies.yml
+  vars:
+    netbird_bootstrap_api_url: "{{ netbird_management_url | regex_replace('/$', '') }}"
+    netbird_api_token: "{{ netbird_client_token.token }}"
+    netbird_groups_after: "{{ netbird_client_groups }}"
+  delegate_to: localhost
+  become: false
+
+- name: Distribute the verified resolver through the NetBird API
+  ansible.builtin.import_tasks: publish.yml

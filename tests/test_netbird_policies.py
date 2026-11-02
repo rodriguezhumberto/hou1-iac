@@ -23,6 +23,13 @@ class PolicyTest(unittest.TestCase):
         self.assertEqual(admin['rules'][0]['ports'], ['22', '443'])
         self.assertEqual(staff['rules'][0]['ports'], ['443'])
         for policy in self.desired:
+            self.assertEqual(len(policy['rules']), 3)
+            for dns_rule, protocol in zip(policy['rules'][1:], ('tcp', 'udp')):
+                self.assertEqual(dns_rule['protocol'], protocol)
+                self.assertEqual(dns_rule['ports'], ['53'])
+                self.assertEqual(dns_rule['sources'], policy['rules'][0]['sources'])
+                self.assertEqual(dns_rule['destinations'], ['prod-servers-id'])
+                self.assertFalse(dns_rule['bidirectional'])
             rule = policy['rules'][0]
             self.assertFalse(rule['bidirectional'])
             self.assertEqual(rule['protocol'], 'tcp')

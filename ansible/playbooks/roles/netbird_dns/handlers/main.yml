@@ -1,0 +1,6 @@
+---
+- name: Restart private DNS
+  ansible.builtin.systemd:
+    name: netbird-dns
+    state: restarted
+    daemon_reload: true

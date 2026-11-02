@@ -1,0 +1,32 @@
+---
+- name: Discover peer addresses and plan private DNS on the controller
+  block:
+    - name: Read enrolled peers
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/peers"
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      register: netbird_dns_peers
+
+    - name: Read existing nameserver groups
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/dns/nameservers"
+        headers:
+          Authorization: "Token {{ netbird_client_token.token }}"
+        use_proxy: false
+        follow_redirects: none
+        status_code: 200
+      register: netbird_dns_existing
+
+    - name: Resolve records and prepare the nameserver group
+      ansible.builtin.set_fact:
+        netbird_dns_plan: >-
+          {{ netbird_dns_peers.json | netbird_dns_plan(
+             netbird_client_groups.json, netbird_dns_records, netbird_server_peer.ip,
+             netbird_dns_domain, netbird_subnet, netbird_dns_existing.json) }}
+  delegate_to: localhost
+  become: false
+  no_log: true

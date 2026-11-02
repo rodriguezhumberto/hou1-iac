@@ -1,0 +1,18 @@
+# Managed by Ansible. Only the NetBird address serves DNS.
+listen-address={{ netbird_server_peer.ip }}
+bind-dynamic
+port=53
+user=netbird-dns
+group=netbird-dns
+pid-file=
+no-resolv
+no-hosts
+cache-size=150
+local-ttl=60
+{% for upstream in netbird_dns_upstreams %}
+server={{ upstream }}
+{% endfor %}
+{% for record in netbird_dns_plan.records %}
+local=/{{ record.name }}/
+host-record={{ record.name }},{{ record.address }}
+{% endfor %}

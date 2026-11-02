@@ -1,0 +1,13 @@
+[Unit]
+Description=NetBird private DNS
+Wants=netbird.service network-online.target
+After=netbird.service network-online.target
+StartLimitIntervalSec=0
+
+[Service]
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/netbird-dns.conf
+Restart=on-failure
+RestartSec=5s
+
+[Install]
+WantedBy=multi-user.target

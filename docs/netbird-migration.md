@@ -10,6 +10,8 @@ this migration.
   `netbird_control_plane` group, always over WireGuard. Do not pass `target_hosts`.
 - `hou1.yml` manages application deployments and clients. It does not update the
   control plane. Both environments use `https://netbird.{{ primary_domain }}`.
+- `netbird-dns.yml` enrolls the production host and deploys private DNS there,
+  using WireGuard for SSH. It does not change the application's listeners.
 - The separate `hou1-netbird` Compose project stores configuration, encryption
   secrets and SQLite data in `/opt/hou1-netbird`. Never regenerate keys for
   existing data.
@@ -110,6 +112,8 @@ server creation and saving the Vault still requires this recovery procedure.
    | `hou1-administrators` | `administrators` | `test-servers`, `prod-servers` | TCP 22, 443 |
    | `hou1-staff` | `staff` | `test-servers`, `prod-servers` | TCP 443 |
 
+   Both policies also permit TCP/UDP 53 to `prod-servers` for private DNS.
+
    Connections can be initiated from source to destination; reply traffic is
    allowed. Policies do not grant server-initiated access to staff devices.
    After verifying these replacements, the playbook disables the built-in
@@ -155,8 +159,8 @@ server creation and saving the Vault still requires this recovery procedure.
 5. Connect an administrator device to the self-hosted endpoint. Verify fresh SSH
    and Ansible access over NetBird and continued WireGuard SSH. Keep a recovery
    session or console available.
-6. Point private DNS for the existing CMS hostname at the NetBird IP, retaining
-   its HTTPS name and certificate. Check DNS, login, assets, uploads and WebSockets.
+6. Deploy private DNS as described below, retaining the existing HTTPS names and
+   certificates. Check DNS, login, assets, uploads and WebSockets.
    Verify staff can access CMS but not SSH, unauthorized peers cannot access
    CMS, and non-VPN devices cannot access CMS or SSH, including over IPv6.
    Public websites must keep working. Check actual Nginx source addresses and
@@ -168,7 +172,53 @@ server creation and saving the Vault still requires this recovery procedure.
    WireGuard SSH remains, while its CMS allowance is removed by default. Disabling
    WireGuard is rejected during this phase.
 9. After sustained test use, enable and enroll production with its own peer IP,
-   then repeat these checks. Control-plane deployment never opts clients in.
+   then repeat these checks. The DNS playbook enrolls production for DNS only;
+   full production application cutover remains a separate step.
+
+## Private DNS
+
+After enrolling the test server, run from `ansible/` on the controller holding the
+encrypted API token:
+
+```bash
+ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
+```
+
+This enrolls production if necessary, discovers addresses through `/api/peers`,
+and installs dnsmasq as `netbird-dns.service`. No manual peer IP is required for
+DNS. The test records select the sole peer in `test-servers`; missing or multiple
+matches stop deployment. Peer addresses remain stable across ordinary reconnects.
+Rerun this playbook after replacing or re-enrolling a server to refresh records.
+
+`netbird_dns_records` defaults to `test`, `staff-test`, and `cms-test` under the
+existing Vault-backed `primary_domain`. Actual hostnames remain in secrets; the
+repository contains variable references. For different names, override
+`netbird_dns_domain` and `netbird_dns_records` in Vault. Each record contains
+`name` and `peer_group` (`test-servers` or `prod-servers`).
+
+The resolver binds only to production's NetBird IP, with TCP/UDP 53 allowed on
+the NetBird interface. Non-overridden names forward to `netbird_dns_upstreams`
+(Cloudflare and Quad9 by default). After testing every override over TCP and UDP,
+the playbook reconciles access policies and publishes `hou1-private-dns` through
+the API. Only `administrators` and `staff` receive this split-domain resolver;
+public DNS stays unchanged. Managed nameserver settings are corrected on reruns;
+operator-owned conflicts stop deployment. Managed server peers keep DNS disabled
+to avoid making server management depend on this resolver.
+
+Remove temporary `/etc/hosts` entries on the Mac, then verify using macOS's system
+resolver (plain `dig` does not reliably follow macOS split DNS):
+
+```bash
+netbird status
+scutil --dns
+dscacheutil -q host -a name test.YOUR_DOMAIN
+curl --connect-timeout 10 https://test.YOUR_DOMAIN/
+```
+
+Expect an available NetBird nameserver and the test peer's address. Keep DNS
+management enabled on client devices. Browser-specific secure DNS can bypass the
+system resolver; use system DNS for this test. End-to-end client verification must
+be performed from an enrolled administrator or staff device.
 
 ## Backup and recovery
 
@@ -219,6 +269,7 @@ From the repository root (requires Nginx >=1.25.1, OpenSSL and Docker Compose):
 ```bash
 ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
 ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
+ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-dns.yml --syntax-check
 python3 -m unittest discover -s tests -v
 ```
 
@@ -226,6 +277,9 @@ Tests cover inventory and migration guards, enrollment, SSH/CMS configuration,
 Compose/Nginx parsing, persistent secrets, encrypted token persistence, and account
 configuration against a local API fixture. They do not deploy services or replace the live access, relay, reboot and
 restore checks above.
+Install `dnsmasq-base` or set `DNSMASQ_BIN` to run the disposable resolver tests;
+these verify TCP/UDP overrides, public forwarding, and absence of public AAAA
+fallback for overridden names without changing the machine's DNS settings.
 
 ## Sources
 

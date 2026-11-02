@@ -37,6 +37,11 @@ def policy_plan(groups, policies):
             name=name, description=MARKER, enabled=True, action='accept', protocol='tcp',
             bidirectional=False, sources=[ids[source]],
             destinations=sorted([ids['test-servers'], ids['prod-servers']]), ports=ports)])
+        for protocol in ('tcp', 'udp'):
+            body['rules'].append(dict(
+                name=name + '-dns-' + protocol, description=MARKER, enabled=True,
+                action='accept', protocol=protocol, bidirectional=False,
+                sources=[ids[source]], destinations=[ids['prod-servers']], ports=['53']))
         matches = [p for p in policies if p['name'] == name]
         if len(matches) > 1:
             raise AnsibleFilterError('Duplicate managed policy name: ' + name)

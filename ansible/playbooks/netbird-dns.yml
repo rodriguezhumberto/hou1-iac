@@ -1,0 +1,13 @@
+---
+- name: Deploy private DNS on the NetBird control-plane host
+  hosts: netbird_control_plane
+  become: true
+  vars:
+    ansible_host: "{{ hou1_vpn_ip }}"
+    netbird_enabled: true
+  pre_tasks:
+    - name: Require the dedicated production target
+      ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
+  roles:
+    - role: netbird_client
+    - role: netbird_dns
