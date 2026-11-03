@@ -1,0 +1,7 @@
+---
+- name: Set the authenticated NetBird API context
+  ansible.builtin.set_fact:
+    netbird_api_url: "{{ netbird_api_context_url }}"
+    netbird_api_headers:
+      Authorization: "Token {{ netbird_api_context_token }}"
+  no_log: true

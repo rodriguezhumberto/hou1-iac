@@ -15,10 +15,10 @@
           - netbird_server_group in ['test-servers', 'prod-servers']
 
     - name: Set the authenticated public API context
-      ansible.builtin.set_fact:
-        netbird_api_url: "{{ netbird_management_url | regex_replace('/$', '') }}"
-        netbird_api_headers:
-          Authorization: "Token {{ netbird_client_token.token }}"
+      ansible.builtin.import_tasks: ../../netbird_common/tasks/api-context.yml
+      vars:
+        netbird_api_context_url: "{{ netbird_management_url | regex_replace('/$', '') }}"
+        netbird_api_context_token: "{{ netbird_client_token.token }}"
 
     - name: Read groups from the public HTTPS management API
       ansible.builtin.uri:

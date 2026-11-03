@@ -85,11 +85,10 @@
   no_log: true
 
 - name: Set the authenticated private API context
-  ansible.builtin.set_fact:
-    netbird_api_url: "{{ netbird_bootstrap_api_url }}"
-    netbird_api_headers:
-      Authorization: "Token {{ netbird_api_token }}"
-  no_log: true
+  ansible.builtin.import_tasks: ../../netbird_common/tasks/api-context.yml
+  vars:
+    netbird_api_context_url: "{{ netbird_bootstrap_api_url }}"
+    netbird_api_context_token: "{{ netbird_api_token }}"
 
 - name: Verify the initial owner setup completed
   ansible.builtin.uri:
