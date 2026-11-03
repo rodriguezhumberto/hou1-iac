@@ -95,7 +95,7 @@
       - netbird_ip is ansible.utils.ipv4
       - "'/' not in netbird_ip"
       - ([netbird_ip] | ansible.utils.ipaddr(netbird_subnet) | length) == 1
-    fail_msg: Enroll with --tags netbird before running security so the verified API-assigned address is available.
+    fail_msg: Set this environment's netbird_ip from Vault to a valid address in netbird_subnet.
   when: netbird_enabled | bool
 
 - name: Configure explicit private SSH listeners with rollback on validation failure

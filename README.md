@@ -19,7 +19,9 @@ ssh-copy-id -i ~/.ssh/id_ed25519.pub username@remote_host
 
 ### 2. Standard Runs (Post-Initialization)
 
-All future configuration runs route strictly over the encrypted VPN interface.
+Standard test and production runs connect over the NetBird addresses declared in
+the encrypted inventory. For enrollment or address repair, add
+`-e management_vpn=wireguard` to use the recovery VPN.
 
 #### Run Everything Against Test VPS
 ```bash

@@ -1,8 +1,8 @@
 # NetBird deployment and recovery
 
-One control plane on production serves both environments. Enroll and validate test
-clients before production. WireGuard remains enabled for SSH recovery throughout
-this migration.
+One control plane on production serves both environments. Both servers use their
+Vault-declared NetBird addresses for normal application management. WireGuard
+remains enabled for enrollment, address repair and control-plane recovery.
 
 ## Deployment layout
 
@@ -132,15 +132,18 @@ server creation and saving the Vault still requires this recovery procedure.
    HTTPS allows staff to reach the CMS; application credentials control editing.
    Staff-page Nginx restrictions and private DNS must also allow the NetBird path.
    TCP 3001 (Kuma) and ICMP ping are not granted by these policies.
-2. Test variables enable `netbird_enabled` by default. Keep
-   `management_vpn: wireguard` and `wireguard_enabled: true`. Run from the controller that holds
-   `ansible/vault/netbird-token.yml` and supply its Vault password. No manual setup
-   key is required. Test and production variables select `test-servers` and
-   `prod-servers`, respectively.
-3. From `ansible/`, enroll test:
+2. The encrypted inventory stores `test_netbird_ip` and `prod_netbird_ip`.
+   Each environment maps `netbird_ip` to its own value; both enable NetBird and
+   select `management_vpn: netbird`. Run from a controller connected to NetBird
+   as an administrator, holding `ansible/vault/netbird-token.yml`, and supply its
+   Vault password. No manual setup key is required. Test and production select
+   `test-servers` and `prod-servers`, respectively. Keep `wireguard_enabled: true`.
+3. From `ansible/`, enroll or repair test over WireGuard before relying on its
+   declared NetBird address:
 
    ```bash
-   ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --tags netbird --ask-vault-pass
+   ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test \
+     -e management_vpn=wireguard --tags netbird --ask-vault-pass
    ```
 
    Test needs outbound connectivity to management, relay and STUN; home-router
@@ -153,18 +156,25 @@ server creation and saving the Vault still requires this recovery procedure.
    Reruns reuse peer identity, verify group membership, and repair missing
    membership while preserving other peers/resources. A peer already in the
    opposite environment group requires explicit correction.
-4. The client role reads the verified assigned address from `netbird status` and
-   the API, then exposes it to the later security role as `netbird_ip`. No address
-   needs to be stored in Vault or passed as an extra variable. Run the full playbook:
+4. Enrollment initially receives an automatically allocated address. The client
+   role identifies that peer through its observed address, verifies its environment
+   group, then uses `PUT /api/peers/{peerId}` to assign the Vault-declared `netbird_ip`
+   if needed. It preserves the peer's name and SSH/login-expiration settings,
+   rejects another peer occupying the address, and waits for API, client status
+   and interface verification. Reruns keep the same address without another PUT.
+   A deleted and re-enrolled peer is assigned the declared address again; this is
+   not a reservation before enrollment. Other devices keep automatic addresses.
+
+   Run the full test playbook over NetBird after confirming fresh SSH access:
 
    ```bash
    ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_test --ask-vault-pass
    ```
 
-   Staff ingress uses `netbird_subnet` automatically when NetBird is enabled;
-   other environments keep their WireGuard subnet. Security/SSH tagged runs
-   also run the client role to discover the address. Management bindings continue
-   to follow `management_vpn`; discovering an address does not switch VPNs.
+   Staff ingress uses `netbird_subnet`. Security/SSH tagged runs also run the client
+   role to enforce and verify the declared address. Kuma's binding follows
+   `management_vpn`. WireGuard SSH remains available; its CMS allowance is removed
+   when NetBird is selected for management.
 
 5. Connect an administrator device to the self-hosted endpoint. Verify fresh SSH
    and Ansible access over NetBird and continued WireGuard SSH. Keep a recovery
@@ -178,12 +188,37 @@ server creation and saving the Vault still requires this recovery procedure.
 7. Test reconnects, relay fallback with direct UDP blocked, and server reboot.
    Repeat access from outside the home network with WireGuard disconnected on
    the test client.
-8. Set `management_vpn: netbird` and repeat the full run. Kuma's binding moves;
-   WireGuard SSH remains, while its CMS allowance is removed by default. Disabling
-   WireGuard is rejected during this phase.
-9. After sustained test use, enable and enroll production with its own peer IP,
-   then repeat these checks. The DNS playbook enrolls production for DNS only;
-   full production application cutover remains a separate step.
+8. For production, first enforce and validate the declared address over WireGuard:
+
+   ```bash
+   ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_prod \
+     -e management_vpn=wireguard --tags netbird --ask-vault-pass
+   ```
+
+   After verifying fresh NetBird SSH access, run the full production playbook:
+
+   ```bash
+   ansible-playbook playbooks/hou1.yml -e target_hosts=hou1_prod --ask-vault-pass
+   ```
+
+   The dedicated control-plane and DNS playbooks continue using WireGuard.
+   Disabling WireGuard is rejected during this migration stage.
+
+### Replacing a server or changing its address
+
+Edit `test_netbird_ip` or `prod_netbird_ip` with `ansible-vault edit
+inventory/group_vars/all/secrets.yml`. Use an available address within
+`netbird_subnet`, excluding its network, broadcast and NetBird DNS addresses.
+Preserve the existing values when replacing a server. If the old peer still owns
+an address, remove that obsolete peer explicitly before enrolling its replacement.
+The playbook never takes an address away from another peer.
+
+Run the appropriate enrollment command above with `management_vpn=wireguard`.
+For an address change or replacement, run the full application playbook with that
+same override first so SSH and application listeners are updated while access
+still uses WireGuard. Then verify NetBird SSH and return to the normal command.
+Rerun `netbird-dns.yml` after changing declared addresses to refresh private DNS.
+Only declaring an address in Vault does not apply it to a running server.
 
 ## Private DNS
 
@@ -194,17 +229,24 @@ encrypted API token:
 ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
 ```
 
-This enrolls production if necessary, discovers addresses through `/api/peers`,
-and installs dnsmasq as `netbird-dns.service`. No manual peer IP is required for
-DNS. The test records select the sole peer in `test-servers`; missing or multiple
-matches stop deployment. Peer addresses remain stable across ordinary reconnects.
-Rerun this playbook after replacing or re-enrolling a server to refresh records.
+This enrolls production if necessary, enforces `prod_netbird_ip`, and installs
+`netbird-dns.service`. Private records use the declared server addresses from Vault;
+DNS no longer discovers server addresses through `/api/peers`. Enroll and validate
+test before publishing its records. Additional peers in server groups do not
+change DNS answers.
 
 `netbird_dns_records` defaults to `test`, `staff-test`, and `cms-test` under the
-existing Vault-backed `primary_domain`. Actual hostnames remain in secrets; the
-repository contains variable references. For different names, override
-`netbird_dns_domain` and `netbird_dns_records` in Vault. Each record contains
-`name` and `peer_group` (`test-servers` or `prod-servers`).
+Vault-backed `primary_domain`, all pointing to `test_netbird_ip`. For different
+names, override `netbird_dns_domain` and `netbird_dns_records` in Vault. Each record
+contains `name` and `address`, for example:
+
+```yaml
+netbird_dns_records:
+  - name: "test.{{ primary_domain }}"
+    address: "{{ test_netbird_ip }}"
+```
+
+Existing custom records using `peer_group` must be converted to `address`.
 
 The resolver binds only to production's NetBird IP on `netbird_dns_port` (1053),
 with TCP/UDP allowed on the NetBird interface. NetBird owns port 53; dnsmasq uses
