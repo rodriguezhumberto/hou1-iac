@@ -6,8 +6,6 @@
         url: "{{ netbird_bootstrap_api_url }}/api/accounts"
         headers:
           Authorization: "Token {{ netbird_api_token }}"
-        use_proxy: false
-        follow_redirects: none
         return_content: true
         status_code: 200
       register: netbird_accounts
@@ -39,8 +37,6 @@
         url: "{{ netbird_bootstrap_api_url }}/api/peers"
         headers:
           Authorization: "Token {{ netbird_api_token }}"
-        use_proxy: false
-        follow_redirects: none
         return_content: true
         status_code: 200
       register: netbird_account_peers
@@ -62,8 +58,6 @@
         body_format: json
         body:
           settings: "{{ netbird_account.settings | combine({'network_range': netbird_subnet}) }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       when: netbird_account.settings.network_range | default('') != netbird_subnet
       changed_when: true
@@ -73,8 +67,6 @@
         url: "{{ netbird_bootstrap_api_url }}/api/accounts"
         headers:
           Authorization: "Token {{ netbird_api_token }}"
-        use_proxy: false
-        follow_redirects: none
         return_content: true
         status_code: 200
       register: netbird_account_after

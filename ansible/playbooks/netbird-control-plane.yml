@@ -2,6 +2,10 @@
 - name: Deploy the shared NetBird control plane on the public production host
   hosts: netbird_control_plane
   become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
   vars:
     # Use the independent recovery VPN even after application inventory cutover.
     ansible_host: "{{ hou1_vpn_ip }}"

@@ -108,7 +108,7 @@
 - name: Reconcile DNS access alongside existing application policies
   block:
     - name: Apply and verify managed policies through the controller
-      ansible.builtin.import_tasks: ../../netbird_control_plane/tasks/policies.yml
+      ansible.builtin.import_tasks: "../../netbird_common/tasks/netbird-policies.yml"
   vars:
     netbird_bootstrap_api_url: "{{ netbird_management_url | regex_replace('/$', '') }}"
     netbird_api_token: "{{ netbird_client_token.token }}"

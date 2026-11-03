@@ -6,8 +6,6 @@
         url: "{{ netbird_bootstrap_api_url }}/api/groups"
         headers:
           Authorization: "Token {{ netbird_api_token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_existing_groups
 
@@ -28,8 +26,6 @@
         body:
           name: "{{ item }}"
           peers: []
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       loop: "{{ netbird_groups }}"
       when: item not in (netbird_existing_groups.json | map(attribute='name') | list)
@@ -40,8 +36,6 @@
         url: "{{ netbird_bootstrap_api_url }}/api/groups"
         headers:
           Authorization: "Token {{ netbird_api_token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_groups_after
 

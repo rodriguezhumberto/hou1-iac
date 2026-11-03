@@ -15,8 +15,6 @@
           expires_in: 600
           ephemeral: false
           auto_groups: ["{{ netbird_server_group_id }}"]
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       delegate_to: localhost
       become: false
@@ -78,8 +76,6 @@
         method: DELETE
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: [200, 404]
       delegate_to: localhost
       become: false

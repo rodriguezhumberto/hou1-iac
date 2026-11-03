@@ -2,6 +2,10 @@
 - name: Deploy private DNS on the NetBird control-plane host
   hosts: netbird_control_plane
   become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
   vars:
     ansible_host: "{{ hou1_vpn_ip }}"
     netbird_enabled: true

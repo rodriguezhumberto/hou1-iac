@@ -6,8 +6,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/peers"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_client_peers
       until: >-
@@ -35,8 +33,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups/{{ netbird_server_group_id }}"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_server_group_before
 
@@ -51,8 +47,6 @@
           name: "{{ netbird_server_group }}"
           peers: "{{ (netbird_server_group_before.json.peers | map(attribute='id') | list) + [netbird_server_peer.id] }}"
           resources: "{{ netbird_server_group_before.json.resources | default([]) }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       when: netbird_server_peer.id not in (netbird_server_group_before.json.peers | map(attribute='id') | list)
       changed_when: true
@@ -62,8 +56,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups/{{ netbird_server_group_id }}"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_server_group_after
 

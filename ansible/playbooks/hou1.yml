@@ -2,6 +2,10 @@
 - name: Rebuild HOU1 Infrastructure
   hosts: "{{ target_hosts | default('hou1_test') }}"
   become: yes
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
 
   pre_tasks:
     - name: Validate VPN configuration for every run, including tagged runs

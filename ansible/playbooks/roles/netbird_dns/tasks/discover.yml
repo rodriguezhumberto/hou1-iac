@@ -6,8 +6,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/peers"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_dns_peers
 
@@ -16,8 +14,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/dns/nameservers"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_dns_existing
 

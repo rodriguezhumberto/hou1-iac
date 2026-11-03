@@ -19,8 +19,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/groups"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_client_groups
 

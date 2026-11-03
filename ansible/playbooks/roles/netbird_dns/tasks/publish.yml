@@ -11,8 +11,6 @@
           Authorization: "Token {{ netbird_client_token.token }}"
         body_format: json
         body: "{{ netbird_dns_plan.body }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       when: netbird_dns_plan.changed
       changed_when: true
@@ -22,8 +20,6 @@
         url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/dns/nameservers"
         headers:
           Authorization: "Token {{ netbird_client_token.token }}"
-        use_proxy: false
-        follow_redirects: none
         status_code: 200
       register: netbird_dns_after
 
