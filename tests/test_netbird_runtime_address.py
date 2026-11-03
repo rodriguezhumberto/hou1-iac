@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-from helpers import ROLES, ROOT, run_play
+from helpers import ROLES, ROOT, run_play, run_plays
 
 import yaml
 
@@ -22,8 +22,10 @@ class RuntimeAddressTest(unittest.TestCase):
             task.update(retries=2, delay=0)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
+            bin_dir = root / 'bin'
+            bin_dir.mkdir()
             for binary in ('netbird', 'ip'):
-                script = root / binary
+                script = bin_dir / binary
                 script.write_text('#!' + sys.executable + '\n' + '''
 import json, os, pathlib, sys
 name = pathlib.Path(sys.argv[0]).name
@@ -51,20 +53,47 @@ else:
                 ]}},
             ]
             tasks = [{'environment': {
-                'PATH': str(root) + ':' + os.environ['PATH'],
-                'ADDRESS_FIXTURE_DIRECTORY': str(root),
+                'PATH': str(bin_dir) + ':' + os.environ['PATH'],
+                'ADDRESS_FIXTURE_DIRECTORY': '{{ fixture_directory }}',
                 'ADDRESS_FIXTURE_STALE': '{{ fixture_stale }}'},
-                'block': waits + verify}]
+                'block': waits + verify + [
+                    {'ansible.builtin.assert': {'that': "fixture_stale == 'none'"}},
+                ],
+                'rescue': [{'ansible.builtin.assert': {'that': [
+                    "fixture_stale in ['netbird', 'ip']",
+                    'ansible_failed_task.name == fixture_expected_task',
+                    "ansible_failed_task.action == 'ansible.builtin.command'",
+                    'ansible_failed_result.attempts == 2',
+                    'ansible_failed_result.rc == 0',
+                    "'100.90.0.99' in ansible_failed_result.stdout",
+                ]}}]}]
+            plays = []
+            fixtures = []
             for stale in ('none', 'netbird', 'ip'):
-                for counter in root.glob('*.count'):
-                    counter.unlink()
-                result = run_play(dict(netbird_enabled=True, netbird_ip='100.90.0.23',
-                                       fixture_stale=stale, ssh_config_before={
-                                           'content': base64.b64encode(b'Port 22\n').decode()}), tasks)
-                self.assertEqual(result.returncode == 0, stale == 'none', result.stdout + result.stderr)
-                if stale == 'none':
-                    self.assertEqual((root / 'netbird.count').read_text(), '2')
-                    self.assertEqual((root / 'ip.count').read_text(), '2')
+                fixture = root / stale
+                fixture.mkdir()
+                fixtures.append((stale, fixture))
+                plays.append(dict(
+                    variables=dict(netbird_enabled=True, netbird_ip='100.90.0.23',
+                                   fixture_stale=stale,
+                                   fixture_expected_task=waits[0 if stale == 'netbird' else 1]['name'],
+                                   fixture_directory=str(fixture),
+                                   ssh_config_before={'content': base64.b64encode(
+                                       b'Port 22\n').decode()}),
+                    tasks=tasks))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for stale, fixture in fixtures:
+                with self.subTest(stale=stale):
+                    if stale == 'none':
+                        self.assertEqual((fixture / 'netbird.count').read_text(), '2')
+                        self.assertEqual((fixture / 'ip.count').read_text(), '2')
+                    elif stale == 'netbird':
+                        self.assertEqual((fixture / 'netbird.count').read_text(), '3')
+                        self.assertFalse((fixture / 'ip.count').exists())
+                    else:
+                        self.assertEqual((fixture / 'netbird.count').read_text(), '2')
+                        self.assertEqual((fixture / 'ip.count').read_text(), '3')
 
     def test_environment_inventory_connects_using_declared_addresses(self):
         inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
