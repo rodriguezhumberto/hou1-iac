@@ -1,0 +1,253 @@
+---
+- name: Validate control-plane inputs
+  ansible.builtin.import_tasks: validate.yml
+
+- name: Require a real run for server initialization and certificate issuance
+  ansible.builtin.assert:
+    that: not ansible_check_mode
+    fail_msg: Use syntax-check and offline tests; control-plane initialization requires a real deployment.
+
+- name: Load the controller token before deploying the server
+  netbird_token_vault:
+    path: "{{ netbird_token_vault_file }}"
+    management_url: "{{ netbird_management_url }}"
+    vault_id: "{{ netbird_token_vault_id }}"
+  no_log: true
+  register: netbird_saved_token
+
+- name: Check that the application has already been provisioned
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/docker-compose.yml"
+  register: netbird_application_compose
+
+- name: Require the existing application ingress before colocating NetBird
+  ansible.builtin.assert:
+    that: netbird_application_compose.stat.exists
+    fail_msg: Deploy the production application with hou1.yml before running the dedicated control-plane playbook.
+
+- name: Create persistent control-plane directories outside the application checkout
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - "{{ netbird_control_plane_directory }}"
+    - "{{ netbird_control_plane_directory }}/data"
+    - "{{ netbird_backup_directory }}"
+
+- name: Create the ingress configuration directory
+  ansible.builtin.file:
+    path: "{{ netbird_control_plane_directory }}/ingress"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Check for persistent encryption secrets
+  ansible.builtin.stat:
+    path: "{{ netbird_control_plane_directory }}/secrets.json"
+  register: netbird_secrets_stat
+
+- name: Check for existing server data
+  ansible.builtin.find:
+    paths: "{{ netbird_control_plane_directory }}/data"
+    file_type: any
+    hidden: true
+  register: netbird_existing_data
+
+- name: Never regenerate encryption keys for existing server data
+  ansible.builtin.assert:
+    that: netbird_secrets_stat.stat.exists or netbird_existing_data.matched == 0
+    fail_msg: Server data exists without secrets.json. Restore the original secrets from backup.
+
+- name: Install the one-time secret generator
+  ansible.builtin.copy:
+    src: create-secrets.py
+    dest: "{{ netbird_control_plane_directory }}/create-secrets.py"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Generate persistent random encryption secrets only once
+  ansible.builtin.command:
+    argv:
+      - "{{ ansible_python_interpreter }}"
+      - "{{ netbird_control_plane_directory }}/create-secrets.py"
+      - "{{ netbird_control_plane_directory }}/secrets.json"
+    creates: "{{ netbird_control_plane_directory }}/secrets.json"
+  no_log: true
+
+- name: Load persistent encryption secrets
+  ansible.builtin.slurp:
+    src: "{{ netbird_control_plane_directory }}/secrets.json"
+  register: netbird_secrets_file
+  no_log: true
+
+- name: Decode persistent encryption secrets
+  ansible.builtin.set_fact:
+    netbird_control_plane_secrets: "{{ netbird_secrets_file.content | b64decode | from_json }}"
+  no_log: true
+
+- name: Validate the persistent encryption key format before starting the server
+  ansible.builtin.assert:
+    that:
+      - item is match('^[A-Za-z0-9+/]{43}=$')
+    fail_msg: Invalid persistent encryption material; restore secrets.json from backup rather than rotating it.
+  loop:
+    - "{{ netbird_control_plane_secrets.relay_auth_secret }}"
+    - "{{ netbird_control_plane_secrets.store_encryption_key }}"
+    - "{{ netbird_control_plane_secrets.cookie_encryption_key }}"
+  no_log: true
+
+- name: Render the combined server configuration without logging secrets
+  ansible.builtin.template:
+    src: config.yaml.j2
+    dest: "{{ netbird_control_plane_directory }}/config.yaml"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+  register: netbird_server_config
+
+- name: Render the dashboard and separate Compose project
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ netbird_control_plane_directory }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - {src: dashboard.env.j2, dest: dashboard.env}
+    - {src: compose.yaml.j2, dest: compose.yaml}
+
+- name: Create the dedicated ingress network
+  community.docker.docker_network:
+    name: "{{ netbird_ingress_network }}"
+    ipam_config:
+      - subnet: "{{ netbird_ingress_subnet }}"
+        iprange: "{{ netbird_ingress_dynamic_range }}"
+
+- name: Prepare DNS challenge credentials for the NetBird certificate
+  ansible.builtin.copy:
+    dest: "{{ netbird_control_plane_directory }}/cloudflare.ini"
+    content: "dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}\n"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Check for the NetBird certificate
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/certbot/conf/live/{{ netbird_domain }}/fullchain.pem"
+  register: netbird_certificate
+
+- name: Obtain the dedicated NetBird certificate through DNS-01
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ app_directory }}/certbot/conf:/etc/letsencrypt"
+      - -v
+      - "{{ netbird_control_plane_directory }}/cloudflare.ini:/cloudflare.ini:ro"
+      - "{{ netbird_certbot_image }}"
+      - certonly
+      - --non-interactive
+      - --agree-tos
+      - --email
+      - "{{ letsencrypt_email }}"
+      - --dns-cloudflare
+      - --dns-cloudflare-credentials
+      - /cloudflare.ini
+      - --dns-cloudflare-propagation-seconds
+      - '20'
+      - --cert-name
+      - "{{ netbird_domain }}"
+      - -d
+      - "{{ netbird_domain }}"
+  when: not netbird_certificate.stat.exists
+
+- name: Preserve NetBird certificate renewal credentials for the app renewal job
+  ansible.builtin.lineinfile:
+    path: "{{ app_directory }}/certbot/conf/renewal/{{ netbird_domain }}.conf"
+    regexp: '^dns_cloudflare_credentials\s*='
+    line: 'dns_cloudflare_credentials = /cloudflare.ini'
+
+- name: Render the public control-plane ingress
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ netbird_control_plane_directory }}/ingress/netbird.conf"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install the stable Nginx include file
+  ansible.builtin.copy:
+    dest: "{{ netbird_control_plane_directory }}/nginx-include.conf"
+    content: "include /etc/nginx/netbird/*.conf;\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Install the application ingress integration
+  ansible.builtin.import_tasks: app-ingress.yml
+
+- name: Allow the combined server STUN port
+  community.general.ufw:
+    rule: allow
+    port: '3478'
+    proto: udp
+
+- name: Start the separate NetBird Compose project
+  community.docker.docker_compose_v2:
+    project_src: "{{ netbird_control_plane_directory }}"
+    project_name: "{{ netbird_control_plane_project }}"
+    files: [compose.yaml]
+    state: present
+    recreate: "{{ 'always' if netbird_server_config.changed else 'auto' }}"
+    wait: true
+    wait_timeout: 60
+
+- name: Apply the Nginx network and mounts without rebuilding application services
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_directory }}"
+    services: [nginx]
+    dependencies: false
+    state: present
+    recreate: "{{ 'always' if netbird_app_override.changed else 'auto' }}"
+
+- name: Validate the active Nginx configuration before reload
+  ansible.builtin.command: docker compose exec -T nginx nginx -t
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
+
+- name: Reload Nginx to pick up directory-mounted ingress changes
+  ansible.builtin.command: docker compose exec -T nginx nginx -s reload
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
+
+- name: Verify the public HTTPS management endpoint
+  ansible.builtin.uri:
+    url: "https://{{ netbird_domain }}/api/instance"
+    status_code: 200
+    return_content: false
+  register: netbird_endpoint
+  until: netbird_endpoint.status | default(0) == 200
+  retries: 12
+  delay: 5
+
+- name: Bootstrap the initial owner through the private container network
+  ansible.builtin.import_tasks: bootstrap.yml
+
+- name: Install a consistent local backup command
+  ansible.builtin.template:
+    src: backup.sh.j2
+    dest: "{{ netbird_control_plane_directory }}/backup.sh"
+    owner: root
+    group: root
+    mode: '0700'

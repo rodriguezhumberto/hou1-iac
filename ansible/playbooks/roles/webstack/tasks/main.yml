@@ -8,6 +8,14 @@
     force: yes
   no_log: true
 
+# The application template currently has one legacy VPN allow directive. Manage
+# the CIDRs here after every checkout so deployment cannot restore the old ACL.
+- name: Configure CMS access for enabled VPNs
+  ansible.builtin.import_tasks: cms-acl.yml
+
+# The dedicated control-plane playbook owns its untracked Compose override.
+# Git checkout preserves it; application deployments never render server config,
+# manage its stack, or open STUN ports. Existing Nginx mounts remain in effect.
 - name: Ensure database directory exists with open permissions for Astro container
   file:
     path: "{{ app_directory }}/database"
@@ -48,7 +56,7 @@
     mode: '0600'
     content: |
       # Network Setup
-      HOU1_VPN_IP={{ hou1_vpn_ip }}
+      HOU1_VPN_IP={{ management_ip }}
       vpn_subnet={{ vpn_subnet }}
       staff_vpn_subnet={{ staff_vpn_subnet }}
 
@@ -132,18 +140,27 @@
     day: "1,15"
     job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
   
+- name: Validate Compose configuration before deployment
+  ansible.builtin.command: docker compose config --quiet
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
+
 - name: Rebuild and deploy updated Docker containers
   command: docker compose up -d --build
   args:
     chdir: "{{ app_directory }}"
 
-- name: Recreate Nginx to render the updated configuration template
-  command: docker compose up -d --no-deps --force-recreate nginx
+
+# Nginx's entrypoint renders bind-mounted templates only at container startup.
+# Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.
+- name: Recreate Nginx to render the current ingress templates
+  ansible.builtin.command: docker compose up -d --no-deps --force-recreate nginx
   args:
     chdir: "{{ app_directory }}"
 
-- name: Validate the running Nginx configuration
-  command: docker compose exec -T nginx nginx -t
+- name: Validate the deployed Nginx configuration
+  ansible.builtin.command: docker compose exec -T nginx nginx -t
   args:
     chdir: "{{ app_directory }}"
   changed_when: false

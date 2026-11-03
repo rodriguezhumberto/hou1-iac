@@ -1,6 +1,6 @@
 ---
 - name: Set SSH authentication policy before provider overrides
-  copy:
+  ansible.builtin.copy:
     dest: /etc/ssh/sshd_config.d/00-ansible-security.conf
     owner: root
     group: root
@@ -13,26 +13,21 @@
     validate: /usr/sbin/sshd -t -f %s
   notify: Reload SSH
 
-- name: Restrict SSH ListenAddress to WireGuard VPN
-  lineinfile:
-    path: /etc/ssh/sshd_config
-    regexp: '^#?ListenAddress'
-    line: 'ListenAddress {{ hou1_vpn_ip }}'
-    validate: /usr/sbin/sshd -t -f %s
-  notify: Reload SSH
-
-- name: Allow UFW Ports
-  ufw:
+- name: Allow public HTTP and HTTPS
+  community.general.ufw:
     rule: allow
-    port: "{{ item.port }}"
-    proto: "{{ item.proto }}"
-  loop:
-    - { port: '51820', proto: 'udp' }
-    - { port: '80', proto: 'tcp' }
-    - { port: '443', proto: 'tcp' }
+    port: "{{ item }}"
+    proto: tcp
+  loop: ['80', '443']
 
-- name: Allow SSH from the VPN subnet only through WireGuard
-  ufw:
+- name: Manage legacy WireGuard ingress
+  community.general.ufw:
+    rule: allow
+    port: '51820'
+    proto: udp
+
+- name: Manage SSH access through WireGuard
+  community.general.ufw:
     rule: allow
     direction: in
     interface: wg0
@@ -40,16 +35,124 @@
     proto: tcp
     src: "{{ vpn_subnet }}"
 
+- name: Allow SSH through NetBird
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: "{{ netbird_interface }}"
+    port: '22'
+    proto: tcp
+    src: "{{ netbird_subnet }}"
+  when: netbird_enabled | bool
+
 - name: Remove the legacy source-only SSH allowance
-  ufw:
-    delete: yes
+  community.general.ufw:
+    delete: true
     rule: allow
     port: '22'
     proto: tcp
     src: "{{ vpn_subnet }}"
 
 - name: Enable UFW and set default deny incoming
-  ufw:
+  community.general.ufw:
     state: enabled
     direction: incoming
     policy: deny
+
+- name: Create the SSH service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/ssh.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Retry SSH startup while private VPN addresses become available
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/ssh.service.d/vpn.conf
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      After=wg-quick@wg0.service {{ 'netbird.service' if netbird_enabled | bool else '' }}
+      StartLimitIntervalSec=0
+      [Service]
+      Restart=on-failure
+      RestartSec=5s
+  register: ssh_vpn_unit
+
+- name: Reload systemd after updating SSH startup ordering
+  ansible.builtin.systemd:
+    daemon_reload: true
+  when: ssh_vpn_unit.changed
+
+# Explicit addresses avoid exposing SSH publicly even if another firewall tool
+# changes its rules. WireGuard remains the recovery path for this migration.
+- name: Require a known peer address before changing SSH listeners
+  ansible.builtin.assert:
+    that:
+      - netbird_ip is ansible.utils.ipv4
+      - "'/' not in netbird_ip"
+      - ([netbird_ip] | ansible.utils.ipaddr(netbird_subnet) | length) == 1
+    fail_msg: Set this environment's netbird_ip from Vault to a valid address in netbird_subnet.
+  when: netbird_enabled | bool
+
+- name: Configure explicit private SSH listeners with rollback on validation failure
+  block:
+    - name: Back up the current SSH configuration in memory
+      ansible.builtin.slurp:
+        src: /etc/ssh/sshd_config
+      register: ssh_config_before
+
+    - name: Write the private VPN listeners and preserve other SSH settings
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config
+        content: "{{ lookup('ansible.builtin.template', 'sshd_config.j2') }}"
+        owner: root
+        group: root
+        mode: '0644'
+        validate: /usr/sbin/sshd -t -f %s
+      notify: Reload SSH
+
+    - name: Reload the running SSH daemon for NetBird listeners
+      ansible.builtin.systemd:
+        name: ssh
+        state: reloaded
+      when: netbird_enabled | bool
+
+    - name: Read the effective SSH configuration including provider overrides
+      ansible.builtin.command: /usr/sbin/sshd -T
+      register: ssh_effective_config
+      changed_when: false
+      check_mode: false
+
+    - name: Verify private SSH listeners
+      ansible.builtin.import_tasks: verify-listeners.yml
+
+    - name: Read the active SSH sockets
+      ansible.builtin.command: ss -Hln 'sport = :22'
+      register: ssh_active_listeners
+      changed_when: false
+      when: netbird_enabled | bool
+
+    - name: Verify the running daemon listens on the NetBird address
+      ansible.builtin.assert:
+        that: "(netbird_ip ~ ':22') in ssh_active_listeners.stdout"
+        fail_msg: >-
+          SSH configuration contains the NetBird listener, but the running daemon
+          does not. Check systemctl status ssh and reload ssh before continuing.
+      when: netbird_enabled | bool
+  rescue:
+    - name: Restore SSH configuration after invalid listener change
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config
+        content: "{{ ssh_config_before.content | b64decode }}"
+        owner: root
+        group: root
+        mode: '0644'
+      when: ssh_config_before.content is defined
+
+    - name: Stop without applying the invalid SSH configuration
+      ansible.builtin.fail:
+        msg: SSH listener validation failed; the previous configuration was restored.

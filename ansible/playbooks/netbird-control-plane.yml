@@ -1,0 +1,18 @@
+---
+- name: Deploy the shared NetBird control plane on the public production host
+  hosts: netbird_control_plane
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  vars:
+    # Use the independent recovery VPN even after application inventory cutover.
+    ansible_host: "{{ hou1_vpn_ip }}"
+  pre_tasks:
+    - name: Require the dedicated production target before any host changes
+      ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
+      tags: [always]
+  roles:
+    - role: docker
+    - role: netbird_control_plane

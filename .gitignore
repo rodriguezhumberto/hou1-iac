@@ -2,6 +2,7 @@
 .vault_pass
 vault_pass.txt
 *.vault_pass
+ansible/vault/netbird-token.yml
 *.age
 *_unencrypted.yml
 *.dec
@@ -24,3 +25,6 @@ roles/external/
 .idea/
 *.log
 *.tmp
+# Python validation artifacts
+__pycache__/
+*.pyc

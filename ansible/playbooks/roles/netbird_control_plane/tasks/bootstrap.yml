@@ -1,0 +1,44 @@
+---
+# Runs on the production host over SSH. No host listener, forwarded setup
+# headers or public bootstrap allowlist is needed for this private request.
+- name: Locate the running NetBird server container
+  ansible.builtin.command:
+    argv:
+      - docker
+      - compose
+      - -p
+      - "{{ netbird_control_plane_project }}"
+      - -f
+      - compose.yaml
+      - ps
+      - --quiet
+      - netbird-server
+    chdir: "{{ netbird_control_plane_directory }}"
+  register: netbird_bootstrap_container_id
+  changed_when: false
+
+- name: Require exactly one NetBird server container
+  ansible.builtin.assert:
+    that: netbird_bootstrap_container_id.stdout is match('^[a-f0-9]{12,64}$')
+    fail_msg: Cannot safely identify the running NetBird server for owner bootstrap.
+
+- name: Inspect the private NetBird server address
+  community.docker.docker_container_info:
+    name: "{{ netbird_bootstrap_container_id.stdout }}"
+  register: netbird_bootstrap_container
+
+- name: Require an address on the dedicated ingress network
+  ansible.builtin.assert:
+    that:
+      - netbird_bootstrap_container.exists
+      - netbird_ingress_network in netbird_bootstrap_container.container.NetworkSettings.Networks
+      - netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress is ansible.utils.ipv4
+      - ([netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
+    fail_msg: NetBird is not reachable on its expected private Docker network.
+
+- name: Select the private API for owner bootstrap
+  ansible.builtin.set_fact:
+    netbird_bootstrap_api_url: "http://{{ netbird_bootstrap_container.container.NetworkSettings.Networks[netbird_ingress_network].IPAddress }}:80"
+
+- name: Initialize the owner if required
+  ansible.builtin.import_tasks: bootstrap-owner.yml

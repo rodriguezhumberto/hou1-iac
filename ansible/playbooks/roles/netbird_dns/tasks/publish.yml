@@ -1,0 +1,34 @@
+---
+- name: Publish split DNS after verifying the resolver and access policies
+  block:
+    - name: Create or update the managed nameserver group
+      ansible.builtin.uri:
+        url: >-
+          {{ netbird_api_url }}/api/dns/nameservers{{
+             '/' ~ netbird_dns_plan.id if netbird_dns_plan.id else '' }}
+        method: "{{ 'PUT' if netbird_dns_plan.id else 'POST' }}"
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body: "{{ netbird_dns_plan.body }}"
+        status_code: 200
+      when: netbird_dns_plan.changed
+      changed_when: true
+
+    - name: Read back the nameserver groups
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/dns/nameservers"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_dns_after
+
+    - name: Verify the distributed split DNS settings
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (netbird_client_groups.json | netbird_dns_plan(
+              netbird_dns_records, netbird_ip,
+              netbird_dns_domain, netbird_subnet, netbird_dns_port,
+              netbird_dns_after.json)).changed
+  delegate_to: localhost
+  become: false
+  no_log: true

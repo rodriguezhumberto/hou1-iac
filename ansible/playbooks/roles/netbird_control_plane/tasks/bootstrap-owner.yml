@@ -1,0 +1,106 @@
+---
+- name: Read the NetBird setup state over the private network
+  ansible.builtin.uri:
+    url: "{{ netbird_bootstrap_api_url }}/api/instance"
+    method: GET
+    status_code: 200
+    return_content: true
+    unredirected_headers: [Authorization]
+  register: netbird_instance_state
+  until: netbird_instance_state.json.setup_required is defined
+  retries: 12
+  delay: 5
+
+- name: Require an explicit boolean setup state before sending owner credentials
+  ansible.builtin.assert:
+    that:
+      - netbird_instance_state.json.setup_required is boolean
+    fail_msg: Refusing bootstrap because the server did not return a valid setup state.
+
+- name: Require a saved token for an initialized instance
+  ansible.builtin.assert:
+    that: netbird_instance_state.json.setup_required or netbird_saved_token.exists
+    fail_msg: >-
+      The owner already exists but its API token Vault is missing. Restore the
+      encrypted file or save a replacement owner PAT using ansible-vault edit;
+      do not reset the owner. See docs/netbird-operations.md for recovery.
+
+- name: Refuse to reuse a previous installation's token for a new instance
+  ansible.builtin.assert:
+    that: not netbird_instance_state.json.setup_required or not netbird_saved_token.exists
+    fail_msg: A token exists for an uninitialized server. Restore server state or archive the old token Vault explicitly.
+
+- name: Require owner variables only while the instance is uninitialized
+  ansible.builtin.assert:
+    that:
+      - netbird_owner_email | default('') is match('^[^\s@]+@[^\s@]+\.[^\s@]+$')
+      - netbird_owner_name | default('') | trim | length > 0
+      - netbird_owner_password | default('') | length >= 8
+      - netbird_owner_password | default('') | length <= 72
+    fail_msg: Provide valid NetBird owner values in the encrypted Vault before bootstrap.
+  when: netbird_instance_state.json.setup_required
+  no_log: true
+
+- name: Create the initial NetBird owner through the private setup API
+  ansible.builtin.uri:
+    url: "{{ netbird_bootstrap_api_url }}/api/setup"
+    method: POST
+    body_format: json
+    body:
+      email: "{{ netbird_owner_email }}"
+      name: "{{ netbird_owner_name }}"
+      password: "{{ netbird_owner_password }}"
+      create_pat: true
+      pat_expire_in: "{{ netbird_api_token_expire_days }}"
+    status_code: 200
+    return_content: true
+  when: netbird_instance_state.json.setup_required
+  register: netbird_owner_setup
+  changed_when: true
+  no_log: true
+
+- name: Persist the one-time token before further API operations
+  netbird_token_vault:
+    path: "{{ netbird_token_vault_file }}"
+    management_url: "{{ netbird_management_url }}"
+    vault_id: "{{ netbird_token_vault_id }}"
+    token: "{{ netbird_owner_setup.json.personal_access_token | default('') }}"
+  when: netbird_instance_state.json.setup_required
+  no_log: true
+
+- name: Select the saved API credential for this run
+  ansible.builtin.set_fact:
+    netbird_api_token: >-
+      {{ netbird_owner_setup.json.personal_access_token
+         if netbird_instance_state.json.setup_required else netbird_saved_token.token }}
+  no_log: true
+
+- name: Set the authenticated private API context
+  ansible.builtin.import_tasks: ../../netbird_common/tasks/api-context.yml
+  vars:
+    netbird_api_context_url: "{{ netbird_bootstrap_api_url }}"
+    netbird_api_context_token: "{{ netbird_api_token }}"
+
+- name: Verify the initial owner setup completed
+  ansible.builtin.uri:
+    url: "{{ netbird_bootstrap_api_url }}/api/instance"
+    method: GET
+    status_code: 200
+    return_content: true
+  register: netbird_instance_after_setup
+  until: >-
+    netbird_instance_after_setup.json.setup_required is defined and
+    netbird_instance_after_setup.json.setup_required is sameas false
+  retries: 6
+  delay: 3
+  when: netbird_instance_state.json.setup_required
+  no_log: true
+
+- name: Configure the account using the persisted API token
+  ansible.builtin.import_tasks: account.yml
+
+- name: Provision the configured groups using the persisted API token
+  ansible.builtin.import_tasks: groups.yml
+
+- name: Configure administrator and staff access policies
+  ansible.builtin.import_tasks: ../../netbird_common/tasks/netbird-policies.yml

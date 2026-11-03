@@ -1,0 +1,83 @@
+---
+- name: Configure and connect the persistent peer
+  block:
+    - name: Create a short-lived setup key for first enrollment
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/setup-keys"
+        method: POST
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body:
+          name: "hou1-{{ inventory_hostname }}"
+          type: one-off
+          usage_limit: 1
+          expires_in: 600
+          ephemeral: false
+          auto_groups: ["{{ netbird_server_group_id }}"]
+        status_code: 200
+      delegate_to: localhost
+      become: false
+      register: netbird_generated_setup_key
+      when: netbird_needs_enrollment | bool
+      no_log: true
+
+    - name: Validate the generated key response
+      ansible.builtin.assert:
+        that:
+          - netbird_generated_setup_key.json.id is match('^[a-zA-Z0-9_-]+$')
+          - netbird_generated_setup_key.json.key | default('') | length > 0
+      when: netbird_needs_enrollment | bool
+      no_log: true
+
+    - name: Create a temporary enrollment key file
+      ansible.builtin.tempfile:
+        state: file
+        prefix: netbird-enrollment-
+      register: netbird_key_file
+      when: netbird_needs_enrollment | bool
+
+    - name: Write the one-off key without exposing it in process arguments
+      ansible.builtin.copy:
+        dest: "{{ netbird_key_file.path }}"
+        content: "{{ netbird_generated_setup_key.json.key }}"
+        owner: root
+        group: root
+        mode: '0600'
+      when: netbird_needs_enrollment | bool
+      no_log: true
+
+    - name: Connect to the self-hosted management server
+      ansible.builtin.command:
+        argv: >-
+          {{ ['timeout', '90', 'netbird', 'up',
+              '--management-url', netbird_management_url,
+              '--interface-name', netbird_interface,
+              '--wireguard-port', netbird_wireguard_port | string,
+              '--disable-dns', '--no-browser'] +
+             (['--setup-key-file', netbird_key_file.path]
+              if netbird_needs_enrollment | bool else []) }}
+      register: netbird_up
+      changed_when: >-
+        not (netbird_before_status.management.connected | default(false)) or
+        netbird_before_status.wireguardPort | default(0) | int != netbird_wireguard_port | int
+      no_log: true
+  always:
+    - name: Remove the temporary enrollment key even on failure
+      ansible.builtin.file:
+        path: "{{ netbird_key_file.path }}"
+        state: absent
+      when: netbird_key_file.path is defined
+      no_log: true
+
+    - name: Delete the issued enrollment key after success or failure
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/setup-keys/{{ netbird_generated_setup_key.json.id }}"
+        method: DELETE
+        headers: "{{ netbird_api_headers }}"
+        status_code: [200, 404]
+      delegate_to: localhost
+      become: false
+      when:
+        - netbird_generated_setup_key.json.id is defined
+        - netbird_generated_setup_key.json.id is match('^[a-zA-Z0-9_-]+$')
+      no_log: true

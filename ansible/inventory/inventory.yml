@@ -14,7 +14,7 @@ all:
         hou1_test:
           hosts:
             test_hou1:
-              ansible_host: 10.10.0.10
+              ansible_host: "{{ management_ip }}"
           vars:
             ansible_user: "{{ new_user}}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
@@ -36,8 +36,14 @@ all:
         hou1_prod:
           hosts:
             prod_hou1:
-              ansible_host: 10.10.0.1
+              ansible_host: "{{ management_ip }}"
           vars:
             ansible_user: "{{ new_user }}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
             ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+
+    # Same production host and prod_env/all Vault variables; no duplicate identity.
+    # Used only by the dedicated control-plane playbook.
+    netbird_control_plane:
+      hosts:
+        prod_hou1: {}

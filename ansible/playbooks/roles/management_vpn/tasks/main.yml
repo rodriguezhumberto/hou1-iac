@@ -1,0 +1,33 @@
+---
+# Included with the always tag so targeted runs cannot bypass migration guards.
+- name: Keep WireGuard recovery throughout this migration stage
+  ansible.builtin.assert:
+    that:
+      - wireguard_enabled | bool
+      - management_vpn in ['wireguard', 'netbird']
+      - management_vpn != 'netbird' or netbird_enabled | bool
+    fail_msg: >-
+      Keep wireguard_enabled=true for SSH recovery. WireGuard retirement
+      belongs to the next issue; select NetBird management only after
+      fresh SSH and reboot recovery checks.
+
+- name: Validate self-hosted NetBird configuration
+  ansible.builtin.assert:
+    that:
+      - netbird_server_group | default('') in ['test-servers', 'prod-servers']
+      - netbird_version == '0.82.0'
+      - netbird_management_url is match('^https://[^/]+/?$')
+      - (netbird_management_url | urlsplit('hostname')) not in ['api.netbird.io', 'app.netbird.io']
+      - netbird_subnet is ansible.utils.ipv4
+      - "'/' in netbird_subnet"
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int >= 16
+      - netbird_interface is match('^[a-zA-Z0-9_-]{1,15}$')
+      - netbird_wireguard_port | int > 0
+      - netbird_wireguard_port | int <= 65535
+      - netbird_wireguard_port | int != 51820
+    fail_msg: Set the self-hosted HTTPS URL, actual account IPv4 CIDR and a port other than 51820.
+  when: netbird_enabled | bool
+
+- name: Validate the declared server address
+  ansible.builtin.import_tasks: ../../netbird_client/tasks/validate-address.yml
+  when: netbird_enabled | bool

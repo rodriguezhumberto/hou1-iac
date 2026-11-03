@@ -1,0 +1,54 @@
+---
+# Select the peer by its observed address in membership.yml before changing it.
+# Never select a peer by the desired IP: that IP might belong to another device.
+- name: Assign the declared address while preserving peer settings
+  block:
+    - name: Refuse an address already assigned to another peer
+      ansible.builtin.assert:
+        that:
+          - >-
+            not (netbird_client_peers.json | selectattr('ip', 'equalto', netbird_ip) |
+                 rejectattr('id', 'equalto', netbird_server_peer.id) | list | length)
+        fail_msg: The declared server address belongs to another peer. Correct the conflict explicitly.
+
+    - name: Update the enrolled peer address only when it differs
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/peers/{{ netbird_server_peer.id }}"
+        method: PUT
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body:
+          ip: "{{ netbird_ip }}"
+          name: "{{ netbird_server_peer.name }}"
+          ssh_enabled: "{{ netbird_server_peer.ssh_enabled }}"
+          login_expiration_enabled: "{{ netbird_server_peer.login_expiration_enabled }}"
+          inactivity_expiration_enabled: "{{ netbird_server_peer.inactivity_expiration_enabled }}"
+        status_code: 200
+      when: netbird_server_peer.ip != netbird_ip
+      changed_when: true
+
+    - name: Read back the enrolled peer by its stable peer ID
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/peers/{{ netbird_server_peer.id }}"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_assigned_peer
+      until: >-
+        netbird_assigned_peer.json.id == netbird_server_peer.id and
+        netbird_assigned_peer.json.ip == netbird_ip
+      retries: 6
+      delay: 2
+
+    - name: Retain the verified peer record for later tasks
+      ansible.builtin.set_fact:
+        netbird_server_peer: "{{ netbird_assigned_peer.json }}"
+  delegate_to: localhost
+  become: false
+  no_log: true
+  rescue:
+    - name: Explain peer address assignment failure
+      ansible.builtin.fail:
+        msg: >-
+          Could not assign or verify the declared server address. Check API access,
+          peer settings, and address conflicts. Use WireGuard for enrollment or
+          address repair; do not change inventory to an unverified address.

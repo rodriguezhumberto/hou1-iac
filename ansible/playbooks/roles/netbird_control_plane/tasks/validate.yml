@@ -1,0 +1,47 @@
+---
+- name: Validate colocated control-plane settings
+  ansible.builtin.assert:
+    that:
+      - netbird_groups is sequence and netbird_groups is not string and netbird_groups is not mapping
+      - netbird_groups | length > 0
+      - netbird_groups | unique | length == netbird_groups | length
+      - netbird_groups | select('string') | list | length == netbird_groups | length
+      - netbird_groups | map('trim') | reject('equalto', '') | list | length == netbird_groups | length
+      - "'All' not in netbird_groups"
+      - netbird_api_token_expire_days | int >= 1
+      - netbird_api_token_expire_days | int <= 365
+      - netbird_subnet is ansible.utils.ipv4
+      - "'/' in netbird_subnet"
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int >= 16
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int <= 28
+      - netbird_server_image == 'netbirdio/netbird-server:' ~ netbird_version
+      - netbird_domain is match('^(?=.{1,253}$)([a-z0-9]([a-z0-9-]*[a-z0-9])?\.)+[a-z]{2,63}$')
+      - >-
+        netbird_domain not in [primary_domain, secondary_domain,
+        'www.' ~ primary_domain, 'www.' ~ secondary_domain,
+        'test.' ~ primary_domain, 'test.' ~ secondary_domain,
+        'cms.' ~ primary_domain, 'cms-test.' ~ primary_domain]
+      - netbird_management_url | regex_replace('/$', '') == 'https://' ~ netbird_domain
+      - wireguard_enabled | bool
+      - netbird_control_plane_directory is match('^/[a-zA-Z0-9/_-]+$')
+      - netbird_control_plane_directory != app_directory
+      - not netbird_control_plane_directory.startswith(app_directory ~ '/')
+      - netbird_backup_directory is match('^/[a-zA-Z0-9/_-]+$')
+      - not netbird_backup_directory.startswith(netbird_control_plane_directory ~ '/')
+      - netbird_backup_directory != netbird_control_plane_directory
+      - netbird_ingress_network is match('^[a-zA-Z0-9_-]+$')
+      - netbird_control_plane_project is match('^[a-z0-9][a-z0-9_-]+$')
+      - netbird_ingress_subnet is ansible.utils.ipv4
+      - "'/' in netbird_ingress_subnet"
+      - netbird_ingress_proxy_ip is ansible.utils.ipv4
+      - "'/' not in netbird_ingress_proxy_ip"
+      - ([netbird_ingress_proxy_ip] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
+      - netbird_ingress_dynamic_range is ansible.utils.ipv4
+      - "'/' in netbird_ingress_dynamic_range"
+      - ([netbird_ingress_dynamic_range] | ansible.utils.ipaddr(netbird_ingress_subnet) | length) == 1
+      - ([netbird_ingress_proxy_ip] | ansible.utils.ipaddr(netbird_ingress_dynamic_range) | length) == 0
+      - netbird_server_image is match('^netbirdio/netbird-server:[0-9]+\.[0-9]+\.[0-9]+$')
+      - netbird_dashboard_image is match('^netbirdio/dashboard:v[0-9]+\.[0-9]+\.[0-9]+$')
+    fail_msg: >-
+      Set a distinct public NetBird domain, private ingress network and pinned
+      images. Keep WireGuard SSH recovery enabled for the colocated control plane.

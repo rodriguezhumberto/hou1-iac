@@ -1,0 +1,79 @@
+---
+- name: Reconcile administrator, staff and DNS network policies
+  block:
+    - name: Read existing policies
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_existing_policies
+
+    - name: Plan managed policies and identify the built-in default
+      ansible.builtin.set_fact:
+        netbird_policy_plan: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_existing_policies.json, netbird_dns_port) }}"
+
+    - name: Create or update managed policies
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/policies{{ '/' ~ item.id if item.id else '' }}"
+        method: "{{ 'PUT' if item.id else 'POST' }}"
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body: "{{ item.body }}"
+        status_code: 200
+      loop: "{{ netbird_policy_plan.managed }}"
+      when: item.changed
+      changed_when: true
+
+    - name: Read back managed policies before restricting the default
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_policies_after
+
+    - name: Normalize the managed policy readback
+      ansible.builtin.set_fact:
+        netbird_policy_plan_after: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port) }}"
+
+    - name: Verify managed policies match the intended access
+      ansible.builtin.assert:
+        that:
+          - not (netbird_policy_plan_after.managed | selectattr('changed') | list | length)
+
+    - name: Disable the built-in All-to-All policy after verifying replacements
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/policies/{{ netbird_policy_plan_after.default.id }}"
+        method: PUT
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body: "{{ netbird_policy_plan_after.default | netbird_policy_body | combine({'enabled': false}) }}"
+        status_code: 200
+      when: netbird_policy_plan_after.default is not none and netbird_policy_plan_after.default.enabled
+      changed_when: true
+
+    - name: Read back the effective policy configuration
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_effective_policies
+
+    - name: Normalize the final policy readback
+      ansible.builtin.set_fact:
+        netbird_policy_plan_final: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port) }}"
+
+    - name: Verify managed access and disabled default
+      ansible.builtin.assert:
+        that:
+          - not (netbird_policy_plan_final.managed | selectattr('changed') | list | length)
+          - not (netbird_policy_plan_final.default is not none and netbird_policy_plan_final.default.enabled)
+  no_log: true
+  rescue:
+    - name: Explain policy reconciliation failure
+      no_log: false
+      ansible.builtin.fail:
+        msg: >-
+          NetBird policy reconciliation failed. Check API access, required group names,
+          duplicate policies, or operator-owned hou1-* / customized Default policies.
+          Review policies in the dashboard before relying on access restrictions.
+          Rerun after correction; WireGuard remains the recovery path.

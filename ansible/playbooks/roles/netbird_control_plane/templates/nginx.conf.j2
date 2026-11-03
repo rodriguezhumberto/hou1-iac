@@ -1,0 +1,63 @@
+# Mounted as a .conf, not an envsubst template. Preserve Nginx's $variables.
+{% macro headers() %}
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $remote_addr;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+{% endmacro %}
+server {
+    listen 80;
+    server_name {{ netbird_domain }};
+    return 301 https://$host$request_uri;
+}
+server {
+    listen 443 ssl;
+    http2 on;
+    server_name {{ netbird_domain }};
+    ssl_certificate /etc/letsencrypt/live/{{ netbird_domain }}/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/{{ netbird_domain }}/privkey.pem;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    # Docker DNS and variable upstreams let Nginx start while NetBird is offline,
+    # and recover without a reload when its containers receive new addresses.
+    resolver 127.0.0.11 valid=10s ipv6=off;
+    set $netbird_server hou1-netbird-server:80;
+    set $netbird_dashboard hou1-netbird-dashboard:80;
+    client_header_timeout 1d;
+    client_body_timeout 1d;
+
+    # Owner creation is performed through the server's private Docker network.
+    # Never expose the unauthenticated setup endpoint through public ingress.
+    location = /api/setup {
+        return 403;
+    }
+    location ^~ /api/setup/ { return 403; }
+
+    location ~ ^/(relay|ws-proxy/) {
+        proxy_pass http://$netbird_server;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "Upgrade";
+        proxy_read_timeout 1d;
+        proxy_send_timeout 1d;
+{{ headers() }}
+    }
+    location ~ ^/(signalexchange\.SignalExchange|management\.(ManagementService|ProxyService))/ {
+        grpc_pass grpc://$netbird_server;
+        grpc_set_header Host $host;
+        grpc_set_header X-Forwarded-For $remote_addr;
+        grpc_set_header X-Forwarded-Proto https;
+        grpc_read_timeout 1d;
+        grpc_send_timeout 1d;
+        grpc_socket_keepalive on;
+    }
+    location ~ ^/(api|oauth2)/ {
+        proxy_pass http://$netbird_server;
+        proxy_read_timeout 1d;
+{{ headers() }}
+    }
+    location / {
+        proxy_pass http://$netbird_dashboard;
+{{ headers() }}
+    }
+}

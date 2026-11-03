@@ -1,0 +1,51 @@
+---
+- name: Ensure the configured NetBird groups exist
+  block:
+    - name: Read existing groups
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/groups"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_existing_groups
+
+    - name: Reject ambiguous existing group names before creating groups
+      ansible.builtin.assert:
+        that:
+          - netbird_existing_groups.json is sequence
+          - netbird_existing_groups.json | selectattr('name', 'equalto', item) | list | length <= 1
+      loop: "{{ netbird_groups }}"
+
+    - name: Create missing groups without changing existing membership
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/groups"
+        method: POST
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body:
+          name: "{{ item }}"
+          peers: []
+        status_code: 200
+      loop: "{{ netbird_groups }}"
+      when: item not in (netbird_existing_groups.json | map(attribute='name') | list)
+      changed_when: true
+
+    - name: Read back the groups
+      ansible.builtin.uri:
+        url: "{{ netbird_api_url }}/api/groups"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: netbird_groups_after
+
+    - name: Verify each configured group exists exactly once
+      ansible.builtin.assert:
+        that:
+          - netbird_groups_after.json | selectattr('name', 'equalto', item) | list | length == 1
+      loop: "{{ netbird_groups }}"
+  no_log: true
+  rescue:
+    - name: Explain group provisioning failure
+      ansible.builtin.fail:
+        msg: >-
+          Could not provision NetBird groups. Check API connectivity, token permissions,
+          and duplicate names in the dashboard. Rerun after correction; existing
+          groups and peer membership are preserved.

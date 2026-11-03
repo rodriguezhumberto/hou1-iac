@@ -1,0 +1,21 @@
+#!/bin/bash
+# Run as root over WireGuard or provider console: the server pauses for consistency.
+set -euo pipefail
+umask 077
+backup_dir={{ netbird_backup_directory | quote }}
+control_plane_dir={{ netbird_control_plane_directory | quote }}
+certbot_dir={{ (app_directory ~ '/certbot') | quote }}
+exec 9>"$backup_dir/.lock"
+flock -n 9 || { echo "A NetBird backup is already running" >&2; exit 1; }
+cd "$control_plane_dir"
+backup_file="$backup_dir/netbird-$(date -u +%Y%m%dT%H%M%S).tar.gz"
+if [[ -z "$(docker compose -p {{ netbird_control_plane_project }} -f compose.yaml ps --status running -q netbird-server)" ]]; then
+    echo "NetBird server must be running before a backup" >&2
+    exit 1
+fi
+# Restart even if tar fails. Do not stop application ingress or the peer daemon.
+trap 'docker compose -p {{ netbird_control_plane_project }} -f compose.yaml start netbird-server' EXIT
+docker compose -p {{ netbird_control_plane_project }} -f compose.yaml stop netbird-server
+tar -czf "$backup_file.partial" -C "$control_plane_dir" . -C "$certbot_dir" conf
+mv "$backup_file.partial" "$backup_file"
+printf '%s\n' "$backup_file"

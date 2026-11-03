@@ -1,6 +1,58 @@
 new_user_public_key: "{{ users_public_ssh }}"
 hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
 vpn_subnet: "10.10.0.0/24"
-staff_vpn_subnet: "{{ vpn_subnet }}"
+staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
 
 ansible_python_interpreter: /usr/bin/python3.11
+
+# Enable clients in test first; retain WireGuard recovery throughout this issue.
+wireguard_enabled: true
+netbird_enabled: false
+management_vpn: wireguard
+# Keep WireGuard for SSH recovery without CMS access after management cutover.
+wireguard_cms_enabled: "{{ management_vpn == 'wireguard' }}"
+netbird_management_url: "https://{{ netbird_domain }}"
+netbird_subnet: "100.90.0.0/16"
+netbird_ip: ""
+netbird_interface: wt0
+netbird_wireguard_port: 51821
+# Shared server/client release; the dashboard has its own version scheme.
+netbird_version: "0.82.0"
+netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
+management_ip: "{{ netbird_ip if management_vpn == 'netbird' else hou1_vpn_ip }}"
+
+# Shared endpoint derives from the existing Vault-backed website domain.
+# Deployment is selected only by the dedicated playbook/inventory group.
+netbird_domain: "netbird.{{ primary_domain }}"
+netbird_control_plane_directory: /opt/hou1-netbird
+netbird_control_plane_project: hou1-netbird
+netbird_server_image: "netbirdio/netbird-server:{{ netbird_version }}"
+netbird_dashboard_image: netbirdio/dashboard:v2.96.0
+netbird_certbot_image: certbot/dns-cloudflare:v5.1.0
+netbird_ingress_network: hou1-netbird-ingress
+netbird_ingress_subnet: 172.30.80.0/29
+# Keep automatically assigned backend addresses away from Nginx's fixed IP.
+netbird_ingress_dynamic_range: 172.30.80.4/30
+netbird_ingress_proxy_ip: 172.30.80.2
+netbird_backup_directory: /var/backups/hou1-netbird
+
+# Controller-side encrypted API credential, separate from inventory secrets.
+netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
+netbird_token_vault_id: default
+netbird_api_token_expire_days: 365
+
+# Groups are created if missing; policies and peer membership are managed separately.
+netbird_groups:
+  - test-servers
+  - prod-servers
+  - administrators
+  - staff
+
+# Names and server addresses derive from the encrypted inventory.
+netbird_dns_domain: "{{ primary_domain }}"
+netbird_dns_records:
+  - {name: "test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
+  - {name: "staff-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
+  - {name: "cms-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
+netbird_dns_upstreams: [1.1.1.1, 9.9.9.9]
+netbird_dns_port: 1053

@@ -1,0 +1,12 @@
+---
+- name: Restrict the control plane to the existing production host
+  ansible.builtin.assert:
+    that:
+      - target_hosts is not defined
+      - groups.get('netbird_control_plane', []) | length == 1
+      - inventory_hostname in groups.get('netbird_control_plane', [])
+      - inventory_hostname in groups.get('hou1_prod', [])
+      - inventory_hostname not in groups.get('test_env', [])
+    fail_msg: >-
+      Use the dedicated netbird_control_plane inventory group and playbook without
+      target_hosts. Its only member must be the existing production host.
