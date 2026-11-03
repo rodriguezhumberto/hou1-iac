@@ -3,9 +3,8 @@
   block:
     - name: Read existing policies
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
         status_code: 200
       register: netbird_existing_policies
 
@@ -15,10 +14,9 @@
 
     - name: Create or update managed policies
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies{{ '/' ~ item.id if item.id else '' }}"
+        url: "{{ netbird_api_url }}/api/policies{{ '/' ~ item.id if item.id else '' }}"
         method: "{{ 'PUT' if item.id else 'POST' }}"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        headers: "{{ netbird_api_headers }}"
         body_format: json
         body: "{{ item.body }}"
         status_code: 200
@@ -28,9 +26,8 @@
 
     - name: Read back managed policies before restricting the default
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
         status_code: 200
       register: netbird_policies_after
 
@@ -45,10 +42,9 @@
 
     - name: Disable the built-in All-to-All policy after verifying replacements
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies/{{ netbird_policy_plan_after.default.id }}"
+        url: "{{ netbird_api_url }}/api/policies/{{ netbird_policy_plan_after.default.id }}"
         method: PUT
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        headers: "{{ netbird_api_headers }}"
         body_format: json
         body: "{{ netbird_policy_plan_after.default | netbird_policy_body | combine({'enabled': false}) }}"
         status_code: 200
@@ -57,9 +53,8 @@
 
     - name: Read back the effective policy configuration
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/policies"
+        headers: "{{ netbird_api_headers }}"
         status_code: 200
       register: netbird_effective_policies
 

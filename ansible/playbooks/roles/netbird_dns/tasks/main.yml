@@ -110,8 +110,6 @@
     - name: Apply and verify managed policies through the controller
       ansible.builtin.import_tasks: "../../netbird_common/tasks/netbird-policies.yml"
   vars:
-    netbird_bootstrap_api_url: "{{ netbird_management_url | regex_replace('/$', '') }}"
-    netbird_api_token: "{{ netbird_client_token.token }}"
     netbird_groups_after: "{{ netbird_client_groups }}"
   delegate_to: localhost
   become: false

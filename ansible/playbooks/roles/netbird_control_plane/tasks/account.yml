@@ -3,9 +3,8 @@
   block:
     - name: Read the account settings
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/accounts"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/accounts"
+        headers: "{{ netbird_api_headers }}"
         return_content: true
         status_code: 200
       register: netbird_accounts
@@ -34,9 +33,8 @@
 
     - name: Check peers before changing the subnet
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/peers"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/peers"
+        headers: "{{ netbird_api_headers }}"
         return_content: true
         status_code: 200
       register: netbird_account_peers
@@ -51,10 +49,9 @@
 
     - name: Set the subnet while preserving other account settings
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/accounts/{{ netbird_account.id }}"
+        url: "{{ netbird_api_url }}/api/accounts/{{ netbird_account.id }}"
         method: PUT
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        headers: "{{ netbird_api_headers }}"
         body_format: json
         body:
           settings: "{{ netbird_account.settings | combine({'network_range': netbird_subnet}) }}"
@@ -64,9 +61,8 @@
 
     - name: Read back the configured account
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/accounts"
-        headers:
-          Authorization: "Token {{ netbird_api_token }}"
+        url: "{{ netbird_api_url }}/api/accounts"
+        headers: "{{ netbird_api_headers }}"
         return_content: true
         status_code: 200
       register: netbird_account_after

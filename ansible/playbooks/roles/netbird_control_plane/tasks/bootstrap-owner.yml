@@ -84,6 +84,13 @@
          if netbird_instance_state.json.setup_required else netbird_saved_token.token }}
   no_log: true
 
+- name: Set the authenticated private API context
+  ansible.builtin.set_fact:
+    netbird_api_url: "{{ netbird_bootstrap_api_url }}"
+    netbird_api_headers:
+      Authorization: "Token {{ netbird_api_token }}"
+  no_log: true
+
 - name: Verify the initial owner setup completed
   ansible.builtin.uri:
     url: "{{ netbird_bootstrap_api_url }}/api/instance"
