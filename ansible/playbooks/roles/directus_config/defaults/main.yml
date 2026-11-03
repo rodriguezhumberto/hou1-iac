@@ -1,0 +1,12 @@
+---
+directus_config_backup_directory: /var/backups/pearlandpaws/directus
+directus_config_settings:
+  storage_asset_transform: all
+  asset_presets:
+    - key: web-optimized
+      fit: contain
+      quality: 85
+      withoutEnlargement: false
+      format: webp
+      transforms: []
+  public_read_collections: [services, pets, directus_files]

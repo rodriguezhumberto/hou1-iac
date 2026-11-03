@@ -151,6 +151,9 @@
   args:
     chdir: "{{ app_directory }}"
 
+- name: Configure Directus
+  ansible.builtin.include_role:
+    name: directus_config
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.

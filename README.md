@@ -52,6 +52,18 @@ Targets only UFW related rules and blocks.
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "ufw" --ask-vault-pass
 ```
 
+#### Repair Directus Settings
+
+Deployment manages the image preset and CMS read access. Run separately on test:
+
+```bash
+ansible-playbook playbooks/directus.yml --check --ask-vault-pass
+ansible-playbook playbooks/directus.yml --ask-vault-pass
+```
+
+Add `-e target_hosts=hou1_prod` for production. Changes are backed up; users,
+content, and licenses are preserved.
+
 #### Update System WireGuard Configurations Only
 ```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "wireguard" --ask-vault-pass

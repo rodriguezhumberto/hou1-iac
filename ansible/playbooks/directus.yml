@@ -1,0 +1,10 @@
+---
+- name: Configure Directus
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: true
+  pre_tasks:
+    - name: Validate management VPN configuration
+      ansible.builtin.import_role:
+        name: management_vpn
+  roles:
+    - role: directus_config
