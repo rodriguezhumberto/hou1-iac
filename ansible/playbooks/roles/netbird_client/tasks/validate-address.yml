@@ -1,0 +1,11 @@
+---
+- name: Require a declared server address in the account subnet
+  ansible.builtin.assert:
+    that:
+      - netbird_ip is ansible.utils.ipv4
+      - "'/' not in netbird_ip"
+      - ([netbird_ip] | ansible.utils.ipaddr(netbird_subnet) | length) == 1
+      - netbird_ip != (netbird_subnet | ansible.utils.ipaddr('network'))
+      - netbird_ip != (netbird_subnet | ansible.utils.ipaddr('broadcast'))
+      - netbird_ip != (netbird_subnet | ansible.utils.ipaddr(-2) | ansible.utils.ipaddr('address'))
+    fail_msg: Set netbird_ip from Vault to an available server address in netbird_subnet, excluding network, broadcast and NetBird DNS addresses.

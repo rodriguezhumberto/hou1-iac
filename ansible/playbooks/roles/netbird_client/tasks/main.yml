@@ -4,6 +4,9 @@
     that: not ansible_check_mode
     fail_msg: NetBird enrollment cannot run in check mode. Use syntax-check and the offline validation suite instead.
 
+- name: Validate the declared server address before enrollment
+  ansible.builtin.import_tasks: validate-address.yml
+
 - name: Prepare controller API access and the environment group
   ansible.builtin.import_tasks: api-context.yml
 
@@ -88,21 +91,38 @@
 - name: Verify the connected management server and port
   ansible.builtin.import_tasks: verify-connection.yml
 
-- name: Read the NetBird interface address
+- name: Assign and verify the enrolled server group
+  ansible.builtin.import_tasks: membership.yml
+
+- name: Enforce the declared address on the enrolled peer
+  ansible.builtin.import_tasks: assign-address.yml
+
+- name: Wait for the client to adopt the declared address
+  ansible.builtin.command: netbird status --json
+  register: netbird_after
+  changed_when: false
+  until: >-
+    (netbird_after.stdout | from_json).management.connected | default(false) and
+    ((netbird_after.stdout | from_json).netbirdIp | default('') | regex_replace('/.*$', '')) == netbird_ip
+  retries: 12
+  delay: 5
+
+- name: Verify the management connection after address assignment
+  ansible.builtin.import_tasks: verify-connection.yml
+
+- name: Wait for the declared address on the NetBird interface
   ansible.builtin.command:
     argv: [ip, -j, -4, address, show, dev, "{{ netbird_interface }}"]
   register: netbird_interface_state
   changed_when: false
+  until: >-
+    netbird_ip in (netbird_interface_state.stdout | from_json |
+                  map(attribute='addr_info') | flatten | map(attribute='local') | list)
+  retries: 12
+  delay: 5
 
 - name: Verify the enrolled peer address
   ansible.builtin.import_tasks: verify-address.yml
-
-- name: Assign and verify the enrolled server group
-  ansible.builtin.import_tasks: membership.yml
-
-- name: Use the verified API-assigned address for later roles
-  ansible.builtin.set_fact:
-    netbird_ip: "{{ netbird_server_peer.ip }}"
 
 - name: Create the enrollment record directory
   ansible.builtin.file:

@@ -1,19 +1,17 @@
-"""Exercise address discovery with the actual SSH template and VPN defaults."""
+"""Exercise declared address verification with the actual SSH template and VPN defaults."""
 import base64
 import json
 import unittest
-import yaml
 
-from helpers import ROLES, run_play
+from helpers import ROLES, ROOT, run_play
+
+import yaml
 
 
 class RuntimeAddressTest(unittest.TestCase):
-    def test_discovered_address_configures_ssh_without_switching_management(self):
-        main = yaml.safe_load((ROLES / 'netbird_client/tasks/main.yml').read_text())
-        promote = next(t for t in main if t.get('name') ==
-                       'Use the verified API-assigned address for later roles')
+    def test_declared_address_configures_ssh_without_switching_management(self):
         template = str(ROLES / 'security/templates/sshd_config.j2')
-        variables = dict(netbird_enabled=True, netbird_ip='',
+        variables = dict(netbird_enabled=True, netbird_ip='100.90.0.23',
                          netbird_after={'stdout': json.dumps({'netbirdIp': '100.90.0.23/16'})},
                          netbird_interface_state={'stdout': json.dumps([
                              {'addr_info': [{'local': '100.90.0.23'}]}])},
@@ -21,7 +19,6 @@ class RuntimeAddressTest(unittest.TestCase):
                          ssh_config_before={'content': base64.b64encode(b'Port 22\n').decode()})
         tasks = [
             {'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks/verify-address.yml')},
-            promote,
             {'ansible.builtin.set_fact': {'rendered': "{{ lookup('template', '" + template + "') }}"}},
             {'ansible.builtin.assert': {'that': [
                 "netbird_ip == '100.90.0.23'",

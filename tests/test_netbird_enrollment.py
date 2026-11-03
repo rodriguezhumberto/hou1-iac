@@ -41,6 +41,8 @@ class EnrollmentTest(unittest.TestCase):
                     self.reply(200, state['groups'])
                 elif self.path.startswith('/api/groups/'):
                     self.reply(200, state['groups'][0])
+                elif self.path == '/api/peers/server-peer':
+                    self.reply(200, state['peers'][0])
                 elif self.path == '/api/peers':
                     self.reply(200, state['peers'])
                 else:
@@ -55,7 +57,10 @@ class EnrollmentTest(unittest.TestCase):
                     group = state['groups'][0]
                     group['peers'].append({'id': 'server-peer'})
                     state['peers'] = [{'id': 'server-peer', 'ip': server_ip,
-                                       'groups': [{'id': group['id'], 'name': group['name']}]}]
+                                       'groups': [{'id': group['id'], 'name': group['name']}],
+                                       'name': 'test-server', 'ssh_enabled': False,
+                                       'login_expiration_enabled': False,
+                                       'inactivity_expiration_enabled': True}]
                     self.reply(200, {})
                 elif self.path == '/api/setup-keys' and self.authenticated():
                     state['key_posts'].append(body)
@@ -70,6 +75,14 @@ class EnrollmentTest(unittest.TestCase):
                 if not self.authenticated():
                     return
                 body = json.loads(self.rfile.read(int(self.headers['Content-Length'])))
+                if self.path == '/api/peers/server-peer':
+                    state['peer_puts'].append(body)
+                    if state.get('reject_ip'):
+                        self.reply(400, {})
+                        return
+                    state['peers'][0].update(body)
+                    self.reply(200, state['peers'][0])
+                    return
                 state['group_puts'].append(body)
                 state['groups'][0].update(body, peers=[{'id': value} for value in body['peers']])
                 state['peers'][0]['groups'].append({'id': 'test', 'name': 'test-servers'})
@@ -117,7 +130,7 @@ if record['has_key']:
                 log = root / 'cli.json'
                 status = {'management': {'url': endpoint, 'connected': True},
                           'wireguardPort': 51821, 'netbirdIp': server_ip + '/16'}
-                base = {'netbird_management_url': endpoint,
+                base = {'netbird_management_url': endpoint, 'netbird_ip': server_ip,
                         'netbird_token_vault_file': str(vault_file),
                         'netbird_server_group': 'test-servers',
                         'netbird_before_status': {'netbirdIp': ''},
@@ -139,14 +152,15 @@ if record['has_key']:
                     state.update(groups=[{'id': 'test', 'name': 'test-servers',
                                           'peers': [{'id': 'other-server'}],
                                           'resources': [{'id': 'resource', 'type': 'host'}]}],
-                                 peers=[], key_posts=[], deleted=[], group_puts=[])
+                                 peers=[], key_posts=[], deleted=[], group_puts=[], peer_puts=[])
 
                 def run(valid, variables=None, fail_cli=False):
                     tasks = [{'environment': {
                         'PATH': str(bin_dir) + ':' + os.environ['PATH'],
                         'NB_FIXTURE_LOG': str(log), 'NB_FIXTURE_URL': endpoint,
                         'NB_FIXTURE_FAIL': str(fail_cli).lower()},
-                        'block': connect_tasks + [membership]}]
+                        'block': connect_tasks + [membership, {
+                            'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks/assign-address.yml')}]}]
                     result = run_play({**base, **(variables or {})}, tasks,
                                       extra_args=['--vault-password-file', str(password), '--diff', '-v'])
                     output = result.stdout + result.stderr
@@ -188,6 +202,30 @@ if record['has_key']:
                     'resources': [{'id': 'resource', 'type': 'host'}]}])
                 run(True, enrolled)
                 self.assertEqual(len(state['group_puts']), 1)
+
+                # Reassignment targets the observed peer ID and preserves all required settings.
+                desired = '100.90.0.23'
+                run(True, {**enrolled, 'netbird_ip': desired})
+                self.assertEqual(state['peer_puts'], [{
+                    'ip': desired, 'name': 'test-server', 'ssh_enabled': False,
+                    'login_expiration_enabled': False, 'inactivity_expiration_enabled': True}])
+                assigned = {'netbird_before_status': {**status, 'netbirdIp': desired + '/16'},
+                            'netbird_after': {'stdout': json.dumps({**status, 'netbirdIp': desired + '/16'})},
+                            'netbird_ip': desired}
+                run(True, assigned)
+                self.assertEqual(len(state['peer_puts']), 1)
+
+                # A stale/deleted peer can be assigned its desired IP again after enrollment.
+                # A conflicting peer is never selected or overwritten instead.
+                state['peers'].append({'id': 'another-peer', 'ip': server_ip})
+                run(False, {**assigned, 'netbird_ip': server_ip})
+                self.assertEqual(len(state['peer_puts']), 1)
+                state['peers'].pop()
+                state['reject_ip'] = True
+                run(False, {**assigned, 'netbird_ip': server_ip})
+                self.assertEqual(state['peers'][0]['ip'], desired)
+                state['reject_ip'] = False
+                run(True, {**assigned, 'netbird_ip': server_ip})
 
                 state['peers'][0]['groups'].append({'id': 'prod', 'name': 'prod-servers'})
                 self.assertIn('opposite environment', run(False, enrolled))

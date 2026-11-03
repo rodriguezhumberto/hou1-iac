@@ -1,14 +1,9 @@
 ---
-- name: Verify the peer belongs to the configured subnet
+- name: Verify the client and interface use the declared address
   ansible.builtin.assert:
     that:
+      - ((netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) == netbird_ip
       - >-
-        ((netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) in
-        ((netbird_interface_state.stdout | from_json | first).addr_info | map(attribute='local') | list)
-      - >-
-        ((netbird_interface_state.stdout | from_json | first).addr_info |
-         map(attribute='local') | list | ansible.utils.ipaddr(netbird_subnet) | length) > 0
-      - >-
-        not (netbird_ip | length) or netbird_ip in
-        ((netbird_interface_state.stdout | from_json | first).addr_info | map(attribute='local') | list)
-    fail_msg: The actual peer address does not match netbird_subnet/netbird_ip. Do not cut over inventory.
+        netbird_ip in (netbird_interface_state.stdout | from_json |
+                       map(attribute='addr_info') | flatten | map(attribute='local') | list)
+    fail_msg: The client or interface does not use the declared netbird_ip. Do not cut over inventory.

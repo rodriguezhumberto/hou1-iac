@@ -23,6 +23,10 @@ class MigrationTest(unittest.TestCase):
             ({'wireguard_enabled': False}, False),
             ({'management_vpn': 'netbird'}, False),
             ({**nb, 'netbird_version': '0.83.0'}, False),
+            ({**nb, 'netbird_ip': ''}, False),
+            ({**nb, 'netbird_ip': '100.90.0.0'}, False),
+            ({**nb, 'netbird_ip': '100.90.255.254'}, False),
+            ({**nb, 'netbird_ip': '100.90.255.255'}, False),
             ({**nb, 'netbird_wireguard_port': 51820}, False),
             ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, False),
             ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, False),
@@ -77,7 +81,7 @@ class MigrationTest(unittest.TestCase):
 
     def test_enrollment_identity_and_address_guards(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks' / name)}
-                 for name in ['enrollment-check.yml', 'verify-connection.yml', 'verify-address.yml']]
+                 for name in ['validate-address.yml', 'enrollment-check.yml', 'verify-connection.yml', 'verify-address.yml']]
         status = {'management': {'url': 'https://netbird.example.org', 'connected': True},
                   'wireguardPort': 51821, 'netbirdIp': '100.90.0.10/16'}
         variables = {**netbird_vars(),
