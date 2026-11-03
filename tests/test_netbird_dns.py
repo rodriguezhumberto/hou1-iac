@@ -1,4 +1,4 @@
-"""Private DNS discovery, API lifecycle, and real resolver behavior."""
+"""Declared private DNS records, API lifecycle, and real resolver behavior."""
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import grp
@@ -27,16 +27,14 @@ class DnsTest(unittest.TestCase):
     def setUp(self):
         self.groups = [dict(id=n, name=n) for n in
                        ('test-servers', 'prod-servers', 'administrators', 'staff')]
-        self.peers = [dict(id='test', ip='100.90.218.114', groups=[self.groups[0]]),
-                      dict(id='prod', ip='100.90.0.1', groups=[self.groups[1]])]
-        self.records = [dict(name=n + '.example.org', peer_group='test-servers')
+        self.records = [dict(name=n + '.example.org', address='100.90.218.114')
                         for n in ('test', 'staff-test', 'cms-test')]
 
     def make_plan(self, existing=()):
-        return plan(self.peers, self.groups, self.records, '100.90.0.1',
+        return plan(self.groups, self.records, '100.90.0.1',
                     'example.org', '100.90.0.0/16', 1053, existing)
 
-    def test_discovery_and_failures(self):
+    def test_declared_records_and_failures(self):
         result = self.make_plan()
         self.assertEqual({r['address'] for r in result['records']}, {'100.90.218.114'})
         self.assertEqual(result['body']['groups'], ['administrators', 'staff'])
@@ -47,11 +45,11 @@ class DnsTest(unittest.TestCase):
         saved = dict(id='dns', **result['body'])
         saved['groups'].reverse()
         self.assertFalse(self.make_plan([saved])['changed'])
-        self.peers[0]['ip'] = '100.90.218.115'
+        self.records[0]['address'] = '100.90.218.115'
         self.assertEqual(self.make_plan([saved])['records'][0]['address'], '100.90.218.115')
-        cases = [lambda: self.peers.append(deepcopy(self.peers[0])),
-                 lambda: self.peers.pop(0),
-                 lambda: self.peers[0].update(ip='192.168.0.1'),
+        cases = [lambda: self.groups.append(deepcopy(self.groups[2])),
+                 lambda: self.groups.pop(2),
+                 lambda: self.records[0].update(address='192.168.0.1'),
                  lambda: self.records[0].update(name='unrelated.net'),
                  lambda: self.records[0].update(name='bad\nserver.example.org'),
                  lambda: self.records.append(deepcopy(self.records[0]))]
@@ -68,19 +66,11 @@ class DnsTest(unittest.TestCase):
 
     def test_api_create_idempotence_update_and_readback(self):
         state = dict(nameservers=[], posts=0, puts=0, corrupt=False)
-        peers = self.peers
 
         class Handler(BaseHTTPRequestHandler):
             def handle_request(self):
                 if self.headers.get('Authorization') != 'Token fixture-token':
                     self.send_error(401)
-                    return
-                if self.path == '/api/peers' and self.command == 'GET':
-                    value = peers
-                    self.send_response(200)
-                    self.send_header('Content-Type', 'application/json')
-                    self.end_headers()
-                    self.wfile.write(json.dumps(value).encode())
                     return
                 if not self.path.startswith('/api/dns/nameservers'):
                     self.send_error(404)
@@ -121,9 +111,8 @@ class DnsTest(unittest.TestCase):
                   for name in ('discover.yml', 'publish.yml')]
             variables = dict(netbird_management_url=f'http://127.0.0.1:{server.server_port}',
                              netbird_client_token=dict(token='fixture-token'),
-                             netbird_dns_peers=dict(json=self.peers),
                     netbird_client_groups=dict(json=self.groups), netbird_dns_port=1053,
-                             netbird_server_peer=self.peers[1], netbird_dns_domain='example.org',
+                             netbird_ip='100.90.0.1', netbird_dns_domain='example.org',
                              netbird_dns_records=self.records)
 
             def run(valid=True):
@@ -185,7 +174,7 @@ class DnsTest(unittest.TestCase):
                     port = reserve.getsockname()[1]
                 template = (ROLES / 'netbird_dns/templates/dnsmasq.conf.j2').read_text()
                 config = Template(template).render(
-                    netbird_server_peer=dict(ip='127.0.0.1'), netbird_dns_port=1053,
+                    netbird_ip='127.0.0.1', netbird_dns_port=1053,
                     netbird_dns_plan=self.make_plan(),
                     netbird_dns_upstreams=[f'127.0.0.1#{upstream.getsockname()[1]}'])
                 config = config.replace('port=1053', f'port={port}')

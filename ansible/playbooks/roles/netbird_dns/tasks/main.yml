@@ -79,7 +79,7 @@
 
 - name: Wait for the private DNS listener
   ansible.builtin.wait_for:
-    host: "{{ netbird_server_peer.ip }}"
+    host: "{{ netbird_ip }}"
     port: "{{ netbird_dns_port }}"
     timeout: 20
 
@@ -88,7 +88,7 @@
     - name: Query the private resolver without logging record names
       ansible.builtin.command:
         argv: >-
-          {{ ['dig', '-p', netbird_dns_port | string, '@' ~ netbird_server_peer.ip, item.0.name, 'A', '+short',
+          {{ ['dig', '-p', netbird_dns_port | string, '@' ~ netbird_ip, item.0.name, 'A', '+short',
               '+time=2', '+tries=1'] + (['+tcp'] if item.1 == 'tcp' else []) }}
       loop: "{{ netbird_dns_plan.records | product(['udp', 'tcp']) | list }}"
       register: netbird_dns_query

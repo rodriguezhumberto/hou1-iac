@@ -48,11 +48,11 @@ netbird_groups:
   - administrators
   - staff
 
-# Names derive from the existing Vault-backed primary_domain; IPs come from peers.
+# Names and server addresses derive from the encrypted inventory.
 netbird_dns_domain: "{{ primary_domain }}"
 netbird_dns_records:
-  - {name: "test.{{ primary_domain }}", peer_group: test-servers}
-  - {name: "staff-test.{{ primary_domain }}", peer_group: test-servers}
-  - {name: "cms-test.{{ primary_domain }}", peer_group: test-servers}
+  - {name: "test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
+  - {name: "staff-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
+  - {name: "cms-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
 netbird_dns_upstreams: [1.1.1.1, 9.9.9.9]
 netbird_dns_port: 1053

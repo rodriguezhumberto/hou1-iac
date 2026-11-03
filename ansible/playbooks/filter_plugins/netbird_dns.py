@@ -1,4 +1,4 @@
-"""Discover private records from unambiguous server groups and plan split DNS."""
+"""Validate declared private records and plan split DNS."""
 from ipaddress import IPv4Address, IPv4Network
 import re
 
@@ -23,14 +23,14 @@ def nameserver_body(value):
                         'nameservers', 'primary', 'search_domains_enabled')}
 
 
-def dns_plan(peers, groups, records, resolver_ip, domain, subnet, resolver_port, existing):
+def dns_plan(groups, records, resolver_ip, domain, subnet, resolver_port, existing):
     domain_name(domain)
     network = IPv4Network(subnet)
 
     def address(value):
         ip = IPv4Address(value)
         if ip not in network:
-            raise AnsibleFilterError('DNS peer address is outside the NetBird subnet.')
+            raise AnsibleFilterError('DNS address is outside the NetBird subnet.')
         return str(ip)
 
     def group_id(name):
@@ -39,24 +39,13 @@ def dns_plan(peers, groups, records, resolver_ip, domain, subnet, resolver_port,
             raise AnsibleFilterError('Private DNS requires exactly one group: ' + name)
         return matches[0]['id']
 
-    def belongs(peer, name):
-        return any(g['id'] == group_id(name) for g in peer.get('groups', []))
-
     resolver_ip = address(resolver_ip)
-    resolvers = [p for p in peers if p['ip'] == resolver_ip and belongs(p, 'prod-servers')]
-    if len(resolvers) != 1:
-        raise AnsibleFilterError('DNS resolver must be the enrolled production peer.')
     resolved = []
     for record in records:
         name = domain_name(record['name'])
         if name != domain and not name.endswith('.' + domain):
             raise AnsibleFilterError('Private record is outside the split DNS domain.')
-        if record['peer_group'] not in ('test-servers', 'prod-servers'):
-            raise AnsibleFilterError('DNS records must select a server environment group.')
-        matches = [p for p in peers if belongs(p, record['peer_group'])]
-        if len(matches) != 1:
-            raise AnsibleFilterError('DNS records require exactly one peer in ' + record['peer_group'])
-        resolved.append(dict(name=name, address=address(matches[0]['ip'])))
+        resolved.append(dict(name=name, address=address(record['address'])))
     if not resolved or len({r['name'] for r in resolved}) != len(resolved):
         raise AnsibleFilterError('Private DNS requires nonempty, unique records.')
     # Use exact records instead of the apex domain. macOS may otherwise prefer
