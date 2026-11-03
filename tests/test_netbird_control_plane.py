@@ -29,6 +29,8 @@ class ControlPlaneTest(unittest.TestCase):
         }
 
     def test_colocation_guards(self):
+        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/validate.yml')}]
+        plays = []
         for overrides, valid in [({}, True), ({'wireguard_enabled': False}, False),
                 ({'netbird_domain': 'example.org'}, False),
                 ({'netbird_ingress_proxy_ip': '192.168.99.2'}, False),
@@ -37,10 +39,10 @@ class ControlPlaneTest(unittest.TestCase):
                 ({'netbird_groups': ['test-servers', 'test-servers']}, False),
                 ({'netbird_groups': ['All']}, False),
                 ({'netbird_server_image': 'netbirdio/netbird-server:latest'}, False)]:
-            with self.subTest(overrides=overrides):
-                result = run_play({**self.variables('/tmp/hou1-test'), **overrides}, [
-                    {'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/validate.yml')}])
-                self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
+            plays.append(guard_play({**self.variables('/tmp/hou1-test'), **overrides},
+                                    tasks, None if valid else 'Validate colocated control-plane settings'))
+        result = run_plays(plays)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_recovery_guard_cannot_be_bypassed_by_deploy_tag(self):
         variables = {**self.variables('/tmp/hou1-test'),
