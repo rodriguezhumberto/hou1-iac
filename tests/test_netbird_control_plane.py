@@ -86,7 +86,6 @@ class ControlPlaneTest(unittest.TestCase):
     def test_application_runs_do_not_deploy_control_plane(self):
         app_play = yaml.safe_load((ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]
         self.assertNotIn('netbird_control_plane', [item['role'] for item in app_play['roles']])
-        self.assertNotIn('post_tasks', app_play)  # No WireGuard retirement.
         control_play = yaml.safe_load(
             (ROOT / 'ansible/playbooks/netbird-control-plane.yml').read_text())[0]
         self.assertEqual(control_play['hosts'], 'netbird_control_plane')

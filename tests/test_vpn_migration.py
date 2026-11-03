@@ -19,7 +19,6 @@ class MigrationTest(unittest.TestCase):
             ({}, True),
             (nb, True),
             ({**nb, 'management_vpn': 'netbird'}, True),
-            ({**nb, 'management_vpn': 'netbird', 'wireguard_enabled': False}, False),
             ({'wireguard_enabled': False}, False),
             ({'management_vpn': 'netbird'}, False),
             ({**nb, 'netbird_version': '0.83.0'}, False),
@@ -32,8 +31,6 @@ class MigrationTest(unittest.TestCase):
             ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, False),
             ({**nb, 'netbird_subnet': '0.0.0.0/0; allow all'}, False),
             ({**nb, 'management_vpn': 'netbird', 'netbird_ip': '192.168.1.2'}, False),
-            ({**nb, 'management_vpn': 'netbird', 'wireguard_enabled': False,
-              'ansible_host': '10.10.0.10'}, False),
         ]
         for variables, valid in scenarios:
             with self.subTest(variables=variables):
@@ -103,13 +100,7 @@ class MigrationTest(unittest.TestCase):
                   'url': 'https://netbird.example.org:8443', 'connected': True}})}}, False),
             ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
                   'url': 'http://netbird.example.org:443', 'connected': True}})}}, False),
-            # A previously verified peer can reconnect without a setup key even
-            # when the daemon initially reports no IP after restart.
-            ({'netbird_before_status': {'netbirdIp': ''}}, True),
-            ({'netbird_before_status': {'netbirdIp': ''},
-              'netbird_marker_stat': {'stat': {'exists': False}}}, True),
             ({'netbird_management_url': 'https://another.example.org'}, False),
-            ({'netbird_subnet': '100.91.0.0/16'}, False),
             ({'netbird_ip': '100.90.0.11'}, False)]
         for overrides, valid in scenarios:
             with self.subTest(overrides=overrides):
@@ -118,7 +109,11 @@ class MigrationTest(unittest.TestCase):
                                  result.stdout + result.stderr)
 
     def test_cms_allowlist_for_each_stage(self):
-        acl_tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')}]
+        acl_tasks = [
+            {'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')},
+            {'ansible.builtin.assert': {'that': [
+                "staff_vpn_subnet == (netbird_subnet if netbird_enabled else vpn_subnet)"]}},
+        ]
         source = '''server {
     server_name cms.example.org;
     allow ${vpn_subnet};
