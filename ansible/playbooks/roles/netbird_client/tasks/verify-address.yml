@@ -1,9 +1,0 @@
----
-- name: Verify the client and interface use the declared address
-  ansible.builtin.assert:
-    that:
-      - ((netbird_after.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) == netbird_ip
-      - >-
-        netbird_ip in (netbird_interface_state.stdout | from_json |
-                       map(attribute='addr_info') | flatten | map(attribute='local') | list)
-    fail_msg: The client or interface does not use the declared netbird_ip. Do not cut over inventory.

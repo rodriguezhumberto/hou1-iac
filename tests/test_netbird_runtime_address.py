@@ -12,7 +12,7 @@ import yaml
 
 
 class RuntimeAddressTest(unittest.TestCase):
-    def test_waits_for_address_propagation_and_rejects_a_stale_client(self):
+    def test_waits_for_address_propagation_and_rejects_stale_addresses(self):
         main = yaml.safe_load((ROLES / 'netbird_client/tasks/main.yml').read_text())
         waits = [task for task in main if task.get('register') in
                  ('netbird_after', 'netbird_interface_state') and 'until' in task
@@ -33,7 +33,7 @@ count.write_text(str(n))
 # Address changes may briefly remove the interface before it is recreated.
 if name == 'ip' and n == 1:
     sys.exit(1)
-ip = '100.90.0.23' if n > 1 and os.environ['ADDRESS_FIXTURE_STALE'] == 'false' else '100.90.0.99'
+ip = '100.90.0.23' if n > 1 and os.environ['ADDRESS_FIXTURE_STALE'] != name else '100.90.0.99'
 if name == 'netbird':
     print(json.dumps({'netbirdIp': ip + '/16', 'management': {'connected': True}}))
 else:
@@ -42,7 +42,6 @@ else:
                 script.chmod(0o755)
             template = str(ROLES / 'security/templates/sshd_config.j2')
             verify = [
-                {'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks/verify-address.yml')},
                 {'ansible.builtin.set_fact': {'rendered': "{{ lookup('template', '" + template + "') }}"}},
                 {'ansible.builtin.assert': {'that': [
                     "'ListenAddress 100.90.0.23' in rendered",
@@ -56,12 +55,14 @@ else:
                 'ADDRESS_FIXTURE_DIRECTORY': str(root),
                 'ADDRESS_FIXTURE_STALE': '{{ fixture_stale }}'},
                 'block': waits + verify}]
-            for stale in ('false', 'true'):
+            for stale in ('none', 'netbird', 'ip'):
+                for counter in root.glob('*.count'):
+                    counter.unlink()
                 result = run_play(dict(netbird_enabled=True, netbird_ip='100.90.0.23',
                                        fixture_stale=stale, ssh_config_before={
                                            'content': base64.b64encode(b'Port 22\n').decode()}), tasks)
-                self.assertEqual(result.returncode == 0, stale == 'false', result.stdout + result.stderr)
-                if stale == 'false':
+                self.assertEqual(result.returncode == 0, stale == 'none', result.stdout + result.stderr)
+                if stale == 'none':
                     self.assertEqual((root / 'netbird.count').read_text(), '2')
                     self.assertEqual((root / 'ip.count').read_text(), '2')
 

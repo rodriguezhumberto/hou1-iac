@@ -120,9 +120,6 @@
   retries: 12
   delay: 5
 
-- name: Verify the enrolled peer address
-  ansible.builtin.import_tasks: verify-address.yml
-
 - name: Create the enrollment record directory
   ansible.builtin.file:
     path: "{{ netbird_enrollment_marker | dirname }}"

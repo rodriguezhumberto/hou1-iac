@@ -78,7 +78,7 @@ class MigrationTest(unittest.TestCase):
 
     def test_enrollment_identity_and_address_guards(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks' / name)}
-                 for name in ['validate-address.yml', 'enrollment-check.yml', 'verify-connection.yml', 'verify-address.yml']]
+                 for name in ['validate-address.yml', 'enrollment-check.yml', 'verify-connection.yml']]
         status = {'management': {'url': 'https://netbird.example.org', 'connected': True},
                   'wireguardPort': 51821, 'netbirdIp': '100.90.0.10/16'}
         variables = {**netbird_vars(),
@@ -86,9 +86,7 @@ class MigrationTest(unittest.TestCase):
             'netbird_marker_stat': {'stat': {'exists': True}},
             'netbird_marker': {'content': base64.b64encode(
                 b'{"management_url":"https://netbird.example.org"}').decode()},
-            'netbird_after': {'stdout': json.dumps(status)},
-            'netbird_interface_state': {'stdout': json.dumps([
-                {'addr_info': [{'local': '100.90.0.10'}]}])}}
+            'netbird_after': {'stdout': json.dumps(status)}}
         scenarios = [({}, True),
             ({'netbird_before_status': {**status, 'management': {
                   'url': 'https://NETBIRD.example.org:443/', 'connected': True}},
@@ -100,8 +98,7 @@ class MigrationTest(unittest.TestCase):
                   'url': 'https://netbird.example.org:8443', 'connected': True}})}}, False),
             ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
                   'url': 'http://netbird.example.org:443', 'connected': True}})}}, False),
-            ({'netbird_management_url': 'https://another.example.org'}, False),
-            ({'netbird_ip': '100.90.0.11'}, False)]
+            ({'netbird_management_url': 'https://another.example.org'}, False)]
         for overrides, valid in scenarios:
             with self.subTest(overrides=overrides):
                 result = run_play({**variables, **overrides}, tasks)
