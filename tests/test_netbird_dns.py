@@ -111,8 +111,14 @@ class DnsTest(unittest.TestCase):
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
         try:
-            tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_dns/tasks' / name)}
-                     for name in ('discover.yml', 'publish.yml')]
+            tasks = [{
+                'ansible.builtin.import_tasks': str(ROLES / 'netbird_common/tasks/api-context.yml'),
+                'vars': {
+                    'netbird_api_context_url': '{{ netbird_management_url }}',
+                    'netbird_api_context_token': '{{ netbird_client_token.token }}',
+                },
+            }] + [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_dns/tasks' / name)}
+                  for name in ('discover.yml', 'publish.yml')]
             variables = dict(netbird_management_url=f'http://127.0.0.1:{server.server_port}',
                              netbird_client_token=dict(token='fixture-token'),
                              netbird_dns_peers=dict(json=self.peers),

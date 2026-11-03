@@ -22,6 +22,8 @@ def run_play(variables, tasks, extra_args=(), inventory_source=None, hosts='loca
             inventory = str(inventory_file)
         play.write_text(yaml.safe_dump([dict(
             hosts=hosts, gather_facts=False,
+            module_defaults=yaml.safe_load(
+                (ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]['module_defaults'],
             vars={**DEFAULTS, 'new_user': 'test-user', 'hou1_vpn_ip': '10.10.0.10',
                   'ansible_host': '100.90.0.10', **variables,
                   'ansible_python_interpreter': sys.executable}, tasks=tasks,
