@@ -8,9 +8,14 @@
   ansible.builtin.assert:
     that:
       - >-
-        (cms_nginx_template.content | b64decode |
-         regex_findall('(?m)^ *allow \${vpn_subnet}; *$') | length) == 1
-    fail_msg: The application CMS allowlist template changed. Review ingress before deploying.
+        ((cms_nginx_template.content | b64decode |
+          regex_findall('(?m)^ *allow \${vpn_subnet}; *$') | length) == 1)
+        or
+        ((cms_nginx_template.content | b64decode | regex_search('proxy_pass +http://directus:8055')) is none
+         and (cms_nginx_template.content | b64decode | regex_search('server_name[^;]*\\b(staff|admin)')) is not none)
+    fail_msg: >-
+      The application CMS allowlist template changed without a recognizable
+      Directus or staff ingress. Review ingress before deploying.
 
 - name: Replace the CMS allowlist with enabled VPN subnets
   ansible.builtin.replace:
@@ -23,3 +28,6 @@
       {% if netbird_enabled | bool %}
           allow {{ netbird_subnet }};
       {% endif %}
+  when: >-
+    (cms_nginx_template.content | b64decode |
+     regex_findall('(?m)^ *allow \${vpn_subnet}; *$') | length) == 1

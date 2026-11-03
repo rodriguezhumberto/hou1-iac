@@ -1,0 +1,35 @@
+#!/bin/sh
+set -eu
+umask 077
+
+archive=${1:?usage: cms-restore.sh ARCHIVE [--apply]}
+apply=${2:-}
+database_root={{ cms_database_directory | quote }}
+media={{ cms_media_directory | quote }}
+tmp=$(mktemp -d)
+cleanup() { rm -rf "$tmp"; }
+trap cleanup EXIT
+
+tar -xzf "$archive" -C "$tmp"
+for database in "$tmp"/database/*.db; do
+  [ -f "$database" ] || continue
+  sqlite3 "$database" 'PRAGMA integrity_check;' | grep -qx ok
+done
+[ -d "$tmp/media" ]
+
+if [ "$apply" != --apply ]; then
+  echo "Archive validated. Re-run with --apply to replace CMS storage."
+  exit 0
+fi
+
+# Snapshot the current state before changing anything, then stop only Astro.
+{{ app_directory | quote }}/cms-backup.sh
+cd {{ app_directory | quote }}
+docker compose stop astro-app
+rm -rf "$database_root" "$media"
+mkdir -p "$database_root" "$media"
+cp -a "$tmp/database/." "$database_root/"
+cp -a "$tmp/media/." "$media/"
+chown -R {{ cms_storage_owner }}:{{ cms_storage_group }} "$database_root" "$media"
+chmod 0750 "$database_root" "$media"
+docker compose start astro-app

@@ -64,6 +64,19 @@ ansible-playbook playbooks/directus.yml --ask-vault-pass
 Add `-e target_hosts=hou1_prod` for production. Changes are backed up; users,
 content, and licenses are preserved.
 
+#### CMS storage and restore
+
+The deploy role keeps Astro CMS SQLite/media under the host's environment
+specific `cms-data` directory and leaves Directus under its existing paths.
+Nightly archives are written to `/var/backups/pearlandpaws/<environment>/cms`.
+See [the short storage and restore guide](docs/cms-storage-backups.md) for
+integrity checks and the rollback-safe restore sequence.
+
+The deployment detects the `directus` Compose service before applying its
+transitional settings. This lets a later application release remove the
+Directus ingress/service without an infrastructure role failure; until then,
+the existing VPN-only ingress and settings reconciliation remain enabled.
+
 #### Update System WireGuard Configurations Only
 ```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "wireguard" --ask-vault-pass

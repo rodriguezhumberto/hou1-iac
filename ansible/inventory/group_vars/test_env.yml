@@ -9,6 +9,7 @@ certbot_mode: "dns"
 staff_domain: "staff-test.{{ primary_domain }}"
 staff_cert_dir: "test.{{ primary_domain }}"
 public_site_origin: "https://test.{{ primary_domain }}"
+cms_environment: test
 
 DIRECTUS_KEY: "{{ TEST_DIRECTUS_KEY }}"
 DIRECTUS_SECRET: "{{ TEST_DIRECTUS_SECRET }}"

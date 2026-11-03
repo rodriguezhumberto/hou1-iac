@@ -8,6 +8,7 @@ certbot_mode: "http"
 staff_domain: "staff.{{ primary_domain }}"
 staff_cert_dir: "{{ primary_domain }}"
 public_site_origin: "https://{{ primary_domain }}"
+cms_environment: production
 
 DIRECTUS_KEY: "{{ PROD_DIRECTUS_KEY }}"
 DIRECTUS_SECRET: "{{ PROD_DIRECTUS_SECRET }}"

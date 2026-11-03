@@ -3,6 +3,30 @@ hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
 vpn_subnet: "10.10.0.0/24"
 staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
 
+# The replacement CMS is deliberately separate from the legacy Directus
+# database and uploads. Test and production override cms_environment below so
+# these paths remain isolated on disk as well as in their credentials.
+cms_environment: unknown
+cms_data_directory: "/var/lib/pearlandpaws/{{ cms_environment }}/cms"
+cms_database_directory: "{{ cms_data_directory }}/database"
+cms_media_directory: "{{ cms_data_directory }}/media"
+# node:24's system appuser/appgroup IDs (override with the IDs used by a
+# future image release). Directus intentionally keeps its own 1000:1000 paths.
+cms_storage_owner: "100"
+cms_storage_group: "102"
+cms_storage_mode: "0750"
+cms_backup_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/cms"
+directus_config_backup_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/directus"
+cms_backup_retention_days: 30
+cms_backup_schedule_minute: "25"
+cms_backup_schedule_hour: "2"
+cms_upload_max_bytes: 10485760
+
+# Directus stays online during the migration and retains its existing paths.
+directus_database_directory: "{{ app_directory }}/database"
+directus_uploads_directory: "{{ app_directory }}/directus-data/uploads"
+directus_extensions_directory: "{{ app_directory }}/directus-data/extensions"
+
 ansible_python_interpreter: /usr/bin/python3.11
 
 # Enable clients in test first; retain WireGuard recovery throughout this issue.

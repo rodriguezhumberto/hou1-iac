@@ -6,7 +6,7 @@
   ansible.builtin.script:
     cmd: >-
       configure.py
-      --database {{ (app_directory ~ '/database/directus.db') | quote }}
+      --database {{ directus_database_file | quote }}
       --backup-directory {{ directus_config_backup_directory | quote }}
       --configuration {{ directus_config_settings | to_json | quote }}
       {{ '--check' if ansible_check_mode else '--apply' }}

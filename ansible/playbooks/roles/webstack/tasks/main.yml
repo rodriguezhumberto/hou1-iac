@@ -16,38 +16,126 @@
 # The dedicated control-plane playbook owns its untracked Compose override.
 # Git checkout preserves it; application deployments never render server config,
 # manage its stack, or open STUN ports. Existing Nginx mounts remain in effect.
-- name: Ensure database directory exists with open permissions for Astro container
+- name: Ensure legacy Directus database directory exists
   file:
-    path: "{{ app_directory }}/database"
+    path: "{{ directus_database_directory }}"
     state: directory
-    mode: '0777'
+    owner: "1000"
+    group: "1000"
+    mode: '0750'
 
 - name: Ensure Directus directories exist with correct permissions
   file:
-    path: "{{ app_directory }}/directus-data/{{ item }}"
+    path: "{{ item }}"
     state: directory
     owner: "1000"
     group: "1000"
     mode: '0755'
   loop:
-    - extensions
-    - uploads
+    - "{{ directus_extensions_directory }}"
+    - "{{ directus_uploads_directory }}"
 
-- name: Seed initial SQLite database files (will NOT overwrite existing production data)
+- name: Ensure replacement CMS storage directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: "{{ cms_storage_mode }}"
+  loop:
+    - "{{ cms_data_directory }}"
+    - "{{ cms_database_directory }}"
+    - "{{ cms_media_directory }}"
+
+- name: Check for the existing Astro form database
+  ansible.builtin.stat:
+    path: "{{ directus_database_directory }}/forms.db"
+  register: legacy_forms_database
+
+- name: Preserve existing Astro form submissions in replacement CMS storage
+  ansible.builtin.copy:
+    remote_src: true
+    src: "{{ directus_database_directory }}/forms.db"
+    dest: "{{ cms_database_directory }}/forms.db"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0640'
+    force: false
+  when: legacy_forms_database.stat.exists
+
+- name: Render the persistent storage Compose override
+  ansible.builtin.template:
+    src: docker-compose.override.yml.j2
+    dest: "{{ app_directory }}/docker-compose.override.yml"
+    mode: '0644'
+
+- name: Ensure CMS backup directory exists
+  ansible.builtin.file:
+    path: "{{ cms_backup_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS backup script
+  ansible.builtin.template:
+    src: cms-backup.sh.j2
+    dest: "{{ app_directory }}/cms-backup.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS restore and validation script
+  ansible.builtin.template:
+    src: cms-restore.sh.j2
+    dest: "{{ app_directory }}/cms-restore.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule CMS database and media backups
+  ansible.builtin.cron:
+    name: "Pearland Paws {{ cms_environment }} CMS backup"
+    minute: "{{ cms_backup_schedule_minute }}"
+    hour: "{{ cms_backup_schedule_hour }}"
+    job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
+
+- name: Seed initial Directus and form database files (will NOT overwrite existing data)
   copy:
     src: "{{ seed_db_source_path }}/"
-    dest: "{{ app_directory }}/database/"
-    mode: '0666'
+    dest: "{{ directus_database_directory }}/"
+    owner: "1000"
+    group: "1000"
+    mode: '0660'
+    force: no
+
+- name: Seed replacement CMS SQLite files (will NOT overwrite existing content)
+  copy:
+    src: "{{ seed_cms_database_source_path | default(seed_db_source_path) }}/"
+    dest: "{{ cms_database_directory }}/"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0640'
     force: no
 
 - name: Seed initial Directus image uploads (will NOT overwrite existing production media)
   copy:
     src: "{{ seed_uploads_source_path }}/" 
-    dest: "{{ app_directory }}/directus-data/uploads/"
+    dest: "{{ directus_uploads_directory }}/"
     owner: "1000"
     group: "1000"
     mode: '0644'
     directory_mode: '0755'
+    force: no
+
+- name: Seed initial replacement CMS media (will NOT overwrite existing production media)
+  copy:
+    src: "{{ seed_cms_media_source_path | default(seed_uploads_source_path) }}/"
+    dest: "{{ cms_media_directory }}/"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0644'
+    directory_mode: "{{ cms_storage_mode }}"
     force: no
 
 - name: Inject production .env file for Astro
@@ -89,6 +177,15 @@
       # Staff app authentication
       STAFF_PASSWORD={{ STAFF_PASSWORD }}
       STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
+
+      # Replacement CMS storage (test and production are host-isolated)
+      CMS_ENVIRONMENT={{ cms_environment }}
+      CMS_DATA_DIR=/var/data
+      CMS_DATABASE_DIR=/var/data/database
+      CMS_MEDIA_DIR=/var/data/media
+      CMS_DATABASE_PATH=/var/data/database
+      CMS_MEDIA_PATH=/var/data/media
+      CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
@@ -146,14 +243,24 @@
     chdir: "{{ app_directory }}"
   changed_when: false
 
+- name: Detect whether the transitional Directus service is present
+  ansible.builtin.command: docker compose config --services
+  args:
+    chdir: "{{ app_directory }}"
+  register: compose_services
+  changed_when: false
+
 - name: Rebuild and deploy updated Docker containers
   command: docker compose up -d --build
   args:
     chdir: "{{ app_directory }}"
 
-- name: Configure Directus
+- name: Configure Directus while the transitional ingress remains enabled
   ansible.builtin.include_role:
     name: directus_config
+  when:
+    - directus_enabled | default(true) | bool
+    - "'directus' in compose_services.stdout_lines"
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.

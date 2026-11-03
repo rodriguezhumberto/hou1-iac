@@ -1,0 +1,28 @@
+#!/bin/sh
+set -eu
+umask 077
+
+backup_root={{ cms_backup_directory | quote }}
+database_root={{ cms_database_directory | quote }}
+media={{ cms_media_directory | quote }}
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+work=$(mktemp -d "$backup_root/.cms-$stamp.XXXXXX")
+archive="$backup_root/cms-$stamp.tar.gz"
+cleanup() { rm -rf "$work"; }
+trap cleanup EXIT
+
+mkdir "$work/database"
+for database in "$database_root"/*.db; do
+  [ -f "$database" ] || continue
+  name=$(basename "$database")
+  sqlite3 "$database" ".backup '$work/database/$name'"
+  sqlite3 "$work/database/$name" 'PRAGMA integrity_check;' | grep -qx ok
+done
+mkdir "$work/media"
+if [ -d "$media" ]; then
+  cp -a "$media/." "$work/media/"
+fi
+tar -czf "$archive.tmp" -C "$work" database media
+mv "$archive.tmp" "$archive"
+chmod 0600 "$archive"
+find "$backup_root" -maxdepth 1 -type f -name 'cms-*.tar.gz' -mtime +{{ cms_backup_retention_days | int }} -delete
