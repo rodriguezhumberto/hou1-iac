@@ -121,23 +121,31 @@ class MigrationTest(unittest.TestCase):
     deny all;
 }
 '''
-        for nb, wg, primary in [(False, True, 'wireguard'), (True, True, 'wireguard'),
-                                (True, True, 'netbird')]:
-            with self.subTest(netbird=nb, wireguard=wg), tempfile.TemporaryDirectory() as directory:
-                nginx = Path(directory) / 'nginx'
-                nginx.mkdir()
+        scenarios = [(False, True, 'wireguard'), (True, True, 'wireguard'),
+                     (True, True, 'netbird')]
+        with tempfile.TemporaryDirectory() as directory:
+            plays = []
+            outputs = []
+            for index, (nb, wg, primary) in enumerate(scenarios):
+                app_directory = Path(directory) / str(index)
+                nginx = app_directory / 'nginx'
+                nginx.mkdir(parents=True)
                 template = nginx / 'nginx.conf.template'
                 template.write_text(source)
                 variables = {**netbird_vars(), 'netbird_enabled': nb,
                              'wireguard_enabled': wg, 'management_vpn': primary,
-                             'app_directory': directory}
-                result = run_play(variables, acl_tasks)
-                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                rendered = template.read_text()
-                self.assertEqual('allow 100.90.0.0/16;' in rendered, nb)
-                self.assertEqual('allow 10.10.0.0/24;' in rendered, wg and primary == 'wireguard')
-                self.assertIn('deny all;', rendered)
-                self.assertNotIn('${vpn_subnet}', rendered)
+                             'app_directory': str(app_directory)}
+                plays.append(dict(variables=variables, tasks=acl_tasks))
+                outputs.append((nb, wg, primary, template))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for nb, wg, primary, template in outputs:
+                with self.subTest(netbird=nb, wireguard=wg, management_vpn=primary):
+                    rendered = template.read_text()
+                    self.assertEqual('allow 100.90.0.0/16;' in rendered, nb)
+                    self.assertEqual('allow 10.10.0.0/24;' in rendered, wg and primary == 'wireguard')
+                    self.assertIn('deny all;', rendered)
+                    self.assertNotIn('${vpn_subnet}', rendered)
 
     def test_changed_application_template_fails_closed(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')}]
