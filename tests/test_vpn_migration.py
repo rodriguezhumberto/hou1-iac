@@ -91,23 +91,23 @@ class MigrationTest(unittest.TestCase):
             'netbird_marker': {'content': base64.b64encode(
                 b'{"management_url":"https://netbird.example.org"}').decode()},
             'netbird_after': {'stdout': json.dumps(status)}}
-        scenarios = [({}, True),
+        connection_guard = 'Verify the management server and actual listening port'
+        scenarios = [({}, None),
             ({'netbird_before_status': {**status, 'management': {
                   'url': 'https://NETBIRD.example.org:443/', 'connected': True}},
               'netbird_after': {'stdout': json.dumps({**status, 'management': {
                   'url': 'https://netbird.example.org:443', 'connected': True}})},
               'netbird_marker': {'content': base64.b64encode(
-                  b'{"management_url":"https://NETBIRD.example.org:443/"}').decode()}}, True),
+                  b'{"management_url":"https://NETBIRD.example.org:443/"}').decode()}}, None),
             ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
-                  'url': 'https://netbird.example.org:8443', 'connected': True}})}}, False),
+                  'url': 'https://netbird.example.org:8443', 'connected': True}})}}, connection_guard),
             ({'netbird_after': {'stdout': json.dumps({**status, 'management': {
-                  'url': 'http://netbird.example.org:443', 'connected': True}})}}, False),
-            ({'netbird_management_url': 'https://another.example.org'}, False)]
-        for overrides, valid in scenarios:
-            with self.subTest(overrides=overrides):
-                result = run_play({**variables, **overrides}, tasks)
-                self.assertEqual(result.returncode == 0, valid,
-                                 result.stdout + result.stderr)
+                  'url': 'http://netbird.example.org:443', 'connected': True}})}}, connection_guard),
+            ({'netbird_management_url': 'https://another.example.org'},
+             'Refuse to change the recorded enrollment endpoint')]
+        result = run_plays([guard_play({**variables, **overrides}, tasks, expected_guard)
+                            for overrides, expected_guard in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_cms_allowlist_for_each_stage(self):
         acl_tasks = [
