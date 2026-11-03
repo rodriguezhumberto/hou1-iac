@@ -3,10 +3,9 @@
   block:
     - name: Create a short-lived setup key for first enrollment
       ansible.builtin.uri:
-        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/setup-keys"
+        url: "{{ netbird_api_url }}/api/setup-keys"
         method: POST
-        headers:
-          Authorization: "Token {{ netbird_client_token.token }}"
+        headers: "{{ netbird_api_headers }}"
         body_format: json
         body:
           name: "hou1-{{ inventory_hostname }}"
@@ -72,10 +71,9 @@
 
     - name: Delete the issued enrollment key after success or failure
       ansible.builtin.uri:
-        url: "{{ netbird_management_url | regex_replace('/$', '') }}/api/setup-keys/{{ netbird_generated_setup_key.json.id }}"
+        url: "{{ netbird_api_url }}/api/setup-keys/{{ netbird_generated_setup_key.json.id }}"
         method: DELETE
-        headers:
-          Authorization: "Token {{ netbird_client_token.token }}"
+        headers: "{{ netbird_api_headers }}"
         status_code: [200, 404]
       delegate_to: localhost
       become: false
