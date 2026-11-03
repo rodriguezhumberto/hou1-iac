@@ -2,6 +2,7 @@ hou1_vpn_ip: "10.10.0.10"
 # Enrolled and verified; retain WireGuard as the management/recovery path.
 netbird_enabled: true
 management_vpn: wireguard
+netbird_ip: "{{ test_netbird_ip }}"
 netbird_server_group: test-servers
 
 certbot_mode: "dns"
