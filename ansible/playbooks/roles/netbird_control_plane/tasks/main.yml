@@ -1,7 +1,4 @@
 ---
-- name: Validate the dedicated production target
-  ansible.builtin.import_tasks: target.yml
-
 - name: Validate control-plane inputs
   ansible.builtin.import_tasks: validate.yml
 
