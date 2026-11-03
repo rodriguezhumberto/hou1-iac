@@ -9,34 +9,36 @@ from pathlib import Path
 import tempfile
 import unittest
 
-from helpers import ROLES, netbird_vars, run_play
+from helpers import ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class MigrationTest(unittest.TestCase):
     def test_rollout_guards(self):
         nb = netbird_vars()
+        recovery = 'Keep WireGuard recovery throughout this migration stage'
+        config = 'Validate self-hosted NetBird configuration'
+        address = 'Require a declared server address in the account subnet'
         scenarios = [
-            ({}, True),
-            (nb, True),
-            ({**nb, 'management_vpn': 'netbird'}, True),
-            ({'wireguard_enabled': False}, False),
-            ({'management_vpn': 'netbird'}, False),
-            ({**nb, 'netbird_version': '0.83.0'}, False),
-            ({**nb, 'netbird_ip': ''}, False),
-            ({**nb, 'netbird_ip': '100.90.0.0'}, False),
-            ({**nb, 'netbird_ip': '100.90.255.254'}, False),
-            ({**nb, 'netbird_ip': '100.90.255.255'}, False),
-            ({**nb, 'netbird_wireguard_port': 51820}, False),
-            ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, False),
-            ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, False),
-            ({**nb, 'netbird_subnet': '0.0.0.0/0; allow all'}, False),
-            ({**nb, 'management_vpn': 'netbird', 'netbird_ip': '192.168.1.2'}, False),
+            ({}, None),
+            ({**nb, 'management_vpn': 'netbird'}, None),
+            ({'wireguard_enabled': False}, recovery),
+            ({'management_vpn': 'netbird'}, recovery),
+            ({**nb, 'netbird_version': '0.83.0'}, config),
+            ({**nb, 'netbird_ip': ''}, address),
+            ({**nb, 'netbird_ip': '100.90.0.0'}, address),
+            ({**nb, 'netbird_ip': '100.90.255.254'}, address),
+            ({**nb, 'netbird_ip': '100.90.255.255'}, address),
+            ({**nb, 'netbird_wireguard_port': 51820}, config),
+            ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, config),
+            ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, config),
+            ({**nb, 'netbird_subnet': '0.0.0.0/0; allow all'}, config),
+            ({**nb, 'management_vpn': 'netbird', 'netbird_ip': '192.168.1.2'}, address),
+            (nb, None),  # A rescued failure must not affect the next scenario.
         ]
-        for variables, valid in scenarios:
-            with self.subTest(variables=variables):
-                result = run_play(variables, [{'ansible.builtin.import_role': {'name': 'management_vpn'}}])
-                self.assertEqual(result.returncode == 0, valid,
-                                 result.stdout + result.stderr)
+        tasks = [{'ansible.builtin.import_role': {'name': 'management_vpn'}}]
+        result = run_plays([guard_play(variables, tasks, expected_guard)
+                            for variables, expected_guard in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_private_ssh_template_preserves_settings_and_is_idempotent(self):
         # Real Ansible rendering checks both initial migration and subsequent runs.
@@ -65,16 +67,18 @@ class MigrationTest(unittest.TestCase):
 
     def test_effective_ssh_listener_guard(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'security/tasks/verify-listeners.yml')}]
+        guard = 'Reject listeners outside the selected private VPN addresses'
+        plays = []
         for listeners, valid in [
             (['listenaddress 10.10.0.10:22', 'listenaddress 100.90.0.10:22'], True),
             (['listenaddress 0.0.0.0:22'], False),
             (['listenaddress [::]:22'], False),
         ]:
-            with self.subTest(listeners=listeners):
-                result = run_play({**netbird_vars(),
-                    'ssh_effective_config': {'stdout_lines': listeners}}, tasks)
-                self.assertEqual(result.returncode == 0, valid,
-                                 result.stdout + result.stderr)
+            plays.append(guard_play({**netbird_vars(),
+                'ssh_effective_config': {'stdout_lines': listeners}},
+                tasks, None if valid else guard))
+        result = run_plays(plays)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_enrollment_identity_and_address_guards(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks' / name)}
