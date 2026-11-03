@@ -56,6 +56,9 @@ name = pathlib.Path(sys.argv[0]).name
 count = pathlib.Path(os.environ['ADDRESS_FIXTURE_DIRECTORY']) / (name + '.count')
 n = int(count.read_text()) + 1 if count.exists() else 1
 count.write_text(str(n))
+# Address changes may briefly remove the interface before it is recreated.
+if name == 'ip' and n == 1:
+    sys.exit(1)
 ip = '100.90.0.23' if n > 1 and os.environ['ADDRESS_FIXTURE_STALE'] == 'false' else '100.90.0.99'
 if name == 'netbird':
     print(json.dumps({'netbirdIp': ip + '/16', 'management': {'connected': True}}))
