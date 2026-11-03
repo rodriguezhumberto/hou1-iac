@@ -2,6 +2,7 @@
 .vault_pass
 vault_pass.txt
 *.vault_pass
+ansible/vault/netbird-token.yml
 *.age
 *_unencrypted.yml
 *.dec
