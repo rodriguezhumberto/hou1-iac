@@ -1,4 +1,0 @@
----
-# Shared by the control-plane and DNS deployments.
-- name: Reconcile shared NetBird policies
-  ansible.builtin.import_tasks: "../../netbird_common/tasks/netbird-policies.yml"
