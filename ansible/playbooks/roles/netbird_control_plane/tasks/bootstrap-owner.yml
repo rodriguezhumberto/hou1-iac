@@ -1,13 +1,4 @@
 ---
-- name: Load or preflight the encrypted controller token file when not already loaded
-  netbird_token_vault:
-    path: "{{ netbird_token_vault_file }}"
-    management_url: "{{ netbird_management_url }}"
-    vault_id: "{{ netbird_token_vault_id }}"
-  register: netbird_saved_token
-  when: netbird_saved_token is not defined
-  no_log: true
-
 - name: Read the NetBird setup state over the private network
   ansible.builtin.uri:
     url: "{{ netbird_bootstrap_api_url }}/api/instance"

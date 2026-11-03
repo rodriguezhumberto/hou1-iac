@@ -7,6 +7,8 @@ import tempfile
 import threading
 import unittest
 
+import yaml
+
 from ansible.parsing.vault import VaultLib, VaultSecret
 
 from helpers import ROLES, run_play
@@ -14,7 +16,14 @@ from helpers import ROLES, run_play
 
 class BootstrapTest(unittest.TestCase):
     def test_bootstrap_vault_and_account_lifecycle(self):
-        tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/bootstrap-owner.yml')}]
+        # Exercise the production preflight and bootstrap together: bootstrap
+        # must retain the token loaded before deployment begins.
+        preflight = next(task for task in yaml.safe_load(
+            (ROLES / 'netbird_control_plane/tasks/main.yml').read_text())
+            if task.get('register') == 'netbird_saved_token')
+        tasks = [preflight, {'ansible.builtin.import_tasks': str(
+            ROLES / 'netbird_control_plane/tasks/bootstrap-owner.yml')}]
+
         token = 'fixture-private-pat'
         state = {}
 
