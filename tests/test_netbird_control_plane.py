@@ -11,7 +11,7 @@ import unittest
 
 import yaml
 
-from helpers import ROOT, ROLES, netbird_vars, run_play
+from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class ControlPlaneTest(unittest.TestCase):
@@ -76,12 +76,15 @@ class ControlPlaneTest(unittest.TestCase):
             tasks, inventory_source=inventory, hosts='hou1_prod:hou1_test')
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
         target_tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'netbird_control_plane/tasks/target.yml')}]
+        guard = 'Restrict the control plane to the existing production host'
+        plays = []
         for hosts, overrides, valid in [
                 ('netbird_control_plane', {}, True), ('hou1_test', {}, False),
                 ('netbird_control_plane', {'target_hosts': 'hou1_test'}, False)]:
-            with self.subTest(hosts=hosts, overrides=overrides):
-                result = run_play(overrides, target_tasks, inventory_source=inventory, hosts=hosts)
-                self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
+            plays.append(dict(guard_play(overrides, target_tasks, None if valid else guard),
+                              hosts=hosts))
+        result = run_plays(plays, inventory_source=inventory)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_application_runs_do_not_deploy_control_plane(self):
         app_play = yaml.safe_load((ROOT / 'ansible/playbooks/hou1.yml').read_text())[0]
