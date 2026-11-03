@@ -23,7 +23,7 @@
     fail_msg: >-
       The owner already exists but its API token Vault is missing. Restore the
       encrypted file or save a replacement owner PAT using ansible-vault edit;
-      do not reset the owner. See docs/netbird-migration.md for recovery.
+      do not reset the owner. See docs/netbird-operations.md for recovery.
 
 - name: Refuse to reuse a previous installation's token for a new instance
   ansible.builtin.assert:

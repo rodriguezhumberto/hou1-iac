@@ -1,3 +1,5 @@
+Run all commands from `ansible/`.
+
 ### 1. Infrastructure Initialization
 
 Use these commands when configuring a brand new instance.
@@ -65,9 +67,34 @@ ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --skip-tags "dep
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test deploy_branch=cms" --ask-vault-pass
 ```
 
-### NetBird: shared control plane, test-first clients
+### 4. NetBird Playbooks
 
-NetBird deployment and migration instructions are maintained in the [deployment and recovery runbook](docs/netbird-migration.md). The dedicated control-plane playbook targets the production host; application runs enroll clients only. WireGuard remains the recovery path while test and production access are validated.
+#### Enroll or Repair Test Over WireGuard
+```bash
+ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test management_vpn=wireguard" --tags "netbird" --ask-vault-pass
+```
 
-See the runbook for prerequisites, Vault credentials, deployment commands,
-test-first enrollment, validation, and recovery.
+#### Enroll or Repair Production Over WireGuard
+```bash
+ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod management_vpn=wireguard" --tags "netbird" --ask-vault-pass
+```
+
+#### Deploy/Update Control Plane
+Targets production over WireGuard.
+```bash
+ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
+```
+
+To connect over NetBird instead:
+```bash
+ansible-playbook playbooks/netbird-control-plane.yml -e 'ansible_host={{ netbird_ip }}' --ask-vault-pass
+```
+
+#### Deploy/Update Private DNS
+Targets production over WireGuard and uses the Vault-declared server addresses.
+```bash
+ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
+```
+
+After enrollment, verify NetBird SSH access and use the standard runs above.
+See the [operations guide](docs/netbird-operations.md) for maintenance and recovery.
