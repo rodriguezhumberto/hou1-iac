@@ -34,23 +34,25 @@
         status_code: 200
       register: netbird_policies_after
 
+    - name: Normalize the managed policy readback
+      ansible.builtin.set_fact:
+        netbird_policy_plan_after: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port) }}"
+
     - name: Verify managed policies match the intended access
       ansible.builtin.assert:
         that:
-          - >-
-            not ((netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port)).managed |
-                 selectattr('changed') | list | length)
+          - not (netbird_policy_plan_after.managed | selectattr('changed') | list | length)
 
     - name: Disable the built-in All-to-All policy after verifying replacements
       ansible.builtin.uri:
-        url: "{{ netbird_bootstrap_api_url }}/api/policies/{{ netbird_policy_plan.default.id }}"
+        url: "{{ netbird_bootstrap_api_url }}/api/policies/{{ netbird_policy_plan_after.default.id }}"
         method: PUT
         headers:
           Authorization: "Token {{ netbird_api_token }}"
         body_format: json
-        body: "{{ netbird_policy_plan.default | netbird_policy_body | combine({'enabled': false}) }}"
+        body: "{{ netbird_policy_plan_after.default | netbird_policy_body | combine({'enabled': false}) }}"
         status_code: 200
-      when: netbird_policy_plan.default is not none and netbird_policy_plan.default.enabled
+      when: netbird_policy_plan_after.default is not none and netbird_policy_plan_after.default.enabled
       changed_when: true
 
     - name: Read back the effective policy configuration
@@ -61,15 +63,15 @@
         status_code: 200
       register: netbird_effective_policies
 
+    - name: Normalize the final policy readback
+      ansible.builtin.set_fact:
+        netbird_policy_plan_final: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port) }}"
+
     - name: Verify managed access and disabled default
       ansible.builtin.assert:
         that:
-          - >-
-            not ((netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port)).managed |
-                 selectattr('changed') | list | length)
-          - >-
-            not (netbird_effective_policies.json | selectattr('name', 'equalto', 'Default') |
-                 selectattr('enabled') | list | length)
+          - not (netbird_policy_plan_final.managed | selectattr('changed') | list | length)
+          - not (netbird_policy_plan_final.default is not none and netbird_policy_plan_final.default.enabled)
   no_log: true
   rescue:
     - name: Explain policy reconciliation failure
