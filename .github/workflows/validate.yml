@@ -18,7 +18,9 @@ jobs:
           docker pull nginx:1.28-alpine
           cat > "$RUNNER_TEMP/nginx-validator" <<'EOF'
           #!/bin/sh
-          exec docker run --rm -v /tmp:/tmp nginx:1.28-alpine nginx "$@"
+          # Nginx -t creates temp directories; keep them owned by the test runner.
+          exec docker run --rm --user "$(id -u):$(id -g)" \
+            -v /tmp:/tmp --entrypoint nginx nginx:1.28-alpine -e stderr "$@"
           EOF
           chmod +x "$RUNNER_TEMP/nginx-validator"
           echo "NGINX_BIN=$RUNNER_TEMP/nginx-validator" >> "$GITHUB_ENV"
