@@ -78,6 +78,7 @@
       After=wg-quick@wg0.service {{ 'netbird.service' if netbird_enabled | bool else '' }}
       StartLimitIntervalSec=0
       [Service]
+      ExecStartPre=/bin/sh -c 'if [ "{{ netbird_enabled | bool }}" = "True" ]; then until /usr/sbin/ip -4 addr show dev {{ netbird_interface }} | /bin/grep -Fq "inet {{ netbird_ip }}/"; do /bin/sleep 1; done; fi'
       Restart=on-failure
       RestartSec=5s
   register: ssh_vpn_unit
