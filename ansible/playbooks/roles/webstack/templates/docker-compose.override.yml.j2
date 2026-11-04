@@ -1,0 +1,4 @@
+# Managed by hou1-iac. Automatically read by every existing docker compose call.
+{% set previous = (cms_compose_override_before.content | b64decode | from_yaml) if cms_compose_override_stat.stat.exists else {} %}
+{% set storage = {'services': {'astro-app': {'volumes': [cms_media_directory ~ ':/var/data/media']}}} %}
+{{ previous | combine(storage, recursive=True) | to_nice_yaml }}

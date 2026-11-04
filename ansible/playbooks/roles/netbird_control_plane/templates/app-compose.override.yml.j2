@@ -1,14 +1,10 @@
 # Managed by hou1-iac. Automatically read by every existing docker compose call.
-services:
-  nginx:
-    volumes:
-      - {{ netbird_control_plane_directory }}/nginx-include.conf:/etc/nginx/conf.d/netbird.conf:ro
-      - {{ netbird_control_plane_directory }}/ingress:/etc/nginx/netbird:ro
-    networks:
-      app-network: {}
-      netbird-ingress:
-        ipv4_address: {{ netbird_ingress_proxy_ip }}
-networks:
-  netbird-ingress:
-    external: true
-    name: {{ netbird_ingress_network }}
+{% set previous = (netbird_app_override_before.content | b64decode | from_yaml) if netbird_app_override_before is defined and netbird_app_override_before.content is defined else {} %}
+{% set ingress = {
+  'services': {'nginx': {
+    'volumes': [netbird_control_plane_directory ~ '/nginx-include.conf:/etc/nginx/conf.d/netbird.conf:ro', netbird_control_plane_directory ~ '/ingress:/etc/nginx/netbird:ro'],
+    'networks': {'app-network': {}, 'netbird-ingress': {'ipv4_address': netbird_ingress_proxy_ip}}
+  }},
+  'networks': {'netbird-ingress': {'external': True, 'name': netbird_ingress_network}}
+} %}
+{{ previous | combine(ingress, recursive=True) | to_nice_yaml }}
