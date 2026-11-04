@@ -1,0 +1,36 @@
+---
+- name: Check whether the app owns its Compose override
+  ansible.builtin.command:
+    argv: [git, ls-files, --error-unmatch, docker-compose.override.yml]
+    chdir: "{{ app_directory }}"
+  register: cms_tracked_override
+  failed_when: cms_tracked_override.rc not in [0, 1]
+  changed_when: false
+
+- name: Require an infrastructure-owned Compose override
+  ansible.builtin.assert:
+    that: cms_tracked_override.rc == 1
+    fail_msg: The app owns docker-compose.override.yml. Review storage and ingress before deploying.
+
+- name: Check for a managed Compose override
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/docker-compose.override.yml"
+  register: cms_compose_override_stat
+
+- name: Read the existing Compose override
+  ansible.builtin.slurp:
+    src: "{{ app_directory }}/docker-compose.override.yml"
+  register: cms_compose_override_before
+  when: cms_compose_override_stat.stat.exists
+
+- name: Preserve operator-owned Compose overrides
+  ansible.builtin.assert:
+    that: "(cms_compose_override_before.content | b64decode).startswith('# Managed by hou1-iac.')"
+    fail_msg: Merge the operator-owned Compose override before configuring CMS storage.
+  when: cms_compose_override_stat.stat.exists
+
+- name: Add the media mount without replacing ingress
+  ansible.builtin.template:
+    src: "{{ role_path }}/../webstack/templates/docker-compose.override.yml.j2"
+    dest: "{{ app_directory }}/docker-compose.override.yml"
+    mode: '0644'

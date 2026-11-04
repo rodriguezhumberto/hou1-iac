@@ -1,10 +1,4 @@
-services:
-  # The replacement app owns CMS data.  Keeping the bind mount outside the
-  # checkout makes deploys and git checkouts unable to replace content.
-  # The existing Directus service is intentionally not mentioned here: its
-  # legacy relative mounts remain active during the transition, and this
-  # override therefore cannot resurrect Directus after a later app release
-  # removes that service.
-  astro-app:
-    volumes:
-      - "{{ cms_data_directory }}:/var/data"
+# Managed by hou1-iac. Automatically read by every existing docker compose call.
+{% set previous = (cms_compose_override_before.content | b64decode | from_yaml) if cms_compose_override_stat.stat.exists else {} %}
+{% set storage = {'services': {'astro-app': {'volumes': [cms_media_directory ~ ':/var/data/media']}}} %}
+{{ previous | combine(storage, recursive=True) | to_nice_yaml }}

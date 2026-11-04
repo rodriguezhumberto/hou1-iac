@@ -1,37 +1,29 @@
 # CMS storage and backups
 
-Test and production use separate `cms_environment` values, host storage paths,
-`.env` files, SQLite databases, and media directories. The generated Compose
-override mounts Astro's replacement CMS at `/var/data`; Directus keeps its
-legacy `database` and `directus-data/uploads` mounts until the migration is
-verified.
+Forms and CMS share the existing `<app-directory>/database/forms.db` mount at
+`/var/data/forms.db`. Deployment never copies or relocates this live WAL database.
+Directus keeps its separate `directus.db` and uploads. Media is mounted separately
+from `/var/lib/pearlandpaws/<test|production>/cms/media` at `/var/data/media`.
 
-The webstack role creates a root-only backup directory and runs
-`cms-backup.sh` nightly. Each archive contains an online SQLite backup of every
-`*.db` file and a copy of `media/`. Archives are mode `0600` and are retained
-for `cms_backup_retention_days` (30 by default). The script checks SQLite
-integrity before publishing an archive, so a partial backup is never renamed
-into the retention set.
+The managed Compose override preserves NetBird ingress and the media mount in
+either deployment order. Operator-owned overrides require a manual merge.
+The app's pinned Node image uses UID 100/GID 102; update storage ownership if
+the image user changes. Each environment retains its own data and credentials.
+Only Directus is seeded by default; optional `seed_cms_media_source_path` must
+contain approved sample photos. Customer submissions are never seeded.
 
-To verify a backup without changing the running stack:
-
-```sh
-tar -tzf /var/backups/pearlandpaws/test/cms/cms-<UTC>.tar.gz
-mkdir -p /tmp/cms-restore
-tar -xzf /var/backups/pearlandpaws/test/cms/cms-<UTC>.tar.gz -C /tmp/cms-restore
-sqlite3 /tmp/cms-restore/database/forms.db 'PRAGMA integrity_check;'
-```
-
-The deploy also installs `cms-restore.sh`. It validates the archive and all
-SQLite files by default; pass `--apply` only after checking the archive name:
+Nightly `cms-backup.sh` uses SQLite's online backup API (including committed WAL
+writes) and archives `database/forms.db` plus `media/`. It checks integrity and
+nonempty schema, uses unique names, and retains private archives for 30 days.
 
 ```sh
-<app-directory>/cms-restore.sh /var/backups/pearlandpaws/test/cms/cms-<UTC>.tar.gz
-<app-directory>/cms-restore.sh /var/backups/pearlandpaws/test/cms/cms-<UTC>.tar.gz --apply
+<app-directory>/cms-restore.sh /var/backups/pearlandpaws/test/cms/cms-<id>.tar.gz
+# Apply only after validating the intended environment/archive:
+<app-directory>/cms-restore.sh /var/backups/pearlandpaws/test/cms/cms-<id>.tar.gz --apply
 ```
 
-The apply step snapshots the current CMS first, stops only Astro, replaces its
-`database/` and `media/`, and starts Astro again. Directus remains running and
-its database/uploads are not part of this procedure. Run the same commands with
-`prod`/`production` paths only when the target environment is explicitly
-intended.
+Restore validates paths, rejects links and empty/corrupt databases, stops Astro,
+takes a recovery snapshot, overlays photos, restores SQLite, and restarts Astro
+even on failure. Newer orphan photos remain on disk for recovery but are not
+publicly served. Directus and its data are untouched. Keep off-host copies;
+a local backup does not protect against server loss.

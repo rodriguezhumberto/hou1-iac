@@ -66,8 +66,8 @@ content, and licenses are preserved.
 
 #### CMS storage and restore
 
-The deploy role keeps Astro CMS SQLite/media under the host's environment
-specific `cms-data` directory and leaves Directus under its existing paths.
+The deploy role keeps forms/CMS SQLite in the existing database mount and
+adds a separate media mount per environment. Directus retains its paths.
 Nightly archives are written to `/var/backups/pearlandpaws/<environment>/cms`.
 See [the short storage and restore guide](docs/cms-storage-backups.md) for
 integrity checks and the rollback-safe restore sequence.

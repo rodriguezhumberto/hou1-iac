@@ -12,7 +12,8 @@
           regex_findall('(?m)^ *allow \${vpn_subnet}; *$') | length) == 1)
         or
         ((cms_nginx_template.content | b64decode | regex_search('proxy_pass +http://directus:8055')) is none
-         and (cms_nginx_template.content | b64decode | regex_search('server_name[^;]*\\b(staff|admin)')) is not none)
+         and '${STAFF_HOSTNAME}' in (cms_nginx_template.content | b64decode)
+         and 'allow ${staff_vpn_subnet};' in (cms_nginx_template.content | b64decode))
     fail_msg: >-
       The application CMS allowlist template changed without a recognizable
       Directus or staff ingress. Review ingress before deploying.

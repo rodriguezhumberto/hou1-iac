@@ -4,32 +4,63 @@ umask 077
 
 archive=${1:?usage: cms-restore.sh ARCHIVE [--apply]}
 apply=${2:-}
+[ -z "$apply" ] || [ "$apply" = --apply ]
 database_root={{ cms_database_directory | quote }}
 media={{ cms_media_directory | quote }}
 tmp=$(mktemp -d)
-cleanup() { rm -rf "$tmp"; }
+restart=no
+cleanup() {
+  result=$?
+  trap - EXIT
+  rm -rf "$tmp"
+  if [ "$restart" = yes ]; then
+    docker compose start astro-app || result=1
+  fi
+  exit "$result"
+}
 trap cleanup EXIT
 
-tar -xzf "$archive" -C "$tmp"
-for database in "$tmp"/database/*.db; do
-  [ -f "$database" ] || continue
-  sqlite3 "$database" 'PRAGMA integrity_check;' | grep -qx ok
-done
-[ -d "$tmp/media" ]
+python3 - "$archive" "$tmp" <<'PYTHON'
+from pathlib import Path, PurePosixPath
+import sqlite3, sys, tarfile
+root = Path(sys.argv[2])
+with tarfile.open(sys.argv[1]) as archive:
+    for member in archive.getmembers():
+        path = PurePosixPath(member.name)
+        assert not path.is_absolute() and '..' not in path.parts
+        assert path.parts and path.parts[0] in ('database', 'media')
+        assert member.isdir() or member.isfile()
+        assert path.parts[0] != 'database' or member.isdir() or member.name == 'database/forms.db'
+    archive.extractall(root, filter='data')
+database = root / 'database/forms.db'
+assert database.is_file() and (root / 'media').is_dir()
+with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as snapshot:
+    assert snapshot.execute('PRAGMA integrity_check').fetchall() == [('ok',)]
+    assert snapshot.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+PYTHON
 
 if [ "$apply" != --apply ]; then
-  echo "Archive validated. Re-run with --apply to replace CMS storage."
+  echo "Archive validated. Re-run with --apply to restore CMS storage."
   exit 0
 fi
 
-# Snapshot the current state before changing anything, then stop only Astro.
-{{ app_directory | quote }}/cms-backup.sh
 cd {{ app_directory | quote }}
 docker compose stop astro-app
-rm -rf "$database_root" "$media"
-mkdir -p "$database_root" "$media"
-cp -a "$tmp/database/." "$database_root/"
+restart=yes
+# Freeze writes before the recovery snapshot. Unique names prevent collisions.
+./cms-backup.sh
+# Photos are immutable. Overlay restored files and retain newer orphan files
+# for recovery; publication checks keep them private after restoring the DB.
+mkdir -p "$media"
 cp -a "$tmp/media/." "$media/"
-chown -R {{ cms_storage_owner }}:{{ cms_storage_group }} "$database_root" "$media"
-chmod 0750 "$database_root" "$media"
-docker compose start astro-app
+chown -R {{ cms_storage_owner }}:{{ cms_storage_group }} "$media"
+find "$media" -type d -exec chmod 0750 {} +
+find "$media" -type f -exec chmod 0600 {} +
+python3 - "$tmp/database/forms.db" "$database_root/forms.db" <<'PYTHON'
+import sqlite3, sys
+with sqlite3.connect(sys.argv[1]) as source:
+    with sqlite3.connect(sys.argv[2]) as target:
+        source.backup(target)
+PYTHON
+chown {{ cms_storage_owner }}:{{ cms_storage_group }} "$database_root/forms.db"
+chmod 0640 "$database_root/forms.db"

@@ -3,15 +3,14 @@ hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
 vpn_subnet: "10.10.0.0/24"
 staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
 
-# The replacement CMS is deliberately separate from the legacy Directus
-# database and uploads. Test and production override cms_environment below so
-# these paths remain isolated on disk as well as in their credentials.
+# Forms and CMS share the existing database mount during rollout and rollback.
+# Media has a separate persistent mount per environment.
 cms_environment: unknown
 cms_data_directory: "/var/lib/pearlandpaws/{{ cms_environment }}/cms"
-cms_database_directory: "{{ cms_data_directory }}/database"
+cms_database_directory: "{{ app_directory }}/database"
 cms_media_directory: "{{ cms_data_directory }}/media"
-# node:24's system appuser/appgroup IDs (override with the IDs used by a
-# future image release). Directus intentionally keeps its own 1000:1000 paths.
+# Verified against the application's pinned node:24.22.2 appuser/appgroup.
+# Override these together if a later application image changes its user.
 cms_storage_owner: "100"
 cms_storage_group: "102"
 cms_storage_mode: "0750"
@@ -21,6 +20,7 @@ cms_backup_retention_days: 30
 cms_backup_schedule_minute: "25"
 cms_backup_schedule_hour: "2"
 cms_upload_max_bytes: 10485760
+cms_pets_source: directus
 
 # Directus stays online during the migration and retains its existing paths.
 directus_database_directory: "{{ app_directory }}/database"

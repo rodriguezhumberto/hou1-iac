@@ -13,16 +13,24 @@
 - name: Configure CMS access for enabled VPNs
   ansible.builtin.import_tasks: cms-acl.yml
 
-# The dedicated control-plane playbook owns its untracked Compose override.
-# Git checkout preserves it; application deployments never render server config,
-# manage its stack, or open STUN ports. Existing Nginx mounts remain in effect.
+- name: Validate CMS environment and the existing database mount
+  ansible.builtin.assert:
+    that:
+      - cms_environment in ['test', 'production']
+      - cms_pets_source in ['directus', 'cms']
+      - cms_database_directory == (app_directory ~ '/database')
+      - directus_database_directory == cms_database_directory
+    fail_msg: Keep the existing database mount during rollout; select test/production and a supported pet source.
+
+# Both deployment paths preserve the other's portion of the managed override.
+# Application runs do not deploy or configure the control-plane service itself.
 - name: Ensure legacy Directus database directory exists
   file:
     path: "{{ directus_database_directory }}"
     state: directory
     owner: "1000"
-    group: "1000"
-    mode: '0750'
+    group: "{{ cms_storage_group }}"
+    mode: '0770'
 
 - name: Ensure Directus directories exist with correct permissions
   file:
@@ -44,30 +52,25 @@
     mode: "{{ cms_storage_mode }}"
   loop:
     - "{{ cms_data_directory }}"
-    - "{{ cms_database_directory }}"
     - "{{ cms_media_directory }}"
 
-- name: Check for the existing Astro form database
-  ansible.builtin.stat:
-    path: "{{ directus_database_directory }}/forms.db"
-  register: legacy_forms_database
+- name: Find existing Astro database and WAL files without moving them
+  ansible.builtin.find:
+    paths: "{{ cms_database_directory }}"
+    patterns: ['forms.db', 'forms.db-wal', 'forms.db-shm']
+    file_type: file
+  register: cms_existing_database
 
-- name: Preserve existing Astro form submissions in replacement CMS storage
-  ansible.builtin.copy:
-    remote_src: true
-    src: "{{ directus_database_directory }}/forms.db"
-    dest: "{{ cms_database_directory }}/forms.db"
+- name: Keep the existing Astro database writable by the application
+  ansible.builtin.file:
+    path: "{{ item.path }}"
     owner: "{{ cms_storage_owner }}"
     group: "{{ cms_storage_group }}"
     mode: '0640'
-    force: false
-  when: legacy_forms_database.stat.exists
+  loop: "{{ cms_existing_database.files }}"
 
-- name: Render the persistent storage Compose override
-  ansible.builtin.template:
-    src: docker-compose.override.yml.j2
-    dest: "{{ app_directory }}/docker-compose.override.yml"
-    mode: '0644'
+- name: Preserve ingress while configuring the media mount
+  ansible.builtin.import_tasks: cms-compose.yml
 
 - name: Ensure CMS backup directory exists
   ansible.builtin.file:
@@ -100,22 +103,13 @@
     hour: "{{ cms_backup_schedule_hour }}"
     job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
 
-- name: Seed initial Directus and form database files (will NOT overwrite existing data)
+- name: Seed only Directus (never seed customer form submissions)
   copy:
-    src: "{{ seed_db_source_path }}/"
-    dest: "{{ directus_database_directory }}/"
+    src: "{{ seed_db_source_path }}/directus.db"
+    dest: "{{ directus_database_directory }}/directus.db"
     owner: "1000"
     group: "1000"
     mode: '0660'
-    force: no
-
-- name: Seed replacement CMS SQLite files (will NOT overwrite existing content)
-  copy:
-    src: "{{ seed_cms_database_source_path | default(seed_db_source_path) }}/"
-    dest: "{{ cms_database_directory }}/"
-    owner: "{{ cms_storage_owner }}"
-    group: "{{ cms_storage_group }}"
-    mode: '0640'
     force: no
 
 - name: Seed initial Directus image uploads (will NOT overwrite existing production media)
@@ -130,13 +124,14 @@
 
 - name: Seed initial replacement CMS media (will NOT overwrite existing production media)
   copy:
-    src: "{{ seed_cms_media_source_path | default(seed_uploads_source_path) }}/"
+    src: "{{ seed_cms_media_source_path }}/"
     dest: "{{ cms_media_directory }}/"
     owner: "{{ cms_storage_owner }}"
     group: "{{ cms_storage_group }}"
     mode: '0644'
     directory_mode: "{{ cms_storage_mode }}"
     force: no
+  when: seed_cms_media_source_path is defined
 
 - name: Inject production .env file for Astro
   copy:
@@ -180,12 +175,10 @@
 
       # Replacement CMS storage (test and production are host-isolated)
       CMS_ENVIRONMENT={{ cms_environment }}
-      CMS_DATA_DIR=/var/data
-      CMS_DATABASE_DIR=/var/data/database
+      CMS_DATABASE_DIR=/var/data
       CMS_MEDIA_DIR=/var/data/media
-      CMS_DATABASE_PATH=/var/data/database
-      CMS_MEDIA_PATH=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
+      CMS_PETS_SOURCE={{ cms_pets_source }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
