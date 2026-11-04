@@ -18,9 +18,10 @@
     that:
       - cms_environment in ['test', 'production']
       - cms_pets_source in ['directus', 'cms']
+      - cms_services_source in ['directus', 'cms']
       - cms_database_directory == (app_directory ~ '/database')
       - directus_database_directory == cms_database_directory
-    fail_msg: Keep the existing database mount during rollout; select test/production and a supported pet source.
+    fail_msg: Keep the existing database mount during rollout; select test/production and supported pet/service sources.
 
 # Both deployment paths preserve the other's portion of the managed override.
 # Application runs do not deploy or configure the control-plane service itself.
@@ -179,6 +180,7 @@
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
       CMS_PETS_SOURCE={{ cms_pets_source }}
+      CMS_SERVICES_SOURCE={{ cms_services_source }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
