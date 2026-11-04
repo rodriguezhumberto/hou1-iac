@@ -9,13 +9,6 @@ staff_domain: "staff.{{ primary_domain }}"
 staff_cert_dir: "{{ primary_domain }}"
 public_site_origin: "https://{{ primary_domain }}"
 cms_environment: production
-
-DIRECTUS_KEY: "{{ PROD_DIRECTUS_KEY }}"
-DIRECTUS_SECRET: "{{ PROD_DIRECTUS_SECRET }}"
-DIRECTUS_ADMIN_EMAIL: "{{ PROD_DIRECTUS_ADMIN_EMAIL }}"
-DIRECTUS_ADMIN_PASSWORD: "{{ PROD_DIRECTUS_ADMIN_PASSWORD }}"
-DIRECTUS_PUBLIC_URL: "{{ PROD_DIRECTUS_PUBLIC_URL }}"
-DIRECTUS_TOKEN: "{{ PROD_DIRECTUS_TOKEN }}"
 VAPID_PUBLIC_KEY: "{{ PROD_VAPID_PUBLIC_KEY }}"
 VAPID_PRIVATE_KEY: "{{ PROD_VAPID_PRIVATE_KEY }}"
 VAPID_SUBJECT: "{{ PROD_VAPID_SUBJECT }}"
@@ -24,4 +17,4 @@ STAFF_SESSION_SECRET: "{{ PROD_STAFF_SESSION_SECRET }}"
 
 ssl_domains:
   - { name: "{{ secondary_domain }}", flags: "-d {{ secondary_domain }} -d www.{{ secondary_domain }}" }
-  - { name: "{{ primary_domain }}", flags: "-d {{ primary_domain }} -d www.{{ primary_domain }} -d cms.{{ primary_domain }} -d {{ staff_domain }}" }
+  - { name: "{{ primary_domain }}", flags: "-d {{ primary_domain }} -d www.{{ primary_domain }} -d {{ staff_domain }}" }

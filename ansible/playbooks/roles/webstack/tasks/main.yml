@@ -8,41 +8,12 @@
     force: yes
   no_log: true
 
-# The application template currently has one legacy VPN allow directive. Manage
-# the CIDRs here after every checkout so deployment cannot restore the old ACL.
-- name: Configure CMS access for enabled VPNs
-  ansible.builtin.import_tasks: cms-acl.yml
-
 - name: Validate CMS environment and the existing database mount
   ansible.builtin.assert:
     that:
       - cms_environment in ['test', 'production']
-      - cms_pets_source in ['directus', 'cms']
-      - cms_services_source in ['directus', 'cms']
       - cms_database_directory == (app_directory ~ '/database')
-      - directus_database_directory == cms_database_directory
-    fail_msg: Keep the existing database mount during rollout; select test/production and supported pet/service sources.
-
-# Both deployment paths preserve the other's portion of the managed override.
-# Application runs do not deploy or configure the control-plane service itself.
-- name: Ensure legacy Directus database directory exists
-  file:
-    path: "{{ directus_database_directory }}"
-    state: directory
-    owner: "1000"
-    group: "{{ cms_storage_group }}"
-    mode: '0770'
-
-- name: Ensure Directus directories exist with correct permissions
-  file:
-    path: "{{ item }}"
-    state: directory
-    owner: "1000"
-    group: "1000"
-    mode: '0755'
-  loop:
-    - "{{ directus_extensions_directory }}"
-    - "{{ directus_uploads_directory }}"
+    fail_msg: Keep the existing database mount during rollout and select test or production.
 
 - name: Ensure replacement CMS storage directories exist
   ansible.builtin.file:
@@ -81,6 +52,44 @@
     group: root
     mode: '0700'
 
+- name: Ensure Directus retirement archive directory exists
+  ansible.builtin.file:
+    path: "{{ directus_retirement_archive_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Check for legacy Directus database
+  ansible.builtin.stat:
+    path: "{{ cms_database_directory }}/directus.db"
+  register: legacy_directus_database
+
+- name: Check for legacy Directus data
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/directus-data"
+  register: legacy_directus_data
+
+- name: Archive legacy Directus database and media before removal
+  ansible.builtin.shell: |
+    set -eu
+    archive={{ directus_retirement_archive | quote }}
+    temporary="$archive.tmp"
+    rm -f "$temporary"
+    if [ -f {{ (cms_database_directory ~ '/directus.db') | quote }} ] && [ -d {{ (app_directory ~ '/directus-data') | quote }} ]; then
+      tar -czf "$temporary" -C {{ app_directory | quote }} database/directus.db directus-data
+    elif [ -f {{ (cms_database_directory ~ '/directus.db') | quote }} ]; then
+      tar -czf "$temporary" -C {{ app_directory | quote }} database/directus.db
+    else
+      tar -czf "$temporary" -C {{ app_directory | quote }} directus-data
+    fi
+    chmod 0600 "$temporary"
+    mv "$temporary" "$archive"
+  args:
+    creates: "{{ directus_retirement_archive }}"
+  when: legacy_directus_database.stat.exists or legacy_directus_data.stat.exists
+  no_log: true
+
 - name: Install CMS backup script
   ansible.builtin.template:
     src: cms-backup.sh.j2
@@ -104,25 +113,6 @@
     hour: "{{ cms_backup_schedule_hour }}"
     job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
 
-- name: Seed only Directus (never seed customer form submissions)
-  copy:
-    src: "{{ seed_db_source_path }}/directus.db"
-    dest: "{{ directus_database_directory }}/directus.db"
-    owner: "1000"
-    group: "1000"
-    mode: '0660'
-    force: no
-
-- name: Seed initial Directus image uploads (will NOT overwrite existing production media)
-  copy:
-    src: "{{ seed_uploads_source_path }}/" 
-    dest: "{{ directus_uploads_directory }}/"
-    owner: "1000"
-    group: "1000"
-    mode: '0644'
-    directory_mode: '0755'
-    force: no
-
 - name: Seed initial replacement CMS media (will NOT overwrite existing production media)
   copy:
     src: "{{ seed_cms_media_source_path }}/"
@@ -144,14 +134,6 @@
       vpn_subnet={{ vpn_subnet }}
       staff_vpn_subnet={{ staff_vpn_subnet }}
 
-      # Directus Environment Variables
-      DIRECTUS_LICENSE_KEY={{ DIRECTUS_LICENSE_KEY }}
-      DIRECTUS_KEY={{ DIRECTUS_KEY }}
-      DIRECTUS_SECRET={{ DIRECTUS_SECRET }}
-      DIRECTUS_ADMIN_EMAIL={{ DIRECTUS_ADMIN_EMAIL }}
-      DIRECTUS_ADMIN_PASSWORD={{ DIRECTUS_ADMIN_PASSWORD }}
-      DIRECTUS_PUBLIC_URL={{ DIRECTUS_PUBLIC_URL }}
-      DIRECTUS_TOKEN={{ DIRECTUS_TOKEN }}
       
       # Nginx Environment Mappings
       PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
@@ -179,8 +161,6 @@
       CMS_DATABASE_DIR=/var/data
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
-      CMS_PETS_SOURCE={{ cms_pets_source }}
-      CMS_SERVICES_SOURCE={{ cms_services_source }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
@@ -238,24 +218,20 @@
     chdir: "{{ app_directory }}"
   changed_when: false
 
-- name: Detect whether the transitional Directus service is present
-  ansible.builtin.command: docker compose config --services
-  args:
-    chdir: "{{ app_directory }}"
-  register: compose_services
-  changed_when: false
-
 - name: Rebuild and deploy updated Docker containers
   command: docker compose up -d --build
   args:
     chdir: "{{ app_directory }}"
 
-- name: Configure Directus while the transitional ingress remains enabled
-  ansible.builtin.include_role:
-    name: directus_config
-  when:
-    - directus_enabled | default(true) | bool
-    - "'directus' in compose_services.stdout_lines"
+- name: Find retired Directus containers
+  ansible.builtin.command: docker ps -aq --filter label=com.docker.compose.service=directus
+  register: retired_directus_containers
+  changed_when: false
+
+- name: Remove retired Directus containers explicitly
+  ansible.builtin.command: docker rm -f {{ item }}
+  loop: "{{ retired_directus_containers.stdout_lines }}"
+  when: retired_directus_containers.stdout_lines | length > 0
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.
