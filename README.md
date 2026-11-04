@@ -87,10 +87,15 @@ ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "wireguar
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --skip-tags "deploy" --ask-vault-pass
 ```
 
-#### Selecting a Branch for Playbook to Pull
+#### Selecting an Application Branch, Tag, or Commit
 ```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test deploy_branch=cms" --ask-vault-pass
+ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test deploy_ref=cms-rollout" --ask-vault-pass
 ```
+
+`deploy_ref` selects the application revision. The legacy `deploy_branch` argument
+still works; `deploy_ref` takes precedence. The default remains `main`.
+Select the infrastructure revision with Git before running Ansible.
+See [release and rollback commands](docs/releases.md).
 
 ### 4. NetBird Playbooks
 
