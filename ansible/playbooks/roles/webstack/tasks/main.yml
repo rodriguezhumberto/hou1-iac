@@ -3,7 +3,7 @@
   git:
     repo: "{{ app_repo_pat }}"
     dest: "{{ app_directory }}"
-    version: "{{ deploy_branch | default('main') }}"
+    version: "{{ deploy_ref | default(deploy_branch | default('main')) }}"
     update: yes
     force: yes
   no_log: true
