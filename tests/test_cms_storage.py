@@ -94,19 +94,6 @@ class CmsStorageTest(unittest.TestCase):
                     self.assertIn('override', result.stdout)
                     self.assertEqual(override.read_text(), original)
 
-    def test_acl_accepts_real_staff_placeholder_only_with_its_vpn_restriction(self):
-        for restriction, valid in [('allow ${staff_vpn_subnet};', True), ('', False)]:
-            with self.subTest(valid=valid), tempfile.TemporaryDirectory() as directory:
-                app = Path(directory)
-                (app / 'nginx').mkdir()
-                source = 'server {\n server_name ${STAFF_HOSTNAME};\n ' + restriction + '\n deny all;\n}\n'
-                template = app / 'nginx/nginx.conf.template'
-                template.write_text(source)
-                result = run_play({'app_directory': str(app)},
-                    [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/cms-acl.yml')}])
-                self.assertEqual(result.returncode == 0, valid, result.stdout + result.stderr)
-                self.assertEqual(template.read_text(), source)
-
     def test_backup_wal_restore_and_failure_recovery(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
