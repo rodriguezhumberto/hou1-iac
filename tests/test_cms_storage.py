@@ -199,7 +199,10 @@ class CmsStorageTest(unittest.TestCase):
                     ('database/forms.db', b'', 'file'),
                     ('database/forms.db', b'not sqlite', 'file'),
                     ('../outside', b'escape', 'file'),
-                    ('media/link', b'', 'symlink')]:
+                    ('media/../../outside', b'escape', 'file'),
+                    ('media/link', b'', 'symlink'),
+                    ('media/link', b'', 'hardlink'),
+                    ('media/pipe', b'', 'fifo')]:
                 archive = root / 'invalid.tar.gz'
                 with tarfile.open(archive, 'w:gz') as tar:
                     member = tarfile.TarInfo(name)
@@ -207,6 +210,11 @@ class CmsStorageTest(unittest.TestCase):
                     if kind == 'symlink':
                         member.type = tarfile.SYMTYPE
                         member.linkname = '/etc/passwd'
+                    elif kind == 'hardlink':
+                        member.type = tarfile.LNKTYPE
+                        member.linkname = 'database/forms.db'
+                    elif kind == 'fifo':
+                        member.type = tarfile.FIFOTYPE
                     tar.addfile(member, io.BytesIO(body) if kind == 'file' else None)
                 result = subprocess.run([str(restore), str(archive), '--apply'],
                                         text=True, capture_output=True)

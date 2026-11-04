@@ -22,7 +22,7 @@ trap cleanup EXIT
 
 python3 - "$archive" "$tmp" <<'PYTHON'
 from pathlib import Path, PurePosixPath
-import sqlite3, sys, tarfile
+import shutil, sqlite3, sys, tarfile
 root = Path(sys.argv[2])
 with tarfile.open(sys.argv[1]) as archive:
     for member in archive.getmembers():
@@ -31,7 +31,16 @@ with tarfile.open(sys.argv[1]) as archive:
         assert path.parts and path.parts[0] in ('database', 'media')
         assert member.isdir() or member.isfile()
         assert path.parts[0] != 'database' or member.isdir() or member.name == 'database/forms.db'
-    archive.extractall(root, filter='data')
+    # Older Debian Python lacks extraction filters. Never restore archive links,
+    # permissions or special files; create only validated directories/files.
+    for member in archive.getmembers():
+        target = root / member.name
+        if member.isdir():
+            target.mkdir(parents=True, exist_ok=True, mode=0o700)
+        else:
+            target.parent.mkdir(parents=True, exist_ok=True, mode=0o700)
+            with archive.extractfile(member) as source, target.open('xb') as output:
+                shutil.copyfileobj(source, output)
 database = root / 'database/forms.db'
 assert database.is_file() and (root / 'media').is_dir()
 with sqlite3.connect(database.as_uri() + '?mode=ro', uri=True) as snapshot:
