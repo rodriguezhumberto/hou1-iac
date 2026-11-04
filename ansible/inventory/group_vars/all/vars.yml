@@ -21,6 +21,7 @@ cms_backup_schedule_minute: "25"
 cms_backup_schedule_hour: "2"
 cms_upload_max_bytes: 10485760
 cms_pets_source: directus
+cms_services_source: directus
 
 # Directus stays online during the migration and retains its existing paths.
 directus_database_directory: "{{ app_directory }}/database"

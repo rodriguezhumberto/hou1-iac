@@ -12,6 +12,11 @@ the image user changes. Each environment retains its own data and credentials.
 Only Directus is seeded by default; optional `seed_cms_media_source_path` must
 contain approved sample photos. Customer submissions are never seeded.
 
+Public pet/service reads default to Directus. After importing and verifying test
+content, select `cms_pets_source=cms` and `cms_services_source=cms` for the intended
+environment; deployment renders both as application runtime settings. Each accepts
+only `directus` or `cms`. Blog reads already use the custom CMS.
+
 Nightly `cms-backup.sh` uses SQLite's online backup API (including committed WAL
 writes) and archives `database/forms.db` plus `media/`. It checks integrity and
 nonempty schema, uses unique names, and retains private archives for 30 days.
