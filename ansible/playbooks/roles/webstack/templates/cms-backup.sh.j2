@@ -1,0 +1,32 @@
+#!/bin/sh
+set -eu
+umask 077
+
+backup_root={{ cms_backup_directory | quote }}
+database_root={{ cms_database_directory | quote }}
+media={{ cms_media_directory | quote }}
+stamp=$(date -u +%Y%m%dT%H%M%SZ)
+work=$(mktemp -d "$backup_root/.cms-$stamp.XXXXXX")
+backup_id=${work##*/}
+archive="$backup_root/${backup_id#.}.tar.gz"
+cleanup() { rm -rf "$work"; rm -f "$archive.tmp"; }
+trap cleanup EXIT
+
+mkdir "$work/database" "$work/media"
+python3 - "$database_root/forms.db" "$work/database/forms.db" <<'PYTHON'
+from pathlib import Path
+import sqlite3, sys
+with sqlite3.connect(Path(sys.argv[1]).resolve().as_uri() + '?mode=ro', uri=True) as source:
+    with sqlite3.connect(sys.argv[2]) as snapshot:
+        source.backup(snapshot)
+        assert snapshot.execute('PRAGMA integrity_check').fetchall() == [('ok',)]
+        assert snapshot.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0]
+PYTHON
+if [ -d "$media" ]; then
+  cp -a "$media/." "$work/media/"
+fi
+tar -czf "$archive.tmp" -C "$work" database media
+mv "$archive.tmp" "$archive"
+chmod 0600 "$archive"
+find "$backup_root" -maxdepth 1 -type f -name 'cms-*.tar.gz' -mtime +{{ cms_backup_retention_days | int }} -delete
+printf '%s\n' "$archive"

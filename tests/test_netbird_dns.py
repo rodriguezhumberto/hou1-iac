@@ -28,7 +28,7 @@ class DnsTest(unittest.TestCase):
         self.groups = [dict(id=n, name=n) for n in
                        ('test-servers', 'prod-servers', 'administrators', 'staff')]
         self.records = [dict(name=n + '.example.org', address='100.90.218.114')
-                        for n in ('test', 'staff-test', 'cms-test')]
+                        for n in ('test', 'staff-test')]
 
     def make_plan(self, existing=()):
         return plan(self.groups, self.records, '100.90.0.1',
@@ -200,7 +200,6 @@ class DnsTest(unittest.TestCase):
                         self.fail('Resolver did not start')
                     for name, qtype, expected in [('test.example.org', 1, '100.90.218.114'),
                                                   ('staff-test.example.org', 1, '100.90.218.114'),
-                                                  ('cms-test.example.org', 1, '100.90.218.114'),
                                                   ('test.example.org', 28, None),
                                                   ('public.example.org', 1, '192.0.2.10')]:
                         for protocol in ('udp', 'tcp'):

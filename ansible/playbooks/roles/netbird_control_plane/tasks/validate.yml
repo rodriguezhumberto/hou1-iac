@@ -19,8 +19,7 @@
       - >-
         netbird_domain not in [primary_domain, secondary_domain,
         'www.' ~ primary_domain, 'www.' ~ secondary_domain,
-        'test.' ~ primary_domain, 'test.' ~ secondary_domain,
-        'cms.' ~ primary_domain, 'cms-test.' ~ primary_domain]
+        'test.' ~ primary_domain, 'test.' ~ secondary_domain]
       - netbird_management_url | regex_replace('/$', '') == 'https://' ~ netbird_domain
       - wireguard_enabled | bool
       - netbird_control_plane_directory is match('^/[a-zA-Z0-9/_-]+$')

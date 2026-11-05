@@ -3,52 +3,88 @@
   git:
     repo: "{{ app_repo_pat }}"
     dest: "{{ app_directory }}"
-    version: "{{ deploy_branch | default('main') }}"
+    version: "{{ deploy_ref | default(deploy_branch | default('main')) }}"
     update: yes
     force: yes
   no_log: true
 
-# The application template currently has one legacy VPN allow directive. Manage
-# the CIDRs here after every checkout so deployment cannot restore the old ACL.
-- name: Configure CMS access for enabled VPNs
-  ansible.builtin.import_tasks: cms-acl.yml
+- name: Validate CMS environment and the existing database mount
+  ansible.builtin.assert:
+    that:
+      - cms_environment in ['test', 'production']
+      - cms_database_directory == (app_directory ~ '/database')
+    fail_msg: Keep the existing database mount during rollout and select test or production.
 
-# The dedicated control-plane playbook owns its untracked Compose override.
-# Git checkout preserves it; application deployments never render server config,
-# manage its stack, or open STUN ports. Existing Nginx mounts remain in effect.
-- name: Ensure database directory exists with open permissions for Astro container
-  file:
-    path: "{{ app_directory }}/database"
+- name: Ensure replacement CMS storage directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
     state: directory
-    mode: '0777'
-
-- name: Ensure Directus directories exist with correct permissions
-  file:
-    path: "{{ app_directory }}/directus-data/{{ item }}"
-    state: directory
-    owner: "1000"
-    group: "1000"
-    mode: '0755'
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: "{{ cms_storage_mode }}"
   loop:
-    - extensions
-    - uploads
+    - "{{ cms_data_directory }}"
+    - "{{ cms_media_directory }}"
 
-- name: Seed initial SQLite database files (will NOT overwrite existing production data)
-  copy:
-    src: "{{ seed_db_source_path }}/"
-    dest: "{{ app_directory }}/database/"
-    mode: '0666'
-    force: no
+- name: Find existing Astro database and WAL files without moving them
+  ansible.builtin.find:
+    paths: "{{ cms_database_directory }}"
+    patterns: ['forms.db', 'forms.db-wal', 'forms.db-shm']
+    file_type: file
+  register: cms_existing_database
 
-- name: Seed initial Directus image uploads (will NOT overwrite existing production media)
+- name: Keep the existing Astro database writable by the application
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0640'
+  loop: "{{ cms_existing_database.files }}"
+
+- name: Preserve ingress while configuring the media mount
+  ansible.builtin.import_tasks: cms-compose.yml
+
+- name: Ensure CMS backup directory exists
+  ansible.builtin.file:
+    path: "{{ cms_backup_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS backup script
+  ansible.builtin.template:
+    src: cms-backup.sh.j2
+    dest: "{{ app_directory }}/cms-backup.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS restore and validation script
+  ansible.builtin.template:
+    src: cms-restore.sh.j2
+    dest: "{{ app_directory }}/cms-restore.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule CMS database and media backups
+  ansible.builtin.cron:
+    name: "Pearland Paws {{ cms_environment }} CMS backup"
+    minute: "{{ cms_backup_schedule_minute }}"
+    hour: "{{ cms_backup_schedule_hour }}"
+    job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
+
+- name: Seed initial replacement CMS media (will NOT overwrite existing production media)
   copy:
-    src: "{{ seed_uploads_source_path }}/" 
-    dest: "{{ app_directory }}/directus-data/uploads/"
-    owner: "1000"
-    group: "1000"
+    src: "{{ seed_cms_media_source_path }}/"
+    dest: "{{ cms_media_directory }}/"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
     mode: '0644'
-    directory_mode: '0755'
+    directory_mode: "{{ cms_storage_mode }}"
     force: no
+  when: seed_cms_media_source_path is defined
 
 - name: Inject production .env file for Astro
   copy:
@@ -60,14 +96,6 @@
       vpn_subnet={{ vpn_subnet }}
       staff_vpn_subnet={{ staff_vpn_subnet }}
 
-      # Directus Environment Variables
-      DIRECTUS_LICENSE_KEY={{ DIRECTUS_LICENSE_KEY }}
-      DIRECTUS_KEY={{ DIRECTUS_KEY }}
-      DIRECTUS_SECRET={{ DIRECTUS_SECRET }}
-      DIRECTUS_ADMIN_EMAIL={{ DIRECTUS_ADMIN_EMAIL }}
-      DIRECTUS_ADMIN_PASSWORD={{ DIRECTUS_ADMIN_PASSWORD }}
-      DIRECTUS_PUBLIC_URL={{ DIRECTUS_PUBLIC_URL }}
-      DIRECTUS_TOKEN={{ DIRECTUS_TOKEN }}
       
       # Nginx Environment Mappings
       PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
@@ -89,6 +117,12 @@
       # Staff app authentication
       STAFF_PASSWORD={{ STAFF_PASSWORD }}
       STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
+
+      # Replacement CMS storage (test and production are host-isolated)
+      CMS_ENVIRONMENT={{ cms_environment }}
+      CMS_DATABASE_DIR=/var/data
+      CMS_MEDIA_DIR=/var/data/media
+      CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
 
 - name: Deploy Cloudflare API Credentials File
   copy:
@@ -141,19 +175,20 @@
     job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
   
 - name: Validate Compose configuration before deployment
-  ansible.builtin.command: docker compose config --quiet
+  ansible.builtin.command: docker compose config --format json
   args:
     chdir: "{{ app_directory }}"
+  register: cms_compose_config
   changed_when: false
+  no_log: true
+
+- name: Freeze and archive this project's retired Directus service
+  ansible.builtin.import_tasks: retire-directus.yml
 
 - name: Rebuild and deploy updated Docker containers
-  command: docker compose up -d --build
+  command: docker compose up -d --build --wait --wait-timeout 120
   args:
     chdir: "{{ app_directory }}"
-
-- name: Configure Directus
-  ansible.builtin.include_role:
-    name: directus_config
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.
@@ -167,3 +202,8 @@
   args:
     chdir: "{{ app_directory }}"
   changed_when: false
+
+- name: Remove archived Directus containers from this project
+  ansible.builtin.command:
+    argv: [docker, rm, "{{ item }}"]
+  loop: "{{ retired_directus_containers.stdout_lines }}"

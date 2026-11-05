@@ -3,6 +3,25 @@ hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
 vpn_subnet: "10.10.0.0/24"
 staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
 
+# Forms and CMS share the existing database mount during rollout and rollback.
+# Media has a separate persistent mount per environment.
+cms_environment: unknown
+cms_data_directory: "/var/lib/pearlandpaws/{{ cms_environment }}/cms"
+cms_database_directory: "{{ app_directory }}/database"
+cms_media_directory: "{{ cms_data_directory }}/media"
+# Verified against the application's pinned node:24.22.2 appuser/appgroup.
+# Override these together if a later application image changes its user.
+cms_storage_owner: "100"
+cms_storage_group: "102"
+cms_storage_mode: "0750"
+cms_backup_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/cms"
+directus_retirement_archive_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/directus-retirement"
+directus_retirement_archive: "{{ directus_retirement_archive_directory }}/directus-legacy.tar.gz"
+cms_backup_retention_days: 30
+cms_backup_schedule_minute: "25"
+cms_backup_schedule_hour: "2"
+cms_upload_max_bytes: 10485760
+
 ansible_python_interpreter: /usr/bin/python3.11
 
 # Enable clients in test first; retain WireGuard recovery throughout this issue.
@@ -53,6 +72,5 @@ netbird_dns_domain: "{{ primary_domain }}"
 netbird_dns_records:
   - {name: "test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
   - {name: "staff-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
-  - {name: "cms-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
 netbird_dns_upstreams: [1.1.1.1, 9.9.9.9]
 netbird_dns_port: 1053
