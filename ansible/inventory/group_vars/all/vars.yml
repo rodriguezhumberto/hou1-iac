@@ -32,6 +32,11 @@ netbird_listen_port: 51821
 netbird_version: "0.82.0"
 netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
 
+# A one-shot public SSH recovery window is armed only while a node is first
+# enrolled.  Successful NetBird SSH validation removes it before handoff.
+ssh_bootstrap_fallback_dir: /var/lib/ansible/ssh-bootstrap
+ssh_bootstrap_fallback_delay: 180s
+
 # Shared endpoint derives from the existing Vault-backed website domain.
 # Deployment is selected only by the dedicated playbook/inventory group.
 netbird_domain: "netbird.{{ primary_domain }}"

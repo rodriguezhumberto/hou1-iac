@@ -22,13 +22,10 @@
     proto: tcp
     src: "{{ netbird_subnet }}"
 
-- name: Create the SSH service override directory
-  ansible.builtin.file:
-    path: /etc/systemd/system/ssh.service.d
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
+- name: Record the public bootstrap address before changing the SSH path
+  ansible.builtin.set_fact:
+    ssh_bootstrap_public_ip: "{{ ansible_host }}"
+  when: node_bootstrap | bool
 
 - name: Snapshot the existing SSH startup override before changing it
   ansible.builtin.stat:
@@ -40,6 +37,117 @@
     src: /etc/systemd/system/ssh.service.d/vpn.conf
   register: ssh_vpn_unit_before
   when: ssh_vpn_unit_before_stat.stat.exists
+
+- name: Check for a stale bootstrap SSH fallback on established hosts
+  ansible.builtin.stat:
+    path: /etc/systemd/system/ansible-ssh-bootstrap-fallback.timer
+  register: ssh_bootstrap_fallback_timer_stat
+
+- name: Stop a stale bootstrap SSH fallback on established hosts
+  ansible.builtin.systemd:
+    name: ansible-ssh-bootstrap-fallback.timer
+    enabled: false
+    state: stopped
+    daemon_reload: true
+  when:
+    - not (node_bootstrap | bool)
+    - ssh_bootstrap_fallback_timer_stat.stat.exists
+
+- name: Remove stale bootstrap SSH fallback files on established hosts
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - /usr/local/sbin/ansible-ssh-bootstrap-fallback
+    - /etc/systemd/system/ansible-ssh-bootstrap-fallback.service
+    - /etc/systemd/system/ansible-ssh-bootstrap-fallback.timer
+    - /etc/ssh/sshd_config.d/01-ansible-bootstrap-fallback.conf
+    - "{{ ssh_bootstrap_fallback_dir }}"
+  when:
+    - not (node_bootstrap | bool)
+    - ssh_bootstrap_fallback_timer_stat.stat.exists
+
+- name: Create the bootstrap SSH fallback state directory
+  ansible.builtin.file:
+    path: "{{ ssh_bootstrap_fallback_dir }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  when: node_bootstrap | bool
+
+- name: Save the public SSH configuration for timer recovery
+  ansible.builtin.copy:
+    src: /etc/ssh/sshd_config
+    dest: "{{ ssh_bootstrap_fallback_dir }}/sshd_config"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+  when: node_bootstrap | bool
+
+- name: Save the existing SSH startup override for timer recovery
+  ansible.builtin.copy:
+    src: /etc/systemd/system/ssh.service.d/vpn.conf
+    dest: "{{ ssh_bootstrap_fallback_dir }}/vpn.conf"
+    remote_src: true
+    owner: root
+    group: root
+    mode: '0644'
+  when:
+    - node_bootstrap | bool
+    - ssh_vpn_unit_before_stat.stat.exists | default(false)
+
+- name: Remove a stale saved SSH startup override
+  ansible.builtin.file:
+    path: "{{ ssh_bootstrap_fallback_dir }}/vpn.conf"
+    state: absent
+  when:
+    - node_bootstrap | bool
+    - not (ssh_vpn_unit_before_stat.stat.exists | default(false))
+
+- name: Install the public SSH fallback script
+  ansible.builtin.template:
+    src: bootstrap-ssh-fallback.sh.j2
+    dest: /usr/local/sbin/ansible-ssh-bootstrap-fallback
+    owner: root
+    group: root
+    mode: '0755'
+  when: node_bootstrap | bool
+
+- name: Install the public SSH fallback service
+  ansible.builtin.template:
+    src: bootstrap-ssh-fallback.service.j2
+    dest: /etc/systemd/system/ansible-ssh-bootstrap-fallback.service
+    owner: root
+    group: root
+    mode: '0644'
+  when: node_bootstrap | bool
+
+- name: Install the public SSH fallback timer
+  ansible.builtin.template:
+    src: bootstrap-ssh-fallback.timer.j2
+    dest: /etc/systemd/system/ansible-ssh-bootstrap-fallback.timer
+    owner: root
+    group: root
+    mode: '0644'
+  when: node_bootstrap | bool
+
+- name: Arm the public SSH fallback before the NetBird cutover
+  ansible.builtin.systemd:
+    name: ansible-ssh-bootstrap-fallback.timer
+    daemon_reload: true
+    enabled: true
+    state: started
+  when: node_bootstrap | bool
+
+- name: Create the SSH service override directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/ssh.service.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
 
 - name: Retry SSH startup while the NetBird address becomes available
   ansible.builtin.copy:
@@ -106,6 +214,35 @@
 
     - name: Verify a fresh administrative SSH connection through NetBird
       ansible.builtin.import_tasks: verify-access.yml
+
+    - name: Mark the public SSH fallback cancelled after NetBird validation
+      ansible.builtin.file:
+        path: "{{ ssh_bootstrap_fallback_dir }}/cancelled"
+        state: touch
+        owner: root
+        group: root
+        mode: '0600'
+      when: node_bootstrap | bool
+
+    - name: Disarm the public SSH fallback after NetBird validation
+      ansible.builtin.systemd:
+        name: ansible-ssh-bootstrap-fallback.timer
+        enabled: false
+        state: stopped
+        daemon_reload: true
+      when: node_bootstrap | bool
+
+    - name: Remove the completed bootstrap SSH fallback
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - /usr/local/sbin/ansible-ssh-bootstrap-fallback
+        - /etc/systemd/system/ansible-ssh-bootstrap-fallback.service
+        - /etc/systemd/system/ansible-ssh-bootstrap-fallback.timer
+        - /etc/ssh/sshd_config.d/01-ansible-bootstrap-fallback.conf
+        - "{{ ssh_bootstrap_fallback_dir }}"
+      when: node_bootstrap | bool
   rescue:
     - name: Restore SSH configuration after invalid listener change
       ansible.builtin.copy:
@@ -150,7 +287,9 @@
 
     - name: Stop after restoring the previous listener
       ansible.builtin.fail:
-        msg: NetBird SSH validation failed; the previous listener configuration was restored and reloaded.
+        msg: >-
+          NetBird SSH validation failed; public SSH on {{ ssh_bootstrap_public_ip | default(ansible_host) }}
+          was restored and reloaded. Retry the initialization over that public address.
 
 - name: Switch initialized hosts to administrative NetBird access
   ansible.builtin.set_fact:

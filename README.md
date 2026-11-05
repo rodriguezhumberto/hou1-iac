@@ -25,8 +25,10 @@ ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test_init" --ask-vault
 
 Use complete runs for initialization. The init targets connect to public IPs;
 SSH hardening requires a fresh administrative connection over NetBird to pass,
-then switches the rest of that run to the administrative user over NetBird.
-Provider-console access is required for recovery.
+then switches the rest of that run to the administrative user over NetBird. A
+180-second public SSH recovery timer is armed during this cutover and is
+removed after the fresh NetBird probe succeeds; if the controller disappears,
+the timer restores the original public SSH path for a retry.
 
 ### 2. Subsequent runs: NetBird
 

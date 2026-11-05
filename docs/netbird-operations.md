@@ -44,6 +44,12 @@ Use the provider console when NetBird is unavailable. Log in, inspect
 Repair the daemon or restore `/etc/netbird` from encrypted backup. Do not clone a
 peer identity onto a second running host.
 
+During first initialization, Ansible arms a 180-second public-SSH fallback timer
+before the listener cutover. A fresh NetBird SSH probe cancels and removes it.
+If the controller is disconnected during cutover, retry through the original
+public IP after the timer restores the saved SSH configuration. The timer is
+not installed on later NetBird-only runs.
+
 If temporary public SSH is needed, use the console to move
 `/etc/systemd/system/ssh.service.d/vpn.conf` aside, remove `ListenAddress` lines
 from `/etc/ssh/sshd_config`, and add `ListenAddress PUBLIC_IP` in

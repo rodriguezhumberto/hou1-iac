@@ -13,6 +13,28 @@ from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_initial_bootstrap_arms_public_fallback_until_netbird_probe(self):
+        source = ROLES / 'security/tasks/main.yml'
+        security = yaml.safe_load(source.read_text())
+        arm = next(task for task in security if task['name'] ==
+                   'Arm the public SSH fallback before the NetBird cutover')
+        cutover = next(task for task in security if 'block' in task)
+        disarm = next(task for task in cutover['block'] if task['name'] ==
+                      'Disarm the public SSH fallback after NetBird validation')
+        cleanup = next(task for task in cutover['block'] if task['name'] ==
+                       'Remove the completed bootstrap SSH fallback')
+        self.assertEqual(arm['when'], 'node_bootstrap | bool')
+        self.assertEqual(disarm['when'], 'node_bootstrap | bool')
+        self.assertEqual(cleanup['when'], 'node_bootstrap | bool')
+        self.assertTrue(any(path.endswith('ansible-ssh-bootstrap-fallback.timer')
+                            for path in cleanup['loop']))
+
+        timer = (ROLES / 'security/templates/bootstrap-ssh-fallback.timer.j2').read_text()
+        script = (ROLES / 'security/templates/bootstrap-ssh-fallback.sh.j2').read_text()
+        self.assertIn('OnActiveSec={{ ssh_bootstrap_fallback_delay }}', timer)
+        self.assertIn('ListenAddress {{ ssh_bootstrap_public_ip }}', script)
+        self.assertIn('[ -f "$state_dir/cancelled" ] && exit 0', script)
+
     def test_console_recovery_keeps_public_path_until_netbird_run_succeeds(self):
         docs = (ROOT / 'docs/netbird-operations.md').read_text()
         keep = docs.index('Keep this temporary path until NetBird SSH succeeds:')

@@ -1,0 +1,39 @@
+#!/bin/sh
+set -eu
+
+state_dir={{ ssh_bootstrap_fallback_dir | quote }}
+config=/etc/ssh/sshd_config
+override=/etc/systemd/system/ssh.service.d/vpn.conf
+fallback_config=/etc/ssh/sshd_config.d/01-ansible-bootstrap-fallback.conf
+
+# The timer is deliberately one-shot.  A successful NetBird probe stops it
+# and removes this state directory before the bootstrap connection is closed.
+[ -f "$state_dir/cancelled" ] && exit 0
+
+if [ -f "$state_dir/sshd_config" ]; then
+    /usr/bin/install -o root -g root -m 0644 "$state_dir/sshd_config" "$config"
+fi
+if [ -f "$state_dir/vpn.conf" ]; then
+    /usr/bin/install -o root -g root -m 0644 "$state_dir/vpn.conf" "$override"
+else
+    /usr/bin/rm -f "$override"
+fi
+
+/bin/cat > "$fallback_config" <<'EOF'
+# Managed by the initial NetBird bootstrap fallback timer.
+ListenAddress {{ ssh_bootstrap_public_ip }}
+EOF
+/usr/bin/chown root:root "$fallback_config"
+/usr/bin/chmod 0644 "$fallback_config"
+
+/usr/bin/systemctl daemon-reload
+if /usr/sbin/sshd -t; then
+    /usr/bin/systemctl reload ssh
+fi
+
+# UFW may not have been enabled yet on a new host.  If it is active, restore
+# the public bootstrap rule so the controller can reconnect by public IP.
+if /usr/sbin/ufw status | /bin/grep -Fq 'Status: active'; then
+    /usr/sbin/ufw allow 22/tcp >/dev/null
+fi
+/usr/bin/touch "$state_dir/fallback-complete"
