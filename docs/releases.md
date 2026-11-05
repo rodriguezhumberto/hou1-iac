@@ -4,10 +4,12 @@ Feature branches and PRs target `cms-rollout` in both repositories. Deploy that
 combined build to test. Keep `main` as the production fallback until the whole
 release passes; then open release PRs from `cms-rollout` into `main`.
 
-Use matching annotated release tags in both repositories. `v0.1.0` is the
-owner-confirmed production baseline; `v0.2.0` is the planned CMS release. Use
-patch versions for fixes and minor versions for features while pre-1.0.
-Never move, delete, or reuse a release tag.
+Version tags are independent in each repository. `v0.1.0` is the
+owner-confirmed production baseline in both repositories; `v0.2.0` is the
+planned coordinated CMS release. Use patch versions for fixes and minor
+versions for features while pre-1.0. Never move, delete, or reuse a release
+tag. An app-only change does not require an infrastructure tag, and an
+infrastructure-only change does not require an app tag.
 
 ## Test the integration build
 
@@ -29,18 +31,21 @@ the **infrastructure** revision. Legacy `deploy_branch` remains supported;
 
 Verify the exact app/infrastructure commit pair on test, including backup/restore
 and migration rollback. Merge release PRs without changing the tested content.
-In each repository, create an annotated tag at its verified commit:
+Create an annotated tag only in repositories that changed:
 
 ```bash
-git tag -a v0.2.0 VERIFIED_COMMIT_SHA -m "CMS release v0.2.0"
-git push origin refs/tags/v0.2.0
+git tag -a APP_TAG VERIFIED_APP_SHA -m "Application release APP_TAG"
+git push origin refs/tags/APP_TAG
+# When infrastructure changed, repeat in hou1-iac with INFRA_TAG and VERIFIED_INFRA_SHA.
 ```
 
-Record both commit SHAs, backup reference, and deployment result in GitHub release
-notes. From a clean infrastructure checkout, fetch tags, switch to `v0.2.0`, and
-run the production playbook with `deploy_ref=v0.2.0`. Verify production before
-marking that release as the new rollback baseline. Branch protection/deployment
-approval is separate; these commands do not deploy automatically.
+Record both deployed refs and commit SHAs, the backup reference, and deployment
+result in GitHub release notes. From a clean infrastructure checkout, fetch the
+infrastructure ref (for example `v0.2.0`), then run the production playbook with
+the tested application ref (for example `deploy_ref=v0.2.1`). Verify production
+before marking that exact pair as the new rollback baseline. Branch
+protection/deployment approval is separate; these commands do not deploy
+automatically.
 
 ## Roll back to the initial baseline
 

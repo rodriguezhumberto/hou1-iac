@@ -27,5 +27,5 @@ stack and successful Nginx validation. Failures leave containers/data available
 for recovery. Existing archives are reused only when their contents match;
 if legacy content changed, select a new `directus_retirement_archive` path.
 
-Restore the application and infrastructure at the paired release tag to roll
-back. Restore the legacy archive only when deliberately restoring Directus.
+Restore the application and infrastructure at the recorded compatible refs to
+roll back. Restore the legacy archive only when deliberately restoring Directus.
