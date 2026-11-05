@@ -304,7 +304,6 @@
 
 - name: Close the public bootstrap connection
   ansible.builtin.meta: reset_connection
-  when: ssh_bootstrap_handoff is not skipped
 
 - name: Set SSH authentication policy before provider overrides
   ansible.builtin.copy:

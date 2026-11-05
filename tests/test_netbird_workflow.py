@@ -165,6 +165,9 @@ class WorkflowTest(unittest.TestCase):
         security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
         handoff = next(task for task in security if task['name'] ==
                        'Switch initialized hosts to administrative NetBird access')
+        reset = next(task for task in security if task['name'] ==
+                     'Close the public bootstrap connection')
+        self.assertNotIn('when', reset)
         tasks = [handoff, {'ansible.builtin.assert': {'that': [
             "ansible_host == netbird_ip", "ansible_user == new_user",
             "ansible_ssh_pass == ''", "not (node_bootstrap | bool)",
