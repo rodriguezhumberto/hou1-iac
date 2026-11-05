@@ -52,44 +52,6 @@
     group: root
     mode: '0700'
 
-- name: Ensure Directus retirement archive directory exists
-  ansible.builtin.file:
-    path: "{{ directus_retirement_archive_directory }}"
-    state: directory
-    owner: root
-    group: root
-    mode: '0700'
-
-- name: Check for legacy Directus database
-  ansible.builtin.stat:
-    path: "{{ cms_database_directory }}/directus.db"
-  register: legacy_directus_database
-
-- name: Check for legacy Directus data
-  ansible.builtin.stat:
-    path: "{{ app_directory }}/directus-data"
-  register: legacy_directus_data
-
-- name: Archive legacy Directus database and media before removal
-  ansible.builtin.shell: |
-    set -eu
-    archive={{ directus_retirement_archive | quote }}
-    temporary="$archive.tmp"
-    rm -f "$temporary"
-    if [ -f {{ (cms_database_directory ~ '/directus.db') | quote }} ] && [ -d {{ (app_directory ~ '/directus-data') | quote }} ]; then
-      tar -czf "$temporary" -C {{ app_directory | quote }} database/directus.db directus-data
-    elif [ -f {{ (cms_database_directory ~ '/directus.db') | quote }} ]; then
-      tar -czf "$temporary" -C {{ app_directory | quote }} database/directus.db
-    else
-      tar -czf "$temporary" -C {{ app_directory | quote }} directus-data
-    fi
-    chmod 0600 "$temporary"
-    mv "$temporary" "$archive"
-  args:
-    creates: "{{ directus_retirement_archive }}"
-  when: legacy_directus_database.stat.exists or legacy_directus_data.stat.exists
-  no_log: true
-
 - name: Install CMS backup script
   ansible.builtin.template:
     src: cms-backup.sh.j2
@@ -213,25 +175,20 @@
     job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
   
 - name: Validate Compose configuration before deployment
-  ansible.builtin.command: docker compose config --quiet
+  ansible.builtin.command: docker compose config --format json
   args:
     chdir: "{{ app_directory }}"
+  register: cms_compose_config
   changed_when: false
+  no_log: true
+
+- name: Freeze and archive this project's retired Directus service
+  ansible.builtin.import_tasks: retire-directus.yml
 
 - name: Rebuild and deploy updated Docker containers
-  command: docker compose up -d --build
+  command: docker compose up -d --build --wait --wait-timeout 120
   args:
     chdir: "{{ app_directory }}"
-
-- name: Find retired Directus containers
-  ansible.builtin.command: docker ps -aq --filter label=com.docker.compose.service=directus
-  register: retired_directus_containers
-  changed_when: false
-
-- name: Remove retired Directus containers explicitly
-  ansible.builtin.command: docker rm -f {{ item }}
-  loop: "{{ retired_directus_containers.stdout_lines }}"
-  when: retired_directus_containers.stdout_lines | length > 0
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.
@@ -245,3 +202,8 @@
   args:
     chdir: "{{ app_directory }}"
   changed_when: false
+
+- name: Remove archived Directus containers from this project
+  ansible.builtin.command:
+    argv: [docker, rm, "{{ item }}"]
+  loop: "{{ retired_directus_containers.stdout_lines }}"

@@ -1,0 +1,55 @@
+---
+- name: Require a replacement stack and an explicit Compose project
+  ansible.builtin.assert:
+    that:
+      - (cms_compose_config.stdout | from_json).name is match('^[a-z0-9][a-z0-9_-]*$')
+      - "'directus' not in (cms_compose_config.stdout | from_json).services"
+    fail_msg: Select the replacement app release before retiring Directus.
+
+- name: Find retired Directus containers belonging to this application
+  ansible.builtin.command:
+    argv:
+      - docker
+      - ps
+      - -aq
+      - --filter
+      - "label=com.docker.compose.project={{ (cms_compose_config.stdout | from_json).name }}"
+      - --filter
+      - "label=com.docker.compose.project.working_dir={{ app_directory }}"
+      - --filter
+      - label=com.docker.compose.service=directus
+  register: retired_directus_containers
+  changed_when: false
+
+- name: Check the expected legacy database before stopping Directus
+  ansible.builtin.stat:
+    path: "{{ cms_database_directory }}/directus.db"
+  register: legacy_directus_database
+
+- name: Require the expected database for containers being retired
+  ansible.builtin.assert:
+    that: legacy_directus_database.stat.isreg | default(false)
+    fail_msg: Directus containers exist without the expected database; review their mounts before retirement.
+  when: retired_directus_containers.stdout_lines | length > 0
+
+- name: Stop this application's Directus writers before checkpoint and archive
+  ansible.builtin.command:
+    argv: [docker, stop, --time, '30', "{{ item }}"]
+  loop: "{{ retired_directus_containers.stdout_lines }}"
+
+- name: Ensure Directus retirement archives remain private
+  ansible.builtin.file:
+    path: "{{ directus_retirement_archive_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Checkpoint and verify the legacy database and media archive
+  ansible.builtin.script:
+    cmd: >-
+      {{ role_path }}/files/archive-directus.py
+      {{ app_directory | quote }} {{ directus_retirement_archive | quote }}
+    executable: python3
+  register: directus_retirement_result
+  changed_when: directus_retirement_result.stdout | trim == 'created'
