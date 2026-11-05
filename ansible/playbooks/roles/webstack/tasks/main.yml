@@ -15,7 +15,7 @@
       - cms_database_directory == (app_directory ~ '/database')
     fail_msg: Keep the existing database mount during rollout and select test or production.
 
-- name: Ensure replacement CMS storage directories exist
+- name: Ensure CMS database and replacement media directories exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -23,6 +23,7 @@
     group: "{{ cms_storage_group }}"
     mode: "{{ cms_storage_mode }}"
   loop:
+    - "{{ cms_database_directory }}"
     - "{{ cms_data_directory }}"
     - "{{ cms_media_directory }}"
 
