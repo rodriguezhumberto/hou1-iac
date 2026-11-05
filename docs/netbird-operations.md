@@ -34,7 +34,6 @@ Assign devices to `administrators` or `staff`. Enrollment manages server groups.
 All-to-All is disabled. Keep NetBird DNS enabled on operator devices. Private DNS
 records use `name` and `address`; the resolver binds to production's NetBird IP.
 NetBird uses WireGuard internally; its client UDP port is `netbird_listen_port`.
-The retired standalone `wg0` service is separate.
 
 ## Recovery and rollback
 
@@ -53,11 +52,10 @@ ssh -o ControlMaster=no new_user@NETBIRD_IP sudo -n true
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
 ```
 
-Before upgrades or retirement, run `/opt/hou1-netbird/backup.sh` over NetBird SSH;
+Before upgrades, run `/opt/hou1-netbird/backup.sh` over NetBird SSH;
 it briefly stops the management server. Back up
 `/var/backups/hou1-netbird`, the controller PAT Vault, and `/etc/netbird` off-host.
-Keep the previous infrastructure/app SHAs and an encrypted copy of legacy
-`/etc/wireguard` until the retirement checks pass.
+Keep the previous infrastructure/app SHAs for rollback.
 
 To restore the control plane, use NetBird SSH to stop its Compose project and
 restore `/opt/hou1-netbird` with original `secrets.json`, data, configuration,
@@ -65,22 +63,3 @@ permissions, certificate lineage, and controller PAT Vault. Start the compatible
 pinned versions, verify NetBird SSH, then rerun normal provisioning. Never run two
 copies of the same server identity. Restoring a legacy infrastructure revision
 alone does not restore deleted VPN configuration or keys.
-
-## Retire existing WireGuard installations
-
-Before retirement, record passing results for **test and production** in issue #4:
-NetBird SSH and CMS access, daemon reconnect, forced relay fallback, reboot
-recovery, and the public-IP bootstrap fallback rehearsal. Confirm no required
-service uses `wg0`. These live checks are not covered by the offline suite.
-
-Then run once per environment, test first:
-
-```bash
-ansible-playbook playbooks/retire-wireguard.yml -e "target_hosts=hou1_test netbird_retirement_verified=true" --ask-vault-pass
-ansible-playbook playbooks/retire-wireguard.yml -e "target_hosts=hou1_prod netbird_retirement_verified=true" --ask-vault-pass
-```
-
-This verifies enrollment and fresh SSH, deploys NetBird-only CMS settings, then
-removes `wg0`, its configuration, known firewall rules, and standalone packages.
-Verify SSH/CMS again after reboot. Remove obsolete WireGuard keys/peer variables
-from inventory Vault with `ansible-vault edit`; provisioning no longer reads them.
