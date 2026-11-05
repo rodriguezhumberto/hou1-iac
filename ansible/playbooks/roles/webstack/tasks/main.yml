@@ -124,6 +124,17 @@
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
 
+- name: Ensure Certbot directories exist before installing credentials
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ app_directory }}/certbot"
+    - "{{ app_directory }}/certbot/conf"
+
 - name: Deploy Cloudflare API Credentials File
   copy:
     dest: "{{ app_directory }}/certbot/cloudflare.ini"
