@@ -20,5 +20,12 @@ before its container is removed. Keep that archive off-host until the rollback
 window expires. It contains only the old Directus database and media; the
 customer database remains in the CMS backup.
 
+Retirement requires an app stack without Directus. It stops only containers
+matching the Compose project and working directory, checkpoints SQLite, and
+verifies the archive before removal. Removal waits for a healthy replacement
+stack and successful Nginx validation. Failures leave containers/data available
+for recovery. Existing archives are reused only when their contents match;
+if legacy content changed, select a new `directus_retirement_archive` path.
+
 Restore the application and infrastructure at the paired release tag to roll
 back. Restore the legacy archive only when deliberately restoring Directus.
