@@ -151,6 +151,8 @@
     certbot/dns-cloudflare certonly 
     -a dns-cloudflare
     -m {{ letsencrypt_email }} 
+    --non-interactive
+    --agree-tos
     {{ item.flags }}
     --expand
     --keep-until-expiring
