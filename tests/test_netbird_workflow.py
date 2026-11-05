@@ -1,5 +1,6 @@
 """Check public bootstrap boundaries, retirement gates, and SSH rollback offline."""
 import copy
+import json
 import os
 from pathlib import Path
 import sys
@@ -12,6 +13,32 @@ from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_existing_wireguard_recovery_requires_verified_retirement(self):
+        source = ROLES / 'security/tasks/retirement-check.yml'
+        guard = 'Require verified retirement before removing legacy SSH recovery'
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            missing = root / 'missing.conf'
+            existing = root / 'wg0.conf'
+            existing.write_text('[Interface]\n')
+            plays = []
+            for config_exists, interface_exists, verified, valid in [
+                (False, False, None, True),   # Fresh public-IP bootstrap.
+                (True, False, None, False),  # A stopped VPN remains a recovery path.
+                (False, True, False, False), # Also detect an interface without its file.
+                (True, True, False, False),
+                (True, True, True, True),
+                (False, False, False, True), # Already-retired hosts need no flag.
+            ]:
+                tasks = yaml.safe_load(source.read_text())
+                tasks[0]['ansible.builtin.stat']['path'] = str(existing if config_exists else missing)
+                interfaces = [{'ifname': 'wt0'}, {'ifname': 'wg0' if interface_exists else 'eth0'}]
+                tasks[1]['ansible.builtin.command']['argv'] = ['echo', json.dumps(interfaces)]
+                variables = {} if verified is None else {'netbird_retirement_verified': verified}
+                plays.append(guard_play(variables, tasks, None if valid else guard))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_only_initialization_can_use_public_addresses(self):
         inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
         tasks = [{'ansible.builtin.import_role': {'name': 'netbird_common'}}]

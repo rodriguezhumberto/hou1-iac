@@ -3,6 +3,9 @@
   ansible.builtin.import_role:
     name: netbird_common
 
+- name: Guard retirement of an existing WireGuard recovery path
+  ansible.builtin.import_tasks: retirement-check.yml
+
 - name: Allow public HTTP and HTTPS
   community.general.ufw:
     rule: allow
