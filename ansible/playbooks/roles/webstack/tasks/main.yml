@@ -15,7 +15,7 @@
       - cms_database_directory == (app_directory ~ '/database')
     fail_msg: Keep the existing database mount during rollout and select test or production.
 
-- name: Ensure replacement CMS storage directories exist
+- name: Ensure CMS database and replacement media directories exist
   ansible.builtin.file:
     path: "{{ item }}"
     state: directory
@@ -23,6 +23,7 @@
     group: "{{ cms_storage_group }}"
     mode: "{{ cms_storage_mode }}"
   loop:
+    - "{{ cms_database_directory }}"
     - "{{ cms_data_directory }}"
     - "{{ cms_media_directory }}"
 
@@ -92,8 +93,8 @@
     mode: '0600'
     content: |
       # Network Setup
-      HOU1_VPN_IP={{ management_ip }}
-      vpn_subnet={{ vpn_subnet }}
+      HOU1_VPN_IP={{ netbird_ip }}
+      vpn_subnet={{ netbird_subnet }}
       staff_vpn_subnet={{ staff_vpn_subnet }}
 
       
@@ -124,6 +125,17 @@
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
 
+- name: Ensure Certbot directories exist before installing credentials
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ app_directory }}/certbot"
+    - "{{ app_directory }}/certbot/conf"
+
 - name: Deploy Cloudflare API Credentials File
   copy:
     dest: "{{ app_directory }}/certbot/cloudflare.ini"
@@ -140,6 +152,8 @@
     certbot/dns-cloudflare certonly 
     -a dns-cloudflare
     -m {{ letsencrypt_email }} 
+    --non-interactive
+    --agree-tos
     {{ item.flags }}
     --expand
     --keep-until-expiring
@@ -186,7 +200,9 @@
   ansible.builtin.import_tasks: retire-directus.yml
 
 - name: Rebuild and deploy updated Docker containers
-  command: docker compose up -d --build --wait --wait-timeout 120
+  # Public bootstrap needs Nginx and its dependencies before NetBird exists.
+  # Defer services that bind the NetBird IP until enrollment completes.
+  command: "docker compose up -d --build --wait --wait-timeout 120{{ ' nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}"
   args:
     chdir: "{{ app_directory }}"
 

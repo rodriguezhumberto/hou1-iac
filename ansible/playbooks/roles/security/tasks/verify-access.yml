@@ -1,0 +1,23 @@
+---
+# A fresh connection avoids accepting an already-open bootstrap or VPN session.
+- name: Connect as the administrative user over NetBird from the controller
+  ansible.builtin.command:
+    argv:
+      - ssh
+      - -o
+      - BatchMode=yes
+      - -o
+      - ConnectTimeout=10
+      - -o
+      - ControlMaster=no
+      - -o
+      - ControlPath=none
+      - -o
+      - StrictHostKeyChecking=accept-new
+      - -i
+      - "{{ ansible_ssh_private_key_file | default('~/.ssh/id_ed25519') | expanduser }}"
+      - "{{ new_user }}@{{ netbird_ip }}"
+      - sudo -n true
+  delegate_to: localhost
+  become: false
+  changed_when: false

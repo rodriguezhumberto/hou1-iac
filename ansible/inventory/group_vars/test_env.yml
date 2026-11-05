@@ -1,7 +1,3 @@
-hou1_vpn_ip: "10.10.0.10"
-# Use the declared NetBird address for management; retain WireGuard recovery.
-netbird_enabled: true
-management_vpn: netbird
 netbird_ip: "{{ test_netbird_ip }}"
 netbird_server_group: test-servers
 

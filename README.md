@@ -1,113 +1,65 @@
-Run all commands from `ansible/`.
+Run commands from `ansible/`. The controller needs Ansible dependencies, its SSH
+key, the inventory Vault password, and NetBird administrator membership.
 
-### 1. Infrastructure Initialization
+### 1. First initialization: public IP
 
-Use these commands when configuring a brand new instance.
-This connects via the public or local network IP address to configure system packages, create the administrative user, setup WireGuard, and lock down SSH.
+For a new production host, first create the application ingress and shared
+NetBird control plane. Public SSH stays available during this step:
 
-#### Test Environment Init
+```bash
+ansible-playbook playbooks/bootstrap-control-plane.yml -e "manual_root_password=YOUR_TEMP_ROOT_PASS" --ask-vault-pass
+```
+
+Join the controller to that NetBird instance and assign it to `administrators`.
+Then enroll the node and restrict SSH to NetBird:
+
+```bash
+ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod_init manual_root_password=YOUR_TEMP_ROOT_PASS" --ask-vault-pass
+```
+
+Test uses the existing production control plane:
+
 ```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test_init" --ask-vault-pass
 ```
-#### Production Environment Init
-Production blocks root login by default, initialization requires providing the temporary root password via an extra variable.
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod_init" -e "manual_root_password=YOUR_TEMP_ROOT_PASS" --ask-vault-pass
-```
-May still not work, so may need to manually copy keys
-```bash
-ssh-copy-id -i ~/.ssh/id_ed25519.pub username@remote_host
-```
 
-### 2. Standard Runs (Post-Initialization)
+Use complete runs for initialization. The init targets connect to public IPs;
+SSH hardening requires a fresh administrative connection over NetBird to pass,
+then switches the rest of that run to the administrative user over NetBird. A
+180-second public SSH recovery timer is armed during this cutover and is
+removed after the fresh NetBird probe succeeds; if the controller disappears,
+the timer restores the original public SSH path for a retry.
 
-Standard test and production runs connect over the NetBird addresses declared in
-the encrypted inventory. For enrollment or address repair, add
-`-e management_vpn=wireguard` to use the recovery VPN.
+### 2. Subsequent runs: NetBird
 
-#### Run Everything Against Test VPS
 ```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test" --ask-vault-pass
-```
-
-#### Run Everything Against Production VPS
-```bash
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
 ```
 
-### 3. Running Targeted Operations (Using Tags)
+Both use the fixed NetBird addresses in the encrypted inventory. Keep the
+controller connected to NetBird. Public-IP fallback is disabled.
 
-Instead of evaluating the entire playbook, tags can target specific tasks.
+### 3. Targeted operations
 
-#### Deploy/Update Application Code Only
-Skips system package updates, security lockouts, and Docker installations. Pulls updated repository contents and rebuilds containers.
+Add `--tags deploy` for application updates, `--tags ufw` for firewall and SSH
+configuration, or `--skip-tags deploy` to skip application deployment.
 
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "deploy" --ask-vault-pass
-```
+Select the application revision with `-e deploy_ref=TAG_OR_SHA`. Legacy
+`deploy_branch` remains supported; `deploy_ref` takes precedence. The default is
+`main`. Select the infrastructure revision with Git before running Ansible.
+See [releases](docs/releases.md) and [CMS backups](docs/cms-storage-backups.md).
 
-#### Troubleshoot or Reconfigure Firewalls Only
-Targets only UFW related rules and blocks.
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "ufw" --ask-vault-pass
-```
+### 4. NetBird playbooks
 
-#### CMS storage and restore
+These connect to production over NetBird:
 
-The deploy role keeps forms/CMS SQLite in the existing database mount and adds
-a separate media mount per environment. Nightly archives are written to
-`/var/backups/pearlandpaws/<environment>/cms`. See [the short storage and
-restore guide](docs/cms-storage-backups.md) for integrity checks and the
-rollback-safe restore sequence.
-
-#### Update System WireGuard Configurations Only
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --tags "wireguard" --ask-vault-pass
-```
-
-#### Run Everything EXCEPT Application Deployment
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --skip-tags "deploy" --ask-vault-pass
-```
-
-#### Selecting an Application Branch, Tag, or Commit
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test deploy_ref=cms-rollout" --ask-vault-pass
-```
-
-`deploy_ref` selects the application revision. The legacy `deploy_branch` argument
-still works; `deploy_ref` takes precedence. The default remains `main`.
-Select the infrastructure revision with Git before running Ansible.
-See [release and rollback commands](docs/releases.md).
-
-### 4. NetBird Playbooks
-
-#### Enroll or Repair Test Over WireGuard
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test management_vpn=wireguard" --tags "netbird" --ask-vault-pass
-```
-
-#### Enroll or Repair Production Over WireGuard
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod management_vpn=wireguard" --tags "netbird" --ask-vault-pass
-```
-
-#### Deploy/Update Control Plane
-Targets production over WireGuard.
 ```bash
 ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
-```
-
-To connect over NetBird instead:
-```bash
-ansible-playbook playbooks/netbird-control-plane.yml -e 'ansible_host={{ netbird_ip }}' --ask-vault-pass
-```
-
-#### Deploy/Update Private DNS
-Targets production over WireGuard and uses the Vault-declared server addresses.
-```bash
 ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
 ```
 
-After enrollment, verify NetBird SSH access and use the standard runs above.
-See the [operations guide](docs/netbird-operations.md) for maintenance and recovery.
+Reconcile a client's enrollment with the normal environment target and
+`--tags netbird`. Established hosts require NetBird SSH; public-IP access is
+available only during first initialization through the bootstrap fallback.
+See [NetBird operations](docs/netbird-operations.md).

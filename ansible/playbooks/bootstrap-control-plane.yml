@@ -1,0 +1,30 @@
+---
+# First production provisioning only. Join the controller to NetBird before hou1.yml.
+- name: Bootstrap production ingress and NetBird over the public IP
+  hosts: hou1_prod_init
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Require a complete public-IP bootstrap
+      ansible.builtin.assert:
+        that:
+          - node_bootstrap | bool
+          - ansible_host == prod_vps_public_ip
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Run this playbook without tags on a fresh production host; SSH remains public until hou1.yml completes.
+      tags: [always]
+    - name: Validate bootstrap host configuration
+      ansible.builtin.import_role:
+        name: netbird_common
+      tags: [always]
+  roles:
+    - role: common
+    - role: docker
+    - role: webstack
+      vars:
+        webstack_bootstrap_ingress_only: true
+    - role: netbird_control_plane

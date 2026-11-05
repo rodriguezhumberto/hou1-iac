@@ -1,0 +1,6 @@
+[Unit]
+Description=Restore public SSH after an incomplete NetBird bootstrap
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/ansible-ssh-bootstrap-fallback

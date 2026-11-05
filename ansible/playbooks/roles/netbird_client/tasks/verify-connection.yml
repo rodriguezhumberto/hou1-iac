@@ -5,4 +5,4 @@
       - >-
         ((netbird_after.stdout | from_json).management.url | netbird_endpoint) ==
         (netbird_management_url | netbird_endpoint)
-      - (netbird_after.stdout | from_json).wireguardPort | int == netbird_wireguard_port | int
+      - (netbird_after.stdout | from_json).wireguardPort | int == netbird_listen_port | int

@@ -5,20 +5,30 @@
     attributes: -i
   ignore_errors: yes 
 
-- name: Force Google DNS to resolve apt update failures
-  copy:
-    dest: /etc/resolv.conf
-    content: "nameserver 8.8.8.8\n"
+- name: Create the systemd-resolved drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Persist resolver fallbacks for hosts without provider DNS
+  ansible.builtin.copy:
+    dest: /etc/systemd/resolved.conf.d/99-hou1-fallback-dns.conf
     owner: root
     group: root
     mode: '0644'
-  when: not (netbird_enabled | bool)
+    content: |
+      [Resolve]
+      FallbackDNS=1.1.1.1 9.9.9.9
+  register: hou1_resolver_fallback
 
-- name: Lock resolv.conf to prevent DHCP network overwrites
-  file:
-    path: /etc/resolv.conf
-    attributes: +i
-  when: not (netbird_enabled | bool)
+- name: Reload systemd-resolved after configuring resolver fallbacks
+  ansible.builtin.systemd:
+    name: systemd-resolved
+    state: restarted
+  when: hou1_resolver_fallback.changed
 
 - name: Update and upgrade apt packages
   apt:
@@ -29,7 +39,6 @@
   apt:
     name:
       - ufw
-      - wireguard
       - apt-transport-https
       - ca-certificates
       - curl

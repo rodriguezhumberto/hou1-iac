@@ -47,8 +47,7 @@ else:
                 {'ansible.builtin.set_fact': {'rendered': "{{ lookup('template', '" + template + "') }}"}},
                 {'ansible.builtin.assert': {'that': [
                     "'ListenAddress 100.90.0.23' in rendered",
-                    "'ListenAddress 10.10.0.10' in rendered",
-                    "management_ip == '10.10.0.10'",
+                    "'ListenAddress 10.10.0.10' not in rendered",
                     "staff_vpn_subnet == '100.90.0.0/16'",
                 ]}},
             ]
@@ -74,7 +73,7 @@ else:
                 fixture.mkdir()
                 fixtures.append((stale, fixture))
                 plays.append(dict(
-                    variables=dict(netbird_enabled=True, netbird_ip='100.90.0.23',
+                    variables=dict(netbird_ip='100.90.0.23',
                                    fixture_stale=stale,
                                    fixture_expected_task=waits[0 if stale == 'netbird' else 1]['name'],
                                    fixture_directory=str(fixture),
@@ -105,9 +104,8 @@ else:
                 (ROOT / ('ansible/inventory/group_vars/' + environment + '_env.yml')).read_text())
             tasks = [{'name': 'Verify ' + environment + ' inventory addresses',
                       'ansible.builtin.assert': {'that': [
-                "netbird_enabled | bool", "management_vpn == 'netbird'",
                 "netbird_ip == " + environment + "_netbird_ip",
-                "ansible_host == netbird_ip", "wireguard_enabled | bool",
+                "ansible_host == netbird_ip",
             ]}}]
             plays.append(dict(variables={**variables, 'test_netbird_ip': '100.90.0.10',
                                          'prod_netbird_ip': '100.90.0.1',

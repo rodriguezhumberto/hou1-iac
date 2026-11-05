@@ -6,12 +6,14 @@
     ansible.builtin.uri:
       use_proxy: false
       follow_redirects: none
-  vars:
-    ansible_host: "{{ hou1_vpn_ip }}"
-    netbird_enabled: true
   pre_tasks:
+    - name: Validate NetBird management
+      ansible.builtin.import_role:
+        name: netbird_common
+      tags: [always]
     - name: Require the dedicated production target
       ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
+      tags: [always]
   roles:
     - role: netbird_client
     - role: netbird_dns

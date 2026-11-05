@@ -1,0 +1,10 @@
+[Unit]
+Description=Public SSH recovery timer for the initial NetBird bootstrap
+
+[Timer]
+OnActiveSec={{ ssh_bootstrap_fallback_delay }}
+AccuracySec=1s
+Unit=ansible-ssh-bootstrap-fallback.service
+
+[Install]
+WantedBy=timers.target

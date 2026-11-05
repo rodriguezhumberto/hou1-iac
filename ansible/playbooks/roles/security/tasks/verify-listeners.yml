@@ -1,11 +1,9 @@
 ---
-- name: Reject listeners outside the selected private VPN addresses
+- name: Reject listeners outside the NetBird address
   ansible.builtin.assert:
     that:
       - >-
         (ssh_effective_config.stdout_lines | select('match', '^listenaddress ') |
-         map('regex_replace', '^listenaddress (.*):[0-9]+$', '\\1') | list |
-         difference([hou1_vpn_ip] +
-                    ([netbird_ip] if netbird_enabled | bool else [])) | length) == 0
+         map('regex_replace', '^listenaddress (.*):[0-9]+$', '\\1') | unique | list) == [netbird_ip]
     fail_msg: An included SSH configuration exposes an unexpected listener. Remove that override first.
   when: not ansible_check_mode
