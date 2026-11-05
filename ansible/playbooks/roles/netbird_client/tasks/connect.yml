@@ -52,14 +52,14 @@
           {{ ['timeout', '90', 'netbird', 'up',
               '--management-url', netbird_management_url,
               '--interface-name', netbird_interface,
-              '--wireguard-port', netbird_wireguard_port | string,
+              '--wireguard-port', netbird_listen_port | string,
               '--disable-dns', '--no-browser'] +
              (['--setup-key-file', netbird_key_file.path]
               if netbird_needs_enrollment | bool else []) }}
       register: netbird_up
       changed_when: >-
         not (netbird_before_status.management.connected | default(false)) or
-        netbird_before_status.wireguardPort | default(0) | int != netbird_wireguard_port | int
+        netbird_before_status.wireguardPort | default(0) | int != netbird_listen_port | int
       no_log: true
   always:
     - name: Remove the temporary enrollment key even on failure

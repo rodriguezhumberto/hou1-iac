@@ -1,68 +1,86 @@
 # NetBird operations
 
-Commands run from `ansible/`; see [README](../README.md#4-netbird-playbooks).
+Run commands from `ansible/`; see [initialization](../README.md#1-first-initialization-public-ip).
 
 ## Credentials and addresses
 
-Inventory Vault contains the owner credentials and the fixed server addresses:
-`test_netbird_ip` and `prod_netbird_ip`. Enrollment assigns those addresses to the
-matching peers and rejects conflicts. Other peers receive automatic addresses.
+Inventory Vault supplies owner credentials and `test_netbird_ip`/`prod_netbird_ip`.
+Enrollment assigns these addresses and rejects conflicts, network/broadcast
+addresses, and NetBird's reserved DNS address. Other peers receive automatic IPs.
 
-The control-plane playbook creates the controller PAT Vault at
-`ansible/vault/netbird-token.yml` on the controller. It is generated, untracked,
-and must be backed up with the server state. PATs expire after 365 days by default.
-For a replacement PAT, save this structure with `ansible-vault create` or `edit`:
+Back up the generated `ansible/vault/netbird-token.yml` off-host. PATs expire after
+365 days by default. Replace an expired PAT with `ansible-vault edit`, then rerun
+the control-plane playbook. Its structure is:
 
 ```yaml
 netbird_management_url: https://netbird.YOUR_DOMAIN
 netbird_api_token: REPLACEMENT_PAT
 ```
 
-Rerun the control-plane playbook. Never reset the owner or delete server data to
-recover a token.
+Never reset the owner or delete server data to recover a token. Address changes
+require provider-console access: update Vault, release conflicting peers, repair
+the client's assigned address through the management API, and rerun normal
+provisioning once NetBird SSH works. Rerun `netbird-dns.yml` afterward.
 
-## Address changes and replacement
+## Access
 
-1. Edit the environment address in
-   `inventory/group_vars/all/secrets.yml` with `ansible-vault edit`.
-2. Remove an obsolete peer if it still owns the desired address.
-3. Run the environment playbook with `-e management_vpn=wireguard`.
-4. Verify NetBird SSH, then run the normal application playbook.
-5. Rerun `netbird-dns.yml` after changing an address.
+Assign devices to `administrators` or `staff`. Enrollment manages server groups.
 
-Addresses must be available within `netbird_subnet` and exclude its network,
-broadcast, and NetBird DNS addresses. The playbook never takes an address from
-another peer. Changing the account subnet after enrollment requires an explicit
-migration.
-
-## Access and DNS
-
-Server enrollment manages `test-servers` and `prod-servers`. Assign devices to
-`administrators` or `staff`.
-
-| Source | Destination | Allowed traffic |
+| Source | Destination | Traffic |
 | --- | --- | --- |
-| Administrators | Test and production servers | TCP 22, 443 |
-| Staff | Test and production servers | TCP 443 |
-| Administrators and staff | Production DNS resolver | TCP/UDP 1053 |
+| Administrators | Both environments | TCP 22, 443 |
+| Staff | Both environments | TCP 443 |
+| Both groups | Production DNS | TCP/UDP 1053 |
 
-The All-to-All policy is disabled. Private DNS records use `name` and `address`
-fields in `netbird_dns_records`; defaults point test names to `test_netbird_ip`.
-The resolver binds to production's fixed address. Keep NetBird DNS enabled on
-client devices.
+All-to-All is disabled. Keep NetBird DNS enabled on operator devices. Private DNS
+records use `name` and `address`; the resolver binds to production's NetBird IP.
+NetBird uses WireGuard internally; its client UDP port is `netbird_listen_port`.
+The retired standalone `wg0` service is separate.
 
-## Backup and restore
+## Recovery and rollback
 
-Before upgrades, run `/opt/hou1-netbird/backup.sh` as root over WireGuard or console.
-It archives `/opt/hou1-netbird` and the application certificate store after a
-consistent SQLite backup. Store archives from `/var/backups/hou1-netbird`, the
-controller PAT Vault, WireGuard configuration, and client peer state in encrypted
-off-host storage.
+Use the provider console when NetBird is unavailable. Log in, inspect
+`systemctl status netbird ssh`, `netbird status -d`, and `journalctl -u netbird`.
+Repair the daemon or restore `/etc/netbird` from encrypted backup. Do not clone a
+peer identity onto a second running host.
 
-To restore, stop the NetBird Compose project, restore `/opt/hou1-netbird` with its
-original `secrets.json`, configuration, data and permissions, then restore the
-certificate lineage and controller PAT Vault. Update public DNS if needed and rerun
-the control-plane playbook with compatible pinned versions. Never run two copies of
-the same server identity.
+If temporary public SSH is needed, use the console to move
+`/etc/systemd/system/ssh.service.d/vpn.conf` aside, remove `ListenAddress` lines
+from `/etc/ssh/sshd_config`, and add `ListenAddress PUBLIC_IP` in
+`/etc/ssh/sshd_config.d/01-console-recovery.conf`. Allow TCP 22 in UFW and the
+provider firewall **only from the controller's public IP**. Run `sshd -t`,
+`systemctl daemon-reload`, and `systemctl restart ssh`. Use the administrative
+user's key. Remove that temporary file and firewall rule after repair, then rerun
+`hou1.yml` over NetBird to restore the service override and private listener.
 
-Use WireGuard to repair NetBird and provider console access for host failure.
+Before upgrades or retirement, use the console to run
+`/opt/hou1-netbird/backup.sh`; it briefly stops the management server. Back up
+`/var/backups/hou1-netbird`, the controller PAT Vault, and `/etc/netbird` off-host.
+Keep the previous infrastructure/app SHAs and an encrypted copy of legacy
+`/etc/wireguard` until the retirement checks pass.
+
+To restore the control plane, use the console to stop its Compose project and
+restore `/opt/hou1-netbird` with original `secrets.json`, data, configuration,
+permissions, certificate lineage, and controller PAT Vault. Start the compatible
+pinned versions, verify NetBird SSH, then rerun normal provisioning. Never run two
+copies of the same server identity. Restoring a legacy infrastructure revision
+alone does not restore deleted VPN configuration or keys.
+
+## Retire existing WireGuard installations
+
+Before retirement, record passing results for **test and production** in issue #4:
+NetBird SSH and CMS access, daemon reconnect, forced relay fallback, reboot
+recovery, and a provider-console recovery/rollback rehearsal. Confirm no required
+service uses `wg0`. These live checks are not covered by the offline suite.
+
+Then run once per environment, test first:
+
+```bash
+ansible-playbook playbooks/retire-wireguard.yml -e "target_hosts=hou1_test netbird_retirement_verified=true" --ask-vault-pass
+ansible-playbook playbooks/retire-wireguard.yml -e "target_hosts=hou1_prod netbird_retirement_verified=true" --ask-vault-pass
+```
+
+This verifies enrollment and fresh SSH, deploys NetBird-only CMS settings, then
+removes `wg0`, its configuration, known firewall rules, and standalone packages.
+Verify SSH/CMS again after reboot. Remove obsolete WireGuard keys/peer variables
+from inventory Vault with `ansible-vault edit`; provisioning no longer reads them.

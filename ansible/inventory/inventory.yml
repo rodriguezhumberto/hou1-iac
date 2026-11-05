@@ -8,13 +8,14 @@ all:
             test_hou1_init:
               ansible_host: "{{ test_vps_public_ip }}"
           vars:
+            node_bootstrap: true
             ansible_user: debian
             ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
         
         hou1_test:
           hosts:
             test_hou1:
-              ansible_host: "{{ management_ip }}"
+              ansible_host: "{{ netbird_ip }}"
           vars:
             ansible_user: "{{ new_user}}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
@@ -28,6 +29,7 @@ all:
             prod_hou1_init:
               ansible_host: "{{ prod_vps_public_ip }}"
           vars:
+            node_bootstrap: true
             ansible_user: root
             # -e "manual_root_password=your_pass" when running init
             ansible_ssh_pass: "{{ manual_root_password | default(omit) }}"
@@ -36,7 +38,7 @@ all:
         hou1_prod:
           hosts:
             prod_hou1:
-              ansible_host: "{{ management_ip }}"
+              ansible_host: "{{ netbird_ip }}"
           vars:
             ansible_user: "{{ new_user }}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"

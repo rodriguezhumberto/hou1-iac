@@ -1,7 +1,5 @@
 new_user_public_key: "{{ users_public_ssh }}"
-hou1_wireguard_server_private_key: "{{ hou1_wg_private_key }}"
-vpn_subnet: "10.10.0.0/24"
-staff_vpn_subnet: "{{ netbird_subnet if netbird_enabled | bool else vpn_subnet }}"
+staff_vpn_subnet: "{{ netbird_subnet }}"
 
 # Forms and CMS share the existing database mount during rollout and rollback.
 # Media has a separate persistent mount per environment.
@@ -24,21 +22,15 @@ cms_upload_max_bytes: 10485760
 
 ansible_python_interpreter: /usr/bin/python3.11
 
-# Enable clients in test first; retain WireGuard recovery throughout this issue.
-wireguard_enabled: true
-netbird_enabled: false
-management_vpn: wireguard
-# Keep WireGuard for SSH recovery without CMS access after management cutover.
-wireguard_cms_enabled: "{{ management_vpn == 'wireguard' }}"
+node_bootstrap: false
 netbird_management_url: "https://{{ netbird_domain }}"
 netbird_subnet: "100.90.0.0/16"
 netbird_ip: ""
 netbird_interface: wt0
-netbird_wireguard_port: 51821
+netbird_listen_port: 51821
 # Shared server/client release; the dashboard has its own version scheme.
 netbird_version: "0.82.0"
 netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
-management_ip: "{{ netbird_ip if management_vpn == 'netbird' else hou1_vpn_ip }}"
 
 # Shared endpoint derives from the existing Vault-backed website domain.
 # Deployment is selected only by the dedicated playbook/inventory group.

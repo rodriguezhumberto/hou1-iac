@@ -92,8 +92,8 @@
     mode: '0600'
     content: |
       # Network Setup
-      HOU1_VPN_IP={{ management_ip }}
-      vpn_subnet={{ vpn_subnet }}
+      HOU1_VPN_IP={{ netbird_ip }}
+      vpn_subnet={{ netbird_subnet }}
       staff_vpn_subnet={{ staff_vpn_subnet }}
 
       
@@ -186,7 +186,9 @@
   ansible.builtin.import_tasks: retire-directus.yml
 
 - name: Rebuild and deploy updated Docker containers
-  command: docker compose up -d --build --wait --wait-timeout 120
+  # Public bootstrap needs Nginx and its dependencies before NetBird exists.
+  # Defer services that bind the NetBird IP until enrollment completes.
+  command: "docker compose up -d --build --wait --wait-timeout 120{{ ' nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}"
   args:
     chdir: "{{ app_directory }}"
 

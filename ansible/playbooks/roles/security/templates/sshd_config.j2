@@ -1,8 +1,5 @@
 # BEGIN ANSIBLE VPN LISTENERS
-ListenAddress {{ hou1_vpn_ip }}
-{% if netbird_enabled | bool %}
 ListenAddress {{ netbird_ip }}
-{% endif %}
 # END ANSIBLE VPN LISTENERS
 {{ ssh_config_before.content | b64decode |
    regex_replace('(?ms)^# BEGIN ANSIBLE VPN LISTENERS\n.*?^# END ANSIBLE VPN LISTENERS\n?', '') |

@@ -25,8 +25,7 @@ def run_plays(play_specs, extra_args=(), inventory_source=None):
         play.write_text(yaml.safe_dump([
             dict(hosts=spec.get('hosts', 'localhost'), gather_facts=False,
                  module_defaults=defaults,
-                 vars={**DEFAULTS, 'new_user': 'test-user', 'hou1_vpn_ip': '10.10.0.10',
-                       'ansible_host': '100.90.0.10', **spec.get('variables', {}),
+                 vars={**DEFAULTS, 'new_user': 'test-user', 'ansible_host': '100.90.0.10', **spec.get('variables', {}),
                        'ansible_python_interpreter': sys.executable},
                  tasks=spec['tasks'])
             for spec in play_specs
@@ -66,6 +65,6 @@ def guard_play(variables, tasks, expected_guard=None):
 
 
 def netbird_vars():
-    return dict(netbird_enabled=True, netbird_server_group='test-servers',
+    return dict(netbird_server_group='test-servers',
                 netbird_management_url='https://netbird.example.org',
                 netbird_subnet='100.90.0.0/16', netbird_ip='100.90.0.10')

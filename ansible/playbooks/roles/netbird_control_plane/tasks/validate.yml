@@ -21,7 +21,6 @@
         'www.' ~ primary_domain, 'www.' ~ secondary_domain,
         'test.' ~ primary_domain, 'test.' ~ secondary_domain]
       - netbird_management_url | regex_replace('/$', '') == 'https://' ~ netbird_domain
-      - wireguard_enabled | bool
       - netbird_control_plane_directory is match('^/[a-zA-Z0-9/_-]+$')
       - netbird_control_plane_directory != app_directory
       - not netbird_control_plane_directory.startswith(app_directory ~ '/')
@@ -43,4 +42,4 @@
       - netbird_dashboard_image is match('^netbirdio/dashboard:v[0-9]+\.[0-9]+\.[0-9]+$')
     fail_msg: >-
       Set a distinct public NetBird domain, private ingress network and pinned
-      images. Keep WireGuard SSH recovery enabled for the colocated control plane.
+      images. Keep provider-console access available for recovery.

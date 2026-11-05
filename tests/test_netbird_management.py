@@ -12,30 +12,27 @@ import unittest
 from helpers import ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
-class MigrationTest(unittest.TestCase):
-    def test_rollout_guards(self):
+class ManagementTest(unittest.TestCase):
+    def test_management_guards(self):
         nb = netbird_vars()
-        recovery = 'Keep WireGuard recovery throughout this migration stage'
         config = 'Validate self-hosted NetBird configuration'
         address = 'Require a declared server address in the account subnet'
         scenarios = [
-            ({}, None),
-            ({**nb, 'management_vpn': 'netbird'}, None),
-            ({'wireguard_enabled': False}, recovery),
-            ({'management_vpn': 'netbird'}, recovery),
+            (nb, None),
             ({**nb, 'netbird_version': '0.83.0'}, config),
             ({**nb, 'netbird_ip': ''}, address),
             ({**nb, 'netbird_ip': '100.90.0.0'}, address),
             ({**nb, 'netbird_ip': '100.90.255.254'}, address),
             ({**nb, 'netbird_ip': '100.90.255.255'}, address),
-            ({**nb, 'netbird_wireguard_port': 51820}, config),
+            ({**nb, 'netbird_listen_port': 51820}, None),
+            ({**nb, 'netbird_listen_port': 0}, config),
             ({**nb, 'netbird_management_url': 'https://api.netbird.io'}, config),
             ({**nb, 'netbird_management_url': 'http://netbird.example.org'}, config),
             ({**nb, 'netbird_subnet': '0.0.0.0/0; allow all'}, config),
-            ({**nb, 'management_vpn': 'netbird', 'netbird_ip': '192.168.1.2'}, address),
+            ({**nb, 'netbird_ip': '192.168.1.2'}, address),
             (nb, None),  # A rescued failure must not affect the next scenario.
         ]
-        tasks = [{'ansible.builtin.import_role': {'name': 'management_vpn'}}]
+        tasks = [{'ansible.builtin.import_role': {'name': 'netbird_common'}}]
         result = run_plays([guard_play(variables, tasks, expected_guard)
                             for variables, expected_guard in scenarios])
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -52,7 +49,7 @@ class MigrationTest(unittest.TestCase):
                 'first_render': "{{ lookup('template', '" + template + "') }}"}},
             {'ansible.builtin.assert': {'that': [
                 "'ListenAddress 100.90.0.10' in first_render",
-                "'ListenAddress 10.10.0.10' in first_render",
+                "'ListenAddress 10.10.0.10' not in first_render",
                 "'Port 22' in first_render",
                 "'Include /etc/ssh/sshd_config.d/*.conf' in first_render",
                 "'0.0.0.0' not in first_render",
@@ -67,10 +64,12 @@ class MigrationTest(unittest.TestCase):
 
     def test_effective_ssh_listener_guard(self):
         tasks = [{'ansible.builtin.import_tasks': str(ROLES / 'security/tasks/verify-listeners.yml')}]
-        guard = 'Reject listeners outside the selected private VPN addresses'
+        guard = 'Reject listeners outside the NetBird address'
         plays = []
         for listeners, valid in [
-            (['listenaddress 10.10.0.10:22', 'listenaddress 100.90.0.10:22'], True),
+            (['listenaddress 100.90.0.10:22'], True),
+            (['listenaddress 10.10.0.10:22', 'listenaddress 100.90.0.10:22'], False),
+            ([], False),
             (['listenaddress 0.0.0.0:22'], False),
             (['listenaddress [::]:22'], False),
         ]:

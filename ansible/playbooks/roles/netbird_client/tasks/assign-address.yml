@@ -50,5 +50,5 @@
       ansible.builtin.fail:
         msg: >-
           Could not assign or verify the declared server address. Check API access,
-          peer settings, and address conflicts. Use WireGuard for enrollment or
+          peer settings, and address conflicts. Use the provider console for
           address repair; do not change inventory to an unverified address.

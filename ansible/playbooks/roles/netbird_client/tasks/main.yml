@@ -5,7 +5,8 @@
     fail_msg: NetBird enrollment cannot run in check mode. Use syntax-check and the offline validation suite instead.
 
 - name: Validate the declared server address before enrollment
-  ansible.builtin.import_tasks: validate-address.yml
+  ansible.builtin.import_role:
+    name: netbird_common
 
 - name: Prepare controller API access and the environment group
   ansible.builtin.import_tasks: api-context.yml

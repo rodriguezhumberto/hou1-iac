@@ -1,0 +1,27 @@
+---
+- name: Retire the legacy VPN after verified NetBird rollout
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Require rollout and console recovery verification before retirement
+      ansible.builtin.assert:
+        that:
+          - netbird_retirement_verified | default(false) | bool
+          - not (node_bootstrap | bool)
+          - inventory_hostname in (groups.get('hou1_test', []) + groups.get('hou1_prod', []))
+          - ansible_host == netbird_ip
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Verify both environments and provider-console recovery per docs/netbird-operations.md, then set netbird_retirement_verified=true. Run without tags over NetBird.
+      tags: [always]
+  roles:
+    - role: netbird_client
+    - role: security
+    - role: webstack
+  post_tasks:
+    - name: Remove legacy WireGuard resources
+      ansible.builtin.import_tasks: tasks/retire-wireguard.yml

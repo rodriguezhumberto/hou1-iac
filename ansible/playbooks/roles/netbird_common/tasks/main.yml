@@ -1,0 +1,37 @@
+---
+- name: Validate self-hosted NetBird configuration
+  ansible.builtin.assert:
+    that:
+      - netbird_server_group | default('') in ['test-servers', 'prod-servers']
+      - netbird_version == '0.82.0'
+      - netbird_management_url is match('^https://[^/]+/?$')
+      - (netbird_management_url | urlsplit('hostname')) not in ['api.netbird.io', 'app.netbird.io']
+      - netbird_subnet is ansible.utils.ipv4
+      - "'/' in netbird_subnet"
+      - netbird_subnet | ansible.utils.ipaddr('prefix') | int >= 16
+      - netbird_interface is match('^[a-zA-Z0-9_-]{1,15}$')
+      - netbird_listen_port | int > 0
+      - netbird_listen_port | int <= 65535
+    fail_msg: Set the self-hosted HTTPS URL, account IPv4 CIDR, interface and UDP port.
+
+- name: Validate the declared server address
+  ansible.builtin.import_tasks: ../../netbird_client/tasks/validate-address.yml
+
+- name: Require public initialization targets or NetBird management
+  ansible.builtin.assert:
+    that:
+      - >-
+        (node_bootstrap | bool and
+         inventory_hostname in (groups.get('hou1_test_init', []) + groups.get('hou1_prod_init', [])) and
+         ansible_host == (prod_vps_public_ip if inventory_hostname in groups.get('hou1_prod_init', [])
+                          else test_vps_public_ip)) or
+        (not (node_bootstrap | bool) and ansible_host == netbird_ip)
+    fail_msg: Use an init inventory target only for public-IP bootstrap; subsequent runs must use the declared NetBird address.
+
+- name: Require complete initialization runs
+  ansible.builtin.assert:
+    that:
+      - ansible_run_tags | list == ['all']
+      - ansible_skip_tags | length == 0
+    fail_msg: Initialize with a complete playbook run before using tags over NetBird.
+  when: node_bootstrap | bool
