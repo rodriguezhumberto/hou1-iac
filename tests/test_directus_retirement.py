@@ -1,5 +1,6 @@
 """Run the retirement tasks with real SQLite/WAL storage and a scoped Docker fixture."""
 import hashlib
+from contextlib import closing
 import json
 import os
 from pathlib import Path
@@ -124,7 +125,7 @@ class RetirementTest(unittest.TestCase):
             self.assertEqual(tar.extractfile('directus-data/uploads/photo.jpg').read(), b'legacy photo')
             snapshot = self.root / 'archived.db'
             snapshot.write_bytes(tar.extractfile('database/directus.db').read())
-        with sqlite3.connect(snapshot) as db:
+        with closing(sqlite3.connect(snapshot)) as db:
             self.assertEqual(db.execute('SELECT name FROM pets').fetchall(), [('committed in WAL',)])
             self.assertEqual(db.execute('PRAGMA integrity_check').fetchall(), [('ok',)])
         self.assertEqual(self.archive.stat().st_mode & 0o777, 0o600)
