@@ -50,8 +50,15 @@ from `/etc/ssh/sshd_config`, and add `ListenAddress PUBLIC_IP` in
 `/etc/ssh/sshd_config.d/01-console-recovery.conf`. Allow TCP 22 in UFW and the
 provider firewall **only from the controller's public IP**. Run `sshd -t`,
 `systemctl daemon-reload`, and `systemctl restart ssh`. Use the administrative
-user's key. Remove that temporary file and firewall rule after repair, then rerun
-`hou1.yml` over NetBird to restore the service override and private listener.
+user's key. Keep this temporary path until NetBird SSH succeeds:
+
+```bash
+ssh -o ControlMaster=no new_user@NETBIRD_IP sudo -n true
+ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
+```
+
+After that run succeeds, remove `01-console-recovery.conf` and its temporary UFW
+and provider-firewall rules from the console, then verify NetBird SSH again.
 
 Before upgrades or retirement, use the console to run
 `/opt/hou1-netbird/backup.sh`; it briefly stops the management server. Back up

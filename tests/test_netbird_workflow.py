@@ -13,6 +13,14 @@ from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_console_recovery_keeps_public_path_until_netbird_run_succeeds(self):
+        docs = (ROOT / 'docs/netbird-operations.md').read_text()
+        keep = docs.index('Keep this temporary path until NetBird SSH succeeds:')
+        cleanup = docs.index('After that run succeeds, remove `01-console-recovery.conf`')
+        self.assertLess(keep, cleanup)
+        recovery = docs[keep:cleanup]
+        self.assertIn('ssh -o ControlMaster=no new_user@NETBIRD_IP sudo -n true', recovery)
+        self.assertIn('ansible-playbook playbooks/hou1.yml', recovery)
     def test_ssh_rollback_restores_startup_override(self):
         security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
         snapshot = next(task for task in security if task['name'] ==
