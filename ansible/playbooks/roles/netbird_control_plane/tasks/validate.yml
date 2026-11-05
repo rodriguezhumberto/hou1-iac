@@ -42,4 +42,4 @@
       - netbird_dashboard_image is match('^netbirdio/dashboard:v[0-9]+\.[0-9]+\.[0-9]+$')
     fail_msg: >-
       Set a distinct public NetBird domain, private ingress network and pinned
-      images. Keep provider-console access available for recovery.
+      images. Keep the encrypted control-plane backup and PAT available for recovery.

@@ -76,4 +76,4 @@
           NetBird policy reconciliation failed. Check API access, required group names,
           duplicate policies, or operator-owned hou1-* / customized Default policies.
           Review policies in the dashboard before relying on access restrictions.
-          Rerun after correction; use the provider console if NetBird is unavailable.
+          Rerun after correction while NetBird access is available.

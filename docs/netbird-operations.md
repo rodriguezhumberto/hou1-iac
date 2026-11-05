@@ -17,10 +17,9 @@ netbird_management_url: https://netbird.YOUR_DOMAIN
 netbird_api_token: REPLACEMENT_PAT
 ```
 
-Never reset the owner or delete server data to recover a token. Address changes
-require provider-console access: update Vault, release conflicting peers, repair
-the client's assigned address through the management API, and rerun normal
-provisioning once NetBird SSH works. Rerun `netbird-dns.yml` afterward.
+Never reset the owner or delete server data to recover a token. Make address
+changes through the management API while NetBird SSH is available, then rerun
+normal provisioning. Rerun `netbird-dns.yml` afterward.
 
 ## Access
 
@@ -39,40 +38,28 @@ The retired standalone `wg0` service is separate.
 
 ## Recovery and rollback
 
-Use the provider console when NetBird is unavailable. Log in, inspect
-`systemctl status netbird ssh`, `netbird status -d`, and `journalctl -u netbird`.
-Repair the daemon or restore `/etc/netbird` from encrypted backup. Do not clone a
-peer identity onto a second running host.
-
 During first initialization, Ansible arms a 180-second public-SSH fallback timer
 before the listener cutover. A fresh NetBird SSH probe cancels and removes it.
 If the controller is disconnected during cutover, retry through the original
 public IP after the timer restores the saved SSH configuration. The timer is
 not installed on later NetBird-only runs.
 
-If temporary public SSH is needed, use the console to move
-`/etc/systemd/system/ssh.service.d/vpn.conf` aside, remove `ListenAddress` lines
-from `/etc/ssh/sshd_config`, and add `ListenAddress PUBLIC_IP` in
-`/etc/ssh/sshd_config.d/01-console-recovery.conf`. Allow TCP 22 in UFW and the
-provider firewall **only from the controller's public IP**. Run `sshd -t`,
-`systemctl daemon-reload`, and `systemctl restart ssh`. Use the administrative
-user's key. Keep this temporary path until NetBird SSH succeeds:
+Established hosts have no password or console recovery path. Keep the controller
+connected to NetBird and repair the daemon through NetBird SSH. Do not clone a
+peer identity onto a second running host.
 
 ```bash
 ssh -o ControlMaster=no new_user@NETBIRD_IP sudo -n true
 ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
 ```
 
-After that run succeeds, remove `01-console-recovery.conf` and its temporary UFW
-and provider-firewall rules from the console, then verify NetBird SSH again.
-
-Before upgrades or retirement, use the console to run
-`/opt/hou1-netbird/backup.sh`; it briefly stops the management server. Back up
+Before upgrades or retirement, run `/opt/hou1-netbird/backup.sh` over NetBird SSH;
+it briefly stops the management server. Back up
 `/var/backups/hou1-netbird`, the controller PAT Vault, and `/etc/netbird` off-host.
 Keep the previous infrastructure/app SHAs and an encrypted copy of legacy
 `/etc/wireguard` until the retirement checks pass.
 
-To restore the control plane, use the console to stop its Compose project and
+To restore the control plane, use NetBird SSH to stop its Compose project and
 restore `/opt/hou1-netbird` with original `secrets.json`, data, configuration,
 permissions, certificate lineage, and controller PAT Vault. Start the compatible
 pinned versions, verify NetBird SSH, then rerun normal provisioning. Never run two
@@ -83,7 +70,7 @@ alone does not restore deleted VPN configuration or keys.
 
 Before retirement, record passing results for **test and production** in issue #4:
 NetBird SSH and CMS access, daemon reconnect, forced relay fallback, reboot
-recovery, and a provider-console recovery/rollback rehearsal. Confirm no required
+recovery, and the public-IP bootstrap fallback rehearsal. Confirm no required
 service uses `wg0`. These live checks are not covered by the offline suite.
 
 Then run once per environment, test first:

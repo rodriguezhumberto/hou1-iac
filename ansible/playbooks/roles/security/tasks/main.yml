@@ -210,7 +210,7 @@
         that:
           - >-
             (ssh_active_listeners.stdout | regex_findall('\S+:22(?=\s)') | unique | list) == [netbird_ip ~ ':22']
-        fail_msg: Active SSH sockets include an unexpected listener. Check ssh.socket and provider overrides from the console.
+        fail_msg: Active SSH sockets include an unexpected listener. Check ssh.socket and provider overrides.
 
     - name: Verify a fresh administrative SSH connection through NetBird
       ansible.builtin.import_tasks: verify-access.yml

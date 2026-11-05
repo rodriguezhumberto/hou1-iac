@@ -7,7 +7,7 @@
       use_proxy: false
       follow_redirects: none
   pre_tasks:
-    - name: Require rollout and console recovery verification before retirement
+    - name: Require verified NetBird rollout before retirement
       ansible.builtin.assert:
         that:
           - netbird_retirement_verified | default(false) | bool
@@ -16,7 +16,7 @@
           - ansible_host == netbird_ip
           - ansible_run_tags | list == ['all']
           - ansible_skip_tags | length == 0
-        fail_msg: Verify both environments and provider-console recovery per docs/netbird-operations.md, then set netbird_retirement_verified=true. Run without tags over NetBird.
+        fail_msg: Verify both environments, including the public-IP bootstrap fallback, per docs/netbird-operations.md, then set netbird_retirement_verified=true. Run without tags over NetBird.
       tags: [always]
   roles:
     - role: netbird_client

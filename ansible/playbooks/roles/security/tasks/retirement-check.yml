@@ -20,6 +20,7 @@
               selectattr('ifname', 'equalto', 'wg0') | list | length))
     fail_msg: >-
       This host still has a WireGuard configuration or wg0 interface. Complete
-      the rollout and console recovery checks in docs/netbird-operations.md,
+      the NetBird rollout and public-IP bootstrap fallback checks in
+      docs/netbird-operations.md,
       then run retire-wireguard.yml with netbird_retirement_verified=true.
       SSH listeners and startup configuration have not been changed.

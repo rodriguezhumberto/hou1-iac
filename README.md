@@ -60,5 +60,6 @@ ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
 ```
 
 Reconcile a client's enrollment with the normal environment target and
-`--tags netbird`. Use the provider console if its NetBird connection is broken.
+`--tags netbird`. Established hosts require NetBird SSH; public-IP access is
+available only during first initialization through the bootstrap fallback.
 See [operations and retirement](docs/netbird-operations.md).
