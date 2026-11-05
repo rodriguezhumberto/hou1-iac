@@ -30,6 +30,17 @@
     group: root
     mode: '0755'
 
+- name: Snapshot the existing SSH startup override before changing it
+  ansible.builtin.stat:
+    path: /etc/systemd/system/ssh.service.d/vpn.conf
+  register: ssh_vpn_unit_before_stat
+
+- name: Read the existing SSH startup override
+  ansible.builtin.slurp:
+    src: /etc/systemd/system/ssh.service.d/vpn.conf
+  register: ssh_vpn_unit_before
+  when: ssh_vpn_unit_before_stat.stat.exists
+
 - name: Retry SSH startup while the NetBird address becomes available
   ansible.builtin.copy:
     dest: /etc/systemd/system/ssh.service.d/vpn.conf
@@ -110,6 +121,32 @@
         name: ssh
         state: reloaded
       when: ssh_config_before.content is defined
+
+    - name: Restore the previous SSH startup override
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/ssh.service.d/vpn.conf
+        content: "{{ ssh_vpn_unit_before.content | b64decode }}"
+        owner: root
+        group: root
+        mode: '0644'
+      when:
+        - ssh_vpn_unit_before_stat.stat.exists
+        - ssh_vpn_unit_before.content is defined
+
+    - name: Remove the new SSH startup override after a failed bootstrap
+      ansible.builtin.file:
+        path: /etc/systemd/system/ssh.service.d/vpn.conf
+        state: absent
+      when: not ssh_vpn_unit_before_stat.stat.exists
+
+    - name: Reload systemd after restoring the SSH startup override
+      ansible.builtin.systemd:
+        daemon_reload: true
+
+    - name: Reload SSH with the restored startup ordering
+      ansible.builtin.systemd:
+        name: ssh
+        state: reloaded
 
     - name: Stop after restoring the previous listener
       ansible.builtin.fail:

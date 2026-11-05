@@ -13,6 +13,26 @@ from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_ssh_rollback_restores_startup_override(self):
+        security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
+        snapshot = next(task for task in security if task['name'] ==
+                        'Snapshot the existing SSH startup override before changing it')
+        read = next(task for task in security if task['name'] ==
+                    'Read the existing SSH startup override')
+        block = next(task for task in security if 'rescue' in task)
+        rescue_names = [task['name'] for task in block['rescue']]
+        self.assertEqual(snapshot['register'], 'ssh_vpn_unit_before_stat')
+        self.assertEqual(read['register'], 'ssh_vpn_unit_before')
+        self.assertIn('Restore the previous SSH startup override', rescue_names)
+        self.assertIn('Remove the new SSH startup override after a failed bootstrap', rescue_names)
+        self.assertIn('Reload systemd after restoring the SSH startup override', rescue_names)
+        restore = next(task for task in block['rescue'] if task['name'] ==
+                       'Restore the previous SSH startup override')
+        remove = next(task for task in block['rescue'] if task['name'] ==
+                      'Remove the new SSH startup override after a failed bootstrap')
+        self.assertIn('ssh_vpn_unit_before_stat.stat.exists', restore['when'])
+        self.assertEqual(remove['when'], 'not ssh_vpn_unit_before_stat.stat.exists')
+
     def test_existing_wireguard_recovery_requires_verified_retirement(self):
         source = ROLES / 'security/tasks/retirement-check.yml'
         guard = 'Require verified retirement before removing legacy SSH recovery'
@@ -163,6 +183,8 @@ sys.exit(int(os.environ['FIXTURE_FAIL']))
                     if 'ansible.builtin.systemd' in task:
                         del task['ansible.builtin.systemd']
                         task['ansible.builtin.shell'] = 'echo reload >> ' + str(reloads)
+                    if task['name'] == 'Remove the new SSH startup override after a failed bootstrap':
+                        task['ansible.builtin.file']['path'] = str(root / 'vpn.conf')
                     if task.get('register') == 'ssh_active_listeners':
                         del task['ansible.builtin.command']
                         task['ansible.builtin.command'] = 'echo tcp LISTEN 0 128 100.90.0.10:22 0.0.0.0:*'
@@ -178,7 +200,9 @@ sys.exit(int(os.environ['FIXTURE_FAIL']))
                     original = 'ListenAddress 203.0.113.10\nPort 22\n'
                     config.write_text(original)
                     reloads.unlink(missing_ok=True)
-                    tasks = [{'block': [fixture], 'environment': {
+                    tasks = [{'block': [fixture], 'vars': {
+                        'ssh_vpn_unit_before_stat': {'stat': {'exists': False}},
+                    }, 'environment': {
                         'PATH': directory + ':' + os.environ['PATH'],
                         'FIXTURE_CONFIG': str(config), 'FIXTURE_FAIL': str(int(fail))},
                         'rescue': [{'ansible.builtin.assert': {'that': [
@@ -189,7 +213,7 @@ sys.exit(int(os.environ['FIXTURE_FAIL']))
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
                     if fail:
                         self.assertEqual(config.read_text(), original)
-                        self.assertEqual(len(reloads.read_text().splitlines()), 2)
+                        self.assertEqual(len(reloads.read_text().splitlines()), 4)
                     else:
                         self.assertIn('ListenAddress 100.90.0.10', config.read_text())
                         self.assertNotIn('ListenAddress 203.0.113.10', config.read_text())
