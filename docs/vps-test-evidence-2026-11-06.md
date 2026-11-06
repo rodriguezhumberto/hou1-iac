@@ -34,6 +34,10 @@ production peer or production account is connected to it.
 
 ## Results
 
+- Infrastructure suite: 81 passed, 1 skipped (82 total). The skip is the
+  controller-only dnsmasq fixture; live VPN DNS queries passed over UDP/TCP.
+  Staff suite: 79 passed, zero failures.
+
 - Full `rehearse-vps.yml` run through the test VPN: 231 tasks OK, 11 changed,
   31 skipped, zero failures. Subsequent test DNS policy repair was applied and
   checked over both transports. The bootstrap, NetBird enrollment, access
@@ -128,7 +132,10 @@ offsite retention, and failure alert delivery are not yet validated.
 - Demonstrate test-to-production egress denial, provider-console emergency
   access, automated offsite backups, monitoring/alert delivery, and storage
   capacity under representative load. Test resources/credentials are separate;
-  production unreachability has not been demonstrated.
+  production unreachability has not been demonstrated. The Cloudflare DNS API
+  credential was reused from the earlier authorized test secret set, rather
+  than minted specifically for this VPS. Isolate/replace that credential before
+  claiming complete production-secret separation.
 - Complete issues #28/#38 runbooks with the tested procedures, resolve or obtain
   explicit acceptance of findings, then review production approval separately.
   Reusing this host for production requires fresh production resources and
