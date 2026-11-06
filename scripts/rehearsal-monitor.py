@@ -201,7 +201,14 @@ def update(root, config, checks):
     previous = (
         json.loads(state_path.read_text()) if state_path.exists() else {"rules": {}}
     )
-    state = {"environment": "test", "recorded_at": now, "rules": {}}
+    # A lost SSH path omits host checks. Keep their last sampled state so an
+    # active alert survives the gap and can resolve when the host returns.
+    # host_reachable independently reports the missing management path.
+    state = {
+        "environment": "test",
+        "recorded_at": now,
+        "rules": dict(previous["rules"]),
+    }
     events = []
     for name, check in checks.items():
         old = previous["rules"].get(name, {"failures": 0, "firing": False})

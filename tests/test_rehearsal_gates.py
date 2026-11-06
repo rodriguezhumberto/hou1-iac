@@ -157,6 +157,11 @@ class AlertDeliveryTest(unittest.TestCase):
                 third = update(root, config, {"staff_app": {"ok": False}})
                 self.assertEqual(third["pending_events"], [])
                 self.assertEqual([r["status"] for r in received], ["firing"])
+                unreachable = update(root, config, {"host_reachable": {"ok": False}})
+                self.assertEqual(
+                    unreachable["rules"]["staff_app"], third["rules"]["staff_app"]
+                )
+                self.assertEqual([r["status"] for r in received], ["firing"])
                 update(root, config, {"staff_app": {"ok": True}})
                 self.assertEqual(
                     [r["status"] for r in received], ["firing", "resolved"]
