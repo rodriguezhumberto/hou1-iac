@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Run isolated OIDC failure-mode assertions and live NetBird test checks."""
+"""Run a synthetic OIDC model matrix and live discovery/reachability checks.
+
+The local model does not exercise deployed callback/token validation. It cannot
+establish security readiness, key rotation, session revocation or drill success.
+Use the live security probes and recorded drill assertions for those claims.
+"""
 import argparse
 import json
 import os
@@ -111,9 +116,10 @@ def main():
     live = {'status': 'skipped'} if args.offline else live_checks(args.issuer, args.netbird_url)
     drills = {}
     for name, path in [('outage', args.outage_evidence), ('restore', args.restore_evidence), ('rollback', args.rollback_evidence)]:
-        drills[name] = 'passed' if path and os.path.isfile(path) and os.path.getsize(path) else 'missing'
+        drills[name] = 'evidence_present_unverified' if path and os.path.isfile(path) and os.path.getsize(path) else 'missing'
     report = {'environment': 'test', 'issuer': args.issuer, 'audience': args.audience,
-              'automated_failure_modes': failures, 'live_checks': live, 'drills': drills,
+              'automated_failure_modes': failures, 'failure_mode_target': 'synthetic_local_model',
+              'security_readiness_established': False, 'live_checks': live, 'drills': drills,
               'refs': {'netbird_version': '0.82.0', 'test_client': os.environ.get('OIDC_TEST_CLIENT_ID', 'netbird-test'),
                        'certificate_ref': os.environ.get('OIDC_TEST_CERT_REF', 'recorded-out-of-band'),
                        'secret_ref': os.environ.get('OIDC_TEST_SECRET_REF', 'sops-age-test')},
