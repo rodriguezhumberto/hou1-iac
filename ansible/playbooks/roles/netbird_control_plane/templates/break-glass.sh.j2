@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+netbird_url={{ netbird_management_url | quote }}
+control={{ netbird_control_plane_directory | quote }}
+evidence={{ netbird_break_glass_evidence_directory | quote }}
+operator=${BREAK_GLASS_OPERATOR:?BREAK_GLASS_OPERATOR is required}
+reason=${BREAK_GLASS_REASON:?BREAK_GLASS_REASON is required}
+pat=${NETBIRD_API_PAT:?NETBIRD_API_PAT is required}
+host=${NETBIRD_HOST:?NETBIRD_HOST is required}
+timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+record="$evidence/break-glass-$timestamp"
+mkdir -p -m 0700 "$evidence"
+printf 'operator=%s\nreason=%s\nstarted=%s\napi_pat_is_not_dashboard_login=true\n' "$operator" "$reason" "$(date -u +%FT%TZ)" >"$record.started"
+
+# API PAT access is intentionally tested separately from dashboard OIDC login.
+curl --fail --silent --show-error --max-time 15 \
+  -H "Authorization: Token $pat" -H 'Accept: application/json' \
+  "$netbird_url/api/instance" >/dev/null
+
+# NetBird SSH remains available while Authentik is down; no dashboard cookie is used.
+ssh -o BatchMode=yes -o ConnectTimeout=15 "$host" "sudo test -f '$control/config.yaml'"
+
+# Restore the embedded IdP from the cutover snapshot when dashboard access is unavailable.
+if [[ -x "$control/authentik-rollback.sh" ]]; then
+  "$control/authentik-rollback.sh" >"$record.rollback" 2>&1
+fi
+curl --fail --silent --show-error --max-time 15 "$netbird_url/api/instance" >/dev/null
+printf 'operator=%s\nreason=%s\nfinished=%s\napi_pat=passed\nnetbird_ssh=passed\nembedded_restore=%s\nescalate_within_minutes={{ netbird_break_glass_escalation_minutes }}\n' \
+  "$operator" "$reason" "$(date -u +%FT%TZ)" "$([[ -s "$record.rollback" ]] && echo attempted || echo not-required)" >"$record.success"
+rm -f -- "$record.started"
