@@ -111,8 +111,11 @@ sed -i '/^  disableGeoliteUpdate:/d; /^server:$/a\  disableGeoliteUpdate: true' 
 docker restart hou1-netbird-test-netbird-server-1
 ```
 
-Console application, API/VPN recovery, immutable redeployment and a repeated
-NetBird firing/resolved drill remain pending. The focused seven-test gate suite
+The operator confirmed the edit/restart commands were run, but API remained
+502 and private access did not return. Current flag/cache/startup diagnostics
+could not be obtained because entering further console commands is difficult.
+The live repair is not counted as passed. API/VPN recovery, immutable redeployment
+and a repeated NetBird firing/resolved drill remain pending. The focused seven-test gate suite
 passes, including rejection of absent/partial/empty caches and production/test
 configuration rendering. No successful live recovery is claimed yet.
 
@@ -156,3 +159,22 @@ Its JWKS overlap and automatic IdP-to-app revocation limitations still apply.
 Browser rendering and alignment of #24 production cutover automation with the
 external-provider result still require review.
 No prerequisite PR was merged or dependent branch rebased.
+
+## Fresh-host reset preflight
+
+The operator proposed a fresh install; no reset has been performed or authorized
+by this report. The earlier off-VPS Authentik and NetBird encrypted archives were
+re-decrypted and their required contents/hashes rechecked. Both old controller
+and separate host recovery identities remain private off-VPS. The newer host-only
+backup has not been retrieved; this is not a snapshot of all later test changes.
+The existing bootstrap public key was verified against its controller private key.
+
+A rebuild must prepare filtered host secrets, controller-issued test certificates
+and the geolocation cache before isolation. Keep a restricted bootstrap recovery
+path until NetBird has actually restarted under isolation and VPN plus staff
+application authentication have passed. Then close public bootstrap SSH and
+repeat the remaining fault drills. Existing private management input is not a
+blank-host inventory: a rebuilt host needs the explicit public bootstrap settings,
+verified replacement SSH host key, and seeded certificate/cache prerequisites.
+The current full-stack entry point does not yet prove that revised rebuild order.
+This preflight is preparation, not a passing rebuild or console-recovery drill.

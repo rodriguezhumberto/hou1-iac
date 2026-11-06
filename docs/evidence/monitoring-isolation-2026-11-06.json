@@ -347,14 +347,14 @@
     "network_policy_changed": false,
     "geolocation_disabled": false,
     "netbird_version": "0.82.0",
-    "live_recovery": "pending console application",
+    "live_recovery": "not passed",
     "implementation_ref": "6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09",
     "diagnosis": "NetBird startup GeoLite download HEAD is rejected by default-deny workload egress",
     "oom_killed": false,
     "exit_code": 1,
     "endpoint": "https://pkgs.netbird.io/geolocation-dbs/GeoLite2-City/download?suffix=tar.gz",
     "blocked_by_explicit_production_set": false,
-    "console_application": "requested; private access still unavailable",
+    "console_application": "operator confirmed edit/restart commands run; API still 502; live flag/cache/error diagnostics unavailable",
     "focused_tests": {
       "passed": 7,
       "failed": 0
@@ -368,5 +368,34 @@
       "skipped": 1,
       "failed": 0
     }
+  },
+  "rebuild_preflight": {
+    "operator_reset_authorized": false,
+    "off_host_archives_reverified": [
+      {
+        "file": "authentik-20261106T114519Z.tar.gz.age",
+        "sha256": "d7b9279ee31f35a5d9a866b04b2c41360e0e2ec0014af6ac30d3f34fe15f7ec7",
+        "decrypt_and_archive_check": "passed",
+        "members": 6
+      },
+      {
+        "file": "netbird-20261106T120029.tar.gz.age",
+        "sha256": "49a796c60929895fa82db4d023133379a2035e2d8b6735debba39c6d669f88ac",
+        "decrypt_and_archive_check": "passed",
+        "members": 83
+      }
+    ],
+    "both_recovery_identities_private_off_host": true,
+    "bootstrap_public_key_verified": true,
+    "new_host_fingerprint_required": true,
+    "newer_host_only_backups_verified_off_host": false,
+    "required_order": [
+      "prepare filtered host secrets and controller-issued certificates",
+      "seed and validate cached geolocation before isolation",
+      "deploy pinned test stack",
+      "apply isolation with public bootstrap recovery still available",
+      "prove NetBird cold restart, VPN and staff authentication",
+      "harden SSH and complete remaining monitoring/recovery drills"
+    ]
   }
 }
