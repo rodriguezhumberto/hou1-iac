@@ -1,0 +1,126 @@
+---
+- name: Refuse gates on anything except the explicit isolated test VPS
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test'
+      - inventory_hostname in groups.get('isolated_test_vps', [])
+      - inventory_hostname not in groups.get('prod_env', [])
+      - ansible_host == netbird_ip
+      - netbird_subnet != '100.90.0.0/16'
+      - rehearsal_deny_cidrs | length > 0
+      - rehearsal_test_addresses | length > 0
+      - rehearsal_controller_managed_tls | bool
+    fail_msg: Monitoring and egress gates require a private isolated test target and controller-managed DNS credentials.
+
+- name: Remove obsolete host-side DNS credentials and renewal job
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: absent
+  loop:
+    - "{{ app_directory }}/certbot/cloudflare.ini"
+    - "{{ netbird_control_plane_directory }}/cloudflare.ini"
+
+- name: Remove the old host-side DNS renewal schedule
+  ansible.builtin.cron:
+    name: "Renew Let's Encrypt SSL Certificates"
+    state: absent
+
+- name: Verify host SOPS excludes the shared DNS capability
+  ansible.builtin.command:
+    argv: [sops, --decrypt, --output-type, json, /opt/hou1-authentik/test/secrets.enc.yaml]
+  environment:
+    SOPS_AGE_KEY_FILE: "{{ authentik_age_key_file }}"
+  register: rehearsal_host_secrets
+  changed_when: false
+  no_log: true
+
+- name: Refuse isolation acceptance while DNS capability is decryptable on test
+  ansible.builtin.assert:
+    that:
+      - "'CLOUDFLARE_DNS_API_TOKEN' not in (rehearsal_host_secrets.stdout | from_json)"
+    fail_msg: Re-encrypt the host-only application secrets under its separate age identity before accepting isolation.
+  no_log: true
+
+- name: Install the existing host inspection utilities
+  ansible.builtin.apt:
+    name: [nftables, curl, sysstat]
+    state: present
+
+- name: Create the test gate configuration directory
+  ansible.builtin.file:
+    path: /etc/hou1-test-gates
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install the host-local health and atomic isolation programs
+  ansible.builtin.copy:
+    src: "{{ item }}.py"
+    dest: "/usr/local/sbin/hou1-test-{{ item }}"
+    owner: root
+    group: root
+    mode: '0700'
+  loop: [probe, isolation]
+
+- name: Configure the protected test addresses and denied production destinations
+  ansible.builtin.copy:
+    dest: /etc/hou1-test-gates/isolation.json
+    owner: root
+    group: root
+    mode: '0600'
+    content: "{{ {'environment': 'test', 'deny_cidrs': rehearsal_deny_cidrs, 'test_addresses': rehearsal_test_addresses, 'allow_local_cidrs': rehearsal_allow_local_cidrs, 'allow_update_cidrs': rehearsal_allow_update_cidrs} | to_nice_json }}"
+
+- name: Install the private read-only health check inputs
+  ansible.builtin.copy:
+    dest: /etc/hou1-test-gates/probe.json
+    owner: root
+    group: root
+    mode: '0600'
+    content: "{{ rehearsal_probe_config | to_nice_json }}"
+
+- name: Require isolation before Docker starts without replacing other firewall tables
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/hou1-test-isolation.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Isolated HOU1 test egress boundary
+      Before=docker.service
+      After=network-pre.target
+      [Service]
+      Type=oneshot
+      RemainAfterExit=yes
+      ExecStart=/usr/local/sbin/hou1-test-isolation /etc/hou1-test-gates/isolation.json
+      ExecReload=/usr/local/sbin/hou1-test-isolation /etc/hou1-test-gates/isolation.json
+      [Install]
+      WantedBy=multi-user.target
+
+- name: Create the Docker service dependency directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/docker.service.d
+    state: directory
+    mode: '0755'
+
+- name: Fail Docker startup closed if test isolation cannot be installed
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/docker.service.d/hou1-test-isolation.conf
+    mode: '0644'
+    content: |
+      [Unit]
+      Requires=hou1-test-isolation.service
+      After=hou1-test-isolation.service
+
+- name: Load the isolated table after validating the entire nft transaction
+  ansible.builtin.command:
+    argv: [/usr/local/sbin/hou1-test-isolation, /etc/hou1-test-gates/isolation.json]
+  changed_when: true
+
+- name: Enable isolation across boot without restarting Docker
+  ansible.builtin.systemd:
+    name: hou1-test-isolation.service
+    daemon_reload: true
+    enabled: true
+    state: started

@@ -1,0 +1,7 @@
+---
+- name: Enforce test monitoring inputs and production egress isolation
+  hosts: isolated_test_vps
+  become: true
+  gather_facts: false
+  roles:
+    - rehearsal_gates

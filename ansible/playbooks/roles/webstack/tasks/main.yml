@@ -147,6 +147,21 @@
     - "{{ app_directory }}/certbot"
     - "{{ app_directory }}/certbot/conf"
 
+- name: Require pre-issued isolated certificates when DNS capability stays on the controller
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/certbot/conf/live/{{ item.name }}/fullchain.pem"
+  loop: "{{ ssl_domains | default([]) }}"
+  register: rehearsal_imported_certificates
+  when: rehearsal_controller_managed_tls | default(false) | bool
+
+- name: Refuse controller-managed TLS until every required test certificate is imported
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test'
+      - rehearsal_imported_certificates.results | map(attribute='stat.exists') | min
+    fail_msg: Import the controller-issued isolated test certificates before deployment.
+  when: rehearsal_controller_managed_tls | default(false) | bool
+
 - name: Deploy Cloudflare API Credentials File
   copy:
     dest: "{{ app_directory }}/certbot/cloudflare.ini"
@@ -154,6 +169,7 @@
     content: |
       dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}
   no_log: true
+  when: not (rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Obtain or update SSL certificates via Cloudflare DNS-01
   command: >
@@ -173,6 +189,7 @@
   loop: "{{ ssl_domains | default([]) }}"
   loop_control:
     label: "Hidden Domain"
+  when: not (rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Create automated SSL renewal script
   copy:
@@ -190,6 +207,7 @@
       cd "{{ app_directory }}"
       docker compose exec -T nginx nginx -t
       docker compose exec -T nginx nginx -s reload
+  when: not (rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Schedule cron job for SSL renewal
   cron:
@@ -198,7 +216,8 @@
     hour: "2"
     day: "1,15"
     job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
-  
+  when: not (rehearsal_controller_managed_tls | default(false) | bool)
+
 - name: Validate Compose configuration before deployment
   ansible.builtin.command: docker compose config --format json
   args:

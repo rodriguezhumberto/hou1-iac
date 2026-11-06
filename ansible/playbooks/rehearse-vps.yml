@@ -23,6 +23,8 @@
           - netbird_token_age_key_file == rehearsal_controller_age_key_file
           - ansible_run_tags | list == ['all']
           - ansible_skip_tags | length == 0
+          - not (rehearsal_controller_managed_tls | default(false) | bool) or ((rehearsal_host_age_key_source | default('') | length > 0) and rehearsal_host_age_key_source != rehearsal_controller_age_key_file)
+          - not (rehearsal_controller_managed_tls | default(false) | bool) or authentik_secret_source != rehearsal_secret_source
         fail_msg: This entry point requires a complete isolated test run, never a production inventory or account.
       tags: [always]
 
@@ -84,7 +86,7 @@
 
     - name: Install the isolated host age identity
       ansible.builtin.copy:
-        src: "{{ rehearsal_controller_age_key_file }}"
+        src: "{{ rehearsal_host_age_key_source | default(rehearsal_controller_age_key_file) }}"
         dest: "{{ authentik_age_key_file }}"
         mode: '0600'
       no_log: true
@@ -159,3 +161,10 @@
       delegate_to: localhost
       become: false
       no_log: true
+
+    - name: Reassert private test egress and credential boundaries after a managed rerun
+      ansible.builtin.include_role:
+        name: rehearsal_gates
+      when:
+        - rehearsal_controller_managed_tls | default(false) | bool
+        - not (node_bootstrap | bool)

@@ -248,6 +248,12 @@
     path: "{{ app_directory }}/certbot/conf/live/{{ authentik_domain }}/fullchain.pem"
   register: authentik_certificate
 
+- name: Require the controller-issued authentik certificate before private DNS deployment
+  ansible.builtin.assert:
+    that: authentik_certificate.stat.exists
+    fail_msg: Import the isolated test certificate from the trusted controller first.
+  when: rehearsal_controller_managed_tls | default(false) | bool
+
 - name: Obtain the Authentik DNS-01 certificate
   ansible.builtin.command:
     argv:
@@ -273,7 +279,9 @@
       - "{{ authentik_domain }}"
       - -d
       - "{{ authentik_domain }}"
-  when: not authentik_certificate.stat.exists
+  when:
+    - not authentik_certificate.stat.exists
+    - not (rehearsal_controller_managed_tls | default(false) | bool)
   no_log: true
 
 - name: Render the Authentik Nginx virtual host
