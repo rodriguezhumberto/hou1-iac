@@ -113,6 +113,15 @@ def evidence_record(path: Path) -> dict[str, object]:
 
 
 def verify_evidence(args: argparse.Namespace, evidence_dir: Path) -> dict[str, object]:
+    deployment_status = evidence_dir / "deployment-status.json"
+    if not deployment_status.is_file():
+        raise RolloutError("deployment phase evidence is missing")
+    try:
+        deployment_steps = json.loads(deployment_status.read_text(encoding="utf-8"))
+    except (OSError, json.JSONDecodeError) as exc:
+        raise RolloutError("deployment phase evidence is not valid JSON") from exc
+    if not deployment_steps or any(step.get("returncode") != 0 for step in deployment_steps):
+        raise RolloutError("deployment phase did not complete successfully")
     records = {}
     for name in REQUIRED_EVIDENCE:
         path = Path(getattr(args, f"{name}_evidence"))
@@ -121,7 +130,7 @@ def verify_evidence(args: argparse.Namespace, evidence_dir: Path) -> dict[str, o
         except ValueError as exc:
             raise RolloutError(f"{name} evidence must be inside --evidence-dir") from exc
         records[name] = evidence_record(path)
-    report = {"environment": "test", "status": "passed", "evidence": records,
+    report = {"environment": "test", "status": "passed", "deployment": "passed", "evidence": records,
               "refs": {"infra": args.infra_ref, "staff": args.staff_ref, "netbird": args.netbird_ref,
                        "certificate": args.cert_ref, "secret": args.secret_ref},
               "recorded_at": time.strftime("%Y-%m-%dT%H:%M:%SZ", time.gmtime())}

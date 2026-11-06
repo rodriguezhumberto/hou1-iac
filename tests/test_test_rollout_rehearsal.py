@@ -47,6 +47,7 @@ class TestRolloutRehearsal(unittest.TestCase):
             root = Path(directory)
             values = args()
             values.evidence_dir = root
+            (root / "deployment-status.json").write_text('[{"step": 1, "returncode": 0}]\n', encoding="utf-8")
             for name in MODULE["REQUIRED_EVIDENCE"]:
                 path = root / f"{name}.txt"
                 path.write_text(f"{name}=passed\n", encoding="utf-8")
