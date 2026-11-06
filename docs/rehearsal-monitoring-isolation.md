@@ -69,6 +69,20 @@ skip host DNS credential installation and renewal. A private full-stack rerun
 reasserts these gates. Fresh public bootstrap must be followed by the private
 gate before test isolation is accepted. Production defaults are unchanged.
 
+For a fresh replacement host, issue the four test certificate lineages on the
+controller and encrypt their certificate state plus a fresh NetBird seed under
+the separate host recipient. The NetBird seed contains new encryption material
+and the two cached geolocation databases, without an old identity database.
+After the standard host dependencies are installed, run
+`ansible/playbooks/rehearsal-seeds.yml` with the explicit public bootstrap
+inventory and `rehearsal_seed_directory`. The entry point refuses production,
+existing identity databases, shared controller keys and unrestricted SSH CIDRs.
+It permits temporary key-only SSH from the controller's single address while
+the stack is rebuilt. Run the full pinned rehearsal, enroll the isolated admin
+peer, apply the private gate and prove a cold NetBird restart. Then run the
+existing security role, verify private SSH, and remove the temporary bootstrap
+SSH rule and drop-in. Public SSH must be closed before accepting the final gate.
+
 ## Off-host monitoring and private alert delivery
 
 `rehearsal-monitor.py` runs on the trusted controller, not inside the monitored
