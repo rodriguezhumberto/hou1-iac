@@ -4,6 +4,7 @@
   become: true
   vars:
     authentik_environment: "{{ deploy_environment | default('test') }}"
+    authentik_secret_source: "{{ playbook_dir }}/../secrets/authentik-{{ authentik_environment }}.enc.yaml"
   roles:
     - role: authentik
       tags: [authentik, deploy]

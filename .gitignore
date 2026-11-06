@@ -25,6 +25,8 @@ roles/external/
 .idea/
 *.log
 *.tmp
+ansible/secrets/*.decrypted.yml
+ansible/secrets/*.rendered.env
 # Python validation artifacts
 __pycache__/
 *.pyc
