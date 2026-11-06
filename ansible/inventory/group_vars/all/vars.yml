@@ -90,6 +90,8 @@ authentik_offhost_backup_root_base: /mnt/offhost-backups/hou1-authentik
 authentik_backup_retention_days: 30
 authentik_backup_schedule_minute: '40'
 authentik_backup_schedule_hour: '2'
+authentik_bootstrap_enabled: false
+authentik_staff_users: []
 
 # Controller-side encrypted API credential, separate from inventory secrets.
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
