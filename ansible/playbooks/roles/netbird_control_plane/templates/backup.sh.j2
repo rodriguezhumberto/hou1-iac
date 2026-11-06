@@ -5,10 +5,14 @@ umask 077
 backup_dir={{ netbird_backup_directory | quote }}
 control_plane_dir={{ netbird_control_plane_directory | quote }}
 certbot_dir={{ (app_directory ~ '/certbot') | quote }}
+configured_recipient={{ netbird_backup_age_recipient | default('') | quote }}
+age_recipient=${NETBIRD_BACKUP_AGE_RECIPIENT:-$configured_recipient}
+[[ -n "$age_recipient" ]] || { echo 'NETBIRD_BACKUP_AGE_RECIPIENT is required' >&2; exit 2; }
+command -v age >/dev/null
 exec 9>"$backup_dir/.lock"
 flock -n 9 || { echo "A NetBird backup is already running" >&2; exit 1; }
 cd "$control_plane_dir"
-backup_file="$backup_dir/netbird-$(date -u +%Y%m%dT%H%M%S).tar.gz"
+backup_file="$backup_dir/netbird-$(date -u +%Y%m%dT%H%M%S).tar.gz.age"
 if [[ -z "$(docker compose -p {{ netbird_control_plane_project }} -f compose.yaml ps --status running -q netbird-server)" ]]; then
     echo "NetBird server must be running before a backup" >&2
     exit 1
@@ -16,6 +20,8 @@ fi
 # Restart even if tar fails. Do not stop application ingress or the peer daemon.
 trap 'docker compose -p {{ netbird_control_plane_project }} -f compose.yaml start netbird-server' EXIT
 docker compose -p {{ netbird_control_plane_project }} -f compose.yaml stop netbird-server
-tar -czf "$backup_file.partial" -C "$control_plane_dir" . -C "$certbot_dir" conf
+tar -czf - -C "$control_plane_dir" . -C "$certbot_dir" conf \
+  | age --encrypt --recipient "$age_recipient" --output "$backup_file.partial"
 mv "$backup_file.partial" "$backup_file"
+sha256sum "$backup_file" >"$backup_file.sha256"
 printf '%s\n' "$backup_file"

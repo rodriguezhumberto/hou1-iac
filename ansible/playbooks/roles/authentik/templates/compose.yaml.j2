@@ -8,7 +8,6 @@ services:
     environment:
       POSTGRES_DB: authentik
       POSTGRES_USER: authentik
-      POSTGRES_PASSWORD: $${AUTHENTIK_POSTGRESQL__PASSWORD}
     volumes:
       - {{ authentik_data_root }}/postgres:/var/lib/postgresql/data
     networks: [backend]
@@ -38,18 +37,18 @@ services:
       - {{ authentik_data_root }}/media:/media
       - {{ authentik_data_root }}/templates:/templates
       - {{ authentik_data_root }}/certs:/certs
-      - {{ authentik_data_root }}/config:/blueprints
+      - {{ authentik_data_root }}/config:/blueprints/custom
     networks:
       backend: {}
       ingress:
         aliases: [authentik-server-{{ authentik_environment }}]
     expose: ['9000']
     healthcheck:
-      test: [CMD-SHELL, 'wget -q -O- http://127.0.0.1:9000/-/health/live/']
+      test: [CMD, ak, healthcheck]
       interval: 15s
       timeout: 5s
-      retries: 10
-      start_period: 30s
+      retries: 40
+      start_period: 60s
     mem_limit: {{ authentik_server_memory }}
     cpus: '{{ authentik_server_cpus }}'
     pids_limit: {{ authentik_server_pids }}
@@ -64,12 +63,20 @@ services:
       postgresql:
         condition: service_healthy
         restart: true
+      authentik-server:
+        condition: service_healthy
     volumes:
       - {{ authentik_data_root }}/media:/media
       - {{ authentik_data_root }}/templates:/templates
       - {{ authentik_data_root }}/certs:/certs
-      - {{ authentik_data_root }}/config:/blueprints
+      - {{ authentik_data_root }}/config:/blueprints/custom
     networks: [backend]
+    healthcheck:
+      test: [CMD, ak, healthcheck]
+      interval: 15s
+      timeout: 5s
+      retries: 20
+      start_period: 30s
     mem_limit: {{ authentik_worker_memory }}
     cpus: '{{ authentik_worker_cpus }}'
     pids_limit: {{ authentik_worker_pids }}

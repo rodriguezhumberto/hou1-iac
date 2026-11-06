@@ -6,6 +6,8 @@ from pathlib import Path
 import tempfile
 import threading
 import unittest
+import shutil
+import subprocess
 
 import yaml
 
@@ -15,6 +17,31 @@ from helpers import ROLES, run_play
 
 
 class BootstrapTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age executables required')
+    def test_sops_token_roundtrip_and_endpoint_isolation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            identity, ciphertext = root / 'test.key', root / 'token.enc.yaml'
+            subprocess.run(['age-keygen', '-o', str(identity)], capture_output=True, check=True)
+            args = {'path': str(ciphertext), 'management_url': 'https://netbird-test.example.invalid',
+                    'age_key_file': str(identity)}
+            token = 'isolated-fixture-pat'
+            result = run_play({}, [
+                {'netbird_token_vault': args, 'register': 'before', 'no_log': True},
+                {'ansible.builtin.assert': {'that': 'not before.exists'}},
+                {'netbird_token_vault': {**args, 'token': token}, 'no_log': True},
+                {'netbird_token_vault': args, 'register': 'saved', 'no_log': True},
+                {'ansible.builtin.assert': {'that': "saved.token == 'isolated-fixture-pat'"}, 'no_log': True},
+            ])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            original = ciphertext.read_bytes()
+            self.assertNotIn(token.encode(), original)
+            self.assertIn(b'ENC[AES256_GCM', original)
+            self.assertEqual(ciphertext.stat().st_mode & 0o777, 0o600)
+            wrong = run_play({}, [{'netbird_token_vault': {**args, 'management_url': 'https://other-test.example.invalid'}, 'no_log': True}])
+            self.assertNotEqual(wrong.returncode, 0)
+            self.assertEqual(ciphertext.read_bytes(), original)
+
     def test_bootstrap_vault_and_account_lifecycle(self):
         # Exercise the production preflight and bootstrap together: bootstrap
         # must retain the token loaded before deployment begins.

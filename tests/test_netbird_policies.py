@@ -12,6 +12,13 @@ plan = MODULE['policy_plan']
 
 
 class PolicyTest(unittest.TestCase):
+    def test_isolated_dns_and_application_policies_target_only_test_servers(self):
+        policies = plan(self.groups, [], 1053, 'test-servers')['managed']
+        for policy in policies:
+            self.assertEqual(policy['body']['rules'][0]['destinations'], ['test-servers-id'])
+        with self.assertRaises(AnsibleFilterError):
+            plan(self.groups, [], 1053, 'All')
+
     def setUp(self):
         self.groups = [{'id': name + '-id', 'name': name} for name in
                        ['test-servers', 'prod-servers', 'administrators', 'staff', 'All']]

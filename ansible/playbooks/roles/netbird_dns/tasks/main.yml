@@ -1,9 +1,18 @@
 ---
-- name: Require the enrolled production control-plane host
+- name: Require the enrolled control plane or a single isolated rehearsal host
   ansible.builtin.assert:
     that:
-      - inventory_hostname in groups.get('netbird_control_plane', [])
-      - netbird_server_group == 'prod-servers'
+      - >-
+        (inventory_hostname in groups.get('netbird_control_plane', []) and
+         netbird_server_group == 'prod-servers') or
+        (inventory_hostname in groups.get('isolated_test_vps', []) and
+         groups.get('isolated_test_vps', []) | length == 1 and
+         inventory_hostname not in groups.get('prod_env', []) and
+         inventory_hostname not in groups.get('netbird_control_plane', []) and
+         cms_environment == 'test' and netbird_server_group == 'test-servers' and
+         netbird_subnet != '100.90.0.0/16' and
+         netbird_domain.startswith('netbird-test.') and
+         netbird_dns_domain == primary_domain and 'test' in primary_domain)
       - netbird_dns_upstreams | length > 0
       - netbird_dns_port | int >= 1024
       - netbird_dns_port | int <= 65535

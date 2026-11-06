@@ -25,7 +25,9 @@ def policy_body(policy):
     return body
 
 
-def policy_plan(groups, policies, dns_port=1053):
+def policy_plan(groups, policies, dns_port=1053, server_group='prod-servers'):
+    if server_group not in ('test-servers', 'prod-servers'):
+        raise AnsibleFilterError('Policies require an explicit test or production server group')
     ids = {}
     for name in ('test-servers', 'prod-servers', 'administrators', 'staff', 'All'):
         matches = [g for g in groups if g['name'] == name]
@@ -38,7 +40,8 @@ def policy_plan(groups, policies, dns_port=1053):
         desired.append(dict(name=name, description=MARKER, enabled=True, source_posture_checks=[], rules=[dict(
             name=name, description=MARKER, enabled=True, action='accept', protocol='tcp',
             bidirectional=False, sources=[ids[source]],
-            destinations=sorted([ids['test-servers'], ids['prod-servers']]), ports=ports)]))
+            destinations=([ids[server_group]] if server_group == 'test-servers'
+                           else sorted([ids['test-servers'], ids['prod-servers']])), ports=ports)]))
     # NetBird 0.82 omits repeated source groups in multi-rule API responses.
     # Single-rule policies keep readback verification reliable without inferring access.
     for protocol in ('tcp', 'udp'):
@@ -46,7 +49,7 @@ def policy_plan(groups, policies, dns_port=1053):
         desired.append(dict(name=name, description=MARKER, enabled=True, source_posture_checks=[], rules=[dict(
             name=name, description=MARKER, enabled=True, action='accept', protocol=protocol,
             bidirectional=False, sources=sorted([ids['administrators'], ids['staff']]),
-            destinations=[ids['prod-servers']], ports=[str(dns_port)])]))
+            destinations=[ids[server_group]], ports=[str(dns_port)])]))
     plan = []
     for body in desired:
         name = body['name']

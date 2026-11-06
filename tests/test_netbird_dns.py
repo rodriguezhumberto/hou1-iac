@@ -14,16 +14,29 @@ import subprocess
 import tempfile
 import threading
 import unittest
+import yaml
 
 from ansible.errors import AnsibleFilterError
 from jinja2 import Template
 
-from helpers import ROLES, ROOT, run_play
+from helpers import ROLES, ROOT, guard_play, run_play, run_plays
 
 plan = runpy.run_path(str(ROOT / 'ansible/playbooks/filter_plugins/netbird_dns.py'))['dns_plan']
 
 
 class DnsTest(unittest.TestCase):
+    def test_isolated_resolver_target_cannot_select_production(self):
+        guard = yaml.safe_load((ROLES / 'netbird_dns/tasks/main.yml').read_text())[0]
+        inventory = {'all': {'children': {'isolated_test_vps': {'hosts': {'fixture': {}}}}}}
+        base = dict(cms_environment='test', netbird_server_group='test-servers',
+                    netbird_subnet='100.91.0.0/16', netbird_domain='netbird-test.vps-test.example.invalid',
+                    primary_domain='vps-test.example.invalid', netbird_dns_domain='vps-test.example.invalid')
+        scenarios = [{}, {'cms_environment': 'prod'}, {'netbird_subnet': '100.90.0.0/16'},
+                     {'netbird_server_group': 'prod-servers'}, {'primary_domain': 'example.invalid'}]
+        result = run_plays([dict(guard_play({**base, **override}, [guard], guard['name'] if override else None),
+                                hosts='fixture') for override in scenarios], inventory_source=inventory)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def setUp(self):
         self.groups = [dict(id=n, name=n) for n in
                        ('test-servers', 'prod-servers', 'administrators', 'staff')]

@@ -1,0 +1,132 @@
+---
+- name: Seed only the fresh isolated rehearsal before starting its services
+  hosts: isolated_test_vps
+  become: true
+  gather_facts: false
+  pre_tasks:
+    - name: Require the public bootstrap fixture and a separate host recovery identity
+      ansible.builtin.assert:
+        that:
+          - groups['isolated_test_vps'] | length == 1
+          - inventory_hostname not in groups.get('prod_env', [])
+          - cms_environment == 'test'
+          - node_bootstrap | bool
+          - ansible_host == test_vps_public_ip
+          - netbird_domain.startswith('netbird-test.')
+          - app_directory.endswith('-test')
+          - rehearsal_controller_managed_tls | bool
+          - rehearsal_host_age_key_source != rehearsal_controller_age_key_file
+          - rehearsal_seed_directory | length > 0
+          - rehearsal_bootstrap_admin_cidr | ansible.utils.ipaddr('prefix') | int in [32, 128]
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Encrypted seeds may only initialize the explicit fresh public test fixture.
+      tags: [always]
+
+  tasks:
+    - name: Keep bootstrap SSH restricted to the controller until restart validation
+      community.general.ufw:
+        rule: allow
+        port: '22'
+        proto: tcp
+        src: "{{ rehearsal_bootstrap_admin_cidr }}"
+
+    - name: Allow test web ingress before enabling the bootstrap firewall
+      community.general.ufw:
+        rule: allow
+        port: "{{ item }}"
+        proto: tcp
+      loop: ['80', '443']
+
+    - name: Set bootstrap firewall defaults without closing the controller path
+      community.general.ufw:
+        direction: "{{ item.direction }}"
+        policy: "{{ item.policy }}"
+      loop:
+        - {direction: incoming, policy: deny}
+        - {direction: outgoing, policy: allow}
+
+    - name: Enable the bootstrap firewall
+      community.general.ufw:
+        state: enabled
+
+    - name: Require SSH keys during the temporary bootstrap phase
+      ansible.builtin.copy:
+        dest: /etc/ssh/sshd_config.d/00-hou1-rehearsal-bootstrap.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          PasswordAuthentication no
+          KbdInteractiveAuthentication no
+
+    - name: Validate the bootstrap SSH configuration before reloading
+      ansible.builtin.command: /usr/sbin/sshd -t
+      changed_when: false
+
+    - name: Reload SSH with key-only bootstrap authentication
+      ansible.builtin.systemd:
+        name: ssh
+        state: reloaded
+
+    - name: Refuse to replace an existing NetBird database during seeding
+      ansible.builtin.find:
+        paths: "{{ netbird_control_plane_directory }}/data"
+        patterns: ['*.db', '*.json', '*.db-wal', '*.db-shm']
+        excludes: ['geonames_*.db']
+        file_type: file
+        hidden: true
+      register: rehearsal_seed_existing_databases
+
+    - name: Require an uninitialized control plane before importing fresh seeds
+      ansible.builtin.assert:
+        that: rehearsal_seed_existing_databases.matched | int == 0
+        fail_msg: Existing NetBird state must use the recovery workflow, not fresh-host seeding.
+
+    - name: Create root-only seed and runtime directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      loop:
+        - /root/.config/sops/age
+        - /opt/hou1-test-source/bootstrap-seeds
+        - "{{ netbird_control_plane_directory }}"
+
+    - name: Install only the host-specific age identity
+      ansible.builtin.copy:
+        src: "{{ rehearsal_host_age_key_source }}"
+        dest: "{{ authentik_age_key_file }}"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Transfer the encrypted test certificate and geolocation seeds
+      ansible.builtin.copy:
+        src: "{{ rehearsal_seed_directory }}/{{ item }}.tar.gz.age"
+        dest: "/opt/hou1-test-source/bootstrap-seeds/{{ item }}.tar.gz.age"
+        owner: root
+        group: root
+        mode: '0600'
+      loop: [certificates, netbird]
+      no_log: true
+
+    - name: Import only the offline NetBird cache before the application checkout
+      ansible.builtin.shell: |
+        set -euo pipefail
+        age --decrypt --identity {{ authentik_age_key_file | quote }} \
+          {{ ('/opt/hou1-test-source/bootstrap-seeds/' ~ item.name ~ '.tar.gz.age') | quote }} \
+          | tar --extract --gzip --file - --directory {{ item.destination | quote }} --no-same-owner
+      args:
+        executable: /bin/bash
+      loop:
+        - {name: netbird, destination: "{{ netbird_control_plane_directory }}"}
+      no_log: true
+
+    - name: Verify the seeded cache before the full-stack entry point runs
+      ansible.builtin.import_role:
+        name: netbird_control_plane
+        tasks_from: rehearsal-cache

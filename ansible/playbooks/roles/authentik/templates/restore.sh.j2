@@ -10,20 +10,43 @@ archive=$1
 project={{ authentik_project_root | quote }}
 data_root={{ authentik_data_root | quote }}
 project_name={{ authentik_compose_project | quote }}
-export AGE_IDENTITIES=${AGE_KEY_FILE:?AGE_KEY_FILE must name the offline age identity}
+age_identity=${AGE_KEY_FILE:-{{ authentik_age_key_file | quote }}}
+[[ -f "$age_identity" ]] || { echo 'AGE_KEY_FILE must name the offline age identity' >&2; exit 2; }
 checksum="${archive}.sha256"
 [[ -f "$archive" && -f "$checksum" ]] || { echo 'backup or checksum is missing' >&2; exit 1; }
-sha256sum --check "$checksum"
+expected=$(awk 'NR == 1 { print $1 }' "$checksum")
+[[ "$expected" =~ ^[a-f0-9]{64}$ ]] || { echo 'Invalid backup checksum manifest' >&2; exit 1; }
+printf '%s  %s\n' "$expected" "$archive" | sha256sum --check -
 tmp=$(mktemp -d)
 cleanup() { rm -rf -- "$tmp"; }
 trap cleanup EXIT
-age --decrypt "$archive" | gzip --decompress | tar --extract --file - -C "$tmp"
-docker compose -p "$project_name" -f "$project/compose.yaml" stop authentik-server authentik-worker postgresql
-tar --extract --file "$tmp/persistent.tar" -C "$data_root"
-docker compose -p "$project_name" -f "$project/compose.yaml" start postgresql
-until docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql pg_isready -U authentik -d authentik >/dev/null 2>&1; do sleep 2; done
-docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -U authentik -d authentik -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null
-docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -U authentik -d authentik <"$tmp/postgresql.sql"
+age --decrypt --identity "$age_identity" "$archive" | gzip --decompress | tar --extract --file - -C "$tmp"
+if [[ -f "$project/compose.yaml" ]]; then
+  docker compose -p "$project_name" -f "$project/compose.yaml" stop authentik-server authentik-worker postgresql
+else
+  [[ -z "$(docker ps -q --filter "label=com.docker.compose.project=$project_name")" ]] || {
+    echo 'Running Authentik containers have no saved Compose file; stop them before clean recovery' >&2; exit 1;
+  }
+fi
+install -d -m 0750 "$project" "$data_root"
+install -d -m 0750 -o {{ authentik_postgres_uid | int }} -g {{ authentik_postgres_gid | int }} "$data_root/postgres"
+for directory in media templates certs config; do
+  install -d -m 0750 -o {{ authentik_container_uid | int }} -g {{ authentik_container_gid | int }} "$data_root/$directory"
+done
+install -m 0644 "$tmp/compose.yaml" "$project/compose.yaml"
 install -m 0600 "$tmp/authentik.env" "$project/authentik.env"
 install -m 0600 "$tmp/oidc-clients.env" "$project/oidc-clients.env"
-docker compose -p "$project_name" -f "$project/compose.yaml" up -d --wait --wait-timeout 120
+install -m 0600 "$tmp/authentik-secrets.enc.yaml" "$project/secrets.enc.yaml"
+tar --extract --file "$tmp/persistent.tar" -C "$data_root"
+docker network inspect {{ authentik_ingress_network | quote }} >/dev/null 2>&1 \
+  || docker network create {{ authentik_ingress_network | quote }} >/dev/null
+docker compose -p "$project_name" -f "$project/compose.yaml" up -d postgresql
+ready=0
+for attempt in $(seq 1 30); do
+  if docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql pg_isready -U authentik -d authentik >/dev/null 2>&1; then ready=1; break; fi
+  sleep 2
+done
+[[ "$ready" == 1 ]] || { echo 'PostgreSQL did not become ready within 60 seconds' >&2; exit 1; }
+docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -U authentik -d authentik -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null
+docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -v ON_ERROR_STOP=1 -U authentik -d authentik <"$tmp/postgresql.sql"
+docker compose -p "$project_name" -f "$project/compose.yaml" up -d --wait --wait-timeout 900

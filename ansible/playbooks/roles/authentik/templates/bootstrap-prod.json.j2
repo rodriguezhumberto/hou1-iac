@@ -7,8 +7,9 @@
   ],
   "users": {{ authentik_staff_users | to_json }},
   "scope_mappings": [
-    {"name": "Pearland Paws groups prod", "scope_name": "groups", "expression": "return {'groups': [group.name for group in request.user.ak_groups.all()]}"},
-    {"name": "Pearland Paws audience prod", "scope_name": "audience", "expression": "return {'aud': request.provider.audience}"}
+    {"name": "Pearland Paws profile prod", "scope_name": "profile", "expression": "return {'name': user.name, 'preferred_username': user.username}"},
+    {"name": "Pearland Paws groups prod", "scope_name": "groups", "expression": "return {'groups': [group.name for group in user.ak_groups.all() if group.name in ['pearland-paws-staff-admin', 'pearland-paws-staff-editor', 'pearland-paws-staff-reader']]}"},
+    {"name": "Pearland Paws audience prod", "scope_name": "audience", "expression": "return {'aud': provider.client_id}"}
   ],
   "staff": {
     "issuer_host": "auth.{{ primary_domain }}",
@@ -18,7 +19,7 @@
     "client_id": "pearland-paws-staff",
     "audience": "pearland-paws-staff",
     "secret_env": "STAFF_OIDC_CLIENT_SECRET",
-    "scopes": ["groups", "audience"],
+    "scopes": ["profile", "groups", "audience"],
     "redirect_uris": ["https://staff.{{ primary_domain }}/api/staff/oidc/callback"],
     "logout_uris": ["https://staff.{{ primary_domain }}/staff/login"]
   },
@@ -30,8 +31,8 @@
     "client_id": "netbird-prod",
     "audience": "netbird-prod",
     "secret_env": "NETBIRD_OIDC_CLIENT_SECRET",
-    "scopes": ["groups", "audience"],
-    "redirect_uris": ["https://netbird.{{ primary_domain }}/nb-auth", "https://netbird.{{ primary_domain }}/nb-silent-auth", "http://localhost:53000/"],
+    "scopes": ["profile", "groups", "audience"],
+    "redirect_uris": ["https://netbird.{{ primary_domain }}/oauth2/callback", "https://netbird.{{ primary_domain }}/nb-auth", "https://netbird.{{ primary_domain }}/nb-silent-auth", "http://localhost:53000/"],
     "logout_uris": ["https://netbird.{{ primary_domain }}/nb-auth"]
   }
 }

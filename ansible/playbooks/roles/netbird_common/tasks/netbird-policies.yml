@@ -10,7 +10,7 @@
 
     - name: Plan managed policies and identify the built-in default
       ansible.builtin.set_fact:
-        netbird_policy_plan: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_existing_policies.json, netbird_dns_port) }}"
+        netbird_policy_plan: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_existing_policies.json, netbird_dns_port, netbird_server_group | default('prod-servers')) }}"
 
     - name: Create or update managed policies
       ansible.builtin.uri:
@@ -33,7 +33,7 @@
 
     - name: Normalize the managed policy readback
       ansible.builtin.set_fact:
-        netbird_policy_plan_after: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port) }}"
+        netbird_policy_plan_after: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_policies_after.json, netbird_dns_port, netbird_server_group | default('prod-servers')) }}"
 
     - name: Verify managed policies match the intended access
       ansible.builtin.assert:
@@ -60,7 +60,7 @@
 
     - name: Normalize the final policy readback
       ansible.builtin.set_fact:
-        netbird_policy_plan_final: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port) }}"
+        netbird_policy_plan_final: "{{ netbird_groups_after.json | netbird_policy_plan(netbird_effective_policies.json, netbird_dns_port, netbird_server_group | default('prod-servers')) }}"
 
     - name: Verify managed access and disabled default
       ansible.builtin.assert:

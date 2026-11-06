@@ -1,0 +1,449 @@
+{
+  "recorded_at": "2026-11-06T21:14:14.310471+00:00",
+  "environment": "isolated test",
+  "issues": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ],
+  "implementation_ref": "6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09",
+  "implementation_ref_redeploy": "pending private-management recovery; earlier working-tree role was applied successfully",
+  "base_infra_ref": "8db0d2563ce314498a4a4840538fe5a1c720de81",
+  "staff_ref": "af9a46b3f3b7a96543481c82979fe4068bc01f4c",
+  "staff_image": "sha256:8dc72772a33a6ba570d9e5ecd5184001faded60bf254a4fd789cf324600c0c85",
+  "netbird_version": "0.82.0",
+  "repository_checks": {
+    "infrastructure": {
+      "passed": 88,
+      "skipped": 1,
+      "failed": 0
+    },
+    "staff": {
+      "passed": 79,
+      "failed": 0
+    },
+    "playbook_syntax": "passed",
+    "python_undefined_names": "passed",
+    "candidate_exact_value_secret_scan": "passed"
+  },
+  "reports": {
+    "isolation": {
+      "environment": "test",
+      "host_ipv4_targets": 11,
+      "host_ipv6_targets": 8,
+      "host_targets_denied": true,
+      "host_deny_counter_increase": 27,
+      "unapproved_host_egress_denied": true,
+      "workloads": [
+        {
+          "container": "hou1-authentik-test-authentik-server-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-authentik-test-authentik-worker-1",
+          "enforcement": "internal network without external route",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 101
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 101
+            }
+          },
+          "forward_counter_increase": 0
+        },
+        {
+          "container": "hou1-authentik-test-postgresql-1",
+          "enforcement": "internal network without external route",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 101
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 101
+            }
+          },
+          "forward_counter_increase": 0
+        },
+        {
+          "container": "pearlandpaws-test-nginx-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-netbird-test-netbird-server-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-netbird-test-dashboard-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "pearlandpaws-test-astro-app-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        }
+      ],
+      "ipv6_forwarding": "0"
+    },
+    "component_alerts": [
+      {
+        "component": "authentik",
+        "rule": "authentik_server",
+        "started_at": "2026-11-06T20:07:12.697794+00:00",
+        "finished_at": "2026-11-06T20:09:02.482058+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "cadence": "two immediate real probe samples; timer cadence tested separately"
+      },
+      {
+        "component": "postgresql",
+        "rule": "postgresql",
+        "started_at": "2026-11-06T20:09:02.482432+00:00",
+        "finished_at": "2026-11-06T20:10:25.187384+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "cadence": "two immediate real probe samples; timer cadence tested separately"
+      },
+      {
+        "component": "staff",
+        "rule": "staff_app",
+        "started_at": "2026-11-06T20:13:47.556325+00:00",
+        "finished_at": "2026-11-06T20:15:41.270592+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      },
+      {
+        "component": "nginx",
+        "rule": "public_nginx",
+        "started_at": "2026-11-06T20:26:41.204298+00:00",
+        "finished_at": "2026-11-06T20:31:14.510176+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      },
+      {
+        "component": "netbird",
+        "rule": "public_netbird_api",
+        "started_at": "2026-11-06T20:31:46.804755+00:00",
+        "firing_received": true,
+        "resolved_received": false,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "result": "blocked: API 502 and private VPN management did not recover within local recovery deadline; provider-console recovery requested",
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      }
+    ],
+    "key_boundary": {
+      "environment": "test",
+      "host_key_cannot_decrypt_controller_bundle": true,
+      "host_key_cannot_decrypt_old_backup": true,
+      "host_ciphertext_excludes_dns_token": true,
+      "new_backup_fetched_verified": false,
+      "new_backup_full_restore_repeated": false
+    },
+    "tls_dry_run": {
+      "environment": "test",
+      "mode": "dry-run",
+      "certificate_lineages": 4,
+      "passed": true,
+      "dns_credentials_shipped": false
+    },
+    "tls_renew": {
+      "environment": "test",
+      "mode": "renew",
+      "certificate_lineages": 4,
+      "passed": true,
+      "dns_credentials_shipped": false
+    },
+    "monitor": {
+      "last_recorded_at": "2026-11-06T21:13:24.589932+00:00",
+      "failed_rules": [
+        "public_netbird_api",
+        "public_authentik_discovery",
+        "host_reachable",
+        "vpn_management",
+        "vpn_signal",
+        "vpn_peer",
+        "staff_oidc_login"
+      ],
+      "pending_events": 0,
+      "receiver_bind": "127.0.0.1:18765",
+      "monitor_timer_enabled": true,
+      "controller_tls_timer_enabled": false,
+      "persistent_controller_runtime": true,
+      "linger": true,
+      "alert_receipt_count": 60,
+      "staff_login_specific_fault_drill": "pending recovery of private management"
+    }
+  },
+  "private_evidence_sha256": {
+    "isolation-drill-report.json": "052e0cb87e43aac36577cebfca71ffdfef7420f7622614a6979691d73e2f1375",
+    "alert-drill-report.json": "f462c252d2a7f2555a8bbb5598a72c3b571344e68e9655a2ad2b3535df8e920c",
+    "local-key-boundary-report.json": "46222d5a84e13ad190e929c797275fb4decb24b30f801d03904a79cb91142121",
+    "final-infra-tests.log": "07be0fa169ce47b38966fad2968c148b7826626a05287a31b781d0c30db6949c",
+    "final-staff-tests.log": "58739421a64c0a74299ccfd9944244f9214e514be61ff454ec7159ae85448cf7",
+    "ingress-netbird-alert-drills-verified.log": "6e29c9ec50cada58e1d6855289f01dd7441775000b31b7cc4e9b90b862bf02f4",
+    "tls-dry-run.log": "16ac7056b29c2ede4564c17882a5c08a0bdc160788fbc72eedfb4af2b4b2be2c",
+    "tls-renew.log": "bb30a1b4e6e7f017c0c7f651e3fcd87d1e7ce983c6bc14fd5e0c2c96f5a4bb59",
+    "post-outage-infra-tests.log": "8f629eb4f6dc9f682a94a7175a36c15336aa6cbd7f295117af44b4092fbe5432",
+    "alert-state-regression.log": "f710c586535ef288ddd7864d254f452b00b5c25afe7a86ab7e7ea20affa50c0b",
+    "cached-geo-recovery-proof.json": "a3510e5bf6879e45f1f50edd7ed5ec695bb22cc2cc787b0aefbc182d220c3eae",
+    "cached-geo-focused-tests-final.log": "ac7da35ccf73bc98347ca039c418ed5c943eb543653bb60dbb21f9694096a846",
+    "cached-geo-infra-tests.log": "1bc0b47454710f230ac726dfc1f99c6b38af09a77b2388986a7aa13bf9ed55c4"
+  },
+  "implementation_sha256": {
+    "scripts/rehearsal-controller-tls.py": "1f3f7c4b9520e2e21f1f8491214fb1ebc7324ae8668be08954e7e30b51b9d2a3",
+    "scripts/rehearsal-monitor.py": "e347d2047c020883dcc0a62661031d60b07f50fa189bd547b6cb5c03d69d6585",
+    "scripts/rehearsal-staff-login-drill.py": "93e60d8d00508cafb68742eb4b280dcc7037e122aa2a9a5bc0f6b58d01f39ced",
+    "scripts/test-rollout-rehearsal.py": "5f1a15204f75abd10dc8b28ed78863abf373569c580ec2707b8c98f8fb66633d",
+    "scripts/prepare-rehearsal-host-secrets.py": "dd601c0c78d57eca6d756f0ce74ae301599e462e641d66f88e27b9dc7b2c4f6c",
+    "scripts/rehearsal-alert-drills.py": "51bd43187ab5dee4c05b8f152cbb3de8ee0f26aab1e62387f8aa9255a07d2d04",
+    "scripts/install-rehearsal-monitor.py": "bab2f552df09a68abc474d844437482bad1db1cdc73931a5b10eda385a843863",
+    "scripts/rehearsal-isolation-drill.py": "09d1bced8cff69f640a9b6937f2b72bd6310292e3f38d89f5baebf31321cb079",
+    "ansible/playbooks/roles/rehearsal_gates/files/probe.py": "db85fcb04e5a7e899fa62d7d1bcec7d5825e0ee72b3334aa7f8356b818a435db",
+    "ansible/playbooks/roles/rehearsal_gates/files/isolation.py": "4ad13ec33ab06485af7b9a7b2a773da681aa30e6d0b73b8cc9130614357d7c8f",
+    "ansible/playbooks/roles/netbird_control_plane/tasks/main.yml": "5919216a056bc01a997f515b4d1551cf0bd77aa3b6343934648f137e01983a30",
+    "ansible/playbooks/roles/netbird_control_plane/tasks/rehearsal-cache.yml": "3a9e7e3f0b68e8a4b732c1081f350020ada3bb783b4cf67014f3084d81d5c826",
+    "ansible/playbooks/roles/netbird_control_plane/templates/config.yaml.j2": "2e22d041688783ec32c6c247c4ed78ee69b76569a2f8fc142dd83e623827b6bd",
+    "ansible/playbooks/roles/netbird_control_plane/templates/config-authentik.yaml.j2": "c2a3b5f38d6986ea6b74a5b8ada23a742f8a70740d868a695a9435acc2d986d4",
+    "ansible/playbooks/roles/rehearsal_gates/tasks/main.yml": "be76fbae5030fcd119756bc881e321433764e76c556573fb2cba13ae48bf92e0"
+  },
+  "production_approval": false,
+  "controller_followup": {
+    "implementation_ref": "34ba80f769f0ec697c17755b2ee5093570f32a03",
+    "runtime_monitor_sha256": "e347d2047c020883dcc0a62661031d60b07f50fa189bd547b6cb5c03d69d6585",
+    "alert_state_regression": "passed; firing state survives omitted host sample and resolves after a healthy sample",
+    "console_recovery_commands_confirmed_run": true,
+    "post_commands_api_status": 502,
+    "private_ssh_recovered": false,
+    "status_diagnostics": "fatal startup and exit/OOM screenshots received; cached-only startup repair awaiting console application",
+    "root_cause": "confirmed: NetBird startup geolocation HEAD blocked by workload default deny",
+    "full_infra_tests": {
+      "passed": 86,
+      "skipped": 1,
+      "failed": 0
+    }
+  },
+  "console_screenshot_findings": {
+    "observed_at_controller_utc": "2026-11-06T20:53:37.966416+00:00",
+    "source": "operator provider-console screenshots",
+    "netbird_server_status": "Restarting (1)",
+    "netbird_dashboard_status": "Up 10 hours",
+    "nginx_configuration_test": "successful",
+    "nginx_to_api_probe": "wget: bad address hou1-netbird-server:80",
+    "startup_error": "pending filtered fatal message",
+    "root_cause": "unconfirmed; container startup failure confirmed",
+    "screenshot_sha256": [
+      "083b6776a0d2da0bb171293f6b48163253bfc96b825754a9c9d4bf3b1a89ef90",
+      "528818b3221b6b1049f2cc559cc93cc732f9e504aab0889f5f5fa2b27807a389"
+    ]
+  },
+  "geolocation_startup_followup": {
+    "recovery_edit": "passed against encrypted backup configuration; only server.disableGeoliteUpdate changes",
+    "idempotent": true,
+    "config_mode_preserved": "0600",
+    "existing_cache_files": [
+      {
+        "filename": "GeoLite2-City_20261013.mmdb",
+        "bytes": 50883239
+      },
+      {
+        "filename": "geonames_20261013.db",
+        "bytes": 6946816
+      }
+    ],
+    "network_policy_changed": false,
+    "geolocation_disabled": false,
+    "netbird_version": "0.82.0",
+    "live_recovery": "not passed",
+    "implementation_ref": "6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09",
+    "diagnosis": "NetBird startup GeoLite download HEAD is rejected by default-deny workload egress",
+    "oom_killed": false,
+    "exit_code": 1,
+    "endpoint": "https://pkgs.netbird.io/geolocation-dbs/GeoLite2-City/download?suffix=tar.gz",
+    "blocked_by_explicit_production_set": false,
+    "console_application": "operator confirmed edit/restart commands run; API still 502; live flag/cache/error diagnostics unavailable",
+    "focused_tests": {
+      "passed": 7,
+      "failed": 0
+    },
+    "screenshot_sha256": [
+      "e27505ea12353cbf45d214f7531f0d4cbcb498d814e8dcf2d6ac603e81d5a61d",
+      "334d2a03d7436bbcf206dffb439aaa8b19e94e94e79b0e327fc9688a28055b1b"
+    ],
+    "full_infra_tests": {
+      "passed": 88,
+      "skipped": 1,
+      "failed": 0
+    }
+  },
+  "rebuild_preflight": {
+    "operator_reset_authorized": false,
+    "off_host_archives_reverified": [
+      {
+        "file": "authentik-20261106T114519Z.tar.gz.age",
+        "sha256": "d7b9279ee31f35a5d9a866b04b2c41360e0e2ec0014af6ac30d3f34fe15f7ec7",
+        "decrypt_and_archive_check": "passed",
+        "members": 6
+      },
+      {
+        "file": "netbird-20261106T120029.tar.gz.age",
+        "sha256": "49a796c60929895fa82db4d023133379a2035e2d8b6735debba39c6d669f88ac",
+        "decrypt_and_archive_check": "passed",
+        "members": 83
+      }
+    ],
+    "both_recovery_identities_private_off_host": true,
+    "bootstrap_public_key_verified": true,
+    "new_host_fingerprint_required": true,
+    "newer_host_only_backups_verified_off_host": false,
+    "required_order": [
+      "prepare filtered host secrets and controller-issued certificates",
+      "seed and validate cached geolocation before isolation",
+      "deploy pinned test stack",
+      "apply isolation with public bootstrap recovery still available",
+      "prove NetBird cold restart, VPN and staff authentication",
+      "harden SSH and complete remaining monitoring/recovery drills"
+    ]
+  },
+  "fresh_rebuild": {
+    "recorded_at": "2026-11-06T22:56:45.139310+00:00",
+    "environment": "isolated test replacement VPS",
+    "host": "139.177.151.12",
+    "host_fingerprint": "SHA256:5f+kLbOe5uHyM0m44PqlAjf022MKDEKqNmKx6rz5VLI",
+    "deployment": "passed from immutable infra bd16f47b218aac4d1f06ffb2b108bee3cb877fa7 and staff af9a46b3f3b7a96543481c82979fe4068bc01f4c",
+    "capacity": "16 GiB RAM, 73 GiB free disk, 1% inodes; gate passed",
+    "netbird_version": "0.82.0",
+    "geolocation_cache": "both nonempty cached databases seeded under host recipient; disableGeoliteUpdate true; geolocation enabled",
+    "public_staff_denied": {
+      "staff": 403,
+      "login": 403,
+      "api": 403
+    },
+    "private_admin_peer": "connected at 100.91.205.101; private SSH at 100.91.0.10",
+    "staff_journey": "admin and reader passed protected read, reader write denial, replay rejection and logout revocation",
+    "isolation": "host and 7 workload namespaces denied production/default egress",
+    "cold_restart": {
+      "api_restored": true,
+      "private_ssh_restored": true,
+      "seconds": 1.0
+    },
+    "public_ssh_closed": true,
+    "backup_audit": {
+      "environment": "test",
+      "host_key_cannot_decrypt_controller_bundle": true,
+      "host_key_cannot_decrypt_old_backup": true,
+      "dns_token_plaintext_host_matches": 0,
+      "controller_identity_host_matches": 0,
+      "new_backup": "authentik-20261106T224912Z.tar.gz.age",
+      "new_backup_sha256": "124646659c8655734a1419b8c294a45127542d1fe59635f800a2390b66a59277",
+      "new_backup_decrypted_off_vps": true,
+      "new_backup_contains_database_dump": true,
+      "new_backup_sops_decrypts_with_host_recovery_key": true,
+      "new_backup_dns_capability_absent": true,
+      "new_backup_full_restore_repeated": false
+    },
+    "image_secret_scan": "passed; image sha256:e53a99b9de0fa698686cff2b40c1cf78ace9e0c93b846acc80aa10e626c8e36e",
+    "staff_fault_alert": "passed three-failure firing and resolved receipt with client restored",
+    "tls_renewal": "passed 4 controller-only test lineages; credentials not shipped",
+    "monitor": "healthy; monitor timer and receiver active; no pending events",
+    "repository_tests": {
+      "infra": "89 passed, 1 skipped",
+      "staff": "79 passed"
+    },
+    "production_approval": false,
+    "remaining": "production promotion, independent alert destination, sustained load, scheduled retention, final runbooks, and production cutover alignment remain separate gates"
+  }
+}

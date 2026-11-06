@@ -170,6 +170,25 @@ class ControlPlaneTest(unittest.TestCase):
             self.assertEqual(service['networks']['netbird-ingress']['ipv4_address'], '172.30.80.2')
             self.assertEqual(len(service['volumes']), 3)
             self.assertEqual(len(service['ports']), 2)
+            # An Authentik attachment belongs on the service as an empty/null
+            # map; only the top-level declaration accepts external and name.
+            # Include the former broken map to verify reruns repair it too.
+            for previous in [{}, {'services': {'nginx': {'networks': {
+                    'authentik-ingress': {'external': True, 'name': 'hou1-authentik-test'}}}}}]:
+                result = run_play({**self.variables(directory),
+                    'authentik_enable_ingress_network': True,
+                    'authentik_active_network': 'hou1-authentik-test',
+                    'netbird_app_override_before': {'content': base64.b64encode(
+                        yaml.safe_dump(previous).encode()).decode()}}, [tasks[3]])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                (paths / 'app-compose.override.yml').replace(app / 'docker-compose.override.yml')
+                merged = subprocess.run(compose + ['--project-directory', str(app), 'config', '--format', 'json'],
+                    text=True, capture_output=True)
+                self.assertEqual(merged.returncode, 0, merged.stderr)
+                model = json.loads(merged.stdout)
+                self.assertIn('authentik-ingress', model['services']['nginx']['networks'])
+                self.assertEqual(model['networks']['authentik-ingress']['name'], 'hou1-authentik-test')
+                self.assertTrue(model['networks']['authentik-ingress']['external'])
             subprocess.run(['bash', '-n', str(paths / 'backup.sh')], check=True)
             # Use a throwaway certificate and local temp paths for syntax-only
             # validation. No Nginx server, DNS lookup, or VPN is started.

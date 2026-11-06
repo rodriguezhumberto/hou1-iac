@@ -57,6 +57,7 @@ netbird_ingress_subnet: 172.30.80.0/29
 netbird_ingress_dynamic_range: 172.30.80.4/30
 netbird_ingress_proxy_ip: 172.30.80.2
 netbird_backup_directory: /var/backups/hou1-netbird
+netbird_backup_age_recipient: ''
 
 # Authentik is placed on the existing node only after authentik-preflight.yml.
 # Keep test and production projects on separate private networks and data roots.
@@ -75,8 +76,8 @@ authentik_postgres_image: postgres:16.6-alpine
 authentik_compose_project_prefix: hou1-authentik
 authentik_project_root_base: /opt/hou1-authentik
 authentik_data_root_base: /var/lib/hou1-authentik
-authentik_postgres_uid: 999
-authentik_postgres_gid: 999
+authentik_postgres_uid: 70
+authentik_postgres_gid: 70
 authentik_container_uid: 1000
 authentik_container_gid: 1000
 authentik_server_cpus: '1.00'
@@ -96,6 +97,7 @@ authentik_offhost_backup_root_base: /mnt/offhost-backups/hou1-authentik
 authentik_backup_retention_days: 30
 authentik_backup_schedule_minute: '40'
 authentik_backup_schedule_hour: '2'
+authentik_backup_age_recipient: ''
 authentik_bootstrap_enabled: false
 authentik_staff_users: []
 

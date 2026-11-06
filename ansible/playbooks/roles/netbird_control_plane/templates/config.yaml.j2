@@ -1,5 +1,8 @@
 # Schema from the NetBird 0.82.0 combined-server installer.
 server:
+{% if cms_environment | default('prod') == 'test' and rehearsal_controller_managed_tls | default(false) | bool %}
+  disableGeoliteUpdate: true
+{% endif %}
   listenAddress: ":80"
   exposedAddress: "https://{{ netbird_domain }}:443"
   stunPorts: [3478]
