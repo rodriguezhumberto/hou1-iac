@@ -1,11 +1,11 @@
 {
-  "recorded_at": "2026-11-06T20:39:44.028447+00:00",
+  "recorded_at": "2026-11-06T20:50:24.711903+00:00",
   "environment": "isolated test",
   "issues": [
     "hou1-iac#27",
     "pearland-paws#39"
   ],
-  "implementation_ref": "41b1a26f185a4f57c864054a11cdf73272d702a3",
+  "implementation_ref": "34ba80f769f0ec697c17755b2ee5093570f32a03",
   "implementation_ref_redeploy": "pending private-management recovery; earlier working-tree role was applied successfully",
   "base_infra_ref": "8db0d2563ce314498a4a4840538fe5a1c720de81",
   "staff_ref": "af9a46b3f3b7a96543481c82979fe4068bc01f4c",
@@ -248,7 +248,7 @@
       "dns_credentials_shipped": false
     },
     "monitor": {
-      "last_recorded_at": "2026-11-06T20:39:00.075445+00:00",
+      "last_recorded_at": "2026-11-06T20:49:00.425779+00:00",
       "failed_rules": [
         "public_netbird_api",
         "host_reachable",
@@ -275,11 +275,13 @@
     "final-staff-tests.log": "58739421a64c0a74299ccfd9944244f9214e514be61ff454ec7159ae85448cf7",
     "ingress-netbird-alert-drills-verified.log": "6e29c9ec50cada58e1d6855289f01dd7441775000b31b7cc4e9b90b862bf02f4",
     "tls-dry-run.log": "16ac7056b29c2ede4564c17882a5c08a0bdc160788fbc72eedfb4af2b4b2be2c",
-    "tls-renew.log": "bb30a1b4e6e7f017c0c7f651e3fcd87d1e7ce983c6bc14fd5e0c2c96f5a4bb59"
+    "tls-renew.log": "bb30a1b4e6e7f017c0c7f651e3fcd87d1e7ce983c6bc14fd5e0c2c96f5a4bb59",
+    "post-outage-infra-tests.log": "8f629eb4f6dc9f682a94a7175a36c15336aa6cbd7f295117af44b4092fbe5432",
+    "alert-state-regression.log": "f710c586535ef288ddd7864d254f452b00b5c25afe7a86ab7e7ea20affa50c0b"
   },
   "implementation_sha256": {
     "scripts/rehearsal-controller-tls.py": "1f3f7c4b9520e2e21f1f8491214fb1ebc7324ae8668be08954e7e30b51b9d2a3",
-    "scripts/rehearsal-monitor.py": "ce193b9ec4b83c9a136cb75c0cdec6528013bd9503cd383ca93ff582273f1ecf",
+    "scripts/rehearsal-monitor.py": "e347d2047c020883dcc0a62661031d60b07f50fa189bd547b6cb5c03d69d6585",
     "scripts/rehearsal-staff-login-drill.py": "93e60d8d00508cafb68742eb4b280dcc7037e122aa2a9a5bc0f6b58d01f39ced",
     "scripts/test-rollout-rehearsal.py": "5f1a15204f75abd10dc8b28ed78863abf373569c580ec2707b8c98f8fb66633d",
     "scripts/prepare-rehearsal-host-secrets.py": "dd601c0c78d57eca6d756f0ce74ae301599e462e641d66f88e27b9dc7b2c4f6c",
@@ -289,5 +291,20 @@
     "ansible/playbooks/roles/rehearsal_gates/files/probe.py": "db85fcb04e5a7e899fa62d7d1bcec7d5825e0ee72b3334aa7f8356b818a435db",
     "ansible/playbooks/roles/rehearsal_gates/files/isolation.py": "4ad13ec33ab06485af7b9a7b2a773da681aa30e6d0b73b8cc9130614357d7c8f"
   },
-  "production_approval": false
+  "production_approval": false,
+  "controller_followup": {
+    "implementation_ref": "34ba80f769f0ec697c17755b2ee5093570f32a03",
+    "runtime_monitor_sha256": "e347d2047c020883dcc0a62661031d60b07f50fa189bd547b6cb5c03d69d6585",
+    "alert_state_regression": "passed; firing state survives omitted host sample and resolves after a healthy sample",
+    "console_recovery_commands_confirmed_run": true,
+    "post_commands_api_status": 502,
+    "private_ssh_recovered": false,
+    "status_diagnostics": "awaiting operator output",
+    "root_cause": "unconfirmed",
+    "full_infra_tests": {
+      "passed": 86,
+      "skipped": 1,
+      "failed": 0
+    }
+  }
 }

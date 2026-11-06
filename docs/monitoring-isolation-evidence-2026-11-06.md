@@ -4,7 +4,9 @@ Paired rollout issues: infrastructure #27 and staff #39. This is a partial gate
 report. **NetBird is currently unavailable after its outage drill; provider-console
 recovery is required.** Production is unchanged and promotion is not approved.
 
-Implementation candidate: `41b1a26f185a4f57c864054a11cdf73272d702a3`.
+Implementation candidate: `34ba80f769f0ec697c17755b2ee5093570f32a03`.
+This includes the controller alert-state follow-up to the initial gate code
+`41b1a26f185a4f57c864054a11cdf73272d702a3`.
 The earlier working-tree gate deployment completed with 15 OK, 3 changed and no
 failures. Redeployment from this immutable implementation ref, followed by the
 final isolation and healthy-login checks, is pending restored private management.
@@ -71,6 +73,19 @@ docker start hou1-netbird-test-netbird-server-1
 docker exec pearlandpaws-test-nginx-1 nginx -t
 docker exec pearlandpaws-test-nginx-1 nginx -s reload
 ```
+
+At the 20:44 UTC follow-up, the operator confirmed these commands had been run,
+but public API remained 502 and private SSH remained unavailable. Container-status,
+Nginx validation and an in-container upstream HTTP check were requested; their
+results are pending. No root cause or successful console recovery is inferred.
+The dashboard still returns 200 independently of the failed API.
+
+During follow-up, a controller regression was corrected: omitted host samples
+now retain existing firing state while the independent unreachable-host rule
+reports the management outage. The regression check proves no false resolution
+and a resolved receipt after a later healthy sample. The committed controller
+program was installed and its digest verified against the checkout; this change
+does not repair or claim to repair the VPN.
 
 After recovery, diagnose and correct the cause, stop the monitor timer during
 faults, repeat the NetBird drill, and require firing plus resolved receipts and
