@@ -1,11 +1,11 @@
 {
-  "recorded_at": "2026-11-06T20:50:24.711903+00:00",
+  "recorded_at": "2026-11-06T21:14:14.310471+00:00",
   "environment": "isolated test",
   "issues": [
     "hou1-iac#27",
     "pearland-paws#39"
   ],
-  "implementation_ref": "34ba80f769f0ec697c17755b2ee5093570f32a03",
+  "implementation_ref": "6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09",
   "implementation_ref_redeploy": "pending private-management recovery; earlier working-tree role was applied successfully",
   "base_infra_ref": "8db0d2563ce314498a4a4840538fe5a1c720de81",
   "staff_ref": "af9a46b3f3b7a96543481c82979fe4068bc01f4c",
@@ -13,7 +13,7 @@
   "netbird_version": "0.82.0",
   "repository_checks": {
     "infrastructure": {
-      "passed": 86,
+      "passed": 88,
       "skipped": 1,
       "failed": 0
     },
@@ -248,9 +248,10 @@
       "dns_credentials_shipped": false
     },
     "monitor": {
-      "last_recorded_at": "2026-11-06T20:49:00.425779+00:00",
+      "last_recorded_at": "2026-11-06T21:13:24.589932+00:00",
       "failed_rules": [
         "public_netbird_api",
+        "public_authentik_discovery",
         "host_reachable",
         "vpn_management",
         "vpn_signal",
@@ -277,7 +278,10 @@
     "tls-dry-run.log": "16ac7056b29c2ede4564c17882a5c08a0bdc160788fbc72eedfb4af2b4b2be2c",
     "tls-renew.log": "bb30a1b4e6e7f017c0c7f651e3fcd87d1e7ce983c6bc14fd5e0c2c96f5a4bb59",
     "post-outage-infra-tests.log": "8f629eb4f6dc9f682a94a7175a36c15336aa6cbd7f295117af44b4092fbe5432",
-    "alert-state-regression.log": "f710c586535ef288ddd7864d254f452b00b5c25afe7a86ab7e7ea20affa50c0b"
+    "alert-state-regression.log": "f710c586535ef288ddd7864d254f452b00b5c25afe7a86ab7e7ea20affa50c0b",
+    "cached-geo-recovery-proof.json": "a3510e5bf6879e45f1f50edd7ed5ec695bb22cc2cc787b0aefbc182d220c3eae",
+    "cached-geo-focused-tests-final.log": "ac7da35ccf73bc98347ca039c418ed5c943eb543653bb60dbb21f9694096a846",
+    "cached-geo-infra-tests.log": "1bc0b47454710f230ac726dfc1f99c6b38af09a77b2388986a7aa13bf9ed55c4"
   },
   "implementation_sha256": {
     "scripts/rehearsal-controller-tls.py": "1f3f7c4b9520e2e21f1f8491214fb1ebc7324ae8668be08954e7e30b51b9d2a3",
@@ -289,7 +293,12 @@
     "scripts/install-rehearsal-monitor.py": "bab2f552df09a68abc474d844437482bad1db1cdc73931a5b10eda385a843863",
     "scripts/rehearsal-isolation-drill.py": "09d1bced8cff69f640a9b6937f2b72bd6310292e3f38d89f5baebf31321cb079",
     "ansible/playbooks/roles/rehearsal_gates/files/probe.py": "db85fcb04e5a7e899fa62d7d1bcec7d5825e0ee72b3334aa7f8356b818a435db",
-    "ansible/playbooks/roles/rehearsal_gates/files/isolation.py": "4ad13ec33ab06485af7b9a7b2a773da681aa30e6d0b73b8cc9130614357d7c8f"
+    "ansible/playbooks/roles/rehearsal_gates/files/isolation.py": "4ad13ec33ab06485af7b9a7b2a773da681aa30e6d0b73b8cc9130614357d7c8f",
+    "ansible/playbooks/roles/netbird_control_plane/tasks/main.yml": "5919216a056bc01a997f515b4d1551cf0bd77aa3b6343934648f137e01983a30",
+    "ansible/playbooks/roles/netbird_control_plane/tasks/rehearsal-cache.yml": "3a9e7e3f0b68e8a4b732c1081f350020ada3bb783b4cf67014f3084d81d5c826",
+    "ansible/playbooks/roles/netbird_control_plane/templates/config.yaml.j2": "2e22d041688783ec32c6c247c4ed78ee69b76569a2f8fc142dd83e623827b6bd",
+    "ansible/playbooks/roles/netbird_control_plane/templates/config-authentik.yaml.j2": "c2a3b5f38d6986ea6b74a5b8ada23a742f8a70740d868a695a9435acc2d986d4",
+    "ansible/playbooks/roles/rehearsal_gates/tasks/main.yml": "be76fbae5030fcd119756bc881e321433764e76c556573fb2cba13ae48bf92e0"
   },
   "production_approval": false,
   "controller_followup": {
@@ -299,8 +308,8 @@
     "console_recovery_commands_confirmed_run": true,
     "post_commands_api_status": 502,
     "private_ssh_recovered": false,
-    "status_diagnostics": "screenshots received: server crash loop exit 1, Nginx valid, upstream name unavailable; filtered startup fatal requested",
-    "root_cause": "unconfirmed",
+    "status_diagnostics": "fatal startup and exit/OOM screenshots received; cached-only startup repair awaiting console application",
+    "root_cause": "confirmed: NetBird startup geolocation HEAD blocked by workload default deny",
     "full_infra_tests": {
       "passed": 86,
       "skipped": 1,
@@ -320,5 +329,44 @@
       "083b6776a0d2da0bb171293f6b48163253bfc96b825754a9c9d4bf3b1a89ef90",
       "528818b3221b6b1049f2cc559cc93cc732f9e504aab0889f5f5fa2b27807a389"
     ]
+  },
+  "geolocation_startup_followup": {
+    "recovery_edit": "passed against encrypted backup configuration; only server.disableGeoliteUpdate changes",
+    "idempotent": true,
+    "config_mode_preserved": "0600",
+    "existing_cache_files": [
+      {
+        "filename": "GeoLite2-City_20261013.mmdb",
+        "bytes": 50883239
+      },
+      {
+        "filename": "geonames_20261013.db",
+        "bytes": 6946816
+      }
+    ],
+    "network_policy_changed": false,
+    "geolocation_disabled": false,
+    "netbird_version": "0.82.0",
+    "live_recovery": "pending console application",
+    "implementation_ref": "6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09",
+    "diagnosis": "NetBird startup GeoLite download HEAD is rejected by default-deny workload egress",
+    "oom_killed": false,
+    "exit_code": 1,
+    "endpoint": "https://pkgs.netbird.io/geolocation-dbs/GeoLite2-City/download?suffix=tar.gz",
+    "blocked_by_explicit_production_set": false,
+    "console_application": "requested; private access still unavailable",
+    "focused_tests": {
+      "passed": 7,
+      "failed": 0
+    },
+    "screenshot_sha256": [
+      "e27505ea12353cbf45d214f7531f0d4cbcb498d814e8dcf2d6ac603e81d5a61d",
+      "334d2a03d7436bbcf206dffb439aaa8b19e94e94e79b0e327fc9688a28055b1b"
+    ],
+    "full_infra_tests": {
+      "passed": 88,
+      "skipped": 1,
+      "failed": 0
+    }
   }
 }

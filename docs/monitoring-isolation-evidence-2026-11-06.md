@@ -4,7 +4,9 @@ Paired rollout issues: infrastructure #27 and staff #39. This is a partial gate
 report. **NetBird is currently unavailable after its outage drill; provider-console
 recovery is required.** Production is unchanged and promotion is not approved.
 
-Implementation candidate: `34ba80f769f0ec697c17755b2ee5093570f32a03`.
+Implementation candidate: `6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09`.
+This includes the cached-geolocation startup correction and the controller code
+`34ba80f769f0ec697c17755b2ee5093570f32a03`.
 This includes the controller alert-state follow-up to the initial gate code
 `41b1a26f185a4f57c864054a11cdf73272d702a3`.
 The earlier working-tree gate deployment completed with 15 OK, 3 changed and no
@@ -63,7 +65,8 @@ The 20:31 UTC NetBird drill delivered its firing event after two failed samples.
 A local 150-second Docker-start recovery job had been armed before shutdown.
 Public API still returned 502 and the VPN/SSH path did not recover within the
 runner's additional 240-second management deadline. No resolved event or recovery
-pass is recorded. The cause is unconfirmed; do not infer an upgrade requirement.
+pass is recorded. The later startup diagnosis and prepared fix are recorded below;
+no upgrade requirement is inferred.
 
 The operator was asked to run these commands in the provider console on
 `139.177.151.12`, where recovery does not depend on the failed VPN:
@@ -81,9 +84,37 @@ operator supplied screenshots: the NetBird server is `Restarting (1)`, the
 dashboard is up, Nginx configuration validation succeeds, and the upstream
 request reports `bad address hou1-netbird-server:80`. This confirms a server
 startup crash loop; an absent Docker DNS entry is consistent with that state.
-The filtered fatal startup error was requested to identify the underlying cause.
-No successful console recovery or upgrade requirement is inferred. The dashboard
-still returns 200 independently of the failed API.
+The initial fatal filter matched `FATA`, but the actual marker was `FATL`.
+A subsequent unfiltered startup excerpt identified the cause at 21:01 UTC:
+geolocation initialization makes a HEAD request to `pkgs.netbird.io` and exits
+when default-deny workload egress rejects it. Docker reports `exit=1 oom=false`.
+This is a startup dependency finding, not evidence of insufficient RAM. No
+successful recovery or upgrade requirement is inferred. The dashboard still
+returns 200 independently of the failed API.
+
+The 0.82.0 source confirms `server.disableGeoliteUpdate: true` selects existing
+cache files without the startup HEAD request when both databases exist. The
+encrypted test NetBird backup contains `GeoLite2-City_20261013.mmdb` (50,883,239
+bytes) and `geonames_20261013.db` (6,946,816 bytes). The console edit was tested
+against that backup's configuration: only the update flag changes, repeating the
+edit is idempotent, and mode 0600 is retained. Geolocation itself stays enabled.
+Both NetBird templates now set this flag only for the controller-managed isolated
+test. The NetBird role checks for both nonempty cache files before rendering;
+the gate role checks them before updating the flag or installing isolation.
+The production default and firewall destinations are unchanged. Cache refresh
+under isolation is outside this proof; these cached databases are dated October 13.
+
+The operator was asked to apply the prepared fix in the provider console:
+
+```bash
+sed -i '/^  disableGeoliteUpdate:/d; /^server:$/a\  disableGeoliteUpdate: true' /opt/hou1-netbird/config.yaml
+docker restart hou1-netbird-test-netbird-server-1
+```
+
+Console application, API/VPN recovery, immutable redeployment and a repeated
+NetBird firing/resolved drill remain pending. The focused seven-test gate suite
+passes, including rejection of absent/partial/empty caches and production/test
+configuration rendering. No successful live recovery is claimed yet.
 
 During follow-up, a controller regression was corrected: omitted host samples
 now retain existing firing state while the independent unreachable-host rule
@@ -103,7 +134,7 @@ root RPC helpers/recovery jobs after drills.
 
 ## Repository verification and remaining acceptance
 
-Infrastructure: **86 passed, one skipped, zero failures** using the existing real
+Infrastructure after the cache fix: **88 passed, one skipped, zero failures** using the existing real
 Nginx/Compose wrappers. Staff: **79 passed, zero failures**. Both new/updated
 playbooks passed syntax checks; Python parsing/undefined-name checks, YAML
 parsing, diff whitespace and exact-value candidate secret scan passed.
