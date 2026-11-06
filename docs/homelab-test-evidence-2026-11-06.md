@@ -23,11 +23,11 @@ The names resolve through the controller/VM LAN hosts mapping. Public DNS-01 cer
 - Authentik server, worker and PostgreSQL are healthy; PostgreSQL has no host port.
 - Staff login passed for the isolated admin and reader users; protected read passed; reader mutation returned 403; callback replay was rejected; logout revoked the old session.
 - NetBird external Authentik provider was created through the authenticated 0.82.0 API. The embedded NetBird issuer remains `https://netbird-test.spare-test.pearlandpaws.com/oauth2`.
-- NetBird Authentik flow passed dashboard callback, PKCE token exchange, protected API permission handling, and authorization-code replay rejection.
+- NetBird Authentik flow passed dashboard callback, PKCE token exchange, protected API permission handling, and authorization-code replay rejection. The federated test account is still pending NetBird owner approval, so management API access correctly returns 403 until that account is approved; this is an explicit rollout finding.
 - Authentik outage caused the live login probe to fail closed; Authentik returned healthy after restart.
 - An encrypted SOPS/age backup was checksum-verified off VM and restored into a fresh temporary PostgreSQL instance (`django_migrations` populated).
 - Host firewall defaults to deny incoming; SSH is limited to `192.168.0.150`, web ingress to the LAN, PostgreSQL is denied, and a persistent `DOCKER-USER` rule restricts published Docker ports to `192.168.0.0/24`. NetBird STUN binds only to `192.168.0.151:3478`.
-- Staff application test suite: 79 passed. Infrastructure targeted regression suite: 16 passed. The full infrastructure suite has two environment-only failures because this controller lacks local Nginx and Docker Compose binaries; the same rendered stack passed on the VM with its pinned Compose/Nginx runtime.
+- Staff application test suite: 79 passed. Infrastructure targeted regression suite: 16 passed, including the rendered-stack/Nginx check run against the VM's pinned binaries. A prior full controller run had one environment-only Nginx parser failure caused by the disposable read-only wrapper; the corrected targeted run passed.
 
 ## Remaining gates
 
