@@ -7,7 +7,7 @@ this is not production approval.
 
 ## Deployment inputs and access
 
-- Infrastructure: 8db0d25 on `issue-27-homelab-rehearsal`.
+- Infrastructure: `8db0d2563ce314498a4a4840538fe5a1c720de81` on `issue-27-homelab-rehearsal`.
 - Staff: `af9a46b3f3b7a96543481c82979fe4068bc01f4c` on `issue-39-homelab-rehearsal`.
 - Authentik `2025.10.4`, PostgreSQL `16.6-alpine`, NetBird server `0.82.0`,
   dashboard `v2.96.0`, Nginx `1.28.0-alpine`, Certbot DNS plugin `v5.1.0`.
@@ -39,8 +39,9 @@ production peer or production account is connected to it.
   Staff suite: 79 passed, zero failures.
 
 - Full `rehearse-vps.yml` run through the test VPN: 231 tasks OK, 11 changed,
-  31 skipped, zero failures. Subsequent test DNS policy repair was applied and
-  checked over both transports. The bootstrap, NetBird enrollment, access
+  31 skipped, zero failures. The final run used an archive of that exact pushed ref,
+  including the test DNS policy repair. Both final staff and NetBird login
+  probes passed after this rerun. The bootstrap, NetBird enrollment, access
   hardening, and capacity/firewall runs also completed successfully.
 - Capacity: RAM, CPU, disk and free-inode gates passed. The inode check uses the
   free count. The existing I/O check proves that `iostat` can run, not sustained
@@ -100,6 +101,10 @@ ansible-playbook -i /var/tmp/hou1-vps-test/management.yml \
   ansible/playbooks/rehearse-vps.yml
 
 ssh -F /var/tmp/hou1-vps-test/ssh_config hou1-vps-test 'sudo -n true'
+
+# Retrieve isolated test logins interactively; do not copy them into evidence.
+ssh -t -F /var/tmp/hou1-vps-test/ssh_config hou1-vps-test \
+  sudo /usr/local/sbin/hou1-vps-test-credentials
 ```
 
 `rehearse-vps.yml` requires a single isolated host, a full staff commit SHA, a
