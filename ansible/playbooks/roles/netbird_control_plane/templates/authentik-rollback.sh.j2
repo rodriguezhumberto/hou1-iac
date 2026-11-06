@@ -1,0 +1,14 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+control={{ netbird_control_plane_directory | quote }}
+backup={{ netbird_backup_directory | quote }}
+project={{ netbird_control_plane_project | quote }}
+snapshot=${1:-$(find "$backup" -mindepth 1 -maxdepth 1 -type d -name 'authentik-cutover-*' -printf '%T@ %p\n' | sort -nr | awk 'NR == 1 {print $2}')}
+[[ -n "$snapshot" && -f "$snapshot/config.yaml" && -f "$snapshot/dashboard.env" ]] || { echo 'no cutover snapshot found' >&2; exit 1; }
+docker compose -p "$project" -f "$control/compose.yaml" stop netbird-server dashboard
+cp -f -- "$snapshot/config.yaml" "$control/config.yaml"
+cp -f -- "$snapshot/dashboard.env" "$control/dashboard.env"
+docker compose -p "$project" -f "$control/compose.yaml" up -d --wait --wait-timeout 120
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "https://{{ netbird_domain }}/api/instance" >/dev/null
+printf 'rollback=passed\nsnapshot=%s\nembedded_issuer=https://{{ netbird_domain }}/oauth2\n' "$snapshot"

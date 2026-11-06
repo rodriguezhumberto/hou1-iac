@@ -1,0 +1,25 @@
+# External Authentik provider for the pinned NetBird 0.82.0 combined server.
+server:
+  listenAddress: ":80"
+  exposedAddress: "https://{{ netbird_domain }}:443"
+  stunPorts: [3478]
+  metricsPort: 9090
+  healthcheckAddress: ":9000"
+  logLevel: info
+  logFile: console
+  authSecret: {{ netbird_control_plane_secrets.relay_auth_secret | to_json }}
+  dataDir: /var/lib/netbird
+  auth:
+    issuer: "{{ netbird_authentik_issuer }}"
+    signKeyRefreshEnabled: true
+    sessionCookieEncryptionKey: {{ netbird_control_plane_secrets.cookie_encryption_key | to_json }}
+    dashboardRedirectURIs:
+      - "https://{{ netbird_domain }}/nb-auth"
+      - "https://{{ netbird_domain }}/nb-silent-auth"
+    cliRedirectURIs: ["http://localhost:53000/"]
+  reverseProxy:
+    trustedHTTPProxies: ["{{ netbird_ingress_proxy_ip }}/32"]
+    trustedPeers: ["{{ netbird_ingress_proxy_ip }}/32"]
+  store:
+    engine: sqlite
+    encryptionKey: {{ netbird_control_plane_secrets.store_encryption_key | to_json }}
