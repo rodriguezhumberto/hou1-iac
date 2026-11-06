@@ -107,6 +107,39 @@
         argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, /opt/hou1-test-source/staff.bundle, 'refs/heads/issue-39-homelab-rehearsal:refs/heads/rehearsal']
       changed_when: false
 
+    - name: Import fresh test certificate seeds only after materializing the app checkout
+      when:
+        - node_bootstrap | bool
+        - rehearsal_controller_managed_tls | default(false) | bool
+        - rehearsal_seed_directory | default('') | length > 0
+      block:
+        - name: Clone the pinned application before creating its runtime certificate directory
+          ansible.builtin.git:
+            repo: "{{ app_repo_pat }}"
+            dest: "{{ app_directory }}"
+            version: "{{ deploy_ref }}"
+            update: true
+            force: true
+          no_log: true
+
+        - name: Create the fresh checkout's private certificate directory
+          ansible.builtin.file:
+            path: "{{ app_directory }}/certbot/conf"
+            state: directory
+            owner: root
+            group: root
+            mode: '0700'
+
+        - name: Import only the host-encrypted issued test certificate state
+          ansible.builtin.shell: |
+            set -euo pipefail
+            age --decrypt --identity {{ authentik_age_key_file | quote }} \
+              /opt/hou1-test-source/bootstrap-seeds/certificates.tar.gz.age \
+              | tar --extract --gzip --file - --directory {{ (app_directory ~ '/certbot/conf') | quote }} --no-same-owner
+          args:
+            executable: /bin/bash
+          no_log: true
+
     - name: Create Authentik ingress before the app attaches its external network
       community.docker.docker_network:
         name: "{{ authentik_test_network }}"

@@ -79,7 +79,8 @@ inventory and `rehearsal_seed_directory`. The entry point refuses production,
 existing identity databases, shared controller keys and unrestricted SSH CIDRs.
 It permits temporary key-only SSH from the controller's single address while
 the stack is rebuilt. Run the full pinned rehearsal, enroll the isolated admin
-peer, apply the private gate and prove a cold NetBird restart. Then run the
+peer, apply the private gate and prove a cold NetBird restart. The issued certificate seed stays encrypted until the full rehearsal clones
+the application; runtime directories must not precede that first clone. Then run the
 existing security role, verify private SSH, and remove the temporary bootstrap
 SSH rule and drop-in. Public SSH must be closed before accepting the final gate.
 

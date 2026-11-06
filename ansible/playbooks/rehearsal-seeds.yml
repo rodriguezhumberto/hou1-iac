@@ -93,7 +93,6 @@
       loop:
         - /root/.config/sops/age
         - /opt/hou1-test-source/bootstrap-seeds
-        - "{{ app_directory }}/certbot/conf"
         - "{{ netbird_control_plane_directory }}"
 
     - name: Install only the host-specific age identity
@@ -115,7 +114,7 @@
       loop: [certificates, netbird]
       no_log: true
 
-    - name: Import the issued test certificates and offline NetBird cache
+    - name: Import only the offline NetBird cache before the application checkout
       ansible.builtin.shell: |
         set -euo pipefail
         age --decrypt --identity {{ authentik_age_key_file | quote }} \
@@ -124,7 +123,6 @@
       args:
         executable: /bin/bash
       loop:
-        - {name: certificates, destination: "{{ app_directory }}/certbot/conf"}
         - {name: netbird, destination: "{{ netbird_control_plane_directory }}"}
       no_log: true
 
