@@ -299,12 +299,26 @@
     "console_recovery_commands_confirmed_run": true,
     "post_commands_api_status": 502,
     "private_ssh_recovered": false,
-    "status_diagnostics": "awaiting operator output",
+    "status_diagnostics": "screenshots received: server crash loop exit 1, Nginx valid, upstream name unavailable; filtered startup fatal requested",
     "root_cause": "unconfirmed",
     "full_infra_tests": {
       "passed": 86,
       "skipped": 1,
       "failed": 0
     }
+  },
+  "console_screenshot_findings": {
+    "observed_at_controller_utc": "2026-11-06T20:53:37.966416+00:00",
+    "source": "operator provider-console screenshots",
+    "netbird_server_status": "Restarting (1)",
+    "netbird_dashboard_status": "Up 10 hours",
+    "nginx_configuration_test": "successful",
+    "nginx_to_api_probe": "wget: bad address hou1-netbird-server:80",
+    "startup_error": "pending filtered fatal message",
+    "root_cause": "unconfirmed; container startup failure confirmed",
+    "screenshot_sha256": [
+      "083b6776a0d2da0bb171293f6b48163253bfc96b825754a9c9d4bf3b1a89ef90",
+      "528818b3221b6b1049f2cc559cc93cc732f9e504aab0889f5f5fa2b27807a389"
+    ]
   }
 }

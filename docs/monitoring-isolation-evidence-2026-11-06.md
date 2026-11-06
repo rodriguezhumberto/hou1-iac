@@ -76,9 +76,14 @@ docker exec pearlandpaws-test-nginx-1 nginx -s reload
 
 At the 20:44 UTC follow-up, the operator confirmed these commands had been run,
 but public API remained 502 and private SSH remained unavailable. Container-status,
-Nginx validation and an in-container upstream HTTP check were requested; their
-results are pending. No root cause or successful console recovery is inferred.
-The dashboard still returns 200 independently of the failed API.
+Nginx validation and an in-container upstream HTTP check were requested. The
+operator supplied screenshots: the NetBird server is `Restarting (1)`, the
+dashboard is up, Nginx configuration validation succeeds, and the upstream
+request reports `bad address hou1-netbird-server:80`. This confirms a server
+startup crash loop; an absent Docker DNS entry is consistent with that state.
+The filtered fatal startup error was requested to identify the underlying cause.
+No successful console recovery or upgrade requirement is inferred. The dashboard
+still returns 200 independently of the failed API.
 
 During follow-up, a controller regression was corrected: omitted host samples
 now retain existing firing state while the independent unreachable-host rule
