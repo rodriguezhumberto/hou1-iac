@@ -34,6 +34,18 @@ alert if a known production name moves outside the configured deny set. A
 reserved currently nonexistent name is recorded explicitly and checked again.
 This is an address-based network policy, not an HTTP hostname proxy.
 
+NetBird 0.82.0 normally checks its geolocation download endpoint at startup,
+even when databases already exist. Before enforcing isolation, the rehearsal
+requires nonempty `GeoLite2-City_*.mmdb` and `geonames_*.db` files in its existing
+data directory. Restore them from the encrypted test NetBird backup or retain
+the files from the initial test bootstrap. Both configuration templates and
+the gate role set `server.disableGeoliteUpdate: true` for controller-managed
+isolated rehearsals. Geolocation remains enabled against those cached files;
+the workload needs no package-host egress exception. Missing/empty cache fails
+the gate before configuration or firewall changes. Production defaults are
+unchanged. Cache dates and recovery/startup evidence must be recorded; this
+does not validate automatic database refresh under isolation.
+
 DNS capability stays on the trusted controller. The fixture preparation command
 creates a different host age identity, re-encrypts application-only SOPS data,
 removes both plaintext DNS files, and updates the private inventory/recovery

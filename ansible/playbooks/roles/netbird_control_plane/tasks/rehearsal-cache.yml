@@ -1,0 +1,21 @@
+---
+- name: Restrict offline geolocation cache handling to the isolated rehearsal
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test'
+      - rehearsal_controller_managed_tls | bool
+    fail_msg: Cached-only geolocation is an isolated rehearsal setting.
+
+- name: Find the existing offline NetBird geolocation databases
+  ansible.builtin.find:
+    paths: "{{ netbird_control_plane_directory }}/data"
+    patterns: "{{ item }}"
+    file_type: file
+    size: '1'
+  loop: ['GeoLite2-City_*.mmdb', 'geonames_*.db']
+  register: rehearsal_netbird_geo_cache
+
+- name: Require both nonempty geolocation databases before denying update traffic
+  ansible.builtin.assert:
+    that: rehearsal_netbird_geo_cache.results | map(attribute='matched') | min | int > 0
+    fail_msg: Restore both geolocation databases from the encrypted test NetBird backup before enforcing isolation.

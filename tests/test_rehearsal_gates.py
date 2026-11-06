@@ -17,6 +17,109 @@ MONITOR = runpy.run_path(str(ROOT / "scripts/rehearsal-monitor.py"))
 
 
 class RehearsalGateTest(unittest.TestCase):
+    def test_cached_geolocation_requires_both_nonempty_databases(self):
+        tasks = [
+            {
+                "ansible.builtin.import_tasks": str(
+                    ROOT
+                    / "ansible/playbooks/roles/netbird_control_plane/tasks/rehearsal-cache.yml"
+                )
+            }
+        ]
+        with tempfile.TemporaryDirectory() as directory:
+            plays = []
+            for label, entries, valid in [
+                ("missing", {}, False),
+                ("partial", {"GeoLite2-City_20261013.mmdb": b"db"}, False),
+                (
+                    "empty",
+                    {"GeoLite2-City_20261013.mmdb": b"db", "geonames_20261013.db": b""},
+                    False,
+                ),
+                (
+                    "complete",
+                    {
+                        "GeoLite2-City_20261013.mmdb": b"db",
+                        "geonames_20261013.db": b"db",
+                    },
+                    True,
+                ),
+            ]:
+                root = Path(directory) / label
+                (root / "data").mkdir(parents=True)
+                for name, content in entries.items():
+                    (root / "data" / name).write_bytes(content)
+                plays.append(
+                    guard_play(
+                        {
+                            "cms_environment": "test",
+                            "rehearsal_controller_managed_tls": True,
+                            "netbird_control_plane_directory": str(root),
+                        },
+                        tasks,
+                        None
+                        if valid
+                        else "Require both nonempty geolocation databases before denying update traffic",
+                    )
+                )
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_only_isolated_rehearsal_renders_cached_geolocation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            tasks = [
+                {
+                    "ansible.builtin.copy": {
+                        "dest": directory + "/{{ fixture_name }}-{{ item }}.yaml",
+                        "content": "{{ lookup('template', '"
+                        + str(
+                            ROOT
+                            / "ansible/playbooks/roles/netbird_control_plane/templates"
+                        )
+                        + "/' + item + '.yaml.j2') }}",
+                    },
+                    "loop": ["config", "config-authentik"],
+                }
+            ]
+            plays = []
+            for name, environment, flag in [
+                ("test", "test", True),
+                ("ordinary-test", "test", False),
+                ("production", "prod", False),
+            ]:
+                plays.append(
+                    {
+                        "variables": {
+                            "fixture_name": name,
+                            "cms_environment": environment,
+                            "rehearsal_controller_managed_tls": flag,
+                            "netbird_domain": "netbird.example.org",
+                            "netbird_authentik_issuer": "https://auth.example.org/application/o/netbird/",
+                            "netbird_control_plane_secrets": {
+                                k: "fixture-only"
+                                for k in [
+                                    "relay_auth_secret",
+                                    "cookie_encryption_key",
+                                    "store_encryption_key",
+                                ]
+                            },
+                        },
+                        "tasks": tasks,
+                    }
+                )
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for name in ["test", "ordinary-test", "production"]:
+                for template in ["config", "config-authentik"]:
+                    config = yaml.safe_load(
+                        (Path(directory) / f"{name}-{template}.yaml").read_text()
+                    )
+                    self.assertEqual(
+                        config["server"].get("disableGeoliteUpdate"),
+                        True if name == "test" else None,
+                    )
+                    self.assertNotIn("NB_DISABLE_GEOLOCATION", str(config))
+
     def config(self):
         return {
             "environment": "test",
