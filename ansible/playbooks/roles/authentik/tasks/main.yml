@@ -86,3 +86,72 @@
       - authentik_compose_ps.stdout is search('authentik-worker')
       - authentik_compose_ps.stdout is not search('0\.0\.0\.0:5432|:::5432')
     fail_msg: Authentik Compose did not start healthy or PostgreSQL has a public listener.
+
+- name: Derive the environment-specific public Authentik hostname
+  ansible.builtin.set_fact:
+    authentik_domain: "{{ 'auth-test.' ~ primary_domain if authentik_environment == 'test' else 'auth.' ~ primary_domain }}"
+    authentik_server_alias: "authentik-server-{{ authentik_environment }}"
+
+- name: Require the existing Nginx ingress mount before publishing Authentik
+  ansible.builtin.stat:
+    path: "{{ netbird_control_plane_directory }}/nginx-include.conf"
+  register: authentik_ingress_include
+
+- name: Refuse to publish an ingress that Nginx cannot load
+  ansible.builtin.assert:
+    that: authentik_ingress_include.stat.exists
+    fail_msg: Deploy the existing Nginx/NetBird ingress integration before Authentik DNS and TLS.
+
+- name: Check the environment-specific Authentik certificate
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/certbot/conf/live/{{ authentik_domain }}/fullchain.pem"
+  register: authentik_certificate
+
+- name: Obtain the Authentik DNS-01 certificate
+  ansible.builtin.command:
+    argv:
+      - docker
+      - run
+      - --rm
+      - -v
+      - "{{ app_directory }}/certbot/conf:/etc/letsencrypt"
+      - -v
+      - "{{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro"
+      - "{{ authentik_certbot_image }}"
+      - certonly
+      - --non-interactive
+      - --agree-tos
+      - --email
+      - "{{ letsencrypt_email }}"
+      - --dns-cloudflare
+      - --dns-cloudflare-credentials
+      - /cloudflare.ini
+      - --dns-cloudflare-propagation-seconds
+      - '20'
+      - --cert-name
+      - "{{ authentik_domain }}"
+      - -d
+      - "{{ authentik_domain }}"
+  when: not authentik_certificate.stat.exists
+  no_log: true
+
+- name: Render the Authentik Nginx virtual host
+  ansible.builtin.template:
+    src: nginx.conf.j2
+    dest: "{{ authentik_ingress_directory }}/authentik-{{ authentik_environment }}.conf"
+    owner: root
+    group: root
+    mode: '0644'
+  register: authentik_nginx_config
+
+- name: Validate Nginx before reload
+  ansible.builtin.command: docker compose exec -T nginx nginx -t
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
+
+- name: Reload Nginx after publishing the Authentik virtual host
+  ansible.builtin.command: docker compose exec -T nginx nginx -s reload
+  args:
+    chdir: "{{ app_directory }}"
+  when: authentik_nginx_config.changed
