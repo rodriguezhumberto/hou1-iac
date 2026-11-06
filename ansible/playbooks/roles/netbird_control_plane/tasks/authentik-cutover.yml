@@ -1,0 +1,63 @@
+---
+- name: Refuse cutover unless the pinned compatibility spike passed
+  ansible.builtin.assert:
+    that:
+      - netbird_version == '0.82.0'
+      - netbird_authentik_cutover_enabled | bool
+      - netbird_authentik_compatibility_passed | default(false) | bool
+      - netbird_authentik_issuer is match('^https://[^/]+/application/o/[^/]+/$')
+      - netbird_authentik_client_id == 'netbird-prod'
+      - netbird_authentik_client_secret_file is match('^/')
+    fail_msg: >-
+      NetBird cutover is blocked. Run the exact 0.82.0 Authentik compatibility
+      spike and pass -e netbird_authentik_compatibility_passed=true.
+
+- name: Require the existing encrypted NetBird state and running server
+  ansible.builtin.stat:
+    path: "{{ item }}"
+  loop:
+    - "{{ netbird_control_plane_directory }}/data"
+    - "{{ netbird_control_plane_directory }}/secrets.json"
+    - "{{ netbird_control_plane_directory }}/config.yaml"
+    - "{{ netbird_control_plane_directory }}/dashboard.env"
+  register: netbird_cutover_state
+
+- name: Refuse a cutover that cannot preserve state
+  ansible.builtin.assert:
+    that: item.stat.exists
+    fail_msg: NetBird state is incomplete; restore the existing backup before cutover.
+  loop: "{{ netbird_cutover_state.results }}"
+
+- name: Render the tested external Authentik NetBird configuration
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ netbird_control_plane_directory }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0600'
+  loop:
+    - {src: config-authentik.yaml.j2, dest: config-authentik.yaml}
+    - {src: dashboard-authentik.env.j2, dest: dashboard-authentik.env}
+  no_log: true
+
+- name: Install the reversible cutover and rollback scripts
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ netbird_control_plane_directory }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - {src: authentik-cutover.sh.j2, dest: authentik-cutover.sh}
+    - {src: authentik-rollback.sh.j2, dest: authentik-rollback.sh}
+  no_log: true
+
+- name: Execute the guarded reversible cutover with no data migration
+  ansible.builtin.command: "{{ netbird_control_plane_directory }}/authentik-cutover.sh"
+  environment:
+    NETBIRD_AUTHENTIK_ISSUER: "{{ netbird_authentik_issuer }}"
+    NETBIRD_AUTHENTIK_CLIENT_ID: "{{ netbird_authentik_client_id }}"
+    NETBIRD_AUTHENTIK_CLIENT_SECRET_FILE: "{{ netbird_authentik_client_secret_file }}"
+  register: netbird_cutover_result
+  changed_when: true
+  no_log: true

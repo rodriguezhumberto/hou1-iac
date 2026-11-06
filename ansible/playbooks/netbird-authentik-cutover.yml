@@ -1,0 +1,21 @@
+---
+- name: Reversibly cut NetBird 0.82.0 over to Authentik
+  hosts: netbird_control_plane
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  vars:
+    netbird_authentik_cutover_enabled: true
+  pre_tasks:
+    - name: Validate NetBird management
+      ansible.builtin.import_role:
+        name: netbird_common
+      tags: [always]
+    - name: Require the dedicated production target before any host changes
+      ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
+      tags: [always]
+  tasks:
+    - name: Run the guarded external OIDC cutover
+      ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/authentik-cutover.yml

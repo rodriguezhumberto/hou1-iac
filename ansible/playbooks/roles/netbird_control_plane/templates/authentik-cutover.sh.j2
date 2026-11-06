@@ -1,0 +1,44 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+control={{ netbird_control_plane_directory | quote }}
+backup={{ netbird_backup_directory | quote }}
+project={{ netbird_control_plane_project | quote }}
+issuer=${NETBIRD_AUTHENTIK_ISSUER:?NETBIRD_AUTHENTIK_ISSUER is required}
+client_id=${NETBIRD_AUTHENTIK_CLIENT_ID:?NETBIRD_AUTHENTIK_CLIENT_ID is required}
+secret_file=${NETBIRD_AUTHENTIK_CLIENT_SECRET_FILE:?NETBIRD_AUTHENTIK_CLIENT_SECRET_FILE is required}
+[[ -r "$secret_file" ]] || { echo 'NetBird client-secret file is unavailable' >&2; exit 1; }
+secret=$(awk -F= '$1 == "NETBIRD_OIDC_CLIENT_SECRET" {print substr($0, index($0, "=") + 1)}' "$secret_file")
+[[ ${#secret} -ge 32 ]] || { echo 'NetBird client secret is missing or too short' >&2; exit 1; }
+timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+snapshot="$backup/authentik-cutover-$timestamp"
+mkdir -p -m 0700 "$snapshot"
+failed=1
+restore_embedded() {
+  [[ -f "$snapshot/config.yaml" && -f "$snapshot/dashboard.env" ]] || return 0
+  cp -f -- "$snapshot/config.yaml" "$control/config.yaml"
+  cp -f -- "$snapshot/dashboard.env" "$control/dashboard.env"
+  docker compose -p "$project" -f "$control/compose.yaml" up -d --wait --wait-timeout 120 netbird-server dashboard || true
+}
+cleanup() {
+  if (( failed )); then
+    restore_embedded
+    printf 'cutover failed and embedded IdP was restored at %s\n' "$(date -u +%FT%TZ)" >"$snapshot/failed"
+  fi
+}
+trap cleanup EXIT
+
+docker compose -p "$project" -f "$control/compose.yaml" stop netbird-server dashboard
+cp -f -- "$control/config.yaml" "$snapshot/config.yaml"
+cp -f -- "$control/dashboard.env" "$snapshot/dashboard.env"
+tar -czf "$snapshot/netbird-state.tar.gz" -C "$control" data secrets.json
+cp -f -- "$control/config-authentik.yaml" "$control/config.yaml"
+sed "s|__NETBIRD_AUTHENTIK_CLIENT_SECRET__|$secret|g" "$control/dashboard-authentik.env" >"$control/dashboard.env"
+chmod 0600 "$control/config.yaml" "$control/dashboard.env"
+docker compose -p "$project" -f "$control/compose.yaml" up -d --wait --wait-timeout 120
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "https://{{ netbird_domain }}/api/instance" >/dev/null
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}.well-known/openid-configuration" | grep -q 'jwks_uri'
+docker compose -p "$project" -f "$control/compose.yaml" ps --status running -q netbird-server dashboard | grep -q .
+printf 'issuer=%s\nclient_id=%s\nembedded_snapshot=%s\nstate_archive=%s\nhealth=passed\n' "$issuer" "$client_id" "$snapshot" "$snapshot/netbird-state.tar.gz" >"$snapshot/success"
+failed=0
