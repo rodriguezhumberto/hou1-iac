@@ -1,0 +1,12 @@
+---
+- name: Bootstrap Authentik identity data for one isolated environment
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: true
+  vars:
+    authentik_environment: "{{ deploy_environment | default('test') }}"
+    authentik_secret_source: "{{ playbook_dir }}/../secrets/authentik-{{ authentik_environment }}.enc.yaml"
+    authentik_bootstrap_enabled: true
+    authentik_api_url: "https://{{ 'auth-test.' ~ primary_domain if authentik_environment == 'test' else 'auth.' ~ primary_domain }}"
+  roles:
+    - role: authentik
+      tags: [authentik, bootstrap, identity]

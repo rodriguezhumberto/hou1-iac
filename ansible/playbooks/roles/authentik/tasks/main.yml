@@ -211,6 +211,44 @@
       - authentik_compose_ps.stdout is not search('0\.0\.0\.0:5432|:::5432')
     fail_msg: Authentik Compose did not start healthy or PostgreSQL has a public listener.
 
+- name: Install the idempotent Authentik identity bootstrap utility
+  ansible.builtin.copy:
+    src: bootstrap.py
+    dest: "{{ authentik_project_root }}/bootstrap.py"
+    owner: root
+    group: root
+    mode: '0700'
+  when: authentik_bootstrap_enabled | bool
+
+- name: Render the isolated environment identity manifest
+  ansible.builtin.template:
+    src: "bootstrap-{{ authentik_environment }}.json.j2"
+    dest: "{{ authentik_project_root }}/bootstrap.json"
+    owner: root
+    group: root
+    mode: '0600'
+  when: authentik_bootstrap_enabled | bool
+
+- name: Apply Authentik groups, claims, scopes, users, and clients idempotently
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ authentik_project_root }}/bootstrap.py"
+      - --base-url
+      - "{{ authentik_api_url }}"
+      - --environment
+      - "{{ authentik_environment }}"
+      - --manifest
+      - "{{ authentik_project_root }}/bootstrap.json"
+  environment:
+    AUTHENTIK_BOOTSTRAP_TOKEN: "{{ authentik_bootstrap_token }}"
+    STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
+    NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
+  register: authentik_bootstrap_result
+  changed_when: true
+  when: authentik_bootstrap_enabled | bool
+  no_log: true
+
 - name: Derive the environment-specific public Authentik hostname
   ansible.builtin.set_fact:
     authentik_domain: "{{ 'auth-test.' ~ primary_domain if authentik_environment == 'test' else 'auth.' ~ primary_domain }}"
