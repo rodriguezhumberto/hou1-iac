@@ -1,0 +1,293 @@
+{
+  "recorded_at": "2026-11-06T20:39:44.028447+00:00",
+  "environment": "isolated test",
+  "issues": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ],
+  "implementation_ref": "41b1a26f185a4f57c864054a11cdf73272d702a3",
+  "implementation_ref_redeploy": "pending private-management recovery; earlier working-tree role was applied successfully",
+  "base_infra_ref": "8db0d2563ce314498a4a4840538fe5a1c720de81",
+  "staff_ref": "af9a46b3f3b7a96543481c82979fe4068bc01f4c",
+  "staff_image": "sha256:8dc72772a33a6ba570d9e5ecd5184001faded60bf254a4fd789cf324600c0c85",
+  "netbird_version": "0.82.0",
+  "repository_checks": {
+    "infrastructure": {
+      "passed": 86,
+      "skipped": 1,
+      "failed": 0
+    },
+    "staff": {
+      "passed": 79,
+      "failed": 0
+    },
+    "playbook_syntax": "passed",
+    "python_undefined_names": "passed",
+    "candidate_exact_value_secret_scan": "passed"
+  },
+  "reports": {
+    "isolation": {
+      "environment": "test",
+      "host_ipv4_targets": 11,
+      "host_ipv6_targets": 8,
+      "host_targets_denied": true,
+      "host_deny_counter_increase": 27,
+      "unapproved_host_egress_denied": true,
+      "workloads": [
+        {
+          "container": "hou1-authentik-test-authentik-server-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-authentik-test-authentik-worker-1",
+          "enforcement": "internal network without external route",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 101
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 101
+            }
+          },
+          "forward_counter_increase": 0
+        },
+        {
+          "container": "hou1-authentik-test-postgresql-1",
+          "enforcement": "internal network without external route",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 101
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 101
+            }
+          },
+          "forward_counter_increase": 0
+        },
+        {
+          "container": "pearlandpaws-test-nginx-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-netbird-test-netbird-server-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "hou1-netbird-test-dashboard-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        },
+        {
+          "container": "pearlandpaws-test-astro-app-1",
+          "enforcement": "nftables",
+          "checks": {
+            "production_ipv4": {
+              "blocked": true,
+              "errno": 113
+            },
+            "production_ipv6": {
+              "blocked": true,
+              "errno": 101
+            },
+            "unapproved_ipv4": {
+              "blocked": true,
+              "errno": 113
+            }
+          },
+          "forward_counter_increase": 2
+        }
+      ],
+      "ipv6_forwarding": "0"
+    },
+    "component_alerts": [
+      {
+        "component": "authentik",
+        "rule": "authentik_server",
+        "started_at": "2026-11-06T20:07:12.697794+00:00",
+        "finished_at": "2026-11-06T20:09:02.482058+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "cadence": "two immediate real probe samples; timer cadence tested separately"
+      },
+      {
+        "component": "postgresql",
+        "rule": "postgresql",
+        "started_at": "2026-11-06T20:09:02.482432+00:00",
+        "finished_at": "2026-11-06T20:10:25.187384+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "cadence": "two immediate real probe samples; timer cadence tested separately"
+      },
+      {
+        "component": "staff",
+        "rule": "staff_app",
+        "started_at": "2026-11-06T20:13:47.556325+00:00",
+        "finished_at": "2026-11-06T20:15:41.270592+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      },
+      {
+        "component": "nginx",
+        "rule": "public_nginx",
+        "started_at": "2026-11-06T20:26:41.204298+00:00",
+        "finished_at": "2026-11-06T20:31:14.510176+00:00",
+        "firing_received": true,
+        "resolved_received": true,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      },
+      {
+        "component": "netbird",
+        "rule": "public_netbird_api",
+        "started_at": "2026-11-06T20:31:46.804755+00:00",
+        "firing_received": true,
+        "resolved_received": false,
+        "recovery_prearmed_seconds": 150,
+        "failure_probe_samples": 2,
+        "result": "blocked: API 502 and private VPN management did not recover within local recovery deadline; provider-console recovery requested",
+        "cadence": "consecutive real probes after shutdown; timer cadence tested separately"
+      }
+    ],
+    "key_boundary": {
+      "environment": "test",
+      "host_key_cannot_decrypt_controller_bundle": true,
+      "host_key_cannot_decrypt_old_backup": true,
+      "host_ciphertext_excludes_dns_token": true,
+      "new_backup_fetched_verified": false,
+      "new_backup_full_restore_repeated": false
+    },
+    "tls_dry_run": {
+      "environment": "test",
+      "mode": "dry-run",
+      "certificate_lineages": 4,
+      "passed": true,
+      "dns_credentials_shipped": false
+    },
+    "tls_renew": {
+      "environment": "test",
+      "mode": "renew",
+      "certificate_lineages": 4,
+      "passed": true,
+      "dns_credentials_shipped": false
+    },
+    "monitor": {
+      "last_recorded_at": "2026-11-06T20:39:00.075445+00:00",
+      "failed_rules": [
+        "public_netbird_api",
+        "host_reachable",
+        "vpn_management",
+        "vpn_signal",
+        "vpn_peer",
+        "staff_oidc_login"
+      ],
+      "pending_events": 0,
+      "receiver_bind": "127.0.0.1:18765",
+      "monitor_timer_enabled": true,
+      "controller_tls_timer_enabled": false,
+      "persistent_controller_runtime": true,
+      "linger": true,
+      "alert_receipt_count": 60,
+      "staff_login_specific_fault_drill": "pending recovery of private management"
+    }
+  },
+  "private_evidence_sha256": {
+    "isolation-drill-report.json": "052e0cb87e43aac36577cebfca71ffdfef7420f7622614a6979691d73e2f1375",
+    "alert-drill-report.json": "f462c252d2a7f2555a8bbb5598a72c3b571344e68e9655a2ad2b3535df8e920c",
+    "local-key-boundary-report.json": "46222d5a84e13ad190e929c797275fb4decb24b30f801d03904a79cb91142121",
+    "final-infra-tests.log": "07be0fa169ce47b38966fad2968c148b7826626a05287a31b781d0c30db6949c",
+    "final-staff-tests.log": "58739421a64c0a74299ccfd9944244f9214e514be61ff454ec7159ae85448cf7",
+    "ingress-netbird-alert-drills-verified.log": "6e29c9ec50cada58e1d6855289f01dd7441775000b31b7cc4e9b90b862bf02f4",
+    "tls-dry-run.log": "16ac7056b29c2ede4564c17882a5c08a0bdc160788fbc72eedfb4af2b4b2be2c",
+    "tls-renew.log": "bb30a1b4e6e7f017c0c7f651e3fcd87d1e7ce983c6bc14fd5e0c2c96f5a4bb59"
+  },
+  "implementation_sha256": {
+    "scripts/rehearsal-controller-tls.py": "1f3f7c4b9520e2e21f1f8491214fb1ebc7324ae8668be08954e7e30b51b9d2a3",
+    "scripts/rehearsal-monitor.py": "ce193b9ec4b83c9a136cb75c0cdec6528013bd9503cd383ca93ff582273f1ecf",
+    "scripts/rehearsal-staff-login-drill.py": "93e60d8d00508cafb68742eb4b280dcc7037e122aa2a9a5bc0f6b58d01f39ced",
+    "scripts/test-rollout-rehearsal.py": "5f1a15204f75abd10dc8b28ed78863abf373569c580ec2707b8c98f8fb66633d",
+    "scripts/prepare-rehearsal-host-secrets.py": "dd601c0c78d57eca6d756f0ce74ae301599e462e641d66f88e27b9dc7b2c4f6c",
+    "scripts/rehearsal-alert-drills.py": "51bd43187ab5dee4c05b8f152cbb3de8ee0f26aab1e62387f8aa9255a07d2d04",
+    "scripts/install-rehearsal-monitor.py": "bab2f552df09a68abc474d844437482bad1db1cdc73931a5b10eda385a843863",
+    "scripts/rehearsal-isolation-drill.py": "09d1bced8cff69f640a9b6937f2b72bd6310292e3f38d89f5baebf31321cb079",
+    "ansible/playbooks/roles/rehearsal_gates/files/probe.py": "db85fcb04e5a7e899fa62d7d1bcec7d5825e0ee72b3334aa7f8356b818a435db",
+    "ansible/playbooks/roles/rehearsal_gates/files/isolation.py": "4ad13ec33ab06485af7b9a7b2a773da681aa30e6d0b73b8cc9130614357d7c8f"
+  },
+  "production_approval": false
+}

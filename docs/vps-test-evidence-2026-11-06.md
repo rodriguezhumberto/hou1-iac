@@ -120,28 +120,26 @@ The restore and rollback probe scripts and exact diagnostic logs are retained
 in that private directory. The restore is a fresh application-state recovery
 on the same VPS with Docker/age already installed, not a provider-console or
 replacement-host rebuild test. `/mnt/offhost-backups` is on the VPS itself;
-only the controller copies demonstrate off-VPS protection. Scheduled transfer,
-offsite retention, and failure alert delivery are not yet validated.
+only the controller copies demonstrate off-VPS protection. At this initial
+rehearsal, scheduled transfer, offsite retention and alert delivery were unvalidated;
+see the later evidence below for the partial monitoring results.
 
-## Remaining gates
+## Later gate evidence and remaining acceptance
 
-- Repeat the complete mirrored security matrix against this VPS, especially
-  live JWKS rotation/overlap, missing groups, invalid-token variants, PKCE
-  failure, revocation policy, and shared-password/session migration. Existing
-  application tests cover these paths; the live checks above cover a subset.
-- Validate browser rendering and real user/CLI VPN enrollment and group
-  assignment, rather than only scripted OIDC and setup-key peer enrollment.
-- Reconcile issue #24's production cutover/rollback automation with the proven
-  external-provider approach. Its current issuer-swapping scripts were not
-  used or validated by this rehearsal. Keep the embedded issuer enabled.
-- Demonstrate test-to-production egress denial, provider-console emergency
-  access, automated offsite backups, monitoring/alert delivery, and storage
-  capacity under representative load. Test resources/credentials are separate;
-  production unreachability has not been demonstrated. The Cloudflare DNS API
-  credential was reused from the earlier authorized test secret set, rather
-  than minted specifically for this VPS. Isolate/replace that credential before
-  claiming complete production-secret separation.
-- Complete issues #28/#38 runbooks with the tested procedures, resolve or obtain
-  explicit acceptance of findings, then review production approval separately.
-  Reusing this host for production requires fresh production resources and
-  secrets; the present test data is not production state.
+The subsequent live security matrix is in infrastructure
+[PR #43](https://github.com/rodriguezhumberto/hou1-iac/pull/43), paired with staff
+[PR #49](https://github.com/rodriguezhumberto/pearland-paws/pull/49).
+[Monitoring/isolation evidence](monitoring-isolation-evidence-2026-11-06.md)
+records the later network/credential controls and private alert receipts.
+**Its NetBird outage drill failed recovery and currently requires provider-console
+intervention.** The four successful component recovery drills do not close that gate.
+
+Final immutable gate redeployment, the separate login-failure alert drill, new-key
+backup verification, healthy scheduled monitoring/TLS, representative storage
+load, console recovery, scheduled offsite retention and production alert routing
+remain open. The earlier backup/restore evidence above predates host-key separation.
+JWKS overlap and automatic IdP-to-app revocation limits from the security PRs
+also remain open. Browser rendering and alignment of #24 production cutover
+automation with the external-provider result still require review. Complete
+#28/#38 runbooks and obtain production approval
+separately; current test resources and secrets must not become production state.
