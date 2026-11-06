@@ -32,7 +32,7 @@
     "audience": "netbird-prod",
     "secret_env": "NETBIRD_OIDC_CLIENT_SECRET",
     "scopes": ["profile", "groups", "audience"],
-    "redirect_uris": ["https://netbird.{{ primary_domain }}/nb-auth", "https://netbird.{{ primary_domain }}/nb-silent-auth", "http://localhost:53000/"],
+    "redirect_uris": ["https://netbird.{{ primary_domain }}/oauth2/callback", "https://netbird.{{ primary_domain }}/nb-auth", "https://netbird.{{ primary_domain }}/nb-silent-auth", "http://localhost:53000/"],
     "logout_uris": ["https://netbird.{{ primary_domain }}/nb-auth"]
   }
 }
