@@ -62,6 +62,27 @@ authentik_min_free_inodes: 200000
 authentik_test_network: hou1-authentik-test
 authentik_prod_network: hou1-authentik-prod
 
+# Authentik Compose defaults. Secrets are supplied by the SOPS/age deployment
+# in issue #21 and are deliberately not committed here.
+authentik_image: ghcr.io/goauthentik/server:2025.10.4
+authentik_postgres_image: postgres:16.6-alpine
+authentik_compose_project_prefix: hou1-authentik
+authentik_project_root_base: /opt/hou1-authentik
+authentik_data_root_base: /var/lib/hou1-authentik
+authentik_postgres_uid: 999
+authentik_postgres_gid: 999
+authentik_container_uid: 1000
+authentik_container_gid: 1000
+authentik_server_cpus: '1.00'
+authentik_worker_cpus: '1.00'
+authentik_postgres_cpus: '1.00'
+authentik_server_memory: 1536M
+authentik_worker_memory: 1024M
+authentik_postgres_memory: 1024M
+authentik_server_pids: 256
+authentik_worker_pids: 256
+authentik_postgres_pids: 128
+
 # Controller-side encrypted API credential, separate from inventory secrets.
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
 netbird_token_vault_id: default

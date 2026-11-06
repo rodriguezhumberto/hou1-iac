@@ -1,0 +1,9 @@
+---
+- name: Deploy the isolated Authentik project
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: true
+  vars:
+    authentik_environment: "{{ deploy_environment | default('test') }}"
+  roles:
+    - role: authentik
+      tags: [authentik, deploy]

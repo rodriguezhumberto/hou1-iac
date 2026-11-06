@@ -1,0 +1,88 @@
+---
+- name: Derive environment-specific project names and roots
+  ansible.builtin.set_fact:
+    authentik_project_root: "{{ authentik_project_root_base }}/{{ authentik_environment }}"
+    authentik_data_root: "{{ authentik_data_root_base }}/{{ authentik_environment }}"
+    authentik_compose_project: "{{ authentik_compose_project_prefix }}-{{ authentik_environment }}"
+    authentik_ingress_network: "{{ authentik_test_network if authentik_environment == 'test' else authentik_prod_network }}"
+
+- name: Validate Authentik environment and isolated roots
+  ansible.builtin.assert:
+    that:
+      - authentik_environment in ['test', 'prod']
+      - authentik_project_root is match('^/opt/hou1-authentik/(test|prod)$')
+      - authentik_data_root is match('^/var/lib/hou1-authentik/(test|prod)$')
+      - authentik_compose_project is match('^hou1-authentik-(test|prod)$')
+      - authentik_postgres_password is defined and authentik_postgres_password | length >= 32
+      - authentik_secret_key is defined and authentik_secret_key | length >= 32
+    fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
+  no_log: true
+
+- name: Create the dedicated Authentik ingress network
+  community.docker.docker_network:
+    name: "{{ authentik_ingress_network }}"
+    state: present
+
+- name: Create persistent Authentik directories with restrictive ownership
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: '0750'
+  loop:
+    - {path: "{{ authentik_project_root }}", owner: root, group: root}
+    - {path: "{{ authentik_data_root }}", owner: root, group: root}
+    - {path: "{{ authentik_data_root }}/postgres", owner: "{{ authentik_postgres_uid }}", group: "{{ authentik_postgres_gid }}"}
+    - {path: "{{ authentik_data_root }}/media", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/templates", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/certs", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/config", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+
+- name: Render the private Authentik environment file
+  ansible.builtin.template:
+    src: authentik.env.j2
+    dest: "{{ authentik_project_root }}/authentik.env"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Render the pinned isolated Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ authentik_project_root }}/compose.yaml"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Validate the Authentik Compose model before startup
+  ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml config
+  args:
+    chdir: "{{ authentik_project_root }}"
+  changed_when: false
+
+- name: Start Authentik only after PostgreSQL health becomes ready
+  community.docker.docker_compose_v2:
+    project_src: "{{ authentik_project_root }}"
+    project_name: "{{ authentik_compose_project }}"
+    files: [compose.yaml]
+    state: present
+    wait: true
+    wait_timeout: 120
+
+- name: Inspect the running Authentik project
+  ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml ps --format json
+  args:
+    chdir: "{{ authentik_project_root }}"
+  register: authentik_compose_ps
+  changed_when: false
+
+- name: Require healthy Authentik services and no public database ports
+  ansible.builtin.assert:
+    that:
+      - authentik_compose_ps.stdout is search('postgresql')
+      - authentik_compose_ps.stdout is search('authentik-server')
+      - authentik_compose_ps.stdout is search('authentik-worker')
+      - authentik_compose_ps.stdout is not search('0\.0\.0\.0:5432|:::5432')
+    fail_msg: Authentik Compose did not start healthy or PostgreSQL has a public listener.
