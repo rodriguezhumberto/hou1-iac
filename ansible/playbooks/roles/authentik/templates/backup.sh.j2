@@ -1,0 +1,41 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+project={{ authentik_project_root | quote }}
+data_root={{ authentik_data_root | quote }}
+backup_root={{ authentik_backup_root | quote }}
+offhost_root={{ authentik_offhost_backup_root | quote }}
+project_name={{ authentik_compose_project | quote }}
+age_recipient=${AUTHENTIK_BACKUP_AGE_RECIPIENT:?AUTHENTIK_BACKUP_AGE_RECIPIENT is required}
+timestamp=$(date -u +%Y%m%dT%H%M%SZ)
+work=$(mktemp -d "${backup_root}/.working.${timestamp}.XXXXXX")
+archive="${backup_root}/authentik-${timestamp}.tar.gz.age"
+checksum="${archive}.sha256"
+success="${archive}.success"
+failure="${backup_root}/authentik-${timestamp}.failed"
+failed=1
+cleanup() {
+  rm -rf -- "$work"
+  if (( failed )); then
+    printf 'backup failed at %s\n' "$(date -u +%FT%TZ)" >"$failure"
+  fi
+}
+trap cleanup EXIT
+
+docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql \
+  pg_dump -U authentik -d authentik --format=plain --no-owner >"$work/postgresql.sql"
+tar --create --file "$work/persistent.tar" -C "$data_root" postgres media templates certs config
+cp -- "$project/compose.yaml" "$project/authentik.env" "$project/oidc-clients.env" "$work/"
+cp -- {{ authentik_secret_source | quote }} "$work/authentik-secrets.enc.yaml"
+tar --create --file - -C "$work" postgresql.sql persistent.tar compose.yaml authentik.env oidc-clients.env authentik-secrets.enc.yaml \
+  | gzip --stdout \
+  | age --encrypt --recipient "$age_recipient" --output "$archive"
+sha256sum "$archive" >"$checksum"
+age --decrypt "$archive" | gzip --decompress | tar --list >/dev/null
+install -m 0600 "$archive" "$offhost_root/"
+install -m 0600 "$checksum" "$offhost_root/"
+printf 'verified %s\n' "$(date -u +%FT%TZ)" >"$success"
+install -m 0600 "$success" "$offhost_root/"
+find "$backup_root" "$offhost_root" -maxdepth 1 -type f -mtime +{{ authentik_backup_retention_days | int }} -delete
+failed=0
