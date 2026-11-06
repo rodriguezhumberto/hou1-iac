@@ -5,6 +5,8 @@
     authentik_data_root: "{{ authentik_data_root_base }}/{{ authentik_environment }}"
     authentik_compose_project: "{{ authentik_compose_project_prefix }}-{{ authentik_environment }}"
     authentik_ingress_network: "{{ authentik_test_network if authentik_environment == 'test' else authentik_prod_network }}"
+    authentik_backup_root: "{{ authentik_backup_root_base }}/{{ authentik_environment }}"
+    authentik_offhost_backup_root: "{{ authentik_offhost_backup_root_base }}/{{ authentik_environment }}"
 
 - name: Validate Authentik environment and isolated roots
   ansible.builtin.assert:
@@ -39,6 +41,17 @@
     - {path: "{{ authentik_data_root }}/templates", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
     - {path: "{{ authentik_data_root }}/certs", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
     - {path: "{{ authentik_data_root }}/config", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+
+- name: Create local and off-host backup roots
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - "{{ authentik_backup_root }}"
+    - "{{ authentik_offhost_backup_root }}"
 
 - name: Decrypt SOPS/age secrets only for deployment and render root-only files
   block:
@@ -146,6 +159,26 @@
     owner: root
     group: root
     mode: '0644'
+
+- name: Install encrypted Authentik backup and restore commands
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ authentik_project_root }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - {src: backup.sh.j2, dest: backup.sh}
+    - {src: restore.sh.j2, dest: restore.sh}
+    - {src: restore-drill.sh.j2, dest: restore-drill.sh}
+  no_log: true
+
+- name: Schedule encrypted Authentik backups with failure reporting
+  ansible.builtin.cron:
+    name: "HOU1 Authentik {{ authentik_environment }} encrypted backup"
+    minute: "{{ authentik_backup_schedule_minute }}"
+    hour: "{{ authentik_backup_schedule_hour }}"
+    job: "{{ authentik_project_root }}/backup.sh >> /var/log/hou1-authentik-backup-{{ authentik_environment }}.log 2>&1"
 
 - name: Validate the Authentik Compose model before startup
   ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml config

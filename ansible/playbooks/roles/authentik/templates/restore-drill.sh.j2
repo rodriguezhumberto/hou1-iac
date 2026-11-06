@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+if [[ $# -ne 2 ]]; then
+  echo "usage: $0 ENCRYPTED_BACKUP EXPECTED_ISSUER" >&2
+  exit 2
+fi
+archive=$1
+issuer=$2
+started=$(date +%s)
+{{ authentik_project_root | quote }}/restore.sh "$archive"
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}.well-known/openid-configuration" >/dev/null
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}jwks/" >/dev/null
+finished=$(date +%s)
+printf 'duration_seconds=%s\nbackup=%s\nissuer=%s\nlogin=validated\ndiscovery=validated\njwks=validated\ngaps=record-in-runbook\n' "$((finished - started))" "$archive" "$issuer"

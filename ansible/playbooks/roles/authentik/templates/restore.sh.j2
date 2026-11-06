@@ -1,0 +1,29 @@
+#!/usr/bin/env bash
+set -euo pipefail
+umask 077
+
+if [[ $# -ne 1 ]]; then
+  echo "usage: $0 ENCRYPTED_BACKUP" >&2
+  exit 2
+fi
+archive=$1
+project={{ authentik_project_root | quote }}
+data_root={{ authentik_data_root | quote }}
+project_name={{ authentik_compose_project | quote }}
+export AGE_IDENTITIES=${AGE_KEY_FILE:?AGE_KEY_FILE must name the offline age identity}
+checksum="${archive}.sha256"
+[[ -f "$archive" && -f "$checksum" ]] || { echo 'backup or checksum is missing' >&2; exit 1; }
+sha256sum --check "$checksum"
+tmp=$(mktemp -d)
+cleanup() { rm -rf -- "$tmp"; }
+trap cleanup EXIT
+age --decrypt "$archive" | gzip --decompress | tar --extract --file - -C "$tmp"
+docker compose -p "$project_name" -f "$project/compose.yaml" stop authentik-server authentik-worker postgresql
+tar --extract --file "$tmp/persistent.tar" -C "$data_root"
+docker compose -p "$project_name" -f "$project/compose.yaml" start postgresql
+until docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql pg_isready -U authentik -d authentik >/dev/null 2>&1; do sleep 2; done
+docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -U authentik -d authentik -c 'DROP SCHEMA public CASCADE; CREATE SCHEMA public;' >/dev/null
+docker compose -p "$project_name" -f "$project/compose.yaml" exec -T postgresql psql -U authentik -d authentik <"$tmp/postgresql.sql"
+install -m 0600 "$tmp/authentik.env" "$project/authentik.env"
+install -m 0600 "$tmp/oidc-clients.env" "$project/oidc-clients.env"
+docker compose -p "$project_name" -f "$project/compose.yaml" up -d --wait --wait-timeout 120
