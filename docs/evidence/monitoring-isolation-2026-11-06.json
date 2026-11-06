@@ -397,5 +397,53 @@
       "prove NetBird cold restart, VPN and staff authentication",
       "harden SSH and complete remaining monitoring/recovery drills"
     ]
+  },
+  "fresh_rebuild": {
+    "recorded_at": "2026-11-06T22:56:45.139310+00:00",
+    "environment": "isolated test replacement VPS",
+    "host": "139.177.151.12",
+    "host_fingerprint": "SHA256:5f+kLbOe5uHyM0m44PqlAjf022MKDEKqNmKx6rz5VLI",
+    "deployment": "passed from immutable infra bd16f47b218aac4d1f06ffb2b108bee3cb877fa7 and staff af9a46b3f3b7a96543481c82979fe4068bc01f4c",
+    "capacity": "16 GiB RAM, 73 GiB free disk, 1% inodes; gate passed",
+    "netbird_version": "0.82.0",
+    "geolocation_cache": "both nonempty cached databases seeded under host recipient; disableGeoliteUpdate true; geolocation enabled",
+    "public_staff_denied": {
+      "staff": 403,
+      "login": 403,
+      "api": 403
+    },
+    "private_admin_peer": "connected at 100.91.205.101; private SSH at 100.91.0.10",
+    "staff_journey": "admin and reader passed protected read, reader write denial, replay rejection and logout revocation",
+    "isolation": "host and 7 workload namespaces denied production/default egress",
+    "cold_restart": {
+      "api_restored": true,
+      "private_ssh_restored": true,
+      "seconds": 1.0
+    },
+    "public_ssh_closed": true,
+    "backup_audit": {
+      "environment": "test",
+      "host_key_cannot_decrypt_controller_bundle": true,
+      "host_key_cannot_decrypt_old_backup": true,
+      "dns_token_plaintext_host_matches": 0,
+      "controller_identity_host_matches": 0,
+      "new_backup": "authentik-20261106T224912Z.tar.gz.age",
+      "new_backup_sha256": "124646659c8655734a1419b8c294a45127542d1fe59635f800a2390b66a59277",
+      "new_backup_decrypted_off_vps": true,
+      "new_backup_contains_database_dump": true,
+      "new_backup_sops_decrypts_with_host_recovery_key": true,
+      "new_backup_dns_capability_absent": true,
+      "new_backup_full_restore_repeated": false
+    },
+    "image_secret_scan": "passed; image sha256:e53a99b9de0fa698686cff2b40c1cf78ace9e0c93b846acc80aa10e626c8e36e",
+    "staff_fault_alert": "passed three-failure firing and resolved receipt with client restored",
+    "tls_renewal": "passed 4 controller-only test lineages; credentials not shipped",
+    "monitor": "healthy; monitor timer and receiver active; no pending events",
+    "repository_tests": {
+      "infra": "89 passed, 1 skipped",
+      "staff": "79 passed"
+    },
+    "production_approval": false,
+    "remaining": "production promotion, independent alert destination, sustained load, scheduled retention, final runbooks, and production cutover alignment remain separate gates"
   }
 }

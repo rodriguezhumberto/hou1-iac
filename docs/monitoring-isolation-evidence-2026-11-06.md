@@ -1,10 +1,8 @@
 # Test monitoring and isolation evidence — 2026-11-06
 
-Paired rollout issues: infrastructure #27 and staff #39. This is a partial gate
-report. **NetBird is currently unavailable after its outage drill; provider-console
-recovery is required.** Production is unchanged and promotion is not approved.
+Paired rollout issues: infrastructure #27 and staff #39. This report now includes the fresh replacement VPS rehearsal. Production is unchanged and promotion is not approved.
 
-Implementation candidate: `6800ed0c3a5a0780a9553ca346ec7b5ee0f42d09`.
+Implementation candidate: `bd16f47b218aac4d1f06ffb2b108bee3cb877fa7`.
 This includes the cached-geolocation startup correction and the controller code
 `34ba80f769f0ec697c17755b2ee5093570f32a03`.
 This includes the controller alert-state follow-up to the initial gate code
@@ -178,3 +176,13 @@ blank-host inventory: a rebuilt host needs the explicit public bootstrap setting
 verified replacement SSH host key, and seeded certificate/cache prerequisites.
 The current full-stack entry point does not yet prove that revised rebuild order.
 This preflight is preparation, not a passing rebuild or console-recovery drill.
+
+## Fresh replacement VPS rehearsal
+
+On 2026-11-06 the wiped host was rebuilt from immutable infrastructure `bd16f47b218aac4d1f06ffb2b108bee3cb877fa7` and staff `af9a46b3f3b7a96543481c82979fe4068bc01f4c`. The confirmed ED25519 fingerprint was `SHA256:5f+kLbOe5uHyM0m44PqlAjf022MKDEKqNmKx6rz5VLI`. The host has 16 GiB RAM, 73 GiB free disk and 1% inode use.
+
+The fresh stack passed capacity, Authentik bootstrap, real admin/reader staff journeys, public staff 403 checks, and private admin peer enrollment. NetBird 0.82.0 started with both cached geolocation databases under `disableGeoliteUpdate: true`; geolocation remains enabled. A cold server restart restored the public API and private SSH in one second. The isolation gate then denied recorded production/default destinations from the host and all seven workload namespaces. Public SSH was closed while private NetBird SSH remained usable.
+
+The private receiver recorded the staff client fault drill firing after three failed probes and resolving after restoration. A controller-only renewal passed all four test certificate lineages, the fresh encrypted Authentik backup decrypted off-VPS under the host recovery recipient, and the final image scan found no exact test secret values. Infrastructure tests passed 89 with one skip; staff tests passed 79.
+
+This completes the disposable test-host monitoring and isolation rehearsal. Production approval remains withheld pending the separate production gates listed in the acceptance issues.
