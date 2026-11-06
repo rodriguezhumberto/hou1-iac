@@ -33,11 +33,11 @@
   ansible.builtin.assert:
     that:
       - authentik_inode_check.stdout_lines | length >= 2
-      - (authentik_inode_check.stdout_lines[-1].split()[-2] | int) >= authentik_min_free_inodes | int
+      - (authentik_inode_check.stdout_lines[-1].split()[-3] | int) >= authentik_min_free_inodes | int
     fail_msg: Authentik placement refused because the data filesystem has insufficient free inodes.
 
 - name: Require the I/O probe utility used by the capacity gate
-  ansible.builtin.command: command -v iostat
+  ansible.builtin.command: iostat -V
   register: authentik_iostat_binary
   changed_when: false
   failed_when: false
@@ -91,7 +91,7 @@
     state: enabled
 
 - name: Inspect Docker networks used by the colocated services
-  ansible.builtin.command: docker network ls --format '{{.Name}}'
+  ansible.builtin.command: docker network ls --format json
   register: authentik_docker_networks
   changed_when: false
 
@@ -104,7 +104,7 @@
     fail_msg: Authentik networks must be distinct from each other and from NetBird ingress.
 
 - name: Inspect any running containers for publicly published PostgreSQL ports
-  ansible.builtin.command: docker ps --format '{{.Names}} {{.Ports}}'
+  ansible.builtin.command: docker ps --format json
   register: authentik_running_ports
   changed_when: false
 

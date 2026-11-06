@@ -75,8 +75,8 @@ authentik_postgres_image: postgres:16.6-alpine
 authentik_compose_project_prefix: hou1-authentik
 authentik_project_root_base: /opt/hou1-authentik
 authentik_data_root_base: /var/lib/hou1-authentik
-authentik_postgres_uid: 999
-authentik_postgres_gid: 999
+authentik_postgres_uid: 70
+authentik_postgres_gid: 70
 authentik_container_uid: 1000
 authentik_container_gid: 1000
 authentik_server_cpus: '1.00'

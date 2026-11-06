@@ -12,7 +12,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
     def test_bootstrap_script_is_valid_and_api_reconciliation_is_idempotent(self):
         py_compile.compile(str(ROLE / 'files/bootstrap.py'), doraise=True)
         script = (ROLE / 'files/bootstrap.py').read_text()
-        for required in ['def ensure', 'PATCH', 'core/groups', 'propertymappings/scope', 'providers/oauth2', 'core/applications', 'environment does not match']:
+        for required in ['def ensure', 'PATCH', 'core/groups', 'propertymappings/provider/scope', 'providers/oauth2', 'core/applications', 'environment does not match']:
             self.assertIn(required, script)
 
     def test_manifests_keep_clients_and_audiences_isolated(self):

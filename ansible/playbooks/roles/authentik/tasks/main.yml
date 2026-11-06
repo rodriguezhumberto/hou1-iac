@@ -60,6 +60,8 @@
         path: "{{ authentik_secret_source }}"
       delegate_to: localhost
       become: false
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"
       register: authentik_secret_source_stat
 
     - name: Refuse deployment without the environment-specific encrypted secret
@@ -100,10 +102,15 @@
         mode: '0600'
       no_log: true
 
+    - name: Read decrypted values from the managed host without logging them
+      ansible.builtin.slurp:
+        src: "{{ authentik_project_root }}/.secrets.decrypted.yml"
+      register: authentik_decrypted_file
+      no_log: true
+
     - name: Load decrypted values into Ansible memory without logging them
-      ansible.builtin.include_vars:
-        file: "{{ authentik_project_root }}/.secrets.decrypted.yml"
-        name: authentik_decrypted
+      ansible.builtin.set_fact:
+        authentik_decrypted: "{{ authentik_decrypted_file.content | b64decode | from_yaml }}"
       no_log: true
 
     - name: Map environment secrets to deployment inputs
@@ -185,6 +192,7 @@
   args:
     chdir: "{{ authentik_project_root }}"
   changed_when: false
+  no_log: true
 
 - name: Start Authentik only after PostgreSQL health becomes ready
   community.docker.docker_compose_v2:
@@ -210,44 +218,6 @@
       - authentik_compose_ps.stdout is search('authentik-worker')
       - authentik_compose_ps.stdout is not search('0\.0\.0\.0:5432|:::5432')
     fail_msg: Authentik Compose did not start healthy or PostgreSQL has a public listener.
-
-- name: Install the idempotent Authentik identity bootstrap utility
-  ansible.builtin.copy:
-    src: bootstrap.py
-    dest: "{{ authentik_project_root }}/bootstrap.py"
-    owner: root
-    group: root
-    mode: '0700'
-  when: authentik_bootstrap_enabled | bool
-
-- name: Render the isolated environment identity manifest
-  ansible.builtin.template:
-    src: "bootstrap-{{ authentik_environment }}.json.j2"
-    dest: "{{ authentik_project_root }}/bootstrap.json"
-    owner: root
-    group: root
-    mode: '0600'
-  when: authentik_bootstrap_enabled | bool
-
-- name: Apply Authentik groups, claims, scopes, users, and clients idempotently
-  ansible.builtin.command:
-    argv:
-      - python3
-      - "{{ authentik_project_root }}/bootstrap.py"
-      - --base-url
-      - "{{ authentik_api_url }}"
-      - --environment
-      - "{{ authentik_environment }}"
-      - --manifest
-      - "{{ authentik_project_root }}/bootstrap.json"
-  environment:
-    AUTHENTIK_BOOTSTRAP_TOKEN: "{{ authentik_bootstrap_token }}"
-    STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
-    NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
-  register: authentik_bootstrap_result
-  changed_when: true
-  when: authentik_bootstrap_enabled | bool
-  no_log: true
 
 - name: Derive the environment-specific public Authentik hostname
   ansible.builtin.set_fact:
@@ -317,3 +287,41 @@
   args:
     chdir: "{{ app_directory }}"
   when: authentik_nginx_config.changed
+
+- name: Install the idempotent Authentik identity bootstrap utility
+  ansible.builtin.copy:
+    src: bootstrap.py
+    dest: "{{ authentik_project_root }}/bootstrap.py"
+    owner: root
+    group: root
+    mode: '0700'
+  when: authentik_bootstrap_enabled | bool
+
+- name: Render the isolated environment identity manifest
+  ansible.builtin.template:
+    src: "bootstrap-{{ authentik_environment }}.json.j2"
+    dest: "{{ authentik_project_root }}/bootstrap.json"
+    owner: root
+    group: root
+    mode: '0600'
+  when: authentik_bootstrap_enabled | bool
+
+- name: Apply Authentik groups, claims, scopes, users, and clients idempotently
+  ansible.builtin.command:
+    argv:
+      - python3
+      - "{{ authentik_project_root }}/bootstrap.py"
+      - --base-url
+      - "{{ authentik_api_url }}"
+      - --environment
+      - "{{ authentik_environment }}"
+      - --manifest
+      - "{{ authentik_project_root }}/bootstrap.json"
+  environment:
+    AUTHENTIK_BOOTSTRAP_TOKEN: "{{ authentik_bootstrap_token }}"
+    STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
+    NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
+  register: authentik_bootstrap_result
+  changed_when: true
+  when: authentik_bootstrap_enabled | bool
+  no_log: true
