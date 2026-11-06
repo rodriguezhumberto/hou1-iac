@@ -1,0 +1,27 @@
+---
+- name: Create the break-glass evidence directory
+  ansible.builtin.file:
+    path: "{{ netbird_break_glass_evidence_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install the redacted break-glass recovery command
+  ansible.builtin.template:
+    src: break-glass.sh.j2
+    dest: "{{ netbird_control_plane_directory }}/break-glass.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Record the approved break-glass operators and escalation target
+  ansible.builtin.copy:
+    dest: "{{ netbird_break_glass_evidence_directory }}/operators"
+    owner: root
+    group: root
+    mode: '0600'
+    content: |
+      operators={{ netbird_break_glass_operators | join(',') }}
+      escalation_minutes={{ netbird_break_glass_escalation_minutes }}
+      api_pat_is_not_dashboard_login=true

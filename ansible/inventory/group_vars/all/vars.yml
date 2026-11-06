@@ -47,6 +47,9 @@ netbird_dashboard_image: netbirdio/dashboard:v2.96.0
 netbird_authentik_client_secret_file: "/opt/hou1-authentik/prod/oidc-clients.env"
 netbird_authentik_issuer: ""
 netbird_authentik_client_id: "netbird-prod"
+netbird_break_glass_operators: []
+netbird_break_glass_escalation_minutes: 15
+netbird_break_glass_evidence_directory: /var/log/hou1-netbird
 netbird_certbot_image: certbot/dns-cloudflare:v5.1.0
 netbird_ingress_network: hou1-netbird-ingress
 netbird_ingress_subnet: 172.30.80.0/29
