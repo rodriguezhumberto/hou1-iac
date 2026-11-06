@@ -82,6 +82,9 @@ authentik_postgres_memory: 1024M
 authentik_server_pids: 256
 authentik_worker_pids: 256
 authentik_postgres_pids: 128
+authentik_certbot_image: certbot/dns-cloudflare:v5.1.0
+authentik_ingress_directory: "{{ netbird_control_plane_directory }}/ingress"
+authentik_active_network: "{{ authentik_test_network if cms_environment == 'test' else authentik_prod_network }}"
 
 # Controller-side encrypted API credential, separate from inventory secrets.
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"

@@ -49,3 +49,6 @@ all:
     netbird_control_plane:
       hosts:
         prod_hou1: {}
+      vars:
+        # Existing Nginx also serves Authentik on its environment network.
+        authentik_enable_ingress_network: true

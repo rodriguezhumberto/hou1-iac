@@ -18,6 +18,11 @@ class AuthentikComposeTest(unittest.TestCase):
         self.assertNotIn('5432:', compose)
         self.assertNotIn('ports:', compose)
 
+    def test_ingress_forwards_oidc_and_restricts_admin_paths(self):
+        ingress = (ROOT / 'ansible/playbooks/roles/authentik/templates/nginx.conf.j2').read_text()
+        for required in ['/.well-known', 'JWKS', 'proxy_set_header X-Forwarded-Proto https', 'proxy_set_header Upgrade', '/if/admin/', '/api/v3/', 'allow {{ netbird_subnet }}', 'deny all']:
+            self.assertIn(required, ingress)
+
     def test_test_and_prod_state_are_variable_separated(self):
         tasks = (ROOT / 'ansible/playbooks/roles/authentik/tasks/main.yml').read_text()
         self.assertIn('authentik_environment in [\'test\', \'prod\']', tasks)
