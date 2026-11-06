@@ -1,0 +1,115 @@
+---
+- name: Gather facts required for the Authentik placement gate
+  ansible.builtin.setup:
+    gather_subset:
+      - hardware
+      - mounts
+      - network
+
+- name: Select the filesystem carrying the Authentik data path
+  ansible.builtin.set_fact:
+    authentik_capacity_mount: >-
+      {{ (ansible_mounts | selectattr('mount', 'equalto', authentik_capacity_path) | list | first)
+         | default((ansible_mounts | selectattr('mount', 'equalto', '/') | list | first), true) }}
+
+- name: Require the supported host capacity before Authentik placement
+  ansible.builtin.assert:
+    that:
+      - ansible_processor_vcpus | int >= authentik_min_vcpus | int
+      - ansible_memtotal_mb | int >= authentik_min_memory_mb | int
+      - authentik_capacity_mount is defined
+      - authentik_capacity_mount.size_available | int >= authentik_min_free_bytes | int
+    fail_msg: >-
+      Authentik placement refused: need at least {{ authentik_min_vcpus }} vCPU,
+      {{ authentik_min_memory_mb }} MiB RAM, and {{ authentik_min_free_bytes }}
+      free bytes on {{ authentik_capacity_path }}.
+
+- name: Check free inodes on the Authentik data filesystem
+  ansible.builtin.command: df -Pi -- "{{ authentik_capacity_path }}"
+  register: authentik_inode_check
+  changed_when: false
+
+- name: Require inode headroom for Authentik and PostgreSQL
+  ansible.builtin.assert:
+    that:
+      - authentik_inode_check.stdout_lines | length >= 2
+      - (authentik_inode_check.stdout_lines[-1].split()[-2] | int) >= authentik_min_free_inodes | int
+    fail_msg: Authentik placement refused because the data filesystem has insufficient free inodes.
+
+- name: Require the I/O probe utility used by the capacity gate
+  ansible.builtin.command: command -v iostat
+  register: authentik_iostat_binary
+  changed_when: false
+  failed_when: false
+
+- name: Measure current data-device utilization before placement
+  ansible.builtin.command: iostat -dx 1 2
+  register: authentik_iostat
+  changed_when: false
+  when: authentik_iostat_binary.rc == 0
+
+- name: Refuse placement when the I/O gate cannot be evaluated
+  ansible.builtin.assert:
+    that:
+      - authentik_iostat_binary.rc == 0
+      - authentik_iostat.stdout is search('Device')
+    fail_msg: Install sysstat and rerun the Authentik capacity gate; I/O headroom was not measured.
+
+- name: Set UFW default policies before adding the narrow allow list
+  community.general.ufw:
+    direction: "{{ item.direction }}"
+    policy: "{{ item.policy }}"
+  loop:
+    - {direction: incoming, policy: deny}
+    - {direction: outgoing, policy: allow}
+
+- name: Allow only public web ingress
+  community.general.ufw:
+    rule: allow
+    port: "{{ item }}"
+    proto: tcp
+  loop: ['80', '443']
+
+- name: Allow private administration through NetBird only
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: "{{ netbird_interface }}"
+    src: "{{ netbird_subnet }}"
+    port: '22'
+    proto: tcp
+
+- name: Explicitly deny PostgreSQL on public interfaces
+  community.general.ufw:
+    rule: deny
+    direction: in
+    port: '5432'
+    proto: tcp
+
+- name: Enable the host firewall after policy validation
+  community.general.ufw:
+    state: enabled
+
+- name: Inspect Docker networks used by the colocated services
+  ansible.builtin.command: docker network ls --format '{{.Name}}'
+  register: authentik_docker_networks
+  changed_when: false
+
+- name: Require distinct private network names for each trust boundary
+  ansible.builtin.assert:
+    that:
+      - authentik_test_network != authentik_prod_network
+      - authentik_test_network != netbird_ingress_network
+      - authentik_prod_network != netbird_ingress_network
+    fail_msg: Authentik networks must be distinct from each other and from NetBird ingress.
+
+- name: Inspect any running containers for publicly published PostgreSQL ports
+  ansible.builtin.command: docker ps --format '{{.Names}} {{.Ports}}'
+  register: authentik_running_ports
+  changed_when: false
+
+- name: Refuse a public PostgreSQL listener
+  ansible.builtin.assert:
+    that:
+      - authentik_running_ports.stdout is not search('0\.0\.0\.0:5432|:::5432')
+    fail_msg: A PostgreSQL container is publishing port 5432 on a public interface.

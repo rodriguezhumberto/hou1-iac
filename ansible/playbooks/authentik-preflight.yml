@@ -1,0 +1,7 @@
+---
+- name: Validate the HOU1 host before Authentik placement
+  hosts: "{{ target_hosts | default('hou1_prod') }}"
+  become: true
+  roles:
+    - role: authentik_policy
+      tags: [authentik, capacity, firewall, isolation]

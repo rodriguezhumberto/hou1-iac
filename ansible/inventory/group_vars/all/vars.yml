@@ -52,6 +52,16 @@ netbird_ingress_dynamic_range: 172.30.80.4/30
 netbird_ingress_proxy_ip: 172.30.80.2
 netbird_backup_directory: /var/backups/hou1-netbird
 
+# Authentik is placed on the existing node only after authentik-preflight.yml.
+# Keep test and production projects on separate private networks and data roots.
+authentik_capacity_path: /var/lib
+authentik_min_vcpus: 2
+authentik_min_memory_mb: 4096
+authentik_min_free_bytes: 21474836480
+authentik_min_free_inodes: 200000
+authentik_test_network: hou1-authentik-test
+authentik_prod_network: hou1-authentik-prod
+
 # Controller-side encrypted API credential, separate from inventory secrets.
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
 netbird_token_vault_id: default
