@@ -8,9 +8,14 @@ if [[ $# -ne 2 ]]; then
 fi
 archive=$1
 issuer=$2
+login_check=${AUTHENTIK_RESTORE_LOGIN_CHECK:?Set AUTHENTIK_RESTORE_LOGIN_CHECK to an executable real-login probe}
+[[ -x "$login_check" ]] || { echo 'A real login probe is required for the restore drill' >&2; exit 2; }
 started=$(date +%s)
 {{ authentik_project_root | quote }}/restore.sh "$archive"
 curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}.well-known/openid-configuration" >/dev/null
-curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}jwks/" >/dev/null
+discovery=$(curl --fail --silent --show-error --retry 12 --retry-delay 2 "${issuer}.well-known/openid-configuration")
+jwks_uri=$(printf '%s' "$discovery" | python3 -c 'import json,sys; print(json.load(sys.stdin)["jwks_uri"])')
+curl --fail --silent --show-error --retry 12 --retry-delay 2 "$jwks_uri" | python3 -c 'import json,sys; assert json.load(sys.stdin)["keys"]'
+"$login_check"
 finished=$(date +%s)
 printf 'duration_seconds=%s\nbackup=%s\nissuer=%s\nlogin=validated\ndiscovery=validated\njwks=validated\ngaps=record-in-runbook\n' "$((finished - started))" "$archive" "$issuer"

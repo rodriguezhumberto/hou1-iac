@@ -294,7 +294,7 @@
     ansible_user: "{{ new_user }}"
     ansible_ssh_pass: ''
     ansible_ssh_private_key_file: "{{ ansible_ssh_private_key_file | default('~/.ssh/id_ed25519') }}"
-    ansible_ssh_common_args: '-o StrictHostKeyChecking=accept-new'
+    ansible_ssh_common_args: "{{ security_netbird_ssh_options | default(['-o', 'StrictHostKeyChecking=accept-new']) | map('quote') | join(' ') }}"
     node_bootstrap: false
   register: ssh_bootstrap_handoff
   when: node_bootstrap | bool

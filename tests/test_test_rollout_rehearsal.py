@@ -4,6 +4,8 @@ from pathlib import Path
 import runpy
 import tempfile
 import unittest
+import yaml
+from helpers import guard_play, run_plays
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -28,6 +30,23 @@ def args(**overrides):
 
 
 class TestRolloutRehearsal(unittest.TestCase):
+    def test_fresh_vps_entrypoint_rejects_production_and_mutable_source(self):
+        playbook = yaml.safe_load((ROOT / 'ansible/playbooks/rehearse-vps.yml').read_text())[0]
+        guard = playbook['pre_tasks'][0]
+        inventory = {'all': {'children': {'isolated_test_vps': {'hosts': {'fixture': {}}}}}}
+        base = dict(ansible_host='203.0.113.20', test_vps_public_ip='203.0.113.20',
+                    cms_environment='test', node_bootstrap=True,
+                    primary_domain='vps-test.example.invalid', netbird_domain='netbird-test.vps-test.example.invalid',
+                    staff_domain='staff-test.vps-test.example.invalid', netbird_subnet='100.91.0.0/16',
+                    rehearsal_staff_ref='a' * 40, netbird_token_age_key_file='/tmp/test-only.key',
+                    rehearsal_controller_age_key_file='/tmp/test-only.key')
+        scenarios = [{}, {'cms_environment': 'production'}, {'netbird_subnet': '100.90.0.0/16'},
+                     {'staff_domain': 'staff.example.invalid'}, {'rehearsal_staff_ref': 'main'}]
+        plays = [dict(guard_play({**base, **override}, [guard], guard['name'] if override else None), hosts='fixture')
+                 for override in scenarios]
+        result = run_plays(plays, inventory_source=inventory)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_commands_are_limited_to_test_inventory(self):
         commands = MODULE["deployment_commands"](args())
         self.assertEqual(len(commands), 4)

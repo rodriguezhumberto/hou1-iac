@@ -5,6 +5,7 @@ No VPS, VPN enrollment, credentials, or Docker daemon is used.
 """
 import base64
 import json
+import os
 from pathlib import Path
 import tempfile
 import unittest
@@ -13,6 +14,25 @@ from helpers import ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class ManagementTest(unittest.TestCase):
+    def test_fresh_ssh_probe_preserves_pinned_proxy_arguments(self):
+        with tempfile.TemporaryDirectory() as directory:
+            capture = Path(directory) / 'argv.json'
+            ssh = Path(directory) / 'ssh'
+            ssh.write_text('#!/usr/bin/python3\nimport json,sys\n'
+                           f'open({str(capture)!r}, "w").write(json.dumps(sys.argv[1:]))\n')
+            ssh.chmod(0o755)
+            options = ['-o', 'StrictHostKeyChecking=yes', '-o', 'HostKeyAlias=verified-test-host',
+                       '-o', 'ProxyCommand=ssh test-gateway nc %h %p']
+            result = run_play({**netbird_vars(), 'security_netbird_ssh_options': options}, [{
+                'ansible.builtin.import_tasks': str(ROLES / 'security/tasks/verify-access.yml'),
+                'environment': {'PATH': directory + ':' + os.environ['PATH']}}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            argv = json.loads(capture.read_text())
+            self.assertEqual(argv[:len(options)], options)
+            self.assertIn('ControlMaster=no', argv)
+            self.assertIn('ControlPath=none', argv)
+            self.assertEqual(argv[-2:], ['test-user@100.90.0.10', 'sudo -n true'])
+
     def test_management_guards(self):
         nb = netbird_vars()
         config = 'Validate self-hosted NetBird configuration'

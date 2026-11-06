@@ -1,0 +1,161 @@
+---
+# Isolated replica only. The dedicated production control-plane guard is unchanged.
+- name: Bootstrap the isolated full-stack rehearsal VPS
+  hosts: isolated_test_vps
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Require a single explicit test host and isolated identity inputs
+      ansible.builtin.assert:
+        that:
+          - groups['isolated_test_vps'] | length == 1
+          - inventory_hostname not in groups.get('prod_env', [])
+          - ansible_host == (test_vps_public_ip if node_bootstrap | bool else netbird_ip)
+          - cms_environment == 'test'
+          - netbird_domain.startswith('netbird-test.')
+          - staff_domain.startswith('staff-test.')
+          - "'test' in primary_domain"
+          - netbird_subnet != '100.90.0.0/16'
+          - rehearsal_staff_ref is match('^[0-9a-f]{40}$')
+          - netbird_token_age_key_file == rehearsal_controller_age_key_file
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: This entry point requires a complete isolated test run, never a production inventory or account.
+      tags: [always]
+
+    - name: Prepare the administrative user and standard host dependencies
+      ansible.builtin.include_role:
+        name: common
+
+    - name: Install the existing Docker engine and Compose role
+      ansible.builtin.include_role:
+        name: docker
+
+    - name: Install the rehearsal capacity and encryption utilities
+      ansible.builtin.apt:
+        name: [sysstat, age, python3-yaml, jq, dnsutils]
+        state: present
+
+    - name: Copy the controller's verified SOPS binary
+      ansible.builtin.copy:
+        src: "{{ rehearsal_sops_binary_source }}"
+        dest: /usr/local/bin/sops
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Enforce capacity before starting the isolated stack
+      ansible.builtin.include_role:
+        name: authentik_policy
+        tasks_from: capacity
+
+    - name: Load only the isolated SOPS secret set on the controller
+      ansible.builtin.command:
+        argv: [sops, --decrypt, --output-type, json, "{{ rehearsal_secret_source }}"]
+      environment:
+        SOPS_AGE_KEY_FILE: "{{ rehearsal_controller_age_key_file }}"
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      register: rehearsal_sops
+      no_log: true
+
+    - name: Map the test secrets without writing controller plaintext
+      ansible.builtin.set_fact:
+        rehearsal_secrets: "{{ rehearsal_sops.stdout | from_json }}"
+        cloudflare_dns_api_token: "{{ (rehearsal_sops.stdout | from_json).CLOUDFLARE_DNS_API_TOKEN }}"
+        staff_oidc_client_secret: "{{ (rehearsal_sops.stdout | from_json).STAFF_OIDC_CLIENT_SECRET }}"
+        STAFF_SESSION_SECRET: "{{ (rehearsal_sops.stdout | from_json).STAFF_SESSION_SECRET }}"
+        netbird_owner_password: "{{ (rehearsal_sops.stdout | from_json).NETBIRD_OWNER_PASSWORD }}"
+        deploy_ref: "{{ rehearsal_staff_ref }}"
+      no_log: true
+
+    - name: Create the private source and age identity directories
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      loop: [/opt/hou1-test-source, /root/.config/sops/age]
+
+    - name: Install the isolated host age identity
+      ansible.builtin.copy:
+        src: "{{ rehearsal_controller_age_key_file }}"
+        dest: "{{ authentik_age_key_file }}"
+        mode: '0600'
+      no_log: true
+
+    - name: Transfer the immutable application source without GitHub credentials
+      ansible.builtin.copy:
+        src: "{{ rehearsal_staff_bundle }}"
+        dest: /opt/hou1-test-source/staff.bundle
+        mode: '0600'
+
+    - name: Materialize the local application Git remote from its bundle
+      ansible.builtin.command:
+        argv: [git, clone, --bare, /opt/hou1-test-source/staff.bundle, /opt/hou1-test-source/staff.git]
+        creates: /opt/hou1-test-source/staff.git/HEAD
+
+    - name: Refresh the rehearsal source ref from the transferred bundle
+      ansible.builtin.command:
+        argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, /opt/hou1-test-source/staff.bundle, 'refs/heads/issue-39-homelab-rehearsal:refs/heads/rehearsal']
+      changed_when: false
+
+    - name: Create Authentik ingress before the app attaches its external network
+      community.docker.docker_network:
+        name: "{{ authentik_test_network }}"
+        state: present
+
+  roles:
+    - role: webstack
+      vars:
+        webstack_bootstrap_ingress_only: true
+    - role: netbird_control_plane
+    - role: authentik
+    - role: netbird_client
+    - role: netbird_dns
+
+  post_tasks:
+    - name: Read external identity providers in this isolated NetBird account
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url }}/api/identity-providers"
+        headers: "{{ netbird_api_headers }}"
+        status_code: 200
+      register: rehearsal_netbird_providers
+      delegate_to: localhost
+      become: false
+      no_log: true
+
+    - name: Select only the rehearsal's Authentik provider
+      ansible.builtin.set_fact:
+        rehearsal_existing_provider: "{{ rehearsal_netbird_providers.json | selectattr('name', 'equalto', 'vps-authentik-test') | list }}"
+      no_log: true
+
+    - name: Refuse to replace a provider belonging to a different issuer
+      ansible.builtin.assert:
+        that:
+          - rehearsal_existing_provider | length <= 1
+          - rehearsal_existing_provider | length == 0 or rehearsal_existing_provider[0].issuer == 'https://auth-test.' ~ primary_domain ~ '/application/o/netbird-test/'
+      no_log: true
+
+    - name: Connect Authentik through NetBird's external-provider API
+      ansible.builtin.uri:
+        url: "{{ netbird_management_url }}/api/identity-providers"
+        method: POST
+        headers: "{{ netbird_api_headers }}"
+        body_format: json
+        body:
+          type: authentik
+          name: vps-authentik-test
+          issuer: "https://auth-test.{{ primary_domain }}/application/o/netbird-test/"
+          client_id: netbird-test
+          client_secret: "{{ netbird_oidc_client_secret }}"
+        status_code: 200
+      when: rehearsal_existing_provider | length == 0
+      delegate_to: localhost
+      become: false
+      no_log: true

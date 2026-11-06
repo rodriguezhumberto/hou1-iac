@@ -12,6 +12,7 @@
     path: "{{ netbird_token_vault_file }}"
     management_url: "{{ netbird_management_url }}"
     vault_id: "{{ netbird_token_vault_id }}"
+    age_key_file: "{{ netbird_token_age_key_file | default(omit) }}"
   no_log: true
   register: netbird_saved_token
 

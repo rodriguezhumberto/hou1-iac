@@ -6,6 +6,7 @@
         path: "{{ netbird_token_vault_file }}"
         management_url: "{{ netbird_management_url }}"
         vault_id: "{{ netbird_token_vault_id }}"
+        age_key_file: "{{ netbird_token_age_key_file | default(omit) }}"
       register: netbird_client_token
 
     - name: Require the saved control-plane token and a server group

@@ -64,6 +64,7 @@
     path: "{{ netbird_token_vault_file }}"
     management_url: "{{ netbird_management_url }}"
     vault_id: "{{ netbird_token_vault_id }}"
+    age_key_file: "{{ netbird_token_age_key_file | default(omit) }}"
     token: "{{ netbird_owner_setup.json.personal_access_token | default('') }}"
   when: netbird_instance_state.json.setup_required
   no_log: true

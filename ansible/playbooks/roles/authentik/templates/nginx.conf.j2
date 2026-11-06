@@ -37,7 +37,18 @@ server {
         proxy_send_timeout 1d;
     }
 
-    # Administrative UI and API are private to the NetBird management subnet.
+    # The flow executor serves the public sign-in stages, including initial VPN
+    # login. It must remain reachable before the user has joined NetBird.
+    location ^~ /api/v3/flows/executor/ {
+        proxy_pass http://$authentik_upstream;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto https;
+        proxy_set_header X-Forwarded-Host $host;
+    }
+
+    # Administrative UI and the remaining API are private to NetBird.
     location ^~ /if/admin/ {
         allow {{ netbird_subnet }};
         deny all;

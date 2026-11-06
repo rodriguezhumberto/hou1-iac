@@ -8,7 +8,7 @@ ROOT = Path(__file__).resolve().parents[1]
 
 class AuthentikPolicyTest(unittest.TestCase):
     def test_inode_gate_uses_free_count_and_rejects_exhaustion(self):
-        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/authentik_policy/tasks/main.yml').read_text())
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/authentik_policy/tasks/capacity.yml').read_text())
         gate = next(task for task in tasks if task['name'] == 'Require inode headroom for Authentik and PostgreSQL')
         fixtures = []
         for free, failure in [(900000, None), (5, gate['name'])]:
@@ -26,7 +26,8 @@ class AuthentikPolicyTest(unittest.TestCase):
         play = yaml.safe_load((ROOT / 'ansible/playbooks/authentik-preflight.yml').read_text())[0]
         self.assertEqual(play['roles'][0]['role'], 'authentik_policy')
         self.assertIn('capacity', play['roles'][0]['tags'])
-        tasks = (ROOT / 'ansible/playbooks/roles/authentik_policy/tasks/main.yml').read_text()
+        task_root = ROOT / 'ansible/playbooks/roles/authentik_policy/tasks'
+        tasks = (task_root / 'main.yml').read_text() + (task_root / 'capacity.yml').read_text()
         for required in ['ansible_processor_vcpus', 'ansible_memtotal_mb', 'df -Pi', 'iostat -dx 1 2', '5432', 'docker network ls', 'docker ps --format']:
             self.assertIn(required, tasks)
 

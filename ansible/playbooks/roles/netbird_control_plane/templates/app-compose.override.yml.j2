@@ -1,10 +1,11 @@
 # Managed by hou1-iac. Automatically read by every existing docker compose call.
 {% set previous = (netbird_app_override_before.content | b64decode | from_yaml) if netbird_app_override_before is defined and netbird_app_override_before.content is defined else {} %}
 {% set authentik_network = {'authentik-ingress': {'external': True, 'name': authentik_active_network}} if authentik_enable_ingress_network | default(false) | bool else {} %}
+{% set authentik_service_network = {'authentik-ingress': none} if authentik_enable_ingress_network | default(false) | bool else {} %}
 {% set ingress = {
   'services': {'nginx': {
     'volumes': [netbird_control_plane_directory ~ '/nginx-include.conf:/etc/nginx/conf.d/netbird.conf:ro', netbird_control_plane_directory ~ '/ingress:/etc/nginx/netbird:ro'],
-    'networks': {'app-network': {}, 'netbird-ingress': {'ipv4_address': netbird_ingress_proxy_ip}} | combine(authentik_network)
+    'networks': {'app-network': {}, 'netbird-ingress': {'ipv4_address': netbird_ingress_proxy_ip}} | combine(authentik_service_network)
   }},
   'networks': {'netbird-ingress': {'external': True, 'name': netbird_ingress_network}} | combine(authentik_network)
 } %}

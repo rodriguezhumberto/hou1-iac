@@ -103,6 +103,8 @@
       SECONDARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
       STAFF_HOSTNAME={{ staff_domain }}
       STAFF_CERT_DIR={{ staff_cert_dir }}
+      PRIMARY_HOSTNAMES={{ public_site_hostnames | default([primary_domain, 'www.' ~ primary_domain, 'test.' ~ primary_domain]) | join(' ') }}
+      SECONDARY_HOSTNAMES={{ secondary_site_hostnames | default([secondary_domain, 'www.' ~ secondary_domain, 'test.' ~ secondary_domain]) | join(' ') }}
       PUBLIC_SITE_ORIGIN={{ public_site_origin }}
 
       # for hCaptcha
@@ -118,12 +120,21 @@
       # Staff app authentication
       STAFF_PASSWORD={{ STAFF_PASSWORD }}
       STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
+      {% if staff_oidc_issuer | default('') %}
+      STAFF_OIDC_ISSUER={{ staff_oidc_issuer }}
+      STAFF_OIDC_CLIENT_ID={{ staff_oidc_client_id }}
+      STAFF_OIDC_CLIENT_SECRET={{ staff_oidc_client_secret }}
+      STAFF_OIDC_REDIRECT_URI=https://{{ staff_domain }}/api/staff/oidc/callback
+      STAFF_OIDC_POST_LOGOUT_REDIRECT_URI=https://{{ staff_domain }}/staff/login
+      STAFF_OIDC_SCOPES=openid profile email groups
+      {% endif %}
 
       # Replacement CMS storage (test and production are host-isolated)
       CMS_ENVIRONMENT={{ cms_environment }}
       CMS_DATABASE_DIR=/var/data
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
+  no_log: true
 
 - name: Ensure Certbot directories exist before installing credentials
   ansible.builtin.file:
@@ -149,7 +160,7 @@
     docker run --rm
     -v {{ app_directory }}/certbot/conf:/etc/letsencrypt 
     -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro
-    certbot/dns-cloudflare certonly 
+    {{ netbird_certbot_image }} certonly
     -a dns-cloudflare
     -m {{ letsencrypt_email }} 
     --non-interactive
@@ -174,7 +185,7 @@
       docker run --rm \
         -v {{ app_directory }}/certbot/conf:/etc/letsencrypt \
         -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro \
-        certbot/dns-cloudflare renew
+        {{ netbird_certbot_image }} renew
 
       cd "{{ app_directory }}"
       docker compose exec -T nginx nginx -t
