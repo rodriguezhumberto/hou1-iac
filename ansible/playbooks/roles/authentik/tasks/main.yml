@@ -13,8 +13,9 @@
       - authentik_project_root is match('^/opt/hou1-authentik/(test|prod)$')
       - authentik_data_root is match('^/var/lib/hou1-authentik/(test|prod)$')
       - authentik_compose_project is match('^hou1-authentik-(test|prod)$')
-      - authentik_postgres_password is defined and authentik_postgres_password | length >= 32
-      - authentik_secret_key is defined and authentik_secret_key | length >= 32
+      - authentik_age_key_file is defined
+      - authentik_age_key_file is match('^/')
+      - authentik_secret_source is defined
     fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
   no_log: true
 
@@ -39,14 +40,104 @@
     - {path: "{{ authentik_data_root }}/certs", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
     - {path: "{{ authentik_data_root }}/config", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
 
-- name: Render the private Authentik environment file
-  ansible.builtin.template:
-    src: authentik.env.j2
-    dest: "{{ authentik_project_root }}/authentik.env"
-    owner: root
-    group: root
-    mode: '0600'
-  no_log: true
+- name: Decrypt SOPS/age secrets only for deployment and render root-only files
+  block:
+    - name: Verify the encrypted environment secret exists on the controller
+      ansible.builtin.stat:
+        path: "{{ authentik_secret_source }}"
+      delegate_to: localhost
+      become: false
+      register: authentik_secret_source_stat
+
+    - name: Refuse deployment without the environment-specific encrypted secret
+      ansible.builtin.assert:
+        that: authentik_secret_source_stat.stat.exists
+        fail_msg: Encrypt the {{ authentik_environment }} secret set with SOPS/age before deployment.
+
+    - name: Copy ciphertext to a root-only temporary path
+      ansible.builtin.copy:
+        src: "{{ authentik_secret_source }}"
+        dest: "{{ authentik_project_root }}/.secrets.encrypted.yml"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Decrypt ciphertext without exposing plaintext in command output
+      ansible.builtin.command:
+        argv:
+          - sops
+          - --decrypt
+          - --input-type
+          - yaml
+          - --output-type
+          - yaml
+          - --output
+          - "{{ authentik_project_root }}/.secrets.decrypted.yml"
+          - "{{ authentik_project_root }}/.secrets.encrypted.yml"
+      environment:
+        SOPS_AGE_KEY_FILE: "{{ authentik_age_key_file }}"
+      no_log: true
+
+    - name: Restrict decrypted secret ownership and mode before reading
+      ansible.builtin.file:
+        path: "{{ authentik_project_root }}/.secrets.decrypted.yml"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Load decrypted values into Ansible memory without logging them
+      ansible.builtin.include_vars:
+        file: "{{ authentik_project_root }}/.secrets.decrypted.yml"
+        name: authentik_decrypted
+      no_log: true
+
+    - name: Map environment secrets to deployment inputs
+      ansible.builtin.set_fact:
+        authentik_secret_key: "{{ authentik_decrypted.AUTHENTIK_SECRET_KEY }}"
+        authentik_postgres_password: "{{ authentik_decrypted.AUTHENTIK_POSTGRES_PASSWORD }}"
+        authentik_bootstrap_token: "{{ authentik_decrypted.AUTHENTIK_BOOTSTRAP_TOKEN }}"
+        staff_oidc_client_secret: "{{ authentik_decrypted.STAFF_OIDC_CLIENT_SECRET }}"
+        netbird_oidc_client_secret: "{{ authentik_decrypted.NETBIRD_OIDC_CLIENT_SECRET }}"
+      no_log: true
+
+    - name: Validate secret lengths before rendering
+      ansible.builtin.assert:
+        that:
+          - authentik_secret_key | length >= 32
+          - authentik_postgres_password | length >= 32
+          - staff_oidc_client_secret | length >= 32
+          - netbird_oidc_client_secret | length >= 32
+        fail_msg: The decrypted secret set is incomplete or contains short values.
+      no_log: true
+
+    - name: Render the private Authentik environment file
+      ansible.builtin.template:
+        src: authentik.env.j2
+        dest: "{{ authentik_project_root }}/authentik.env"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Render the private client-secret overlap file
+      ansible.builtin.template:
+        src: oidc-clients.env.j2
+        dest: "{{ authentik_project_root }}/oidc-clients.env"
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+  always:
+    - name: Remove encrypted and decrypted temporary files
+      ansible.builtin.file:
+        path: "{{ item }}"
+        state: absent
+      loop:
+        - "{{ authentik_project_root }}/.secrets.encrypted.yml"
+        - "{{ authentik_project_root }}/.secrets.decrypted.yml"
+      no_log: true
 
 - name: Render the pinned isolated Compose project
   ansible.builtin.template:
