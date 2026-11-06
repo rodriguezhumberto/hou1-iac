@@ -7,7 +7,7 @@ this is not production approval.
 
 ## Deployment inputs and access
 
-- Infrastructure: CODE_REF_PENDING on `issue-27-homelab-rehearsal`.
+- Infrastructure: 8db0d25 on `issue-27-homelab-rehearsal`.
 - Staff: `af9a46b3f3b7a96543481c82979fe4068bc01f4c` on `issue-39-homelab-rehearsal`.
 - Authentik `2025.10.4`, PostgreSQL `16.6-alpine`, NetBird server `0.82.0`,
   dashboard `v2.96.0`, Nginx `1.28.0-alpine`, Certbot DNS plugin `v5.1.0`.
