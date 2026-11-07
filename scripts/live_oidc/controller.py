@@ -31,6 +31,26 @@ def api(path, method="GET", body=None):
     return json.loads(raw)
 
 
+def container_api(path, method='GET', body=None):
+    """Current overlap API path: bootstrap credential stays inside Authentik."""
+    import shlex
+    assert path.startswith(('providers/oauth2/', 'crypto/certificatekeypairs/'))
+    assert '..' not in path and '?' not in path
+    source = '''import json,os,sys,urllib.request
+r=json.load(sys.stdin)
+request=urllib.request.Request('http://127.0.0.1:9000/api/v3/'+r['path'],
+ data=None if r['body'] is None else json.dumps(r['body']).encode(),
+ method=r['method'],headers={'Authorization':'Bearer '+os.environ['AUTHENTIK_BOOTSTRAP_TOKEN'],
+ 'Content-Type':'application/json'})
+with urllib.request.urlopen(request,timeout=25) as response:
+ print(response.read().decode() or '{}')
+'''
+    raw = shell(shlex.join(['sudo', '-n', 'docker', 'exec', '-i',
+        'hou1-authentik-test-authentik-server-1', 'python', '-c', source]),
+        json.dumps({'path': path, 'method': method, 'body': body}))
+    return json.loads(raw)
+
+
 def secrets():
     r = subprocess.run(
         [

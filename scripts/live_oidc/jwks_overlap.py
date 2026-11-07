@@ -9,11 +9,12 @@ import argparse
 import json
 from pathlib import Path
 import shlex
+import subprocess
 import time
 import urllib.request
 import uuid
 
-from controller import AUTH, ROOT, api, probe, secrets, shell
+from controller import AUTH, ROOT, container_api as api, probe, secrets, shell
 
 STATE = ROOT / 'jwks-overlap-state.json'
 REPORT = ROOT / 'jwks-overlap-report.json'
@@ -51,6 +52,8 @@ def upstream_keys():
 
 def start():
     assert not STATE.exists(), 'Complete or clean up the previous drill first'
+    assert subprocess.run(['systemctl', '--user', 'is-active', '--quiet',
+                           'hou1-test-monitor.timer']).returncode != 0, 'Pause the rehearsal monitor before the timed drill'
     provider = api(PROVIDER)
     assert provider['client_id'] == 'pearland-paws-staff-test'
     original = provider['signing_key']
@@ -62,6 +65,13 @@ def start():
     STATE.write_text(json.dumps(state))
     STATE.chmod(0o600)
     try:
+        shell('sudo -n install -d -m 700 ' + REMOTE)
+        shell("sudo -n sh -c 'umask 077; cat > " + REMOTE + "/recover.py'",
+              Path(__file__).with_name('jwks_recovery.py').read_text())
+        shell("sudo -n sh -c 'umask 077; cat > " + REMOTE + "/restore.json'",
+              json.dumps({'original_key': original}))
+        shell('sudo -n systemd-run --collect --unit=' + UNIT +
+              ' --on-active=40m /usr/bin/python3 ' + REMOTE + '/recover.py')
         key = api('crypto/certificatekeypairs/generate/', 'POST', {
             'common_name': 'issue26-jwks-overlap-test', 'validity_days': 1, 'alg': 'rsa'})
         state['generated_key'] = key['pk']
@@ -75,27 +85,8 @@ def start():
         api(PROVIDER, 'PATCH', {'signing_key': original})
         assert upstream_keys() == old
         STATE.write_text(json.dumps(state))
-        shell('sudo -n install -d -m 700 ' + REMOTE)
         shell("sudo -n sh -c 'umask 077; cat > " + REMOTE + "/proxy.py'",
               Path(__file__).with_name('jwks_proxy.py').read_text())
-        recovery = '''from pathlib import Path
-import json,subprocess
-root=Path('/root/hou1-jwks-security')
-state=json.loads((root/'restore.json').read_text())
-subprocess.run(['python3','/root/hou1-test-auth-api.py'],input=json.dumps({'path':'providers/oauth2/1/','method':'PATCH','body':{'signing_key':state['original_key']}}),text=True,capture_output=True,check=True)
-conf=Path('/opt/hou1-netbird/ingress/authentik-test.conf')
-backup=root/'ingress.original'
-if backup.exists():
- conf.write_bytes(backup.read_bytes())
- subprocess.run(['docker','exec','pearlandpaws-test-nginx-1','nginx','-t'],check=True,capture_output=True)
- subprocess.run(['docker','exec','pearlandpaws-test-nginx-1','nginx','-s','reload'],check=True,capture_output=True)
-subprocess.run(['docker','rm','-f','hou1-jwks-security-proxy'],capture_output=True)
-'''
-        shell("sudo -n sh -c 'umask 077; cat > " + REMOTE + "/recover.py'", recovery)
-        shell("sudo -n sh -c 'umask 077; cat > " + REMOTE + "/restore.json'",
-              json.dumps({'original_key': original}))
-        shell('sudo -n systemd-run --collect --unit=' + UNIT +
-              ' --on-active=40m /usr/bin/python3 ' + REMOTE + '/recover.py')
         publish(old + new)
         setup = r'''
 from pathlib import Path
@@ -150,8 +141,10 @@ print('Private JWKS fixture installed; no published port')
         raise
 
 
-def finish():
+def finish(wait=False):
     state = json.loads(STATE.read_text())
+    while wait and time.time() < state['cache_started_at'] + 905:
+        time.sleep(min(30, state['cache_started_at'] + 905 - time.time()))
     elapsed = time.time() - state['cache_started_at']
     assert elapsed >= 905, 'Wait for the real 15-minute cache lifetime before finish'
     seen = requests()
@@ -208,12 +201,14 @@ print(json.dumps({'ingress_restored_byte_exact':True,'ingress_sha256':hashlib.sh
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--phase', choices=('start', 'finish', 'cleanup'), required=True)
-    phase = parser.parse_args().phase
+    parser.add_argument('--wait', action='store_true', help='Finish after natural cache expiry; use a managed foreground process')
+    args = parser.parse_args()
+    phase = args.phase
     if phase == 'start':
         start()
     elif phase == 'finish':
         try:
-            finish()
+            finish(wait=args.wait)
         finally:
             cleanup()
     else:
