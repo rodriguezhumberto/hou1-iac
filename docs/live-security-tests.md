@@ -115,7 +115,7 @@ export HOU1_SECURITY_WORKDIR=<private-followup-directory>
 python3 scripts/live_oidc/jwks_overlap.py --phase start
 python3 scripts/live_oidc/revocation_boundary.py
 # Wait until the start report's natural_expiry_not_before timestamp.
-python3 scripts/live_oidc/jwks_overlap.py --phase finish
+python3 scripts/live_oidc/jwks_overlap.py --phase finish --wait
 ```
 
 Run these commands sequentially. `start` publishes a temporary union of two
@@ -137,6 +137,16 @@ refresh the cache. `finish` always cleans up. If interrupted, run
 restores the signing key and exact saved ingress without controller access.
 Cleanup verifies original native JWKS publication and deletes only the generated
 key and the dedicated fixture container/directory.
+
+The overlap helper now uses `controller.container_api` directly; it does not
+require installing `/root/hou1-test-auth-api.py`. Its root recovery script is
+self-contained, uses the container-local bootstrap token, and attempts ingress
+restoration independently if Authentik is unavailable. The timer is armed before
+switching signing keys. `--wait` finishes after natural expiry in a foreground
+process retained by the execution tool; avoid detached shell sleep jobs. Start
+refuses an active rehearsal-monitor timer to prevent incidental cache refresh.
+Stop both `hou1-test-monitor.timer` and `hou1-test-monitor.service` before start,
+then restore monitoring after cleanup and require all 33 rules healthy.
 
 `revocation_boundary.py` changes only the internal `vps-staff-admin` fixture,
 with an independent five-minute recovery timer. It retains two admin sessions
