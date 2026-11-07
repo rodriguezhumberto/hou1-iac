@@ -83,7 +83,7 @@
     owner: root
     group: root
     mode: '0600'
-    content: "{{ {'environment': 'test', 'deny_cidrs': rehearsal_deny_cidrs, 'test_addresses': rehearsal_test_addresses, 'allow_local_cidrs': rehearsal_allow_local_cidrs, 'allow_update_cidrs': rehearsal_allow_update_cidrs} | to_nice_json }}"
+    content: "{{ {'environment': 'test', 'deny_cidrs': rehearsal_deny_cidrs, 'test_addresses': rehearsal_test_addresses, 'allow_local_cidrs': rehearsal_allow_local_cidrs, 'allow_update_cidrs': rehearsal_allow_update_cidrs, 'google_oauth': {'enabled': rehearsal_google_oauth_enabled | bool, 'container': rehearsal_google_oauth_container, 'project': rehearsal_google_oauth_project, 'network': authentik_test_network}} | to_nice_json }}"
 
 - name: Install the private read-only health check inputs
   ansible.builtin.copy:
@@ -137,4 +137,47 @@
     name: hou1-test-isolation.service
     daemon_reload: true
     enabled: true
+    state: started
+
+- name: Install the bounded Google OAuth endpoint refresh
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/hou1-test-google-egress.service
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Refresh isolated Authentik Google HTTPS destinations
+      After=docker.service hou1-test-isolation.service network-online.target
+      [Service]
+      Type=oneshot
+      TimeoutStartSec=45
+      ExecStart=/usr/local/sbin/hou1-test-isolation /etc/hou1-test-gates/isolation.json --refresh-google
+
+- name: Install the Google OAuth DNS refresh schedule
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/hou1-test-google-egress.timer
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Keep isolated Google HTTPS exceptions current
+      [Timer]
+      OnBootSec=90s
+      OnUnitActiveSec=60s
+      Unit=hou1-test-google-egress.service
+      [Install]
+      WantedBy=timers.target
+
+- name: Enable Google refresh only for an explicitly opted-in test inventory
+  ansible.builtin.systemd:
+    name: hou1-test-google-egress.timer
+    daemon_reload: true
+    enabled: "{{ rehearsal_google_oauth_enabled | bool }}"
+    state: "{{ 'started' if rehearsal_google_oauth_enabled | bool else 'stopped' }}"
+
+- name: Reconcile Google endpoints and remove managed hostname pins when disabled
+  ansible.builtin.systemd:
+    name: hou1-test-google-egress.service
     state: started

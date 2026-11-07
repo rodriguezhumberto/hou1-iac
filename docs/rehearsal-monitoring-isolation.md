@@ -34,6 +34,46 @@ alert if a known production name moves outside the configured deny set. A
 reserved currently nonexistent name is recorded explicitly and checked again.
 This is an address-based network policy, not an HTTP hostname proxy.
 
+For a Google source, opt in with `rehearsal_google_oauth_enabled: true` in the
+private test inventory. The gate permits TCP/443 from the running Authentik
+server's ingress-network address to the resolved addresses of
+`accounts.google.com`, `oauth2.googleapis.com`, and `www.googleapis.com` (discovery,
+token exchange, userinfo and signing keys). It verifies the server's Compose
+project/service labels. Override `rehearsal_google_oauth_container` and
+`rehearsal_google_oauth_project` together if the test project is renamed.
+
+Google DNS can return different addresses to the host and container even a few
+seconds apart. Each successful refresh also updates a marked block in the
+server container's `/etc/hosts` with exactly the validated, permitted answers.
+Only address families assigned to that container are pinned. The helper uses
+root inside the verified container to preserve Docker's mounted hosts-file inode
+and all unmanaged entries. It updates nftables first, then hostname pins; a
+partial failure can deny login but cannot grant additional destinations. Container
+recreation discards the pins; the next refresh rediscovers its address and
+reinstalls them. Other workloads' name resolution is unchanged.
+
+Google destinations use separate IPv4/IPv6 source/destination sets; host update
+permissions are unchanged. Other workloads and TCP/80 receive no Google
+exception. Production deny rules still run first, and a Google DNS result that
+is non-global or overlaps a deny network rejects the entire refresh. HTTPS
+certificate verification remains required: an IP allowlist does not restrict
+other virtual hosts sharing a Google address.
+
+`hou1-test-google-egress.timer` refreshes DNS and the running server address every
+60 seconds. Entries expire after 300 seconds even if the timer or DNS fails;
+a failed refresh leaves existing entries only until that expiry. New connections
+then fail closed; the existing established-connection policy is unchanged.
+Expired pins can remain locally but grant no new connections. Boot/reloading
+the isolation table clears the Google sets; Docker requires this base policy
+before startup and the next successful refresh restores access. This preserves
+SSH recovery without making Docker startup depend on Google DNS. Check the
+refresh service status after
+network/source changes, and rerun the production/default-deny isolation drill
+alongside Google discovery/JWKS/token checks. Disabling the opt-in and rerunning
+the gate stops the timer, clears the exceptions, and removes the marked hosts
+block from a running server. Production does not load
+this test gate. This change configures egress, not Google users, clients or roles.
+
 NetBird 0.82.0 normally checks its geolocation download endpoint at startup,
 even when databases already exist. Before enforcing isolation, the rehearsal
 requires nonempty `GeoLite2-City_*.mmdb` and `geonames_*.db` files in its existing
