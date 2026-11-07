@@ -24,13 +24,19 @@ class OidcIntegrationHarnessTest(unittest.TestCase):
     def test_offline_run_writes_isolated_evidence_without_secrets(self):
         with tempfile.TemporaryDirectory() as directory:
             report = Path(directory) / 'evidence.json'
+            drill = Path(directory) / 'unverified-drill.txt'
+            drill.write_text('This file contains no drill assertions.\n')
             env = {**os.environ, 'OIDC_TEST_ENVIRONMENT': 'test', 'OIDC_TEST_CLIENT_ID': 'netbird-test'}
             subprocess.run([sys.executable, str(HARNESS), '--issuer', 'https://auth-test.example/application/o/netbird-test/',
-                            '--audience', 'netbird-test', '--netbird-url', 'https://netbird-test.example', '--report', str(report), '--offline'],
+                            '--audience', 'netbird-test', '--netbird-url', 'https://netbird-test.example', '--report', str(report),
+                            '--restore-evidence', str(drill), '--offline'],
                            env=env, check=True)
             data = json.loads(report.read_text())
             self.assertEqual(data['environment'], 'test')
             self.assertEqual(data['live_checks']['status'], 'skipped')
+            self.assertEqual(data['failure_mode_target'], 'synthetic_local_model')
+            self.assertFalse(data['security_readiness_established'])
+            self.assertEqual(data['drills']['restore'], 'evidence_present_unverified')
             report_text = report.read_text()
             self.assertNotIn('NETBIRD_API_PAT', report_text)
             self.assertNotIn('client_secret', report_text)
