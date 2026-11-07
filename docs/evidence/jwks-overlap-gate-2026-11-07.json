@@ -1,0 +1,164 @@
+{
+  "environment": "test",
+  "authentik_native_overlap": false,
+  "overlap_source": "temporary JWKS fixture using real Authentik public keys",
+  "cache_ttl_seconds": 900,
+  "elapsed_real_seconds": 905.0,
+  "app_not_restarted": true,
+  "clock_unmodified": true,
+  "results": [
+    {
+      "case": "baseline",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-baseline-683506ed",
+        "session_created": true
+      }
+    },
+    {
+      "case": "new_key_refreshes_to_overlap",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-new_key_refreshes_to_overlap-3a3873e3",
+        "session_created": true
+      }
+    },
+    {
+      "case": "old_key_accepted_during_overlap",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-old_key_accepted_during_overlap-55df8304",
+        "session_created": true
+      }
+    },
+    {
+      "case": "new_key_accepted_during_overlap",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-new_key_accepted_during_overlap-5fbbe9fb",
+        "session_created": true
+      }
+    },
+    {
+      "case": "withdrawn_old_key_still_cached",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-withdrawn_old_key_still_cached-0ac62c05",
+        "session_created": true
+      }
+    },
+    {
+      "case": "expired_cache_jwks_unavailable_fails_closed",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "jwks-expired_cache_jwks_unavailable_fails_closed-d6a06170",
+        "session_created": false
+      }
+    },
+    {
+      "case": "withdrawn_old_key_rejected_after_cache_expiry",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "jwks-withdrawn_old_key_rejected_after_cache_expiry-43756984",
+        "session_created": false
+      }
+    },
+    {
+      "case": "current_key_accepted_after_cache_recovery",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "jwks-current_key_accepted_after_cache_recovery-7b25c686",
+        "session_created": true
+      }
+    }
+  ],
+  "jwks_requests": [
+    {
+      "time": 1794055256.5922644,
+      "status": 200,
+      "kids": [
+        "3f332d832dec24fe4bac7258462684e8",
+        "f71afbb3a56c8bdedb5c28ff4e1d5617"
+      ]
+    },
+    {
+      "time": 1794056172.7343724,
+      "status": 503,
+      "kids": [
+        "f71afbb3a56c8bdedb5c28ff4e1d5617"
+      ]
+    },
+    {
+      "time": 1794056185.0906487,
+      "status": 200,
+      "kids": [
+        "f71afbb3a56c8bdedb5c28ff4e1d5617"
+      ]
+    },
+    {
+      "time": 1794056185.1046145,
+      "status": 200,
+      "kids": [
+        "f71afbb3a56c8bdedb5c28ff4e1d5617"
+      ]
+    }
+  ],
+  "cleanup": {
+    "ingress_restored_byte_exact": true,
+    "ingress_sha256": "886ab5f9e47e9771e2ad49dfa22d1fb0d414d1ff3a327556d37d3c74d059f1b7",
+    "proxy_removed": true,
+    "original_provider_key_restored": true,
+    "native_jwks_restored": true,
+    "generated_key_deleted": true,
+    "recovery_directory_removed": true,
+    "pending_jwks_browser_files": 0,
+    "monitor_healthy_rules": 33,
+    "monitor_pending": 0
+  },
+  "runtime_image_ids": {
+    "pearlandpaws-test-astro-app-1": "sha256:dc94152dc5359745d1f7969c96b21c96745f5d7c29416066b59a4f322d6f2e74",
+    "hou1-authentik-test-authentik-server-1": "sha256:4b4f9ae106dbda902b836aa7a79d2f456b8302f090b862f7ad1bf268402730b2",
+    "hou1-netbird-test-netbird-server-1": "sha256:7b5b53b2dc8bc25639f791cf72d47cf86911894ff3f8a97cb79bab9be958109c"
+  },
+  "issues": {
+    "infrastructure": 26,
+    "staff": 37
+  },
+  "native_dual_key_publication_gate": "unsupported; remains a production rotation finding"
+}
