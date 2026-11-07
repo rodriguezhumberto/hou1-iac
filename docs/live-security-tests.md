@@ -219,3 +219,8 @@ the actual immutable app/image refs, backup checksum, restore duration and
 healthy final state. Keep earlier NetBird state-rollback and real 905-second
 JWKS-cache evidence under their original refs; neither is silently relabeled
 as a new drill or as native Authentik dual-key publication.
+
+The [2026-11-07 coordinated acceptance evidence](oidc-security-acceptance-2026-11-07.md)
+records the executed phases, exact images, encrypted restore point, measured
+restore duration and final cleanup. Its machine-readable report is mirrored
+in the staff repository for issue #37.

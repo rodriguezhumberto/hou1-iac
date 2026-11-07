@@ -1,0 +1,1173 @@
+{
+  "schema": 1,
+  "issues": {
+    "staff": 37,
+    "infrastructure": 26
+  },
+  "environment": "test",
+  "recorded_at": "2026-11-07T18:58:44.484679+00:00",
+  "deployment": {
+    "app_ref": "bc2bc630831cb3f9522c0f026ebb2f2b39e63ada",
+    "image": "pearlandpaws-test-security:bc2bc630831cb3f9522c0f026ebb2f2b39e63ada",
+    "build_and_transfer": "passed",
+    "deployed_image_id": "sha256:5a6c454d9671a28e19dd9a328e1ba6ef238f9f4af73f2a049cc398890e082927",
+    "old_image_id": "sha256:dc94152dc5359745d1f7969c96b21c96745f5d7c29416066b59a4f322d6f2e74",
+    "offboarding_supported": true,
+    "environment": "test"
+  },
+  "source_refs": {
+    "infra_test_source": "2a4c1be9cdf448858a1ac5cef5a86ce6f5dd57ae",
+    "staff_probe_source": "855e3946f7dcea2c727150c6c475a58d50b4781d"
+  },
+  "isolation": {
+    "users": [
+      "vps-staff-admin",
+      "vps-staff-reader"
+    ],
+    "groups": [
+      "pearland-paws-staff-admin",
+      "pearland-paws-staff-reader"
+    ],
+    "staff_client": "pearland-paws-staff-test",
+    "netbird_client": "isolated test embedded issuer with external test Authentik provider",
+    "secret_reference": "private controller secrets.enc.yaml, encrypted with the test-only SOPS/age recipient",
+    "tls_certificates": [
+      {
+        "service": "auth",
+        "hostname": "auth-test.vps-test.pearlandpaws.com",
+        "sha256": "03313e485cf241a41f2182baada7ba327f49fba6d2dc001070104b23a168aa66",
+        "subject_alternative_names": [
+          "auth-test.vps-test.pearlandpaws.com"
+        ],
+        "not_after": "Feb  4 21:09:10 2027 GMT",
+        "public_trust_validation": "passed"
+      },
+      {
+        "service": "staff",
+        "hostname": "staff-test.vps-test.pearlandpaws.com",
+        "sha256": "4b4f278afde672a3084a4f1b9d3f1aef91662dac5774fe96e9e4021b999d7ee3",
+        "subject_alternative_names": [
+          "landing-test.vps-test.pearlandpaws.com",
+          "staff-test.vps-test.pearlandpaws.com",
+          "test.vps-test.pearlandpaws.com"
+        ],
+        "not_after": "Feb  4 21:04:48 2027 GMT",
+        "public_trust_validation": "passed"
+      },
+      {
+        "service": "netbird",
+        "hostname": "netbird-test.vps-test.pearlandpaws.com",
+        "sha256": "cd015bae3cc2cece701071d82ba821324e7cecc5d7c973d6a54624ad9365a3f4",
+        "subject_alternative_names": [
+          "netbird-test.vps-test.pearlandpaws.com"
+        ],
+        "not_after": "Feb  4 21:07:02 2027 GMT",
+        "public_trust_validation": "passed"
+      }
+    ]
+  },
+  "claims": {
+    "started_at": "2026-11-07T18:35:49.063017+00:00",
+    "recorded_at": "2026-11-07T18:39:32.299214+00:00",
+    "results": [
+      {
+        "case": "invalid_issuer",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "invalid_issuer-db907871",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://wrong-test.example.invalid/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "invalid_audience",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "invalid_audience-37c05bb4",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "other-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "invalid_azp",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "invalid_azp-868220be",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": "other-test",
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "empty_azp",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "empty_azp-a4bcad37",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": "",
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "false_azp",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "false_azp-180281f6",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": false,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "reversed_time",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "reversed_time-1949f877",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 16,
+            "iat": 26,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "expired",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "expired-3a7cddbe",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": -121,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "future_nbf",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "future_nbf-6455f4c0",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": 119
+          }
+        }
+      },
+      {
+        "case": "future_iat",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "future_iat-855791ad",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": 119,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "excess_lifetime",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "excess_lifetime-9996b452",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 1198,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "missing_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "missing_groups-ec279642",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": false,
+          "groups": null,
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "empty_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "empty_groups-48c05af3",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "string_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "string_groups-a5fb9d44",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": "pearland-paws-staff-admin",
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "duplicate_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "duplicate_groups-f5258692",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin",
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "blank_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": true,
+          "expectation": "rejected",
+          "protected_status": 401,
+          "run_id": "blank_groups-69b2b9b2",
+          "session_created": false
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            " "
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "unknown_groups",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "forbidden",
+          "logout_revoked": true,
+          "protected_status": 403,
+          "run_id": "unknown_groups-11a233f3",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "unmapped-test-group"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "skew_exp_30s",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "skew_exp_30s-2b288683",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": -31,
+            "iat": -331,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "skew_nbf_30s",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "skew_nbf_30s-087275a0",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": 29
+          }
+        }
+      },
+      {
+        "case": "skew_iat_30s",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "skew_iat_30s-2cb6da4b",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": 29,
+            "nbf": null
+          }
+        }
+      }
+    ]
+  },
+  "callbacks": [
+    {
+      "case": "callback_state",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "callback_state-208543e1",
+        "session_created": false
+      },
+      "receipt": null
+    },
+    {
+      "case": "callback_missing_cookie",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "callback_missing_cookie-527ef0ff",
+        "session_created": false
+      },
+      "receipt": null
+    },
+    {
+      "case": "callback_swapped_cookie",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "callback_swapped_cookie-66642151",
+        "session_created": false
+      },
+      "receipt": null
+    },
+    {
+      "case": "callback_nonce",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "callback_nonce-941944f7",
+        "session_created": false
+      },
+      "receipt": {
+        "upstream_status": 200,
+        "signature_fault_applied": false,
+        "alg": "RS256",
+        "kid": "3f332d832dec24fe4bac7258462684e8",
+        "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+        "aud": "pearland-paws-staff-test",
+        "azp": null,
+        "groups_present": true,
+        "groups": [
+          "pearland-paws-staff-admin"
+        ],
+        "time_offsets": {
+          "exp": 299,
+          "iat": -1,
+          "nbf": null
+        }
+      }
+    },
+    {
+      "case": "callback_pkce",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "callback_pkce-363fa26d",
+        "session_created": false
+      },
+      "receipt": {
+        "upstream_status": 400,
+        "signature_fault_applied": false
+      }
+    },
+    {
+      "case": "bad_signature",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "bad_signature-c2ce7049",
+        "session_created": false
+      },
+      "receipt": {
+        "upstream_status": 200,
+        "signature_fault_applied": true,
+        "alg": "RS256",
+        "kid": "3f332d832dec24fe4bac7258462684e8",
+        "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+        "aud": "pearland-paws-staff-test",
+        "azp": null,
+        "groups_present": true,
+        "groups": [
+          "pearland-paws-staff-admin"
+        ],
+        "time_offsets": {
+          "exp": 299,
+          "iat": -1,
+          "nbf": null
+        }
+      }
+    },
+    {
+      "redirect_uri_rejected": true,
+      "run_id": "redirect_uri-cec56ee9",
+      "status": 400
+    },
+    {
+      "case": "reader",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "reader_write_status": 403,
+        "run_id": "reader-0c1b9adc",
+        "session_created": true
+      },
+      "receipt": {
+        "upstream_status": 200,
+        "signature_fault_applied": false,
+        "alg": "RS256",
+        "kid": "3f332d832dec24fe4bac7258462684e8",
+        "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+        "aud": "pearland-paws-staff-test",
+        "azp": null,
+        "groups_present": true,
+        "groups": [
+          "pearland-paws-staff-reader"
+        ],
+        "time_offsets": {
+          "exp": 298,
+          "iat": -2,
+          "nbf": null
+        }
+      }
+    }
+  ],
+  "native_rotation": {
+    "jwks_before": [
+      "3f332d832dec24fe4bac7258462684e8"
+    ],
+    "jwks_rotated": [
+      "4515075a045b88451accc8fe245083a4"
+    ],
+    "overlap_published": false,
+    "results": [
+      {
+        "case": "pre_rotation",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "pre_rotation-297e114d",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "rotated_key",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "rotated_key-383aeceb",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "4515075a045b88451accc8fe245083a4",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 299,
+            "iat": -1,
+            "nbf": null
+          }
+        }
+      },
+      {
+        "case": "original_key_restored",
+        "assertion": "passed",
+        "probe": {
+          "callback_rejected": false,
+          "callback_replay_rejected": true,
+          "expectation": "accepted",
+          "logout_revoked": true,
+          "protected_status": 200,
+          "run_id": "original_key_restored-71450cda",
+          "session_created": true
+        },
+        "receipt": {
+          "upstream_status": 200,
+          "signature_fault_applied": false,
+          "alg": "RS256",
+          "kid": "3f332d832dec24fe4bac7258462684e8",
+          "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+          "aud": "pearland-paws-staff-test",
+          "azp": null,
+          "groups_present": true,
+          "groups": [
+            "pearland-paws-staff-admin"
+          ],
+          "time_offsets": {
+            "exp": 298,
+            "iat": -2,
+            "nbf": null
+          }
+        }
+      }
+    ]
+  },
+  "sessions": [
+    {
+      "case": "subject_revocation_two_sessions",
+      "assertion": "passed",
+      "revocation_mechanism": "operator SQLite invalidation matching revokeStaffSubject",
+      "revoked_rows": 2
+    },
+    {
+      "case": "login_after_subject_revocation",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "login_after_subject_revocation-fbf5ec72",
+        "session_created": true
+      },
+      "receipt": {
+        "upstream_status": 200,
+        "signature_fault_applied": false,
+        "alg": "RS256",
+        "kid": "3f332d832dec24fe4bac7258462684e8",
+        "iss": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+        "aud": "pearland-paws-staff-test",
+        "azp": null,
+        "groups_present": true,
+        "groups": [
+          "pearland-paws-staff-admin"
+        ],
+        "time_offsets": {
+          "exp": 299,
+          "iat": -1,
+          "nbf": null
+        }
+      }
+    },
+    {
+      "case": "idle_expire",
+      "assertion": "passed",
+      "mechanism": "advance only test session DB timestamp; real HTTP authorization"
+    },
+    {
+      "case": "absolute_expire",
+      "assertion": "passed",
+      "mechanism": "advance only test session DB timestamp; real HTTP authorization"
+    }
+  ],
+  "redirect_boundaries": [
+    {
+      "case": "return_backslash",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "post_login_origin_matches_staff": true,
+        "protected_status": 200,
+        "run_id": "return_backslash-26d84472",
+        "session_created": true
+      }
+    },
+    {
+      "case": "return_control",
+      "assertion": "passed",
+      "probe": {
+        "callback_rejected": false,
+        "callback_replay_rejected": true,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "post_login_origin_matches_staff": true,
+        "protected_status": 200,
+        "run_id": "return_control-a1909d2d",
+        "session_created": true
+      }
+    }
+  ],
+  "netbird": [
+    {
+      "mode": "normal",
+      "assertion": "passed",
+      "checks": [
+        "PASS Authentik -> NetBird embedded IdP -> dashboard callback; PKCE token exchange",
+        "PASS bearer-authenticated NetBird API HTTP 200",
+        "PASS replayed authorization code rejected",
+        "{\"case\": \"netbird_malformed\", \"status\": 401, \"assertion\": \"passed\"}",
+        "{\"case\": \"netbird_invalid_signature\", \"status\": 401, \"assertion\": \"passed\"}"
+      ]
+    },
+    {
+      "mode": "pkce",
+      "assertion": "passed",
+      "checks": [
+        "{\"case\": \"netbird_pkce_mismatch\", \"status\": 400, \"assertion\": \"passed\"}"
+      ]
+    }
+  ],
+  "recovery": {
+    "environment": "test",
+    "started_at": "2026-11-07T18:42:39.009534+00:00",
+    "before": {
+      "issuer": "https://auth-test.vps-test.pearlandpaws.com/application/o/pearland-paws-staff-test/",
+      "jwks_sha256": "b3c23d2b79aa15ac0507ba4efdcabe8a2ccb1cbc5640d589dc393a11d4070855",
+      "identity_access_sha256": "d0584d2e9e121ca059e2f076fbbc99e23892a2125fa2cb2fc7abdaf9c247f32d"
+    },
+    "baseline_admin": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "run_id": "recovery-positive-dc942a5d",
+      "session_created": true
+    },
+    "baseline_reader": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "reader_write_status": 403,
+      "run_id": "recovery-positive-f844ee88",
+      "session_created": true
+    },
+    "backup": {
+      "backup_id": "authentik-20261107T184305Z.tar.gz.age",
+      "sha256": "187ce2730b722944ef6e68149367d669a8b440f301da5ce3aed1c5e1a74eda15",
+      "bytes": 6900656,
+      "off_vps_checksum_and_decryption": "passed",
+      "controller_key_uploaded": false
+    },
+    "guardian_armed": true,
+    "updated_at": "2026-11-07T18:49:43.022611+00:00",
+    "outage": {
+      "inflight_callback": {
+        "callback_rejected": true,
+        "expectation": "rejected",
+        "protected_status": 401,
+        "run_id": "recovery-inflight-5527dcda",
+        "session_created": false
+      },
+      "fresh_login": {
+        "protected_status": 401,
+        "provider_outage_denied": true,
+        "provider_status": 502,
+        "run_id": "recovery-fresh-8fcd96b8",
+        "session_created": false
+      },
+      "private_ssh": "passed",
+      "netbird_local_owner_pkce_api": "passed",
+      "netbird_pat": "passed"
+    },
+    "restore_started_at": "2026-11-07T18:44:56.681408+00:00",
+    "restored_admin": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "run_id": "recovery-positive-a184b707",
+      "session_created": true
+    },
+    "restored_reader": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "reader_write_status": 403,
+      "run_id": "recovery-positive-24180381",
+      "session_created": true
+    },
+    "restore": {
+      "fresh_database_and_config": "passed",
+      "issuer_and_signing_keys": "unchanged",
+      "restore_source": "verified off-VPS encrypted copy",
+      "duration_seconds": 147.72
+    },
+    "guardian_disarmed_after_assertions": true,
+    "completed_at": "2026-11-07T18:49:43.022575+00:00"
+  },
+  "release_rollback": {
+    "environment": "test",
+    "candidate": {
+      "image_id": "sha256:5a6c454d9671a28e19dd9a328e1ba6ef238f9f4af73f2a049cc398890e082927",
+      "revision": "bc2bc630831cb3f9522c0f026ebb2f2b39e63ada"
+    },
+    "rollback_image": {
+      "image_id": "sha256:3e9053dee17dc2fdae7f2452336257fac2f018da90f0535d322d7238d940febe",
+      "revision": "2f133f32aae5656a4dea1b2649b9af166ff16aa9"
+    },
+    "rollback_admin": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "run_id": "recovery-positive-82c67f64",
+      "session_created": true
+    },
+    "rollback_reader": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "reader_write_status": 403,
+      "run_id": "recovery-positive-0c41078b",
+      "session_created": true
+    },
+    "candidate_restored_exactly": true,
+    "restored_admin": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "run_id": "recovery-positive-90c714ac",
+      "session_created": true
+    },
+    "restored_reader": {
+      "callback_rejected": false,
+      "callback_replay_rejected": true,
+      "expectation": "accepted",
+      "logout_revoked": true,
+      "protected_status": 200,
+      "reader_write_status": 403,
+      "run_id": "recovery-positive-2ea2d5b8",
+      "session_created": true
+    }
+  },
+  "image_secret_scan": {
+    "known_test_secrets_in_image": false,
+    "archive_bytes_scanned": 1483654144
+  },
+  "final": {
+    "environment": "test",
+    "provider_restored": true,
+    "generated_key_mapping_removed": true,
+    "public_staff_login_api_and_spoofed_forwarded_ip_status": 403,
+    "runtime_image_ids": {
+      "pearlandpaws-test-astro-app-1": "sha256:5a6c454d9671a28e19dd9a328e1ba6ef238f9f4af73f2a049cc398890e082927",
+      "hou1-authentik-test-authentik-server-1": "sha256:4b4f9ae106dbda902b836aa7a79d2f456b8302f090b862f7ad1bf268402730b2",
+      "hou1-authentik-test-authentik-worker-1": "sha256:4b4f9ae106dbda902b836aa7a79d2f456b8302f090b862f7ad1bf268402730b2",
+      "hou1-authentik-test-postgresql-1": "sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef",
+      "hou1-netbird-test-netbird-server-1": "sha256:7b5b53b2dc8bc25639f791cf72d47cf86911894ff3f8a97cb79bab9be958109c",
+      "hou1-netbird-test-dashboard-1": "sha256:340b13c00b84349572a2acc5605e907cb09250a9e6461c757097eabdb8e02f2c",
+      "pearlandpaws-test-nginx-1": "sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284"
+    },
+    "all_seven_services_healthy": true,
+    "supported_persistent_offboarding_cli": "passed",
+    "temporary_proxies_and_pending_browser_files": 0,
+    "post_restore_netbird_login_api_replay": "passed",
+    "temporary_rpc_and_probes_removed": true,
+    "monitoring": {
+      "healthy_rules": 33,
+      "firing_rules": 0,
+      "pending_events": 0
+    },
+    "monitor_timer_restored": true
+  },
+  "prior_evidence": {
+    "jwks-overlap-gate-2026-11-07.json": {
+      "sha256": "f8918439ae71c4dbb29811c7abf334dd093e16228b39abb8f48fdc0df51e5478",
+      "status": "previously executed; not repeated or relabeled by this run"
+    },
+    "live-security-2026-11-06.json": {
+      "sha256": "853c7ff0a898de69b05fcc48fafbe9cb0ae6d0b1ce13d18f8fe755f7d9eed1c1",
+      "status": "previously executed; not repeated or relabeled by this run"
+    }
+  },
+  "repository_checks": {
+    "staff_tests": 91,
+    "staff_build": "passed",
+    "staff_integration_tests": 9,
+    "infra_tests_run": 133,
+    "infra_tests_passed": 132,
+    "infra_optional_skips": 1,
+    "ansible_syntax_checks": 4,
+    "recovery_worker_failure_tests": 4,
+    "diff_check": "passed"
+  },
+  "limits": [
+    "Authentik 2025.10.4 publishes one selected signing key; native dual-key publication is unsupported.",
+    "IdP GUI disable/group changes do not automatically revoke opaque app sessions; use the authenticated audited offboarding command.",
+    "Idle/absolute expiry uses adjusted test session timestamps; no full eight-hour wait is claimed.",
+    "Fresh restore recovers application state on the existing VPS, not a provider-console or replacement-host rebuild.",
+    "NetBird device/peer and state-rollback evidence retains its original refs; this run repeats NetBird login/API/token negatives and independent outage access.",
+    "Production monitoring, secret consolidation, rollout/recovery approval and final runbook work remain separate."
+  ]
+}
