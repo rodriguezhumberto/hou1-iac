@@ -67,12 +67,55 @@ Expired pins can remain locally but grant no new connections. Boot/reloading
 the isolation table clears the Google sets; Docker requires this base policy
 before startup and the next successful refresh restores access. This preserves
 SSH recovery without making Docker startup depend on Google DNS. Check the
-refresh service status after
-network/source changes, and rerun the production/default-deny isolation drill
+refresh service status after network/source changes, and rerun the
+production/default-deny isolation drill
 alongside Google discovery/JWKS/token checks. Disabling the opt-in and rerunning
 the gate stops the timer, clears the exceptions, and removes the marked hosts
-block from a running server. Production does not load
-this test gate. This change configures egress, not Google users, clients or roles.
+block from a running server. Production does not load this test gate. The egress
+change does not configure Google users, clients or roles.
+
+NetBird admission can use the Google allowlist instead of a manual approval
+queue. Run the controller-side reconciliation only after configuring the test
+Google source and its verified-email policy:
+
+```bash
+python3 scripts/rehearsal-netbird-admission.py --config <private-admission.json>
+```
+
+The private JSON file contains `environment: "test"`, the pinned `ssh` argument
+list, `netbird_url` (`https://netbird-test.<test-suffix>`), `authentik_issuer`
+(`https://auth-test.<test-suffix>/application/o/netbird-test/`), `netbird_subnet`,
+`netbird_token_file` (SOPS encrypted), `age_key_file`, `google_emails` (exact,
+lowercase addresses), and `fixture_users` (explicit internal rehearsal usernames
+with `@example.invalid` email addresses). No OAuth secret or PAT is stored in
+this configuration file. Keep it private because it names people and recovery
+paths. The controller obtains Authentik API authorization inside the existing
+server container and decrypts the NetBird PAT locally using SOPS/age.
+
+The command requires both Google source flows to enforce their existing
+allowlist policy in ALL mode. It reconciles verified-email admission and a
+separate `netbird-test` application policy, also in ALL mode. The application
+permits only allowlisted users enrolled through the Google source and the
+explicit internal test fixtures. Other Authentik applications, staff roles,
+superuser status, and VPN access policies are unchanged. The live policy engine
+must accept the intended identities and reject unlisted/unverified identities
+before `settings.extra.user_approval_required` is disabled. Every other NetBird
+account setting is preserved and read back. Existing pending users are activated
+only when their exact email is allowlisted and their connector matches the
+isolated Authentik issuer; they retain the regular `user` role. The local
+NetBird recovery owner remains available through the existing controlled login.
+The embedded login has no public self-registration; creating local users
+requires the authenticated management API. Do not enable public registration
+as part of this change.
+
+Removing a name blocks new Authentik authorizations. Existing sessions, issued
+tokens, NetBird users and enrolled peers require the corresponding revocation
+and removal procedure; editing the list alone is not immediate session
+revocation. To restore the approval queue, read the current account settings,
+PUT them back with only `extra.user_approval_required: true`, and verify the
+readback. Preserve the Authentik admission gate; re-enabling the queue does not
+retroactively change already approved users. Production requires its own
+separate rollout configuration and validation.
 
 NetBird 0.82.0 normally checks its geolocation download endpoint at startup,
 even when databases already exist. Before enforcing isolation, the rehearsal
