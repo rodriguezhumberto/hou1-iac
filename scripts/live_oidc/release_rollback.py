@@ -40,7 +40,14 @@ print(json.dumps({'image_id':x['Image'],'revision':x['Config']['Labels'].get('or
 
 def main():
     before = inspect()
-    old = json.loads(remote('import subprocess,json; x=json.loads(subprocess.check_output('+repr(['docker','image','inspect',OLD])+'))[0]; assert x["Config"]["Labels"]["io.pearlandpaws.staff-offboarding-schema"]=="1"; print(json.dumps({"image_id":x["Id"]}))'))
+    old_code = '''import subprocess,json
+x=json.loads(subprocess.check_output(''' + repr(['docker','image','inspect',OLD]) + '''))[0]
+labels=x['Config']['Labels']
+assert labels['io.pearlandpaws.staff-offboarding-schema']=='1'
+assert labels['org.opencontainers.image.revision']=='2f133f32aae5656a4dea1b2649b9af166ff16aa9'
+print(json.dumps({'image_id':x['Id'],'revision':labels['org.opencontainers.image.revision']}))
+'''
+    old = json.loads(remote(old_code))
     assert old['image_id'] != before['image_id']
     recovery = '''import subprocess,pathlib
 subprocess.run('''+repr(BASE+UP)+''',check=True,capture_output=True,timeout=150)
