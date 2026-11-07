@@ -118,6 +118,7 @@
       VAPID_SUBJECT={{ VAPID_SUBJECT }}
 
       # Staff app authentication
+      STAFF_ENVIRONMENT={{ 'production' if deploy_environment == 'prod' else 'test' }}
       STAFF_PASSWORD={{ STAFF_PASSWORD }}
       STAFF_SESSION_SECRET={{ STAFF_SESSION_SECRET }}
       {% if staff_oidc_issuer | default('') %}
