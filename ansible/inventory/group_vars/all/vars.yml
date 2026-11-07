@@ -101,6 +101,12 @@ authentik_backup_age_recipient: ''
 authentik_bootstrap_enabled: false
 authentik_staff_users: []
 
+# Opt in only for isolated rehearsals with a Google source. Rules target the
+# running server container and expire unless its endpoint refresh succeeds.
+rehearsal_google_oauth_enabled: false
+rehearsal_google_oauth_container: "hou1-authentik-test-authentik-server-1"
+rehearsal_google_oauth_project: "hou1-authentik-test"
+
 # Controller-side encrypted API credential, separate from inventory secrets.
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
 netbird_token_vault_id: default
