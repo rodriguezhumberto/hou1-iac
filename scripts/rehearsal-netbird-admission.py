@@ -4,7 +4,6 @@
 import argparse
 import json
 import os
-from pathlib import Path
 import shlex
 import subprocess
 import urllib.parse
@@ -201,10 +200,31 @@ def configure(config, auth, netbird):
             'existing_allowlisted_pending_users_reconciled': approved}
 
 
+def load_encrypted_config(path, age_key_file=None):
+    """Decrypt authenticated SOPS input in memory; never fall back to plaintext."""
+    key_file = age_key_file or os.environ.get('SOPS_AGE_KEY_FILE')
+    if not key_file:
+        raise ValueError('Supply --age-key-file or SOPS_AGE_KEY_FILE for the encrypted config')
+    try:
+        result = subprocess.run(
+            ['sops', '--decrypt', '--output-type', 'json', str(path)],
+            env={**os.environ, 'SOPS_AGE_KEY_FILE': str(key_file)},
+            capture_output=True, text=True, check=True, timeout=30)
+        config = json.loads(result.stdout)
+        if not isinstance(config, dict):
+            raise ValueError('Expected a configuration object')
+        return config
+    except (OSError, subprocess.SubprocessError, ValueError):
+        # SOPS diagnostics and malformed decrypted JSON can contain private data.
+        raise ValueError('Encrypted configuration could not be decrypted and validated') from None
+
+
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', required=True)
-    c = json.loads(Path(p.parse_args().config).read_text())
+    p.add_argument('--age-key-file', help='Age identity for config decryption (or SOPS_AGE_KEY_FILE)')
+    args = p.parse_args()
+    c = load_encrypted_config(args.config, args.age_key_file)
     if c['environment'] != 'test':
         raise ValueError('Refusing production')
     nb = urllib.parse.urlsplit(c['netbird_url'])

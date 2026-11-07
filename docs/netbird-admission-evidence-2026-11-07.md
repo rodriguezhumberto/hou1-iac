@@ -43,9 +43,11 @@ Recorded checks:
 - Public user-creation API without credentials: 401. Public setup endpoint: 403.
 - Reconciliation rerun: succeeds with zero pending users requiring activation;
   the application policy and binding are reused.
-- Six admission/access regression tests pass. The complete repository suite runs 102
-  tests: 101 pass and one DNS resolver integration check is skipped because the
-  controller has no `dnsmasq` binary. Ansible syntax and Python compilation pass.
+- Nine admission/access regression tests pass, including real SOPS/age round-trip,
+  plaintext/wrong-key/tampered-input rejection, and external identity selection.
+  The complete repository suite runs 105 tests: 104 pass and one DNS resolver
+  integration check is skipped because the controller has no `dnsmasq` binary.
+  Ansible syntax, Python compilation, and whitespace checks pass.
 - The selected human account's Authentik membership is
   `pearland-paws-staff-admin`, with no Authentik superuser group. Testing the
   actual groups property mapping for that identity returns exactly
@@ -62,9 +64,19 @@ Recorded checks:
   `extra.user_approval_required` changed to false. The existing subnet, peer
   settings, regular-user restrictions and local recovery login remain intact.
 
-The private admission input and human email addresses remain outside Git. The
-NetBird PAT remains SOPS/age encrypted on the controller; Authentik's existing
-bootstrap credential is used inside its running test container. No production
+The entire private admission input is now SOPS/age encrypted with the existing
+controller identity, including the allowlisted emails and explicit staff-role
+assignments. Decryption matches the original object in memory, and the emails
+are absent from the ciphertext. The encrypted file has mode `0600` and remains
+outside Git. Reconciliation from ciphertext passes all five application-policy
+and five Google-policy checks, with one staff assignment configured, none waiting
+for first login, and zero pending users requiring activation. Only after those
+checks passed was the original plaintext source removed. The script decrypts in
+memory without producing a plaintext file and has no plaintext fallback.
+
+The NetBird PAT remains SOPS/age encrypted on the controller; Authentik's existing
+bootstrap credential is used inside its running test container. Authentik retains
+identity data and policy expressions in its runtime database. No production
 configuration, credential, user, or service was modified.
 
 See [the rehearsal procedure](rehearsal-monitoring-isolation.md) for the command,
@@ -80,7 +92,8 @@ ansible-playbook -i <private-test-inventory> \
   ansible/playbooks/rehearsal-gates.yml --syntax-check
 ```
 
-Private evidence includes the full test log, admission input, and
+Private evidence includes the full test log, encrypted admission input,
+`encrypted-admission-report.json`, and
 `netbird-first-login-report.json` with successful first-login and cleanup
 assertions. Interactive Google login after reconciliation still needs the
 operator's browser session.

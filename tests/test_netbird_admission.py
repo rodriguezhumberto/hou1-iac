@@ -2,14 +2,71 @@
 
 import copy
 import importlib.util
+import json
+import os
 from pathlib import Path
+import shutil
+import subprocess
+import tempfile
 from types import SimpleNamespace
 import textwrap
 import unittest
+from unittest.mock import patch
 
 SPEC = importlib.util.spec_from_file_location('admission', Path(__file__).resolve().parents[1] / 'scripts/rehearsal-netbird-admission.py')
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
+
+
+@unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age binaries required')
+class EncryptedConfigTest(unittest.TestCase):
+    def setUp(self):
+        self.temp = tempfile.TemporaryDirectory()
+        self.addCleanup(self.temp.cleanup)
+        self.root = Path(self.temp.name)
+        self.key = self.root / 'age.key'
+        subprocess.run(['age-keygen', '-o', str(self.key)], check=True, capture_output=True)
+        recipient = subprocess.run(['age-keygen', '-y', str(self.key)],
+                                   check=True, capture_output=True, text=True).stdout.strip()
+        self.config = {'environment': 'test', 'google_emails': ['private@example.invalid'],
+                       'staff_users': [{'email': 'private@example.invalid', 'role': 'admin'}]}
+        self.encrypted = self.root / 'admission.enc.json'
+        result = subprocess.run(['sops', '--encrypt', '--config', '/dev/null', '--age', recipient,
+                                 '--input-type', 'json', '--output-type', 'json', '/dev/stdin'],
+                                input=json.dumps(self.config), text=True, capture_output=True, check=True)
+        self.encrypted.write_text(result.stdout)
+
+    def test_real_sops_round_trip_hides_emails_and_roles_and_supports_environment_key(self):
+        ciphertext = self.encrypted.read_text()
+        self.assertNotIn('private@example.invalid', ciphertext)
+        self.assertNotIn('"admin"', ciphertext)
+        self.assertEqual(m.load_encrypted_config(self.encrypted, self.key), self.config)
+        with patch.dict(os.environ, {'SOPS_AGE_KEY_FILE': str(self.key)}):
+            self.assertEqual(m.load_encrypted_config(self.encrypted), self.config)
+        self.assertEqual(sorted(p.name for p in self.root.iterdir()), ['admission.enc.json', 'age.key'])
+
+    def test_plaintext_wrong_key_and_tampering_fail_without_disclosing_values(self):
+        wrong_key = self.root / 'wrong.key'
+        subprocess.run(['age-keygen', '-o', str(wrong_key)], check=True, capture_output=True)
+        plaintext = self.root / 'plaintext.json'
+        plaintext.write_text(json.dumps(self.config))
+        # A well-formed encrypted document with an altered encrypted field must
+        # fail MAC validation even when the identity can decrypt the data key.
+        tampered = self.root / 'tampered.enc.json'
+        document = json.loads(self.encrypted.read_text())
+        document['google_emails'] = ['leaked@example.invalid']
+        tampered.write_text(json.dumps(document))
+        for path, key in [(plaintext, self.key), (self.encrypted, wrong_key), (tampered, self.key)]:
+            with self.subTest(path=path.name), self.assertRaises(ValueError) as caught:
+                m.load_encrypted_config(path, key)
+            self.assertEqual(str(caught.exception), 'Encrypted configuration could not be decrypted and validated')
+            self.assertTrue(caught.exception.__suppress_context__)
+
+    def test_missing_identity_fails_before_running_sops(self):
+        with patch.dict(os.environ, {}, clear=True), patch.object(m.subprocess, 'run') as run:
+            with self.assertRaisesRegex(ValueError, 'Supply --age-key-file'):
+                m.load_encrypted_config(self.encrypted)
+            run.assert_not_called()
 
 
 def evaluate(expression, user, context=None):

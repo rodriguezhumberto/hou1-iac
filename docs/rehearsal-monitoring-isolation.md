@@ -79,17 +79,30 @@ queue. Run the controller-side reconciliation only after configuring the test
 Google source and its verified-email policy:
 
 ```bash
-python3 scripts/rehearsal-netbird-admission.py --config <private-admission.json>
+python3 scripts/rehearsal-netbird-admission.py \
+  --config <private-admission.enc.json> --age-key-file <private-age-identity>
 ```
 
-The private JSON file contains `environment: "test"`, the pinned `ssh` argument
+The entire private JSON file must be SOPS/age encrypted, including every email
+and staff-role value. The script decrypts it in memory and rejects plaintext,
+wrong-key, or integrity-check failures before contacting either service. Supply
+the config's age identity with `--age-key-file` or `SOPS_AGE_KEY_FILE`; it cannot
+be discovered from inside the encrypted document. Keep the identity and the
+encrypted file outside Git with mode `0600`. To edit, use
+`SOPS_AGE_KEY_FILE=<private-age-identity> sops <private-admission.enc.json>` with
+a trusted local editor configured to disable swap, backup and history files;
+SOPS uses a temporary plaintext editing file, so avoid editing on shared hosts.
+Do not export decrypted copies to disk.
+
+The decrypted object contains `environment: "test"`, the pinned `ssh` argument
 list, `netbird_url` (`https://netbird-test.<test-suffix>`), `authentik_issuer`
 (`https://auth-test.<test-suffix>/application/o/netbird-test/`), `netbird_subnet`,
 `netbird_token_file` (SOPS encrypted), `age_key_file`, `google_emails` (exact,
 lowercase addresses), and `fixture_users` (explicit internal rehearsal usernames
 with `@example.invalid` email addresses). No OAuth secret or PAT is stored in
-this configuration file. Keep it private because it names people and recovery
-paths. Optional `staff_users` entries have an exact allowlisted `email` and a
+this configuration file. Authentik still needs the approved identities in its
+runtime database; this encryption protects the controller's source file.
+Optional `staff_users` entries have an exact allowlisted `email` and a
 `role` of `reader`, `editor`, or `admin`; `admin` means staff-app Administrator.
 These entries assign the matching Authentik staff-role group and NetBird's
 `staff` auto-group to the active Google identity. The NetBird role stays `user`;
