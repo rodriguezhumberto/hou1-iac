@@ -129,6 +129,7 @@ def outage(report):
 
 def restore(report):
     assert 'outage' in report and 'restore_started_at' not in report
+    assert identity() == report['before'], 'Recover the healthy original IdP before the fresh restore'
     report['restore_started_at'] = datetime.now(timezone.utc).isoformat()
     record(report)
     shell('sudo -n systemd-run --collect --unit=hou1-oidc-fresh-restore /usr/bin/python3 ' + REMOTE + '/worker.py restore')
@@ -141,7 +142,8 @@ def finish(report):
     report['restored_admin'] = positive()
     report['restored_reader'] = positive(True)
     report['restore'] = {'fresh_database_and_config': 'passed', 'issuer_and_signing_keys': 'unchanged',
-                         'restore_source': 'verified off-VPS encrypted copy'}
+                         'restore_source': 'verified off-VPS encrypted copy',
+                         **json.loads(shell('sudo -n cat ' + REMOTE + '/restore-timing.json'))}
     shell('sudo -n touch ' + REMOTE + '/completed')
     shell('sudo -n systemctl stop ' + UNIT + '.timer')
     report['guardian_disarmed_after_assertions'] = True

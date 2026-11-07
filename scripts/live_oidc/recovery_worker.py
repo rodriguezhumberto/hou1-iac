@@ -11,6 +11,7 @@ from pathlib import Path
 import shutil
 import subprocess
 import sys
+import time
 
 ROOT = Path('/root/hou1-oidc-recovery')
 PROJECT = Path('/opt/hou1-authentik/test')
@@ -65,6 +66,7 @@ def recover():
 def restore():
     if any((ROOT / name).exists() for name in ('original-data', 'completed', 'recovered')):
         raise RuntimeError('Recovery drill already started')
+    started = time.monotonic()
     saved = ROOT / 'original-config'
     saved.mkdir(mode=0o700)
     for name in FILES:
@@ -80,6 +82,7 @@ def restore():
         run(['docker', 'exec', 'pearlandpaws-test-nginx-1', 'nginx', '-t'])
         run(['docker', 'exec', 'pearlandpaws-test-nginx-1', 'nginx', '-s', 'reload'])
         (ROOT / 'restore-command-passed').write_text('Fresh state restored; awaiting controller assertions\n')
+        (ROOT / 'restore-timing.json').write_text(json.dumps({'duration_seconds': round(time.monotonic() - started, 2)}))
     except BaseException:
         recover()
         raise
