@@ -103,8 +103,60 @@ class AdmissionTest(unittest.TestCase):
         self.assertTrue(evaluate(expression, self.users[1]))
 
     def test_refuses_production_or_unbounded_google_admission(self):
-        for overrides in [{'environment': 'prod'}, {'google_emails': []}, {'google_emails': ['*@gmail.com']}, {'fixture_users': ['allowed']}]:
+        for overrides in [{'environment': 'prod'}, {'google_emails': []}, {'google_emails': ['*@gmail.com']}, {'fixture_users': ['allowed']}, {'staff_users': [{'email': 'other@gmail.com', 'role': 'admin'}]}, {'staff_users': [{'email': 'allowed@gmail.com', 'role': 'owner'}]}]:
             self.setUp()
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
                 m.configure({**self.config, **overrides}, self.auth, self.netbird)
             self.assertEqual(self.nb_calls, [])
+
+
+class StaffAccessTest(unittest.TestCase):
+    def test_app_admin_gets_staff_network_access_without_network_admin_privileges(self):
+        user = {'pk': 7, 'email': 'allowed@gmail.com', 'is_active': True,
+                'path': 'goauthentik.io/sources/google', 'groups': ['unrelated', 'reader']}
+        nb_user = {'id': 'human', 'email': user['email'], 'idp_id': 'connector',
+                   'role': 'user', 'is_blocked': False, 'pending_approval': False,
+                   'auto_groups': ['existing']}
+        peer = {'id': 'device', 'user_id': nb_user['id'], 'groups': [{'id': 'existing'}]}
+        updates = []
+
+        def auth(method, path, body=None):
+            if path.startswith('core/groups/?'):
+                return {'results': [{'pk': role, 'name': name} for role, name in m.STAFF_ROLES.items()]}
+            if path == 'core/users/7/':
+                if method == 'PATCH': user.update(body);updates.append(('auth', copy.deepcopy(body)))
+                return copy.deepcopy(user)
+            raise AssertionError((method, path))
+
+        def netbird(method, path, body=None):
+            if path == '/groups': return [{'id': 'staff-group', 'name': 'staff'}]
+            if path == '/users': return [copy.deepcopy(nb_user)]
+            if path == '/peers': return [copy.deepcopy(peer)]
+            if path == '/users/human':
+                nb_user.update(body)
+                peer['groups'] = [{'id': group} for group in nb_user['auto_groups']]
+                updates.append(('netbird', copy.deepcopy(body)))
+                return nb_user
+            raise AssertionError((method, path))
+
+        args = ([{'email': user['email'], 'role': 'admin'}], [user], {'id': 'connector'}, auth, netbird)
+        report = m.configure_staff_access(*args)
+        self.assertEqual(report, {'staff_users_configured': 1, 'staff_users_awaiting_first_login': 0})
+        self.assertEqual(user['groups'], ['admin', 'unrelated'])
+        self.assertEqual(nb_user['auto_groups'], ['existing', 'staff-group'])
+        self.assertEqual(nb_user['role'], 'user')
+        self.assertNotIn('administrators', nb_user['auto_groups'])
+        self.assertEqual(len(updates), 2)
+        m.configure_staff_access(*args)
+        self.assertEqual(len(updates), 2)
+
+    def test_unknown_identity_waits_without_granting_any_role_or_network_access(self):
+        def auth(method, path, body=None):
+            self.assertEqual(method, 'GET')
+            return {'results': [{'pk': r, 'name': n} for r, n in m.STAFF_ROLES.items()]}
+        def netbird(method, path, body=None):
+            self.assertEqual(method, 'GET')
+            return [{'id': 'staff', 'name': 'staff'}] if path == '/groups' else []
+        result = m.configure_staff_access([{'email': 'new@gmail.com', 'role': 'reader'}], [], {'id': 'connector'}, auth, netbird)
+        self.assertEqual(result['staff_users_awaiting_first_login'], 1)
+        self.assertEqual(result['staff_users_configured'], 0)

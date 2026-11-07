@@ -42,12 +42,65 @@ def unique(items, key, value):
     return matches[0]
 
 
+STAFF_ROLES = {role: 'pearland-paws-staff-' + role for role in ('reader', 'editor', 'admin')}
+
+
+def configure_staff_access(assignments, users, provider, auth, netbird):
+    """Keep network staff access separate from application privilege."""
+    if not assignments:
+        return {'staff_users_configured': 0, 'staff_users_awaiting_first_login': 0}
+    staff = unique(netbird('GET', '/groups'), 'name', 'staff')
+    groups = auth('GET', 'core/groups/?page_size=1000')['results']
+    role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in STAFF_ROLES.items()}
+    peers = netbird('GET', '/peers')
+    nb_users = netbird('GET', '/users')
+    configured = waiting = 0
+    for assignment in assignments:
+        matches = [u for u in users if u.get('email') == assignment['email']]
+        if not matches:
+            waiting += 1
+            continue
+        user = unique(matches, 'email', assignment['email'])
+        if not user['is_active'] or user['path'] != 'goauthentik.io/sources/google':
+            raise ValueError('Staff assignment requires an active Google-source identity')
+        desired = sorted((set(user.get('groups', [])) - set(role_ids.values())) | {role_ids[assignment['role']]})
+        if sorted(user.get('groups', [])) != desired:
+            auth('PATCH', 'core/users/' + str(user['pk']) + '/', {'groups': desired})
+        actual = auth('GET', 'core/users/' + str(user['pk']) + '/')
+        if sorted(actual['groups']) != desired:
+            raise ValueError('Authentik staff role readback differs')
+        matches = [u for u in nb_users if u.get('email') == assignment['email'] and u.get('idp_id') == provider['id']]
+        if not matches:
+            waiting += 1
+            continue
+        nb_user = unique(matches, 'email', assignment['email'])
+        if nb_user['role'] != 'user' or nb_user['is_blocked'] or nb_user['pending_approval']:
+            raise ValueError('Staff network assignment requires an active regular NetBird user')
+        desired = sorted(set(nb_user.get('auto_groups', [])) | {staff['id']})
+        if sorted(nb_user.get('auto_groups', [])) != desired:
+            netbird('PUT', '/users/' + urllib.parse.quote(nb_user['id'], safe=''), {
+                'auto_groups': desired, 'role': nb_user['role'], 'is_blocked': nb_user['is_blocked']})
+        actual = unique(netbird('GET', '/users'), 'id', nb_user['id'])
+        if sorted(actual['auto_groups']) != desired or actual['role'] != 'user':
+            raise ValueError('NetBird staff group readback differs')
+        owned_ids = {p['id'] for p in peers if p.get('user_id') == nb_user['id']}
+        actual_peers = netbird('GET', '/peers')
+        if not all(staff['id'] in [g['id'] for g in p['groups']] for p in actual_peers if p['id'] in owned_ids):
+            raise ValueError('Staff group did not propagate to existing devices')
+        configured += 1
+    return {'staff_users_configured': configured, 'staff_users_awaiting_first_login': waiting}
+
+
 def configure(config, auth, netbird):
     if config['environment'] != 'test':
         raise ValueError('This command is restricted to isolated test')
     emails = sorted(set(config['google_emails']))
     if not emails or any(e != e.lower() or e.count('@') != 1 or '*' in e or any(c.isspace() for c in e) for e in emails):
         raise ValueError('Supply explicit lowercase Google account addresses')
+    assignments = config.get('staff_users', [])
+    if (len({u['email'] for u in assignments}) != len(assignments)
+            or any(u['email'] not in emails or u['role'] not in STAFF_ROLES for u in assignments)):
+        raise ValueError('Staff roles require unique, explicitly allowlisted Google accounts')
     users = auth('GET', 'core/users/?page_size=1000')['results']
     fixture_ids = []
     for name in config['fixture_users']:
@@ -124,6 +177,8 @@ def configure(config, auth, netbird):
         raise ValueError('Expected the isolated test account and subnet')
     account = accounts[0]
     settings = account['settings']
+    if assignments and not settings['groups_propagation_enabled']:
+        raise ValueError('Staff access requires existing device group propagation')
     settings['extra']['user_approval_required'] = False
     netbird('PUT', '/accounts/' + account['id'], {'settings': settings})
     actual = netbird('GET', '/accounts')[0]['settings']
@@ -140,7 +195,8 @@ def configure(config, auth, netbird):
             if updated.get('pending_approval') or updated.get('is_blocked') or updated.get('role') != 'user':
                 raise ValueError('Allowlisted pending user did not become a regular active user')
             approved += 1
-    return {'environment': 'test', 'application_policy_checks': len(users),
+    staff_report = configure_staff_access(assignments, users, provider, auth, netbird)
+    return {**staff_report, 'environment': 'test', 'application_policy_checks': len(users),
             'google_policy_checks': source_checks, 'manual_approval_required': False,
             'existing_allowlisted_pending_users_reconciled': approved}
 

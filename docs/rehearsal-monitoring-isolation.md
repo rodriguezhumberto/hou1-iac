@@ -89,15 +89,30 @@ list, `netbird_url` (`https://netbird-test.<test-suffix>`), `authentik_issuer`
 lowercase addresses), and `fixture_users` (explicit internal rehearsal usernames
 with `@example.invalid` email addresses). No OAuth secret or PAT is stored in
 this configuration file. Keep it private because it names people and recovery
-paths. The controller obtains Authentik API authorization inside the existing
+paths. Optional `staff_users` entries have an exact allowlisted `email` and a
+`role` of `reader`, `editor`, or `admin`; `admin` means staff-app Administrator.
+These entries assign the matching Authentik staff-role group and NetBird's
+`staff` auto-group to the active Google identity. The NetBird role stays `user`;
+the `administrators` network group is never added. Existing unrelated groups
+are preserved; an explicit role change replaces only the other staff-role groups.
+Device group propagation must already be enabled. Existing devices receive
+`staff` immediately, and future devices owned by that user inherit it.
+
+Assignments for identities that have not completed Google/NetBird first login
+are counted in `staff_users_awaiting_first_login`. Rerun reconciliation after
+first login to finish their assignments. Sign out of the staff app and sign
+in again after a role change so its session receives the new claims.
+
+The controller obtains Authentik API authorization inside the existing
 server container and decrypts the NetBird PAT locally using SOPS/age.
 
 The command requires both Google source flows to enforce their existing
 allowlist policy in ALL mode. It reconciles verified-email admission and a
 separate `netbird-test` application policy, also in ALL mode. The application
 permits only allowlisted users enrolled through the Google source and the
-explicit internal test fixtures. Other Authentik applications, staff roles,
-superuser status, and VPN access policies are unchanged. The live policy engine
+explicit internal test fixtures. Staff roles are assigned only to explicit
+`staff_users`; other Authentik applications, superuser status, and VPN access
+policies are unchanged. The live policy engine
 must accept the intended identities and reject unlisted/unverified identities
 before `settings.extra.user_approval_required` is disabled. Every other NetBird
 account setting is preserved and read back. Existing pending users are activated

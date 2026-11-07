@@ -21,6 +21,10 @@ The controller reconciliation now applies these boundaries in order:
 4. Exact allowlisted users already pending on the test Authentik connector are
    activated once, retaining the regular `user` role. Unknown pending users are
    left untouched.
+5. Explicit `staff_users` assignments supply the application role and the
+   NetBird `staff` auto-group independently. An operator-selected staff-app
+   Administrator retains NetBird's regular user role and receives no SSH/admin
+   network group. Login admission alone does not grant application privileges.
 
 Recorded checks:
 
@@ -39,9 +43,21 @@ Recorded checks:
 - Public user-creation API without credentials: 401. Public setup endpoint: 403.
 - Reconciliation rerun: succeeds with zero pending users requiring activation;
   the application policy and binding are reused.
-- Four admission regression tests pass. The complete repository suite runs 100
-  tests: 99 pass and one DNS resolver integration check is skipped because the
+- Six admission/access regression tests pass. The complete repository suite runs 102
+  tests: 101 pass and one DNS resolver integration check is skipped because the
   controller has no `dnsmasq` binary. Ansible syntax and Python compilation pass.
+- The selected human account's Authentik membership is
+  `pearland-paws-staff-admin`, with no Authentik superuser group. Testing the
+  actual groups property mapping for that identity returns exactly
+  `{'groups': ['pearland-paws-staff-admin']}`.
+- Its NetBird user has the `staff` auto-group. Its existing connected device
+  receives `staff`, with no `administrators` group. The user remains a regular
+  NetBird `user`. Existing HTTPS and test DNS policies apply; SSH remains limited
+  to the administrators network group.
+- Both existing staff test users complete the real VPN-only staff login and
+  protected read; the reader cannot write, callback replay fails, and logout
+  revokes the prior session. The staff login outside the VPN remains 403.
+  The staff network group receives the private DNS configuration.
 - Account settings readback matches the prior settings with only
   `extra.user_approval_required` changed to false. The existing subnet, peer
   settings, regular-user restrictions and local recovery login remain intact.
