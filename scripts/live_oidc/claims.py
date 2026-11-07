@@ -12,8 +12,12 @@ original = {
 }
 (ROOT / "provider-restore.json").write_text(json.dumps(original))
 (ROOT / "provider-restore.json").chmod(0o600)
-old_group = "6b0fa9db-b4cf-47f5-82b3-df459ea50f64"
-assert old_group in original["property_mappings"]
+scopes = api('propertymappings/provider/scope/?page_size=1000')
+assert not scopes.get('next')
+group_mappings = [m['pk'] for m in scopes['results']
+                  if m['scope_name'] == 'groups' and m['pk'] in original['property_mappings']]
+assert len(group_mappings) == 1
+old_group = group_mappings[0]
 results = []
 mapping = None
 started = datetime.now(timezone.utc).isoformat()

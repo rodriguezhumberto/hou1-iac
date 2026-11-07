@@ -32,3 +32,10 @@ The JSON report contains no tokens or secret values. Attach it to issues #26
 and #37 with immutable refs, certificate/secret reference IDs, test users and
 groups, start/end times, and accepted gaps. A report with production hostnames,
 clients, or secret references is rejected before any live request.
+
+The follow-up in `scripts/live_oidc/jwks_overlap.py` measures the deployed
+15-minute JWKS cache, controlled public-key overlap, key withdrawal and failed
+refresh. `revocation_boundary.py` distinguishes blocked fresh login from
+revocation of existing sessions after IdP disable/group changes. Use the
+follow-up instructions in [the execution notes](live-security-tests.md),
+including local recovery timers and exact ingress restoration.

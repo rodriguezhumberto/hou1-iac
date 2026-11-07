@@ -17,9 +17,9 @@ STAFF = "https://staff-test.vps-test.pearlandpaws.com"
 
 
 def shell(command, data=None):
-    r = subprocess.run(SSH + [command], input=data, capture_output=True, text=True)
+    r = subprocess.run(SSH + [command], input=data, capture_output=True, text=True, timeout=90)
     if r.returncode:
-        raise RuntimeError("remote command failed: " + r.stderr[-1200:])
+        raise RuntimeError("remote command failed; captured diagnostics withheld")
     return r.stdout
 
 
@@ -61,7 +61,7 @@ def probe(a):
         text=True,
     )
     if r.returncode:
-        raise RuntimeError("peer probe failed: " + r.stderr[-1600:])
+        raise RuntimeError("peer probe failed; captured diagnostics withheld")
     return json.loads(r.stdout)
 
 

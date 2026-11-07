@@ -100,3 +100,53 @@ flows; repeat admin/reader and NetBird positive logins without the proxy. Verify
 public staff denial and service health. Save redacted receipts/assertions with
 UTC timestamps and artifact hashes. Reuse prior restore/rollback evidence only
 with its actual assertions, refs, immutable artifact hashes and stated limits.
+
+## JWKS lifetime and IdP revocation follow-up
+
+Use a fresh mode-0700 directory via `HOU1_SECURITY_WORKDIR` for the follow-up.
+The updated `auth_api.py` obtains API authorization inside the test Authentik
+container; no host SOPS path or controller identity is needed by that helper.
+Install the updated staff probe before running. Pause the test monitor timer
+and service during deliberate authentication failures, and restore them after
+all cleanup and healthy-login checks.
+
+```bash
+export HOU1_SECURITY_WORKDIR=<private-followup-directory>
+python3 scripts/live_oidc/jwks_overlap.py --phase start
+python3 scripts/live_oidc/revocation_boundary.py
+# Wait until the start report's natural_expiry_not_before timestamp.
+python3 scripts/live_oidc/jwks_overlap.py --phase finish
+```
+
+Run these commands sequentially. `start` publishes a temporary union of two
+real Authentik public keys only at the test staff JWKS path. The installed
+Authentik publishes one selected signing key natively; this fixture measures
+the application's overlap/cache behavior, not native Authentik overlap support.
+The new `kid` must trigger a refresh, both cached keys must work, and withdrawing
+the old public key must leave the warm cache usable until its real 900-second
+lifetime expires. `finish` requires at least 905 elapsed seconds, then proves a
+JWKS outage fails closed, a withdrawn old key is rejected, and the current key
+works again. No app restart, clock change, or token fabrication is involved.
+The separate JS regression test accelerates time locally; it is labeled
+separately from the real-time deployed test.
+
+Do not run another key-rotation drill during this window. Other probes must
+finish before the cache deadline, since a successful post-expiry login can
+refresh the cache. `finish` always cleans up. If interrupted, run
+`jwks_overlap.py --phase cleanup`; an independent 40-minute host timer also
+restores the signing key and exact saved ingress without controller access.
+Cleanup verifies original native JWKS publication and deletes only the generated
+key and the dedicated fixture container/directory.
+
+`revocation_boundary.py` changes only the internal `vps-staff-admin` fixture,
+with an independent five-minute recovery timer. It retains two admin sessions
+and a reader control session, disables the fixture and tests fresh-login denial,
+then explicitly revokes the admin subject and tests both cookies against the
+real protected HTTP API. It repeats the distinction for removal of staff groups.
+The account's active state and groups are restored in `finally`; private browser
+artifacts are removed and both positive logins are repeated.
+
+An existing session remaining valid after an IdP disable/group change is a
+recorded offboarding limitation, not automatic revocation passing. Explicit
+subject invalidation must return 401 while the reader control remains 200.
+No human Google accounts, NetBird membership, or production state are changed.

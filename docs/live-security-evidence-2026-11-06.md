@@ -78,3 +78,8 @@ These issues remain open for coordinated acceptance:
 
 See the infrastructure [execution notes](live-security-tests.md). Passwords,
 private keys, raw codes, tokens and session cookies are excluded from evidence.
+
+The [2026-11-07 follow-up](live-security-followup-2026-11-07.md) measures the
+deployed 15-minute JWKS cache and IdP disable/group-removal boundaries on the
+rebuilt test host. It distinguishes controlled consumer overlap from native
+Authentik publication and explicit revocation from automatic IdP propagation.
