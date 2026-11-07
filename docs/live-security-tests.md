@@ -160,3 +160,67 @@ An existing session remaining valid after an IdP disable/group change is a
 recorded offboarding limitation, not automatic revocation passing. Explicit
 subject invalidation must return 401 while the reader control remains 200.
 No human Google accounts, NetBird membership, or production state are changed.
+
+## Current-release outage, fresh restore and application rollback
+
+Run the current signed-claim/callback/session matrix first, always restoring
+the provider and removing the token proxy before taking a backup. The
+`skew_exp_30s` fixture sets `iat` 330 seconds in the past so its recently
+expired token still has a valid issuance-to-expiry interval. Empty/false
+authorized-party claims and reversed token times are separate rejection cases.
+
+`recovery_gate.py` uses only the fixed isolated VPS adapter. Install the
+existing private Auth API helper and updated staff HTTP probe as described
+above. Keep the controller monitor paused through intentional failures.
+With a new mode-0700 `HOU1_SECURITY_WORKDIR`, run these phases sequentially:
+
+```bash
+python3 scripts/live_oidc/recovery_gate.py --phase prepare
+python3 scripts/live_oidc/recovery_gate.py --phase outage
+# Confirm the independently started Authentik recovery service is healthy.
+python3 scripts/live_oidc/recovery_gate.py --phase restore
+# Confirm hou1-oidc-fresh-restore.service completed successfully.
+python3 scripts/live_oidc/recovery_gate.py --phase finish
+```
+
+`prepare` takes a fresh logical backup with the existing host age recipient,
+verifies checksum and decryption off-VPS using the controller's separate copy
+of the host recovery identity, and uploads only the encrypted archive back for
+restoration. It records issuer, public JWKS and a digest of stable UUID/active/
+group bindings. It arms a 20-minute host timer before stopping anything.
+No controller age identity is uploaded.
+
+`outage` retains an unexchanged code, stops only Authentik server/worker, and
+asserts both that callback and a fresh login fail without a staff session.
+Fresh pinned VPN SSH, independent NetBird local-owner PKCE/API login and the
+current test PAT must keep working. A `finally` starts Authentik independently.
+
+`restore` runs the self-contained `recovery_worker.py` through systemd. It
+quarantines the consistent cold original database/configuration and initializes
+fresh state from the off-VPS archive. The host guardian can restore the original
+without controller SSH or the Authentik API. `finish` verifies the exact issuer,
+signing keys and identity bindings, then repeats admin/reader, replay, logout
+and reader-write denial before disarming recovery. On failure invoke
+`recovery_gate.py --phase recover`; do not remove the original quarantine until
+the failure is understood. This is application-state recovery on the existing
+host, not a replacement-host/provider-console exercise.
+
+`release_rollback.py` separately tests the staff release rollback. It requires
+the current rehearsal's `issue37-security.override.yml` and retained prior test
+image `pearlandpaws-test-offboarding:2f133f32aae5656a4dea1b2649b9af166ff16aa9`.
+Both images must include persistent subject blocking. An independent five-minute
+timer restores the candidate; the script asserts admin/reader, replay, logout
+and reader write denial on the prior image, then restores the exact candidate
+and repeats those assertions. It does not restore data or restart NetBird.
+
+Afterward remove the temporary RPC/probe files and pending browser artifacts,
+verify public staff login/API denial, and resume the controller monitor. Record
+the actual immutable app/image refs, backup checksum, restore duration and
+healthy final state. Keep earlier NetBird state-rollback and real 905-second
+JWKS-cache evidence under their original refs; neither is silently relabeled
+as a new drill or as native Authentik dual-key publication.
+
+The [2026-11-07 coordinated acceptance evidence](oidc-security-acceptance-2026-11-07.md)
+records the executed phases, exact images, encrypted restore point, measured
+restore duration and final cleanup. Its machine-readable report is mirrored
+in the staff repository for issue #37.

@@ -39,3 +39,8 @@ refresh. `revocation_boundary.py` distinguishes blocked fresh login from
 revocation of existing sessions after IdP disable/group changes. Use the
 follow-up instructions in [the execution notes](live-security-tests.md),
 including local recovery timers and exact ingress restoration.
+
+The coordinated [2026-11-07 acceptance report](oidc-security-acceptance-2026-11-07.md)
+records the current-release signed-token/callback matrix, real outage, fresh
+application-state restore, image rollback and final isolation checks. It keeps
+earlier CLI/peer and real-time JWKS evidence under their original runtime refs.
