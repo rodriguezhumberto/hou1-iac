@@ -38,6 +38,9 @@ cases = [
         "{'groups':['pearland-paws-staff-admin'],'azp':'other-test'}",
         "rejected",
     ),
+    ("empty_azp", "{'groups':['pearland-paws-staff-admin'],'azp':''}", "rejected"),
+    ("false_azp", "{'groups':['pearland-paws-staff-admin'],'azp':False}", "rejected"),
+    ("reversed_time", "{'groups':['pearland-paws-staff-admin'],'iat':int(time())+30,'exp':int(time())+20}", "rejected"),
     (
         "expired",
         "{'groups':['pearland-paws-staff-admin'],'exp':int(time())-120}",
@@ -70,7 +73,7 @@ cases = [
     ("unknown_groups", "{'groups':['unmapped-test-group']}", "forbidden"),
     (
         "skew_exp_30s",
-        "{'groups':['pearland-paws-staff-admin'],'exp':int(time())-30}",
+        "{'groups':['pearland-paws-staff-admin'],'iat':int(time())-330,'exp':int(time())-30}",
         "accepted",
     ),
     (
@@ -121,6 +124,12 @@ try:
             assert receipt["aud"] == "other-test"
         if name == "invalid_azp":
             assert receipt["azp"] == "other-test"
+        if name == "empty_azp":
+            assert receipt["azp"] == ""
+        if name == "false_azp":
+            assert receipt["azp"] is False
+        if name == "reversed_time":
+            assert receipt["time_offsets"]["exp"] < receipt["time_offsets"]["iat"]
         if name == "missing_groups":
             assert not receipt["groups_present"]
         if name == "expired":
