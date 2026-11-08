@@ -39,7 +39,11 @@ class AuthentikAPI:
         if existing:
             patch = {key: val for key, val in payload.items() if existing.get(key) != val}
             if patch:
-                lookup = existing['slug'] if resource == 'core/applications' else existing['pk']
+                # 2025.10.4 validates source updates using attrs['provider_type'],
+                # including PATCHes of its write-only consumer secret.
+                if resource == 'sources/oauth':
+                    patch['provider_type'] = payload['provider_type']
+                lookup = existing['slug'] if resource in ('core/applications', 'sources/oauth') else existing['pk']
                 self.request('PATCH', f'/{resource}/{lookup}/', patch)
             return existing['pk']
         return self.request('POST', f'/{resource}/', payload)['pk']
@@ -57,6 +61,70 @@ def validate_manifest(manifest, environment):
     for client in [manifest['staff'], manifest['netbird']]:
         if any(not uri.startswith(('https://', 'http://localhost:')) for uri in client['redirect_uris'] + client['logout_uris']):
             raise ValueError('redirect and logout URIs must be HTTPS or the documented CLI localhost URI')
+    google = manifest.get('google')
+    if google is not None:
+        if environment != 'test':
+            raise ValueError('Google source bootstrap is restricted to the isolated rehearsal')
+        emails = google.get('allowed_emails', [])
+        if (not isinstance(emails, list) or not emails
+                or any(not isinstance(email, str) or email != email.lower()
+                       or email.count('@') != 1 or '*' in email
+                       or any(c.isspace() for c in email) for email in emails)):
+            raise ValueError('Google requires an explicit lowercase account allowlist')
+        if not google.get('client_id', '').endswith('.apps.googleusercontent.com'):
+            raise ValueError('Google requires its isolated OAuth client ID')
+
+
+def apply_google(google, api, secret):
+    """Gate both source flows before enabling Google or exposing its login button."""
+    flows = []
+    for slug in ('default-source-authentication', 'default-source-enrollment'):
+        flow = api.find('flows/instances', 'slug', slug)
+        if not flow:
+            raise ValueError('Default source flows must exist before Google bootstrap')
+        flows.append(flow)
+    identification = api.find('stages/identification', 'name', 'default-authentication-identification')
+    user_write = api.find('stages/user_write', 'name', 'default-source-enrollment-write')
+    if not identification or not user_write:
+        raise ValueError('Default identification and source enrollment stages must exist')
+    if not secret:
+        raise ValueError('Google OAuth client secret is required')
+    expression = (
+        'userinfo = context.get("oauth_userinfo", {})\n'
+        'verified = userinfo.get("email_verified", userinfo.get("verified_email", False))\n'
+        f'return verified is True and userinfo.get("email", "").lower() in {sorted(set(google["allowed_emails"]))!r}'
+    )
+    policy = api.ensure('policies/expression', 'name', 'Google approved accounts', {
+        'name': 'Google approved accounts', 'expression': expression})
+    for flow in flows:
+        if flow.get('policy_engine_mode') != 'all':
+            api.request('PATCH', f'/flows/instances/{flow["slug"]}/', {'policy_engine_mode': 'all'})
+        bindings = api.request('GET', f'/policies/bindings/?target={flow["pk"]}&page_size=1000')
+        if bindings.get('next'):
+            raise ValueError('Refusing partially paginated source policy bindings')
+        matches = [b for b in bindings.get('results', []) if b['target'] == flow['pk'] and b.get('policy') == policy]
+        if len(matches) > 1:
+            raise ValueError('Duplicate Google source policy binding')
+        payload = {'target': flow['pk'], 'policy': policy, 'order': 0,
+                   'enabled': True, 'negate': False, 'failure_result': False}
+        if not matches:
+            api.request('POST', '/policies/bindings/', payload)
+        elif any(matches[0].get(k) != v for k, v in payload.items()):
+            api.request('PATCH', f'/policies/bindings/{matches[0]["pk"]}/', payload)
+    # Internal is Authentik's normal application-user type, not superuser status.
+    # Roles remain explicit and are reconciled separately after first login.
+    if user_write.get('user_type') != 'internal':
+        api.request('PATCH', f'/stages/user_write/{user_write["pk"]}/', {'user_type': 'internal'})
+    source = api.ensure('sources/oauth', 'slug', 'google', {
+        'name': 'Google', 'slug': 'google', 'enabled': True, 'provider_type': 'google',
+        'consumer_key': google['client_id'], 'consumer_secret': secret,
+        'authentication_flow': flows[0]['pk'], 'enrollment_flow': flows[1]['pk'],
+        'policy_engine_mode': 'all', 'user_matching_mode': 'email_link',
+        'user_path_template': 'goauthentik.io/sources/%(slug)s',
+        'additional_scopes': 'email openid profile', 'pkce': 'S256'})
+    sources = sorted(set(identification.get('sources', [])) | {source})
+    if sorted(identification.get('sources', [])) != sources:
+        api.request('PATCH', f'/stages/identification/{identification["pk"]}/', {'sources': sources})
 
 
 def apply(manifest, api, secrets):
@@ -100,6 +168,8 @@ def apply(manifest, api, secrets):
         })
         api.ensure('core/applications', 'slug', client['application_slug'], {
             'name': client['application_name'], 'slug': client['application_slug'], 'provider': clients[client_name]})
+    if manifest.get('google'):
+        apply_google(manifest['google'], api, secrets.get('GOOGLE_OAUTH_CLIENT_SECRET'))
     return {'groups': len(groups), 'users': len(users), 'providers': len(clients)}
 
 
@@ -116,6 +186,8 @@ def main():
         manifest = json.load(stream)
     validate_manifest(manifest, args.environment)
     secrets = {key: os.environ[key] for key in ('STAFF_OIDC_CLIENT_SECRET', 'NETBIRD_OIDC_CLIENT_SECRET')}
+    if manifest.get('google'):
+        secrets['GOOGLE_OAUTH_CLIENT_SECRET'] = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
     print(json.dumps(apply(manifest, AuthentikAPI(args.base_url, args.token), secrets), sort_keys=True))
 
 

@@ -68,7 +68,7 @@
     - name: Map the test secrets without writing controller plaintext
       ansible.builtin.set_fact:
         rehearsal_secrets: "{{ rehearsal_sops.stdout | from_json }}"
-        cloudflare_dns_api_token: "{{ (rehearsal_sops.stdout | from_json).CLOUDFLARE_DNS_API_TOKEN }}"
+        cloudflare_dns_api_token: "{{ (rehearsal_sops.stdout | from_json).CLOUDFLARE_DNS_API_TOKEN | default('') }}"
         staff_oidc_client_secret: "{{ (rehearsal_sops.stdout | from_json).STAFF_OIDC_CLIENT_SECRET }}"
         STAFF_SESSION_SECRET: "{{ (rehearsal_sops.stdout | from_json).STAFF_SESSION_SECRET }}"
         netbird_owner_password: "{{ (rehearsal_sops.stdout | from_json).NETBIRD_OWNER_PASSWORD }}"

@@ -1,0 +1,125 @@
+{
+  "recorded_at": "2026-11-08T08:42:54.561457+00:00",
+  "environment": "test",
+  "phase": "preparation-only",
+  "host_key_trust": "operator-authorized-TOFU",
+  "ed25519_fingerprint": "SHA256:XXORXxOJUlqWb34HvHR1iYYflnndjXQfNzj4OT+NjPE",
+  "host": {
+    "address": "139.177.151.12",
+    "os": "Debian 12",
+    "vcpus": 4,
+    "memory_mib": 16005,
+    "root_disk_available_gib": 75,
+    "root_inodes_available": 5207055
+  },
+  "password_delivery_removed": true,
+  "hou4_preserved": true,
+  "maintenance_silence": false,
+  "deployment_run": false,
+  "backup_restore_gate": "outstanding-operator-deferred",
+  "cms_content_seed": "manual-pending",
+  "scope_checks": [
+    {
+      "identity": "deployment.agekey",
+      "input": "fresh-runtime.enc.yaml",
+      "decryption_permitted": true
+    },
+    {
+      "identity": "deployment.agekey",
+      "input": "fresh-host.enc.yaml",
+      "decryption_permitted": false
+    },
+    {
+      "identity": "deployment.agekey",
+      "input": "authentik-prod.enc.yaml",
+      "decryption_permitted": false
+    },
+    {
+      "identity": "deployment.agekey",
+      "input": "authentik-test.enc.yaml",
+      "decryption_permitted": false
+    },
+    {
+      "identity": "host.agekey",
+      "input": "fresh-host.enc.yaml",
+      "decryption_permitted": true
+    },
+    {
+      "identity": "host.agekey",
+      "input": "fresh-runtime.enc.yaml",
+      "decryption_permitted": false
+    },
+    {
+      "identity": "host.agekey",
+      "input": "authentik-prod.enc.yaml",
+      "decryption_permitted": false
+    },
+    {
+      "identity": "host.agekey",
+      "input": "authentik-test.enc.yaml",
+      "decryption_permitted": false
+    }
+  ],
+  "dns": {
+    "test.vps-test.pearlandpaws.com": [
+      "139.177.151.12"
+    ],
+    "landing-test.vps-test.pearlandpaws.com": [
+      "139.177.151.12"
+    ],
+    "staff-test.vps-test.pearlandpaws.com": [
+      "139.177.151.12"
+    ],
+    "auth-test.vps-test.pearlandpaws.com": [
+      "139.177.151.12"
+    ],
+    "netbird-test.vps-test.pearlandpaws.com": [
+      "139.177.151.12"
+    ]
+  },
+  "base_infra_ref": "b088e959b680ceed1533d19c7458005f627455af",
+  "staff_ref": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+  "netbird_version": "0.82.0",
+  "google_client_secret": "received-encrypted-delivery-deleted",
+  "google_allowlist_roles": "awaiting-operator-encrypted-handoff",
+  "validations": [
+    {
+      "command": "NGINX_BIN=/var/tmp/hou1-offboarding-tools/nginx-validator python3 -m unittest discover -s tests -v",
+      "result": "passed",
+      "tests_run": 144,
+      "skipped": 1,
+      "skip_reason": "Optional dnsmasq binary not configured",
+      "log_sha256": "d0105c2ee62880d9973d7793157b4818bba721cb00b8da7ef963225a60e6d2a3",
+      "note": "Full suite preceded the final bootstrap test/API refinements; the final affected module was rerun below."
+    },
+    {
+      "command": "python3 -m unittest discover -s tests -p test_authentik_bootstrap.py -v",
+      "result": "passed",
+      "tests_run": 14,
+      "skipped": 0,
+      "log_sha256": "696f95a1082673c70270564e2922e23569101a36e4a7b93fa366875a3f066e9c"
+    },
+    {
+      "command": "ansible-playbook --syntax-check",
+      "playbooks": [
+        "rehearse-vps.yml",
+        "rehearsal-seeds.yml",
+        "authentik-bootstrap.yml"
+      ],
+      "result": "passed",
+      "note": "Static check against repository inventory; no isolated_test_vps target selected and no remote tasks run."
+    },
+    {
+      "command": "git diff --check",
+      "result": "passed"
+    }
+  ],
+  "unvalidated": [
+    "fresh full-stack deployment",
+    "live Google OAuth login and role reconciliation",
+    "HOU4 VPN re-enrollment and monitoring recovery",
+    "manual CMS content seed",
+    "fresh restore and rollback drills",
+    "temporary deployment identity retirement after operator handoff"
+  ]
+}

@@ -6,6 +6,12 @@
     {"name": "pearland-paws-staff-reader"}
   ],
   "users": {{ authentik_staff_users | to_json }},
+{% if authentik_google_enabled | default(false) %}
+  "google": {
+    "client_id": {{ authentik_decrypted.GOOGLE_OAUTH_CLIENT_ID | to_json }},
+    "allowed_emails": {{ authentik_decrypted.GOOGLE_ALLOWED_EMAILS | to_json }}
+  },
+{% endif %}
   "scope_mappings": [
     {"name": "Pearland Paws profile test", "scope_name": "profile", "expression": "return {'name': user.name, 'preferred_username': user.username}"},
     {"name": "Pearland Paws groups test", "scope_name": "groups", "expression": "return {'groups': [group.name for group in user.ak_groups.all() if group.name in ['pearland-paws-staff-admin', 'pearland-paws-staff-editor', 'pearland-paws-staff-reader']]}"},

@@ -18,6 +18,7 @@
       - authentik_age_key_file is defined
       - authentik_age_key_file is match('^/')
       - authentik_secret_source is defined
+      - not (authentik_google_enabled | default(false) | bool) or (authentik_environment == 'test' and authentik_bootstrap_enabled | bool)
     fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
   no_log: true
 
@@ -341,23 +342,32 @@
     group: root
     mode: '0600'
   when: authentik_bootstrap_enabled | bool
+  no_log: true
 
-- name: Apply Authentik groups, claims, scopes, users, and clients idempotently
-  ansible.builtin.command:
-    argv:
-      - python3
-      - "{{ authentik_project_root }}/bootstrap.py"
-      - --base-url
-      - "{{ authentik_bootstrap_base_url }}"
-      - --environment
-      - "{{ authentik_environment }}"
-      - --manifest
-      - "{{ authentik_project_root }}/bootstrap.json"
-  environment:
-    AUTHENTIK_BOOTSTRAP_TOKEN: "{{ authentik_bootstrap_token }}"
-    STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
-    NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
-  register: authentik_bootstrap_result
-  changed_when: true
+- name: Apply private Authentik identity inputs and remove the runtime manifest
   when: authentik_bootstrap_enabled | bool
   no_log: true
+  block:
+    - name: Apply Authentik groups, claims, scopes, users, and clients idempotently
+      ansible.builtin.command:
+        argv:
+          - python3
+          - "{{ authentik_project_root }}/bootstrap.py"
+          - --base-url
+          - "{{ authentik_bootstrap_base_url }}"
+          - --environment
+          - "{{ authentik_environment }}"
+          - --manifest
+          - "{{ authentik_project_root }}/bootstrap.json"
+      environment:
+        AUTHENTIK_BOOTSTRAP_TOKEN: "{{ authentik_bootstrap_token }}"
+        STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
+        NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
+        GOOGLE_OAUTH_CLIENT_SECRET: "{{ authentik_decrypted.GOOGLE_OAUTH_CLIENT_SECRET | default('') }}"
+      register: authentik_bootstrap_result
+      changed_when: true
+  always:
+    - name: Remove plaintext identity input after a successful or failed bootstrap
+      ansible.builtin.file:
+        path: "{{ authentik_project_root }}/bootstrap.json"
+        state: absent

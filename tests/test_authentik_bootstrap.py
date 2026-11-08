@@ -5,8 +5,11 @@ import py_compile
 import unittest
 from types import SimpleNamespace
 from urllib.parse import parse_qs, urlsplit
+import tempfile
+import yaml
 
 from jinja2 import Environment
+from helpers import run_play
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE = ROOT / 'ansible/playbooks/roles/authentik'
@@ -45,7 +48,9 @@ class FixtureAPI(bootstrap.AuthentikAPI):
             return {}
         if method == 'PATCH':
             resource, lookup = '/'.join(parts[:-1]), parts[-1]
-            key = 'slug' if resource == 'core/applications' else 'pk'
+            if resource == 'sources/oauth':
+                assert payload['provider_type'] == 'google'
+            key = 'slug' if resource in ('core/applications', 'sources/oauth', 'flows/instances') else 'pk'
             obj = next(obj for obj in self.objects[resource] if obj[key] == lookup)
             obj.update(payload)
             return obj
@@ -63,6 +68,127 @@ class FixtureAPI(bootstrap.AuthentikAPI):
 
 
 class AuthentikBootstrapTest(unittest.TestCase):
+    def google_api(self):
+        api = FixtureAPI()
+        api.objects['flows/instances'] += [
+            {'pk': 'source-auth', 'slug': 'default-source-authentication', 'policy_engine_mode': 'any'},
+            {'pk': 'source-enroll', 'slug': 'default-source-enrollment', 'policy_engine_mode': 'any'},
+        ]
+        api.objects['stages/identification'] = [
+            {'pk': 'identify', 'name': 'default-authentication-identification', 'sources': ['other-source']}]
+        api.objects['stages/user_write'] = [
+            {'pk': 'write', 'name': 'default-source-enrollment-write', 'user_type': 'external'}]
+        return api
+
+    def google_manifest(self):
+        env = Environment()
+        env.filters['to_json'] = json.dumps
+        return json.loads(env.from_string((ROLE / 'templates/bootstrap-test.json.j2').read_text()).render(
+            primary_domain='example.invalid', authentik_staff_users=[], authentik_google_enabled=True,
+            authentik_decrypted={'GOOGLE_OAUTH_CLIENT_ID': 'fixture.apps.googleusercontent.com',
+                                 'GOOGLE_ALLOWED_EMAILS': ['allowed@example.invalid']}))
+
+    def test_google_fresh_bootstrap_gates_flows_before_enabling_source_and_preserves_other_sources(self):
+        manifest = self.google_manifest()
+        bootstrap.validate_manifest(manifest, 'test')
+        api = self.google_api()
+        bootstrap.apply_google(manifest['google'], api, 'fixture-secret')
+        source = api.objects['sources/oauth'][0]
+        source_write = next(i for i, w in enumerate(api.writes) if w[1] == '/sources/oauth/')
+        binding_writes = [i for i, w in enumerate(api.writes) if w[1] == '/policies/bindings/']
+        self.assertEqual(len(binding_writes), 2)
+        self.assertTrue(all(i < source_write for i in binding_writes))
+        self.assertEqual(source['pkce'], 'S256')
+        self.assertEqual(source['user_matching_mode'], 'email_link')
+        self.assertEqual(source['user_path_template'], 'goauthentik.io/sources/%(slug)s')
+        self.assertEqual(api.objects['stages/user_write'][0]['user_type'], 'internal')
+        self.assertEqual(api.objects['stages/identification'][0]['sources'], sorted(['other-source', source['pk']]))
+        self.assertTrue(all(f['policy_engine_mode'] == 'all' for f in api.objects['flows/instances'][-2:]))
+        first_count = len(api.writes)
+        bootstrap.apply_google(manifest['google'], api, 'fixture-secret')
+        self.assertEqual(len(api.writes), first_count)
+        self.assertEqual(len(api.objects['sources/oauth']), 1)
+        self.assertEqual(len(api.objects['policies/bindings']), 2)
+
+    def test_google_source_policy_rejects_unverified_and_unlisted_accounts(self):
+        api = self.google_api()
+        bootstrap.apply_google(self.google_manifest()['google'], api, 'fixture-secret')
+        expression = api.objects['policies/expression'][0]['expression']
+        for context, expected in [
+            ({'email': 'allowed@example.invalid', 'email_verified': True}, True),
+            ({'email': 'ALLOWED@example.invalid', 'verified_email': True}, True),
+            ({'email': 'allowed@example.invalid', 'email_verified': False}, False),
+            ({'email': 'allowed@example.invalid', 'email_verified': 'true'}, False),
+            ({'email': 'stranger@example.invalid', 'email_verified': True}, False),
+            ({}, False),
+        ]:
+            namespace = {'context': {'oauth_userinfo': context}}
+            exec('def evaluate():\n' + '\n'.join('    ' + line for line in expression.splitlines()), namespace)
+            self.assertEqual(namespace['evaluate'](), expected)
+
+    def test_google_write_only_secret_update_uses_source_slug(self):
+        api = self.google_api()
+        google = self.google_manifest()['google']
+        bootstrap.apply_google(google, api, 'fixture-secret')
+        del api.objects['sources/oauth'][0]['consumer_secret']
+        api.writes.clear()
+        bootstrap.apply_google(google, api, 'rotated-fixture-secret')
+        self.assertEqual(api.writes, [('PATCH', '/sources/oauth/google/', {
+            'consumer_secret': 'rotated-fixture-secret', 'provider_type': 'google'})])
+
+    def test_emergency_password_is_optional_and_rendered_from_private_inputs(self):
+        env = Environment()
+        template = env.from_string((ROLE / 'templates/authentik.env.j2').read_text())
+        values = dict(authentik_secret_key='key', authentik_postgres_password='postgres', authentik_bootstrap_token='token')
+        self.assertNotIn('AUTHENTIK_BOOTSTRAP_PASSWORD', template.render(**values))
+        self.assertIn('AUTHENTIK_BOOTSTRAP_PASSWORD=fixture-emergency', template.render(
+            **values, authentik_decrypted={'AUTHENTIK_EMERGENCY_PASSWORD': 'fixture-emergency'}))
+
+    def test_failed_bootstrap_removes_private_manifest_without_logging_its_values(self):
+        task = next(task for task in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if task['name'] == 'Apply private Authentik identity inputs and remove the runtime manifest')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            secret = 'PRIVATE-IDENTITY-FIXTURE'
+            (root / 'bootstrap.json').write_text(secret)
+            (root / 'bootstrap.py').write_text('raise RuntimeError(' + repr(secret) + ')\n')
+            result = run_play({
+                'authentik_bootstrap_enabled': True, 'authentik_project_root': directory,
+                'authentik_bootstrap_base_url': 'http://127.0.0.1:1', 'authentik_environment': 'test',
+                'authentik_bootstrap_token': secret, 'staff_oidc_client_secret': secret,
+                'netbird_oidc_client_secret': secret, 'authentik_decrypted': {},
+            }, [{'block': [task], 'rescue': [{'ansible.builtin.set_fact': {'bootstrap_failed': True}}]},
+                {'ansible.builtin.assert': {'that': 'bootstrap_failed | default(false)'}}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertFalse((root / 'bootstrap.json').exists())
+            self.assertNotIn(secret, result.stdout + result.stderr)
+
+    def test_google_missing_prerequisites_fail_before_enabling_source(self):
+        for resource in ('flows/instances', 'stages/identification', 'stages/user_write'):
+            api = self.google_api()
+            api.objects[resource] = []
+            with self.assertRaises(ValueError):
+                bootstrap.apply_google(self.google_manifest()['google'], api, 'fixture-secret')
+            self.assertEqual(api.writes, [])
+        api = self.google_api()
+        with self.assertRaises(ValueError):
+            bootstrap.apply_google(self.google_manifest()['google'], api, '')
+        self.assertEqual(api.writes, [])
+
+    def test_google_manifest_refuses_production_or_broad_allowlists(self):
+        for value in ([], ['*@example.invalid'], ['UPPER@example.invalid'], ['bad email@example.invalid']):
+            manifest = self.google_manifest()
+            manifest['google']['allowed_emails'] = value
+            with self.assertRaises(ValueError):
+                bootstrap.validate_manifest(manifest, 'test')
+        env = Environment()
+        env.filters['to_json'] = json.dumps
+        manifest = json.loads(env.from_string((ROLE / 'templates/bootstrap-prod.json.j2').read_text()).render(
+            primary_domain='example.invalid', authentik_staff_users=[]))
+        manifest['google'] = self.google_manifest()['google']
+        with self.assertRaisesRegex(ValueError, 'restricted to the isolated rehearsal'):
+            bootstrap.validate_manifest(manifest, 'prod')
+
     def test_pinned_schema_reconciles_twice_without_duplicate_objects(self):
         env = Environment()
         env.filters['to_json'] = json.dumps
