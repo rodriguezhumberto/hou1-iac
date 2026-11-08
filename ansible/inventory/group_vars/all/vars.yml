@@ -100,6 +100,7 @@ authentik_backup_schedule_hour: '2'
 authentik_backup_age_recipient: ''
 authentik_bootstrap_enabled: false
 authentik_staff_users: []
+authentik_google_enabled: false
 
 # Opt in only for isolated rehearsals with a Google source. Rules target the
 # running server container and expire unless its endpoint refresh succeeds.
