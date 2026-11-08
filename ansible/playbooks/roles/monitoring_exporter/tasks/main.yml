@@ -14,6 +14,8 @@
       - hou1_monitoring_peer_ip != netbird_ip
       - hou1_monitoring_exporter_port | int == 9100
       - hou1_monitoring_backup_directory == '/var/backups/hou1-authentik/test'
+      - hou1_request_metrics_enabled is boolean
+      - hou1_request_metrics_log == '/opt/pearlandpaws-test/nginx-logs/metrics.jsonl'
       - not ansible_check_mode
     fail_msg: Use the isolated private HOU1 target and one declared HOU4 VPN peer.
 
@@ -33,7 +35,7 @@
 
 - name: Install the native private exporter and collector dependencies
   ansible.builtin.apt:
-    name: [prometheus-node-exporter, python3]
+    name: [prometheus-node-exporter, python3, logrotate]
     state: present
     policy_rc_d: 101
     install_recommends: false
@@ -48,6 +50,7 @@
     group: '{{ item.group }}'
     mode: '{{ item.mode }}'
   loop:
+    - {path: /var/lib/hou1-monitoring, group: root, mode: '0700'}
     - {path: /etc/hou1-monitoring, group: root, mode: '0700'}
     - {path: /usr/local/libexec, group: root, mode: '0755'}
     - {path: /var/lib/prometheus/node-exporter, group: prometheus, mode: '0750'}
@@ -59,7 +62,7 @@
     owner: root
     group: root
     mode: '0600'
-    content: "{{ {'environment': 'test', 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory} | to_nice_json }}"
+    content: "{{ {'environment': 'test', 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory, 'request_metrics_enabled': hou1_request_metrics_enabled, 'request_metrics_log': hou1_request_metrics_log} | to_nice_json }}"
 
 - name: Install the read-only aggregate collector
   ansible.builtin.copy:
@@ -68,6 +71,30 @@
     owner: root
     group: root
     mode: '0700'
+
+- name: Install the credential-free request aggregate helper
+  ansible.builtin.copy:
+    src: request_metrics.py
+    dest: /usr/local/libexec/request_metrics.py
+    owner: root
+    group: root
+    mode: '0600'
+
+- name: Install bounded metrics log rotation
+  ansible.builtin.template:
+    src: logrotate.j2
+    dest: /etc/hou1-monitoring/logrotate.conf
+    owner: root
+    group: root
+    mode: '0600'
+  when: hou1_request_metrics_enabled
+
+- name: Check metric log size and retention hourly
+  ansible.builtin.cron:
+    name: HOU1 isolated credential-free metrics log rotation
+    minute: '17'
+    job: /usr/sbin/logrotate --state /var/lib/hou1-monitoring/logrotate.state /etc/hou1-monitoring/logrotate.conf
+    state: "{{ 'present' if hou1_request_metrics_enabled else 'absent' }}"
 
 - name: Configure the private exporter and textfile directory
   ansible.builtin.copy:

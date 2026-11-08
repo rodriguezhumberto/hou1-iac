@@ -1,0 +1,14 @@
+{{ hou1_request_metrics_log }} {
+    daily
+    maxsize 10M
+    rotate 3
+    su root root
+    missingok
+    notifempty
+    nocompress
+    create 0640 root root
+    sharedscripts
+    postrotate
+        /usr/bin/docker exec {{ hou1_monitoring_containers.nginx.name }} nginx -s reopen >/dev/null 2>&1
+    endscript
+}

@@ -11,3 +11,5 @@ hou1_monitoring_containers:
   netbird: {name: hou1-netbird-test-netbird-server-1, project: hou1-netbird-test}
   netbird-dashboard: {name: hou1-netbird-test-dashboard-1, project: hou1-netbird-test}
 hou1_monitoring_backup_directory: /var/backups/hou1-authentik/test
+hou1_request_metrics_enabled: false
+hou1_request_metrics_log: /opt/pearlandpaws-test/nginx-logs/metrics.jsonl

@@ -21,6 +21,11 @@ program.chmod(0o700)
 tls_program = root / "controller-tls.py"
 shutil.copyfile(Path(__file__).with_name("rehearsal-controller-tls.py"), tls_program)
 tls_program.chmod(0o700)
+# Keep a maintained source for the configured private admin peer's probe.
+# The transport remains explicit in staff_probe_command; never embed credentials.
+staff_program = root / "live-staff-check.py"
+shutil.copyfile(Path(__file__).with_name("rehearsal-staff-health.py"), staff_program)
+staff_program.chmod(0o700)
 units = Path.home() / ".config/systemd/user"
 units.mkdir(parents=True, exist_ok=True)
 files = {
