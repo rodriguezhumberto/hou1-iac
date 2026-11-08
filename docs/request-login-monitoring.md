@@ -94,3 +94,11 @@ PostgreSQL, container, backup and renewal monitoring continue separately.
 
 Production support for the test-only HOU1 role and actual production identities,
 secrets and recovery custody remain separate rollout work.
+
+Evidence from the isolated rehearsal is recorded in
+[evidence/request-login-monitoring-2026-11-08.json](evidence/request-login-monitoring-2026-11-08.json):
+93 staff tests, 139 infrastructure tests with one existing DNS-tool skip, 39 HOU4
+tests, native Nginx privacy/error/latency checks, successful live firing and
+resolved Discord notifications, preserved counters across rotation, eight healthy
+targets, 23 inactive rules and 22 provisioned dashboard queries. Both scoped
+Ansible reruns reported zero changes. No production promotion was performed.

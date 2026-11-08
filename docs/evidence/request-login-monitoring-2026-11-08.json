@@ -1,0 +1,677 @@
+{
+  "environment": "test",
+  "recorded_at": "2026-11-08T05:43:05.629320+00:00",
+  "issues": [
+    "rodriguezhumberto/hou1-iac#27",
+    "rodriguezhumberto/pearland-paws#39"
+  ],
+  "merged_pr": {
+    "url": "https://github.com/rodriguezhumberto/hou1-iac/pull/50",
+    "merge_commit": "cf22aa963b44ba9358d1351a8f4e99c1905331d6"
+  },
+  "source_refs": {
+    "hou1": "61a21d0ca77c603213566f997a5ababfecd59c09",
+    "staff": "d5bd7b7c5c496c06b3c487131835c16920b0cd67",
+    "hou4_local_only": "724b9329766604d8c2594af4b0c9018ea50ed2b7",
+    "deployed_staff_image_source": "346760920d90f2c31fe4a188a8c8ead2e6aae53a"
+  },
+  "deployed_collector_sha256": {
+    "/usr/local/libexec/request_metrics.py": "945f7adbdf44e665da5e132faa98f6f2ca0d34262f796ea88864bbda8399d764",
+    "/usr/local/libexec/hou1-monitoring-collect": "ed58e1cb81822fd532cc210b24bdb94a2dd7588854729160d48028f9af79a775"
+  },
+  "validation": {
+    "staff": {
+      "tests": 93,
+      "passed": 93,
+      "failed": 0
+    },
+    "hou1": {
+      "tests": 140,
+      "passed": 139,
+      "skipped": 1,
+      "skip": "Existing optional dnsmasq integration tool not installed.",
+      "final_rerun_note": "An invocation without NGINX_BIN failed one existing ingress-tool prerequisite; all 6 tests in that module then passed with the configured validator. The preceding full run with that setting passed 139/140 with the same DNS skip."
+    },
+    "hou4": {
+      "tests": 39,
+      "passed": 39,
+      "failed": 0,
+      "skipped": 0,
+      "additional_native_hold_and_initiation_checks": "passed"
+    },
+    "native_nginx_fixture": {
+      "observed_5xx": true,
+      "observed_slow_callback": true,
+      "nginx_version": "1.28-alpine",
+      "native_metrics_schema": true,
+      "fixed_outcomes": true,
+      "public_denial_excluded_from_login_failures": true,
+      "spoofed_request_marker_ignored": true,
+      "internal_result_header_hidden": true,
+      "credential_sentinels_absent": true,
+      "records": [
+        {
+          "v": 1,
+          "time": 1794116224.913,
+          "service": "staff",
+          "route": "callback",
+          "status": 302,
+          "duration": 0.001,
+          "result": "success"
+        },
+        {
+          "v": 1,
+          "time": 1794116224.926,
+          "service": "staff",
+          "route": "callback",
+          "status": 302,
+          "duration": 0.0,
+          "result": "failure"
+        },
+        {
+          "v": 1,
+          "time": 1794116224.938,
+          "service": "staff",
+          "route": "callback",
+          "status": 403,
+          "duration": 0.0,
+          "result": "none"
+        },
+        {
+          "v": 1,
+          "time": 1794116224.951,
+          "service": "staff",
+          "route": "request",
+          "status": 503,
+          "duration": 0.001,
+          "result": "none"
+        },
+        {
+          "v": 1,
+          "time": 1794116227.063,
+          "service": "staff",
+          "route": "callback",
+          "status": 302,
+          "duration": 2.101,
+          "result": "success"
+        }
+      ]
+    },
+    "ansible_rerun": {
+      "hou1": {
+        "ok": 34,
+        "changed": 0,
+        "failed": 0,
+        "unreachable": 0
+      },
+      "hou4_prometheus_grafana": {
+        "ok": 35,
+        "changed": 0,
+        "failed": 0,
+        "unreachable": 0
+      }
+    },
+    "app_deployment": {
+      "app_deployed": true,
+      "nginx_validated_reloaded": true,
+      "old_image_and_config_retained": true,
+      "staff_ref": "346760920d90f2c31fe4a188a8c8ead2e6aae53a"
+    },
+    "routine_probe": {
+      "routine_login_probe": "passed",
+      "identities_checked": 2,
+      "checks_passed": 7
+    },
+    "valid_login_recovery": {
+      "environment": "test",
+      "valid_login": {
+        "callback_rejected": false,
+        "expectation": "accepted",
+        "logout_revoked": true,
+        "protected_status": 200,
+        "run_id": "metrics-3372aa89",
+        "session_created": true
+      },
+      "session_revoked_on_logout": true
+    },
+    "log_rotation": {
+      "forced_rename_rotation": true,
+      "counters_preserved": true,
+      "before": {
+        "inode": 672273,
+        "requests": 702,
+        "callback_count": 14,
+        "success": 10,
+        "offset": 79636
+      },
+      "after": {
+        "inode": 672274,
+        "requests": 704,
+        "callback_count": 14,
+        "success": 10,
+        "offset": 114
+      },
+      "repeat": {
+        "inode": 672274,
+        "requests": 704,
+        "callback_count": 14,
+        "success": 10,
+        "offset": 114
+      },
+      "repeat_unchanged": true
+    },
+    "isolation": {
+      "environment": "test",
+      "public_ports": [
+        {
+          "host": "139.177.151.12",
+          "port": 22,
+          "reachable": false
+        },
+        {
+          "host": "139.177.151.12",
+          "port": 9100,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 22,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 80,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 443,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 3000,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 9090,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 9093,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 9094,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 9100,
+          "reachable": false
+        },
+        {
+          "host": "136.0.42.245",
+          "port": 9115,
+          "reachable": false
+        }
+      ],
+      "administrator_peer_metrics_denied": true
+    },
+    "stack_audit": {
+      "environment": "test",
+      "recorded_at": "2026-11-08T05:42:18.794966+00:00",
+      "services": {
+        "netbird": "active",
+        "ssh": "active",
+        "prometheus-node-exporter": "active",
+        "prometheus-blackbox-exporter": "active",
+        "prometheus-alertmanager": "active",
+        "prometheus": "active",
+        "grafana-server": "active",
+        "hou4-test-alert-receiver": "active",
+        "nginx": "active"
+      },
+      "startup": {
+        "netbird": "enabled",
+        "ssh": "enabled",
+        "prometheus-node-exporter": "enabled",
+        "prometheus-blackbox-exporter": "enabled",
+        "prometheus-alertmanager": "enabled",
+        "prometheus": "enabled",
+        "grafana-server": "enabled",
+        "hou4-test-alert-receiver": "enabled",
+        "nginx": "enabled"
+      },
+      "netbird_version": "0.82.0",
+      "netbird_private_management": "passed",
+      "ssh_hardening": "passed",
+      "host_firewall": "active; private SSH and declared administrator-only HTTPS",
+      "monitoring_loopback_listeners": {
+        "18443": "127.0.0.1:18443",
+        "9100": "127.0.0.1:9100",
+        "9090": "127.0.0.1:9090",
+        "9093": "127.0.0.1:9093",
+        "9115": "127.0.0.1:9115",
+        "3000": "127.0.0.1:3000"
+      },
+      "grafana_https_listener": "100.91.0.22:443",
+      "prometheus_configuration_accepted": true,
+      "prometheus_retention": "15d or 2GiB",
+      "prometheus_targets": [
+        {
+          "job": "hou1-authentik-ready",
+          "health": "up"
+        },
+        {
+          "job": "hou1-netbird-api",
+          "health": "up"
+        },
+        {
+          "job": "hou1-node",
+          "health": "up"
+        },
+        {
+          "job": "hou1-staff-public-denied",
+          "health": "up"
+        },
+        {
+          "job": "hou4-internal-alertmanager",
+          "health": "up"
+        },
+        {
+          "job": "hou4-internal-blackbox",
+          "health": "up"
+        },
+        {
+          "job": "hou4-internal-prometheus",
+          "health": "up"
+        },
+        {
+          "job": "hou4-node",
+          "health": "up"
+        }
+      ],
+      "https_probes": [
+        {
+          "job": "hou1-authentik-ready",
+          "success": true
+        },
+        {
+          "job": "hou1-netbird-api",
+          "success": true
+        },
+        {
+          "job": "hou1-staff-public-denied",
+          "success": true
+        }
+      ],
+      "alert_states": {
+        "Hou4MetricsTargetDown": "inactive",
+        "Hou4HttpsProbeFailed": "inactive",
+        "Hou4TlsCertificateExpiring": "inactive",
+        "Hou4AlertDeliveryFailed": "inactive",
+        "Hou4MemoryPressure": "inactive",
+        "Hou4InodePressure": "inactive",
+        "Hou4DiskIoPressure": "inactive",
+        "Hou4NodeExporterDown": "inactive",
+        "Hou4FilesystemAlmostFull": "inactive",
+        "Hou1CollectorUnavailable": "inactive",
+        "Hou1ContainerUnhealthy": "inactive",
+        "Hou1PostgresqlUnavailable": "inactive",
+        "Hou1AuthentikBackupStale": "inactive",
+        "Hou1RequestMetricsUnavailable": "inactive",
+        "Hou1NginxServerErrorRate": "inactive",
+        "Hou1StaffLoginFailures": "inactive",
+        "Hou1StaffLoginFailureRate": "inactive",
+        "Hou1StaffCallbackLatency": "inactive",
+        "Hou1StaffCallbackOutcomeMissing": "inactive",
+        "Hou4CertificateRenewalFailed": "inactive",
+        "Hou4CertificateRenewalOverdue": "inactive",
+        "Hou4RenewalMetricsStale": "inactive",
+        "Hou4GrafanaCertificateExpiring": "inactive"
+      },
+      "grafana_version": "13.3.0",
+      "grafana_https_settings": "passed",
+      "grafana_login_datasource_query_logout": "requires separate external HTTPS test",
+      "private_https_receiver": "passed",
+      "packages": [
+        "grafana 13.3.0",
+        "netbird 0.82.0",
+        "nginx 1.22.1-9+deb12u10",
+        "prometheus 2.42.0+ds-5+deb12u1",
+        "prometheus-alertmanager 0.25.0-1+b4",
+        "prometheus-blackbox-exporter 0.23.0-4+b4",
+        "prometheus-node-exporter 1.5.0-1+b6"
+      ],
+      "memory_kib": {
+        "MemTotal": 2014124,
+        "MemAvailable": 1123092
+      },
+      "root_disk_bytes": {
+        "total": 53618913280,
+        "available": 48034271232
+      },
+      "boot_id": "31076aa0-bf99-4544-961a-7367b3d2750d",
+      "uptime_seconds": 8193.54
+    },
+    "private_grafana_https": {
+      "hostname": "grafana-test.vps-test.pearlandpaws.com",
+      "authorized_admin_https": true,
+      "trusted_tls": true,
+      "secure_session_cookie": true,
+      "anonymous_denied": true,
+      "admin_login": true,
+      "datasource_loopback": true,
+      "prometheus_query_targets": 8,
+      "logout_invalidated_session": true,
+      "test_resolution": "--dns-servers 100.91.0.10:1053",
+      "provisioned_operations_dashboard": true,
+      "dashboard_panels": 22,
+      "dashboard_title": "HOU1 Operations"
+    },
+    "all_panel_queries": {
+      "environment": "test",
+      "recorded_at": "2026-11-08T05:41:18.508353+00:00",
+      "checks": {
+        "hou1_exporter": true,
+        "collector": true,
+        "postgresql": true,
+        "renewal_status": true,
+        "healthy_containers": 7,
+        "collector_age": 30,
+        "renewal_metrics_age": 76,
+        "renewal_success_age": 4576,
+        "local_authentik_backup_age": 10871,
+        "postgresql_database_size_bytes": 91566563.0,
+        "dashboard_queries": [
+          {
+            "title": "Metrics target health",
+            "series": 8
+          },
+          {
+            "title": "HTTPS service probes",
+            "series": 3
+          },
+          {
+            "title": "CPU usage",
+            "series": 2
+          },
+          {
+            "title": "Memory used",
+            "series": 2
+          },
+          {
+            "title": "Filesystem free",
+            "series": 2
+          },
+          {
+            "title": "Filesystem inodes free",
+            "series": 2
+          },
+          {
+            "title": "HOU1 container health",
+            "series": 7
+          },
+          {
+            "title": "Authentik PostgreSQL query health",
+            "series": 1
+          },
+          {
+            "title": "Authentik PostgreSQL connections",
+            "series": 1
+          },
+          {
+            "title": "Authentik PostgreSQL database size",
+            "series": 1
+          },
+          {
+            "title": "Authentik PostgreSQL commit rate",
+            "series": 1
+          },
+          {
+            "title": "Local Authentik backup age",
+            "series": 1
+          },
+          {
+            "title": "Grafana renewal last run (1 = success)",
+            "series": 1
+          },
+          {
+            "title": "Grafana renewal last success age",
+            "series": 1
+          },
+          {
+            "title": "Grafana certificate lifetime remaining",
+            "series": 1
+          },
+          {
+            "title": "Firing alerts",
+            "series": 1
+          },
+          {
+            "title": "Nginx server errors",
+            "series": 4
+          },
+          {
+            "title": "Staff callback failure rate",
+            "series": 1
+          },
+          {
+            "title": "Staff callback p95 processing time",
+            "series": 1
+          },
+          {
+            "title": "Consecutive staff callback failures",
+            "series": 1
+          },
+          {
+            "title": "Request metrics collection health",
+            "series": 1
+          },
+          {
+            "title": "Staff callback outcomes",
+            "series": 3
+          }
+        ]
+      }
+    },
+    "final_request_metrics": {
+      "checks": {
+        "hou1_request_metrics_collection_success{job=\"hou1-node\"}": [
+          {
+            "metric": {
+              "__name__": "hou1_request_metrics_collection_success",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node"
+            },
+            "value": [
+              1794116538.763,
+              "1"
+            ]
+          }
+        ],
+        "hou1_staff_login_consecutive_failures{job=\"hou1-node\"}": [
+          {
+            "metric": {
+              "__name__": "hou1_staff_login_consecutive_failures",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node"
+            },
+            "value": [
+              1794116538.764,
+              "0"
+            ]
+          }
+        ],
+        "hou1_staff_callback_duration_seconds_count{job=\"hou1-node\"}": [
+          {
+            "metric": {
+              "__name__": "hou1_staff_callback_duration_seconds_count",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node"
+            },
+            "value": [
+              1794116538.765,
+              "21"
+            ]
+          }
+        ],
+        "hou1_staff_callback_duration_seconds_sum{job=\"hou1-node\"}": [
+          {
+            "metric": {
+              "__name__": "hou1_staff_callback_duration_seconds_sum",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node"
+            },
+            "value": [
+              1794116538.766,
+              "22.217"
+            ]
+          }
+        ],
+        "hou1_staff_login_total{job=\"hou1-node\"}": [
+          {
+            "metric": {
+              "__name__": "hou1_staff_login_total",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node",
+              "phase": "callback",
+              "result": "failure"
+            },
+            "value": [
+              1794116538.767,
+              "7"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "hou1_staff_login_total",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node",
+              "phase": "callback",
+              "result": "success"
+            },
+            "value": [
+              1794116538.767,
+              "14"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "hou1_staff_login_total",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node",
+              "phase": "callback",
+              "result": "unknown"
+            },
+            "value": [
+              1794116538.767,
+              "0"
+            ]
+          },
+          {
+            "metric": {
+              "__name__": "hou1_staff_login_total",
+              "instance": "100.91.0.10:9100",
+              "job": "hou1-node",
+              "phase": "start",
+              "result": "failure"
+            },
+            "value": [
+              1794116538.767,
+              "0"
+            ]
+          }
+        ]
+      },
+      "alerts": []
+    },
+    "live_login_alert_drill": {
+      "environment": "test",
+      "fault": "three invalid OIDC callbacks from authorized VPN peer; no IdP/config/VPN changes",
+      "before": {
+        "sent": 3.0,
+        "failed": 0,
+        "streak": 0.0,
+        "alerts": []
+      },
+      "recorded_at": "2026-11-08T05:41:39.742390+00:00",
+      "fault_injected": {
+        "invalid_callbacks": 3,
+        "new_session_cookie": false
+      },
+      "firing_delivered": {
+        "sent": 4.0,
+        "failed": 0,
+        "streak": 3.0,
+        "alerts": [
+          {
+            "name": "Hou1StaffLoginFailures",
+            "state": "firing"
+          },
+          {
+            "name": "Hou1StaffLoginFailureRate",
+            "state": "pending"
+          }
+        ]
+      },
+      "restored": {
+        "valid_login_and_logout": true
+      },
+      "resolved_delivered": {
+        "sent": 5.0,
+        "failed": 0,
+        "streak": 0.0,
+        "alerts": []
+      },
+      "result": {
+        "passed": true
+      }
+    },
+    "cleanup": {
+      "exact_secret_value_scan_passed": true,
+      "files_scanned": 57,
+      "temporary_plaintext_vars_removed": true
+    }
+  },
+  "observations": [
+    "Routine health checks previously replayed every valid callback. The maintained probe now verifies login, roles and logout without intentional attacks; dedicated security probes retain replay tests.",
+    "Two real successful callbacks took 2.215s and 5.081s during validation. The latency rule fired and subsequently cleared. The drill initially waited too briefly for its five-minute measurement window; it was rerun after a clean baseline without altering thresholds.",
+    "A stack audit during validation saw a transient HTTPS probe failure. The final audit passed all three HTTPS probes, eight targets and 23 inactive alert rules.",
+    "Discord delivery evidence is successful Alertmanager notification counters with zero failures; it is not human confirmation of reading a message."
+  ],
+  "limits": [
+    "Callback processing latency excludes human time at Google.",
+    "Idle rates/quantiles can be NaN.",
+    "Native fixtures prove 5xx and slow-callback logging and PromQL thresholds; no live IdP outage or deliberate NetBird restart was introduced.",
+    "Independent monitoring-node outage detection remains deferred.",
+    "HOU1 role remains test-only; production promotion and production identity/secret/recovery custody are separate gates.",
+    "HOU4 has no remote and remains local-only."
+  ],
+  "production_promoted": false,
+  "log_sha256": {
+    "login-alert-baseline-window.log": "547be7939f1eced5b1d8d47e76d1d4750521f4baec3ff05befa1318f68664e4e",
+    "infra-rerun.log": "a95db3108f4bcb52315f0eb6f7cc631a5fcbe882c4a3093e9f61081e84ff33a1",
+    "staff-tests.log": "881e52e960c5fece00de77e4904d125e9fb4f1ee7301bcadf90b4a480194a722",
+    "alert-hold-tests.log": "f40ca9739443521e96fa20d79c61f5ef115ee277bb17d519a504878aff619abc",
+    "hou4-deploy.log": "158c4c19e0799a948b105851238a0bebe46c78fd09192724d8c438059a6b399f",
+    "hou4-rerun.log": "2014538e6b82e566a04a94503afa1ad78839b52a9093a91c1e3035c91c1d9a7b",
+    "logrotate-check.log": "a1ce23b32ef51aec2c1c7b1ba733dab6c6868e78a9e43c50eb5bcceeb8b5fa3a",
+    "stack-audit.log": "02972db7f57d31cba8ac52879791a62ab3f8adecc3fc3de83d5d3192769faef9",
+    "infra-focused.log": "08b1d21a143e82e7c353d631e2a7e978617312743ec70b8fc85b72bdf57090be",
+    "final-metrics.log": "da5dffb74f9288812ce8d9ca12d754d205d28fec779a83c3728942b1211a1cfa",
+    "infra-deploy.log": "83b737f7005a4b170e8a7152af59faa85f9435c6a778f3d6a3ff57fcbab57f19",
+    "infra-tests.log": "d078878ef7e1ac01ddbf9b94d17e0324e121f2a7d90ca3ca2282336a6275e117",
+    "infra-validator-rerun.log": "b2791a35e03fa7751f0c9be080d573429547ef1a4b95ffbd9af2a1aa028973dd",
+    "infra-tests-final.log": "f370c54417c175c1b5af18fdb62a928e1d9530a9a145bce90f0e923070453a67",
+    "app-build.log": "92d46489eebb82c45e1dd1e94f003d3585b52843bf6e714cfaa54a63df0e377b",
+    "grafana-https.log": "a0c28c51f93b4f1cbd3ad42bdd9a91a43e1ce868d85eb8eb09a8b73177e66676",
+    "login-alert-drill.log": "c9d81f31de19158b5fc25be657b4b45b61f1a0810febe854921c22bb06498523",
+    "infra-syntax.log": "b19795280559210ceeaf2bc91fa7115dab1f5bf335adc36b67dbeb79e9c08955",
+    "hou4-tests.log": "ce8aa1c560d59ee5986bc55fe6aafc54f39f37319a2fa43aa98799ffc25f60f8"
+  }
+}
