@@ -1,0 +1,7 @@
+[Unit]
+Wants=netbird.service
+After=netbird.service
+[Service]
+Restart=on-failure
+RestartSec=5s
+ExecStartPre=/usr/bin/timeout 90 /bin/sh -c 'until /usr/sbin/ip -4 addr show dev {{ netbird_interface }} 2>/dev/null | /bin/grep -Fq "inet {{ netbird_ip }}/"; do /bin/sleep 1; done'

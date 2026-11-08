@@ -1,0 +1,15 @@
+---
+- name: Export isolated HOU1 metrics privately to HOU4
+  hosts: isolated_test_vps
+  become: true
+  gather_facts: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Validate existing private management
+      ansible.builtin.import_role:
+        name: netbird_common
+  roles:
+    - role: monitoring_exporter

@@ -1,0 +1,146 @@
+---
+- name: Require an explicit isolated private metrics deployment
+  ansible.builtin.assert:
+    that:
+      - hou1_monitoring_enabled is boolean and hou1_monitoring_enabled
+      - cms_environment == 'test'
+      - groups.get('isolated_test_vps', []) | length == 1
+      - inventory_hostname not in groups.get('prod_env', [])
+      - ansible_host == netbird_ip
+      - not (node_bootstrap | bool)
+      - netbird_subnet == '100.91.0.0/16'
+      - hou1_monitoring_peer_ip is ansible.utils.ipv4
+      - (hou1_monitoring_peer_ip | ansible.utils.ipaddr(netbird_subnet)) is truthy
+      - hou1_monitoring_peer_ip != netbird_ip
+      - hou1_monitoring_exporter_port | int == 9100
+      - hou1_monitoring_backup_directory == '/var/backups/hou1-authentik/test'
+      - not ansible_check_mode
+    fail_msg: Use the isolated private HOU1 target and one declared HOU4 VPN peer.
+
+- name: Require test-only fixed container projects
+  ansible.builtin.assert:
+    that:
+      - item.key is match('^[a-z0-9-]+$')
+      - item.value.name is match('^[a-z0-9-]+-test-[a-z0-9-]+-1$')
+      - item.value.project in ['hou1-authentik-test', 'hou1-netbird-test', 'pearlandpaws-test']
+  loop: '{{ hou1_monitoring_containers | dict2items }}'
+
+- name: Prepare controller API context without reenrolling any peer
+  ansible.builtin.import_tasks: ../../netbird_client/tasks/api-context.yml
+
+- name: Reconcile only the two metrics peer groups and their single-port policy
+  ansible.builtin.import_tasks: policy.yml
+
+- name: Install the native private exporter and collector dependencies
+  ansible.builtin.apt:
+    name: [prometheus-node-exporter, python3]
+    state: present
+    policy_rc_d: 101
+    install_recommends: false
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Create protected metrics directories
+  ansible.builtin.file:
+    path: '{{ item.path }}'
+    state: directory
+    owner: root
+    group: '{{ item.group }}'
+    mode: '{{ item.mode }}'
+  loop:
+    - {path: /etc/hou1-monitoring, group: root, mode: '0700'}
+    - {path: /usr/local/libexec, group: root, mode: '0755'}
+    - {path: /var/lib/prometheus/node-exporter, group: prometheus, mode: '0750'}
+    - {path: /etc/systemd/system/prometheus-node-exporter.service.d, group: root, mode: '0755'}
+
+- name: Configure the read-only aggregate sources
+  ansible.builtin.copy:
+    dest: /etc/hou1-monitoring/collector.json
+    owner: root
+    group: root
+    mode: '0600'
+    content: "{{ {'environment': 'test', 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory} | to_nice_json }}"
+
+- name: Install the read-only aggregate collector
+  ansible.builtin.copy:
+    src: collect.py
+    dest: /usr/local/libexec/hou1-monitoring-collect
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Configure the private exporter and textfile directory
+  ansible.builtin.copy:
+    dest: /etc/default/prometheus-node-exporter
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      ARGS="--web.listen-address={{ netbird_ip }}:9100 --collector.textfile.directory=/var/lib/prometheus/node-exporter"
+  notify: Restart private node exporter
+
+- name: Wait for the VPN address on exporter startup
+  ansible.builtin.template:
+    src: exporter.conf.j2
+    dest: /etc/systemd/system/prometheus-node-exporter.service.d/20-netbird.conf
+    mode: '0644'
+  notify: Restart private node exporter
+
+- name: Install the collector unit
+  ansible.builtin.template:
+    src: collector.service.j2
+    dest: /etc/systemd/system/hou1-monitoring-collect.service
+    mode: '0644'
+  register: hou1_collector_unit
+
+- name: Install the minutely collector timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/hou1-monitoring-collect.timer
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Refresh HOU1 monitoring aggregates every minute
+      [Timer]
+      OnCalendar=minutely
+      Persistent=true
+      [Install]
+      WantedBy=timers.target
+  register: hou1_collector_timer
+
+- name: Apply service changes before first collection
+  ansible.builtin.meta: flush_handlers
+
+- name: Enable the private node exporter
+  ansible.builtin.systemd_service:
+    name: prometheus-node-exporter
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Allow metrics only from the declared HOU4 peer on the VPN interface
+  community.general.ufw:
+    rule: allow
+    direction: in
+    interface: '{{ netbird_interface }}'
+    from_ip: '{{ hou1_monitoring_peer_ip }}'
+    to_ip: '{{ netbird_ip }}'
+    to_port: '9100'
+    proto: tcp
+
+- name: Run one complete read-only collection before enabling its timer
+  ansible.builtin.command: /usr/local/libexec/hou1-monitoring-collect
+  changed_when: false
+
+- name: Enable periodic collection
+  ansible.builtin.systemd_service:
+    name: hou1-monitoring-collect.timer
+    daemon_reload: true
+    enabled: true
+    state: started
+
+- name: Require one exact private metrics listener
+  ansible.builtin.command: ss -Hln 'sport = :9100'
+  register: hou1_exporter_sockets
+  changed_when: false
+  failed_when: >-
+    (hou1_exporter_sockets.stdout | regex_findall('\S+:9100(?=\s)') | unique | list) != [netbird_ip ~ ':9100']
