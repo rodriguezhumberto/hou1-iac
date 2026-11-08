@@ -38,10 +38,14 @@ verified; the password delivery file was deleted afterward.
 3. Prepare test TLS certificates and both NetBird geolocation cache files before
    enforcing isolated egress. These are prerequisites, not database restores.
    Record their provenance and hashes. Do not copy previous account databases.
-4. Run the fresh-host entry points in order: prerequisite preparation,
+4. Run the fresh-host entry points in order: `rehearsal-prepare.yml`,
    `rehearsal-seeds.yml`, then `rehearse-vps.yml`. Use the same pinned infrastructure
    checkout for each invocation and save redacted output. Enable the Authentik
    bootstrap and `authentik_google_enabled` in the isolated test inventory.
+   Preparation installs Debian's resolver and encryption dependencies before the
+   common role or encrypted seeds need them. Create the staff Git bundle from
+   `main` (or explicitly set `rehearsal_staff_bundle_ref`); `rehearsal_staff_ref`
+   still selects the exact immutable application commit from that bundle.
 5. Verify that Authentik initializes groups, claims, clients and its local
    emergency administrator. Google source bootstrap must bind the verified-email
    allowlist to both source flows before enabling Google. The bootstrap manifest

@@ -1,0 +1,42 @@
+---
+- name: Prepare the fresh Debian host for the isolated rehearsal
+  hosts: isolated_test_vps
+  become: true
+  pre_tasks:
+    - name: Require the explicit fresh test host before installing prerequisites
+      ansible.builtin.assert:
+        that:
+          - groups['isolated_test_vps'] | length == 1
+          - inventory_hostname not in groups.get('prod_env', [])
+          - cms_environment == 'test'
+          - node_bootstrap | bool
+          - ansible_host == test_vps_public_ip
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.distribution_major_version == '12'
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Preparation requires the explicit fresh Debian 12 test fixture.
+      tags: [always]
+
+    - name: Install dependencies used before the full-stack entry point
+      ansible.builtin.apt:
+        name: [systemd-resolved, ufw, age, python3-yaml, jq, sysstat, dnsutils]
+        update_cache: true
+        state: present
+
+    - name: Copy the controller's verified SOPS binary for encrypted seeding
+      ansible.builtin.copy:
+        src: "{{ rehearsal_sops_binary_source }}"
+        dest: /usr/local/bin/sops
+        owner: root
+        group: root
+        mode: '0755'
+
+    - name: Check capacity before installing the application runtime
+      ansible.builtin.include_role:
+        name: authentik_policy
+        tasks_from: capacity
+
+  roles:
+    - common
+    - docker
