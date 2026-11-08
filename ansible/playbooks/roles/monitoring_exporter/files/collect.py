@@ -68,6 +68,15 @@ def collect(config, now=None):
         failed=max(failed,marker.stat().st_mtime)
     emit('hou1_backup_last_success_timestamp_seconds',latest,backup='authentik-local')
     emit('hou1_backup_last_attempt_success',int(latest>0 and latest>=failed),backup='authentik-local')
+    if config.get('request_metrics_enabled'):
+        request_success = 0
+        try:
+            import request_metrics
+            samples.append(request_metrics.collect(config['request_metrics_log'], '/var/lib/hou1-monitoring/requests.json').rstrip())
+            request_success = 1
+        except Exception:
+            success = False
+        emit('hou1_request_metrics_collection_success', request_success)
     emit('hou1_metrics_collection_success',int(success))
     emit('hou1_metrics_collection_timestamp_seconds',now)
     return '\n'.join(samples)+'\n',success

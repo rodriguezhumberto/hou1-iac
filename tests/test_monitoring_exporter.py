@@ -19,7 +19,7 @@ collector=importlib.util.module_from_spec(spec);spec.loader.exec_module(collecto
 class MonitoringExporterTest(unittest.TestCase):
     def test_deployment_guard_rejects_public_and_production_before_api_or_host_changes(self):
         task=yaml.safe_load((ROOT/'ansible/playbooks/roles/monitoring_exporter/tasks/main.yml').read_text())[0]
-        base=dict(hou1_monitoring_enabled=True,cms_environment='test',netbird_subnet='100.91.0.0/16',
+        base=dict(hou1_request_metrics_enabled=False,hou1_request_metrics_log='/opt/pearlandpaws-test/nginx-logs/metrics.jsonl',hou1_monitoring_enabled=True,cms_environment='test',netbird_subnet='100.91.0.0/16',
                   netbird_ip='100.91.0.10',ansible_host='100.91.0.10',node_bootstrap=False,
                   hou1_monitoring_peer_ip='100.91.0.22',hou1_monitoring_exporter_port=9100,
                   hou1_monitoring_backup_directory='/var/backups/hou1-authentik/test')
