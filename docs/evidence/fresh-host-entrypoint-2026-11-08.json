@@ -13,11 +13,11 @@
       "failed": 0,
       "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0"
     },
-    "certificates": "in-progress",
-    "full_stack": "not-started",
+    "certificates": "passed-four-fresh-lineages",
+    "full_stack": "initial-identity-bootstrap-failed-corrected-retry-pending",
     "cms_seed": "manual-pending",
     "restore": "outstanding-operator-deferred",
-    "hou4_reenrollment": "pending-console-access"
+    "hou4_reenrollment": "passed-private-SSH-restored-public-rule-removed"
   },
   "tests": [
     {
@@ -52,5 +52,15 @@
     "http_status": 504,
     "resolution": "Bounded curl retry; binary version and SHA-256 pin unchanged",
     "validation": "pending CI rerun"
-  }
+  },
+  "live_findings": [
+    {
+      "phase": "Auth source bootstrap",
+      "cause": "Policy binding list target filter accepts the inherited model UUID, not the serialized flow UUID",
+      "failure": "HTTP 400 before Google source enablement",
+      "fix": "List bindings with pagination guard and match serialized targets locally; contract fixture distinguishes inherited UUIDs",
+      "focused_validation": "14 bootstrap checks passed",
+      "plaintext_manifest_cleanup": "verified after failure"
+    }
+  ]
 }

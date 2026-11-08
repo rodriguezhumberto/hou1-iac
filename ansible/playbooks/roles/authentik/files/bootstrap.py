@@ -99,7 +99,10 @@ def apply_google(google, api, secret):
     for flow in flows:
         if flow.get('policy_engine_mode') != 'all':
             api.request('PATCH', f'/flows/instances/{flow["slug"]}/', {'policy_engine_mode': 'all'})
-        bindings = api.request('GET', f'/policies/bindings/?target={flow["pk"]}&page_size=1000')
+        # The list filter expects the inherited PolicyBindingModel UUID, while
+        # serialized targets and writes use the flow UUID. Match returned
+        # targets locally rather than submitting a flow UUID to that filter.
+        bindings = api.request('GET', '/policies/bindings/?page_size=1000')
         if bindings.get('next'):
             raise ValueError('Refusing partially paginated source policy bindings')
         matches = [b for b in bindings.get('results', []) if b['target'] == flow['pk'] and b.get('policy') == policy]
