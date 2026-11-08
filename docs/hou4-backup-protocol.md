@@ -4,6 +4,11 @@ This implements the off-host collection needed for the recovery rehearsal in
 #27. It does not establish production readiness until a fresh-node restore has
 passed. Existing production data is never used as a test seed.
 
+The [live HOU4 rehearsal](evidence/hou4-backup-live-2026-11-08.json) collected a
+32.4 MB encrypted point, verified transfer integrity, and passed Discord recovery
+and HOU4 reboot checks. Actual offline decryption, a clean full-stack restore,
+and interrupted HOU1 preparation recovery remain open gates.
+
 HOU1 prepares one encrypted recovery point locally at 02:00 UTC. HOU4 collects
 the completed file at 03:00 UTC; both timers use up to five minutes of jitter
 and persistent missed-run handling. HOU4 retains the newest point from each of seven distinct UTC dates
