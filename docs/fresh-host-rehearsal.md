@@ -93,3 +93,57 @@ The old HOU1 synthetic monitor is disabled until its inputs can be replaced.
 HOU4's TLS renewal and TLS metrics timers remain enabled, and its monitoring and
 alert delivery are not silenced. Fresh deployment must reinstall and validate
 the intended HOU1 renewal and synthetic-check jobs with new scoped inputs.
+
+## Fresh-run checkpoint (2026-11-08)
+
+The corrected pinned bootstrap completed with 246 successful tasks and no
+failures. Full private SSH hardening/application deployment completed with 122,
+monitoring with 37, and isolation with 24 successful tasks, all without failures.
+HOU4 retained its monitoring installation, rejoined at its existing private IP,
+and resumed scraping HOU1. Both nodes' public SSH and metrics ports are closed;
+public staff login/API and Authentik administration return 403. Public website,
+NetBird API and Authentik discovery return 200 with trusted TLS.
+
+Fresh internal admin/reader login, protected read, reader write denial and logout
+checks passed. The admission policy passed four application-user and five Google
+verified-email checks before disabling manual approval. One encrypted staff
+assignment initially awaited the user's first Google login in the fresh identity
+database. The operator has now confirmed that Google sign-in succeeded;
+reconciliation verified one staff assignment, zero waiting assignments and ten
+live policy checks. The NetBird account retains the regular user role. The old and new databases were not mixed.
+
+The host age identity can decrypt application runtime secrets without the DNS
+capability. Controller health inputs now contain only the two fresh fixture
+passwords. Existing scoped DNS renewal credentials remain on the controller;
+monitoring and renewal timers are enabled. The separate ongoing test-job SSH key
+was restored alongside the operator and temporary keys. Its passwordless sudo
+access remains a controller-isolation limitation. Backup freshness alerts are
+expected to fire because the operator deferred backups; keep them visible.
+
+The fresh live security matrix passed 19 signed-claim cases, 8 callback cases,
+3 signing-key rotation logins and 4 session cases, plus its positive baseline.
+Invalid state/cookies, nonce, PKCE, signature, issuer, audience, authorized party,
+token times and malformed groups were denied; an unknown group received 403.
+Real session revocation and timestamp-driven idle/absolute expiry returned 401.
+The original provider, signing key and ingress were restored; the unpublished
+fault proxy was removed. NetBird's live PKCE, replay and invalid-bearer checks
+passed too. These rotation checks do not replace the separate real-time
+old/new signing-key overlap and cache-expiry gate.
+
+Google discovery and JWKS returned 200 with certificate validation inside
+Authentik; a deliberately invalid token request returned Google's expected 400.
+The production/default-deny drill passed on the host and all seven workload
+namespaces. Discord's integration counter increased with no reported delivery
+failures after a bounded test alert; this is aggregate delivery evidence, not an
+independent confirmation of message display at the destination.
+
+The reboot check passed: HOU1 recovered VPN-only SSH and metrics, NetBird,
+Authentik discovery and the persistent isolation/collector services without a
+public SSH fallback or alert silence. Fresh access and Google endpoint checks
+are repeated after reboot. Operator decryption and personal SSH-key access must
+still be confirmed before retiring the temporary deployment grant.
+
+A brief post-boot disk-I/O headroom failure recovered without changing the 70%
+threshold (follow-up utilization 9.6%). The final synthetic monitor reports only
+the deliberately outstanding backup-freshness rule; no alert deliveries are
+pending. Human Google sign-in was confirmed by the operator.

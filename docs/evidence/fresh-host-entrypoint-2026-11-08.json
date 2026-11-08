@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-08T09:00:57.165706+00:00",
+  "recorded_at": "2026-11-08T09:50:59.989666+00:00",
   "environment": "test",
   "infra_ref": "a0233db39f40a48ce760d69d1fd0d95783675534",
   "staff_ref": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
@@ -14,10 +14,253 @@
       "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0"
     },
     "certificates": "passed-four-fresh-lineages",
-    "full_stack": "initial-identity-bootstrap-failed-corrected-retry-pending",
+    "full_stack": {
+      "result": "passed",
+      "ok": 246,
+      "changed": 36,
+      "unreachable": 0,
+      "failed": 0,
+      "log_sha256": "fd1395917b1fff8d3ff7d293885c19178691bb8f9b875d30b00bdf37ae130073"
+    },
     "cms_seed": "manual-pending",
     "restore": "outstanding-operator-deferred",
-    "hou4_reenrollment": "passed-private-SSH-restored-public-rule-removed"
+    "hou4_reenrollment": "passed-private-SSH-restored-public-rule-removed",
+    "hardening": {
+      "result": "passed",
+      "ok": 122,
+      "changed": 19,
+      "unreachable": 0,
+      "failed": 0,
+      "log_sha256": "16f371548edbdab268ed89c3ebc23ae12afecd4af93a9c22383cfb4ed8c8eb26"
+    },
+    "monitoring": {
+      "result": "passed",
+      "ok": 37,
+      "changed": 16,
+      "unreachable": 0,
+      "failed": 0,
+      "log_sha256": "fada4fa846da06cf9c0f6dcb7346df147b3592659fcd112e2a879fcf451271b8"
+    },
+    "isolation": {
+      "result": "passed",
+      "ok": 24,
+      "changed": 14,
+      "unreachable": 0,
+      "failed": 0,
+      "log_sha256": "3a2b8dccd37edee33f60fd0fded235ea2ac16d0c8079053b1316645b9a9173ab"
+    },
+    "identity_admission": {
+      "staff_users_configured": 0,
+      "staff_users_awaiting_first_login": 1,
+      "environment": "test",
+      "application_policy_checks": 4,
+      "google_policy_checks": 5,
+      "manual_approval_required": false,
+      "existing_allowlisted_pending_users_reconciled": 0
+    },
+    "staff_health": {
+      "routine_login_probe": "passed",
+      "identities_checked": 2,
+      "checks_passed": 7
+    },
+    "access_boundaries": {
+      "environment": "test",
+      "recorded_at": "2026-11-08T09:38:16.637155+00:00",
+      "checks": {
+        "staff_public": {
+          "curl_exit": 0,
+          "http_status": 403,
+          "passed": true
+        },
+        "staff_login_public": {
+          "curl_exit": 0,
+          "http_status": 403,
+          "passed": true
+        },
+        "auth_admin_public": {
+          "curl_exit": 0,
+          "http_status": 403,
+          "passed": true
+        },
+        "public_site": {
+          "curl_exit": 0,
+          "http_status": 200,
+          "passed": true
+        },
+        "netbird_api": {
+          "curl_exit": 0,
+          "http_status": 200,
+          "passed": true
+        },
+        "auth_discovery": {
+          "curl_exit": 0,
+          "http_status": 200,
+          "passed": true
+        },
+        "hou1_public_22": {
+          "passed": true,
+          "reachable": false
+        },
+        "hou1_public_9100": {
+          "passed": true,
+          "reachable": false
+        },
+        "hou4_public_22": {
+          "passed": true,
+          "reachable": false
+        },
+        "hou4_public_9100": {
+          "passed": true,
+          "reachable": false
+        },
+        "private_ssh": {
+          "passed": true
+        }
+      }
+    },
+    "token_callback_session_matrix": {
+      "recorded_at": "2026-11-08T09:44:51.413001+00:00",
+      "environment": "test",
+      "phases": [
+        {
+          "phase": "proxy_setup",
+          "exit_code": 0
+        },
+        {
+          "phase": "controller",
+          "exit_code": 0
+        },
+        {
+          "phase": "claims",
+          "exit_code": 0
+        },
+        {
+          "phase": "callbacks",
+          "exit_code": 0
+        },
+        {
+          "phase": "rotation",
+          "exit_code": 0
+        },
+        {
+          "phase": "sessions",
+          "exit_code": 0
+        },
+        {
+          "phase": "proxy_cleanup",
+          "exit_code": 0
+        }
+      ]
+    },
+    "google_endpoint_tls": {
+      "recorded_at": "2026-11-08T09:47:46.428477+00:00",
+      "environment": "test",
+      "certificate_validation": true,
+      "authentik_server_statuses": {
+        "discovery": 200,
+        "jwks": 200,
+        "token_invalid_grant": 400
+      }
+    },
+    "netbird_live_oidc": {
+      "environment": "test",
+      "results": [
+        {
+          "mode": "normal",
+          "exit_code": 0
+        },
+        {
+          "mode": "pkce",
+          "exit_code": 0
+        }
+      ]
+    },
+    "monitoring_delivery": {
+      "recorded_at": "2026-11-08T09:42:46.877023+00:00",
+      "discord_counters": {
+        "alertmanager_notifications_total": 33.0
+      },
+      "delivery_test_alert_active": false,
+      "hou1_metrics": [
+        {
+          "health": "up",
+          "last_error_empty": true
+        }
+      ],
+      "notification_count_increase": 5.0,
+      "notification_failures_increase": 0,
+      "limit": "Aggregate Discord integration counters; message display at destination not independently confirmed."
+    },
+    "live_claims": {
+      "cases": 19,
+      "all_assertions_passed": true,
+      "report_sha256": "582517d95f76381f0948c4d38e6df435988b9a04b59e6bccfcf6b29615293991"
+    },
+    "live_callbacks": {
+      "cases": 8,
+      "all_assertions_passed": true,
+      "report_sha256": "63f2be86f8a51bfc4840edc437986954c9e85f5ab0719b8eaadca02d040518be"
+    },
+    "live_rotation": {
+      "cases": 3,
+      "all_assertions_passed": true,
+      "report_sha256": "ec08ed266bbd2d50b7ee351f1ce42446add8a081b3547592a250f64c9f17b455"
+    },
+    "live_sessions": {
+      "cases": 4,
+      "all_assertions_passed": true,
+      "report_sha256": "7e42f848c7c5adb41bf47555a56b9f1b4c7746659ef79f266b0511d14924d4a7"
+    },
+    "isolation_drill": {
+      "host_targets_denied": true,
+      "host_ipv4_targets": 11,
+      "host_ipv6_targets": 8,
+      "workload_namespaces_verified": 7,
+      "report_sha256": "d2d8f7d19be009a1c83e8ca43c90d7f89d46a2d07113fa9324498ba938949773"
+    },
+    "reboot": {
+      "environment": "test",
+      "started_at": "2026-11-08T09:45:18.889632+00:00",
+      "finished_at": "2026-11-08T09:47:04.778163+00:00",
+      "boot_changed": true,
+      "private_ssh_recovered": true,
+      "private_metrics_listener": true,
+      "isolation_and_collectors_enabled": true,
+      "netbird_and_authentik_public_readiness": true,
+      "fallback_timer_absent": true,
+      "alerts_silenced": false
+    },
+    "security_cleanup": {
+      "ingress_restored_byte_exact": true,
+      "ingress_sha256": "886ab5f9e47e9771e2ad49dfa22d1fb0d414d1ff3a327556d37d3c74d059f1b7",
+      "proxy_removed": true,
+      "root_rpc_helpers_removed": true,
+      "pending_peer_probe_files_removed": true
+    },
+    "final_synthetic_monitor": {
+      "recorded_at": "2026-11-08T09:49:45.978931+00:00",
+      "unhealthy_rules": [
+        "authentik_backup_fresh"
+      ],
+      "pending_events": 0
+    },
+    "io_headroom": {
+      "first_post_boot_sample": "failed",
+      "followup_disk_util_percent": 9.6,
+      "followup_monitor": "passed",
+      "threshold_percent": 70,
+      "threshold_unchanged": true
+    },
+    "google_human_login": "operator-confirmed-success",
+    "first_login_reconciliation": {
+      "staff_users_configured": 1,
+      "staff_users_awaiting_first_login": 0,
+      "environment": "test",
+      "application_policy_checks": 5,
+      "google_policy_checks": 5,
+      "manual_approval_required": false,
+      "existing_allowlisted_pending_users_reconciled": 0
+    }
   },
   "tests": [
     {
@@ -25,7 +268,8 @@
       "result": "passed",
       "tests_run": 147,
       "skipped": 1,
-      "log_sha256": "05de40e8efcb05ee751bd84947e75745763a5a6e31529d8d574cbfa0240f3345"
+      "log_sha256": "1ceb1120e6307745fe626dd5d5bb7afec429b643b58af98af10338c762bcb5d6",
+      "rerun_after_bootstrap_rule_cleanup": true
     },
     {
       "command": "npm test",
@@ -43,6 +287,11 @@
         "rehearse-vps.yml"
       ],
       "result": "passed"
+    },
+    {
+      "command": "ansible-playbook --syntax-check -i <private-management-inventory> ansible/playbooks/rehearsal-gates.yml",
+      "result": "passed",
+      "log_sha256": "d8bcffbd0bdd9f38ec12acf1edb61e90a6fe22702a319331996f1e6040344502"
     }
   ],
   "ci_setup_finding": {
@@ -51,7 +300,7 @@
     "stage": "SOPS release download",
     "http_status": 504,
     "resolution": "Bounded curl retry; binary version and SHA-256 pin unchanged",
-    "validation": "pending CI rerun"
+    "validation": "b0b2d5c and 14f65e7 checks passed"
   },
   "live_findings": [
     {
@@ -60,7 +309,47 @@
       "failure": "HTTP 400 before Google source enablement",
       "fix": "List bindings with pagination guard and match serialized targets locally; contract fixture distinguishes inherited UUIDs",
       "focused_validation": "14 bootstrap checks passed",
-      "plaintext_manifest_cleanup": "verified after failure"
+      "plaintext_manifest_cleanup": "verified after failure",
+      "corrected_retry": "passed; same fresh databases preserved"
+    },
+    {
+      "phase": "private hardening",
+      "cause": "Ansible resolves /dev/stdin to an inaccessible pipe path",
+      "failure": "helper invocation stopped before changes",
+      "resolution": "Mode-0600 extra vars inside a private RAM-backed temporary directory; removed on exit"
+    },
+    {
+      "phase": "bootstrap firewall cleanup",
+      "cause": "Standard security role removes world SSH allowances but preserves the rehearsal source-specific allowance",
+      "resolution": "Private test gate deletes only the controller-source rule declared by the seed playbook",
+      "live_validation": "SSH listener private; exact source allowance absent; public SSH unreachable"
     }
+  ],
+  "bootstrap_retry_ref": "b0b2d5c0140ec7b2b127e6ca5a945c024de670c2",
+  "gate_cleanup_ref": "14f65e7050b77d48fc3c2cd2079f82e061ca5c05",
+  "controller_jobs": {
+    "health_check": "fresh-two-fixture-passwords-only",
+    "tls_renewal": "existing-DNS-only-scope",
+    "timers_enabled": true,
+    "plaintext_extra_vars_removed": true,
+    "ongoing_ssh_sudo": "existing-privileged-access-is-a-production-isolation-limitation",
+    "temporary_deployment_key": "pending-operator-decryption-and-access-verification-before-retirement"
+  },
+  "operator_handoff": {
+    "operator_only_encrypted_documents": 5,
+    "temporary_deployment_key_cannot_decrypt_handoff": true,
+    "private_keys_or_passwords_in_public_evidence": false
+  },
+  "outstanding": [
+    "Backups and restore drill explicitly deferred by operator",
+    "Manual staff/CMS content seeding",
+    "Operator local age decryption and SSH-key verification; then retire temporary deployment grant",
+    "Remaining production controller-isolation gates",
+    "Fresh real-time signing-key overlap/cache-expiry and outage/rollback drills not rerun in this checkpoint"
+  ],
+  "promotion_approved": false,
+  "rollout_issues_remain_open": [
+    "hou1-iac#27",
+    "pearland-paws#39"
   ]
 }
