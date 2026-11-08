@@ -83,6 +83,46 @@ def policy_plan(groups, policies, dns_port=1053, server_group='prod-servers'):
     return dict(managed=plan, default=default)
 
 
+def monitoring_plan(groups, peers, policies, monitor_ip, server_ip):
+    """Restrict one monitoring peer to one isolated target on TCP 9100."""
+    from ipaddress import IPv4Address, IPv4Network
+    network = IPv4Network('100.91.0.0/16')
+    if (monitor_ip == server_ip or IPv4Address(monitor_ip) not in network
+            or IPv4Address(server_ip) not in network):
+        raise AnsibleFilterError('Monitoring requires distinct isolated VPN peers')
+    environment = [g for g in groups if g['name'] == 'test-servers']
+    if len(environment) != 1:
+        raise AnsibleFilterError('Monitoring requires the isolated test-servers group')
+    members = {p['id'] if isinstance(p, dict) else p for p in environment[0].get('peers', [])}
+    planned = []
+    for name, address in [('hou1-monitoring-test', monitor_ip), ('hou1-metrics-test', server_ip)]:
+        matches = [p for p in peers if p['ip'] == address]
+        if len(matches) != 1 or matches[0]['id'] not in members:
+            raise AnsibleFilterError('Metrics peers must be unique enrolled test servers')
+        peer = matches[0]['id']
+        found = [g for g in groups if g['name'] == name]
+        if len(found) > 1:
+            raise AnsibleFilterError('Duplicate metrics group')
+        current = found[0] if found else None
+        if current and {p['id'] if isinstance(p, dict) else p for p in current.get('peers', [])} != {peer}:
+            raise AnsibleFilterError('Existing metrics group has unexpected members; review manually')
+        planned.append(dict(id=current['id'] if current else None, body=dict(name=name, peers=[peer])))
+    policy = None
+    if all(g['id'] for g in planned):
+        name = 'hou1-monitoring-test-metrics'
+        marker = 'Managed by hou1-iac monitoring.'
+        body = dict(name=name, description=marker, enabled=True, source_posture_checks=[], rules=[dict(
+            name=name, description=marker, enabled=True, action='accept', protocol='tcp',
+            bidirectional=False, sources=[planned[0]['id']], destinations=[planned[1]['id']], ports=['9100'])])
+        found = [p for p in policies if p['name'] == name]
+        if len(found) > 1 or (found and found[0].get('description') != marker):
+            raise AnsibleFilterError('Duplicate or operator-owned monitoring policy')
+        current = found[0] if found else None
+        policy = dict(body=body, id=current['id'] if current else None,
+                      changed=not current or policy_body(current) != policy_body(body))
+    return dict(groups=planned, policy=policy)
+
+
 class FilterModule:
     def filters(self):
-        return {'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan}
+        return {'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan}

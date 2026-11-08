@@ -1,0 +1,13 @@
+---
+hou1_monitoring_enabled: false
+hou1_monitoring_peer_ip: ''
+hou1_monitoring_exporter_port: 9100
+hou1_monitoring_containers:
+  postgresql: {name: hou1-authentik-test-postgresql-1, project: hou1-authentik-test}
+  authentik-server: {name: hou1-authentik-test-authentik-server-1, project: hou1-authentik-test}
+  authentik-worker: {name: hou1-authentik-test-authentik-worker-1, project: hou1-authentik-test}
+  staff-app: {name: pearlandpaws-test-astro-app-1, project: pearlandpaws-test}
+  nginx: {name: pearlandpaws-test-nginx-1, project: pearlandpaws-test}
+  netbird: {name: hou1-netbird-test-netbird-server-1, project: hou1-netbird-test}
+  netbird-dashboard: {name: hou1-netbird-test-dashboard-1, project: hou1-netbird-test}
+hou1_monitoring_backup_directory: /var/backups/hou1-authentik/test

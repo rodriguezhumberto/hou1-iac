@@ -1,0 +1,15 @@
+[Unit]
+Description=Read-only HOU1 aggregate monitoring metrics
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/hou1-monitoring-collect
+User=root
+Group=prometheus
+UMask=0027
+TimeoutStartSec=100
+NoNewPrivileges=true
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ReadWritePaths=/var/lib/prometheus/node-exporter

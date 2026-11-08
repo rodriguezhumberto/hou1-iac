@@ -1,0 +1,442 @@
+{
+  "environment": "test",
+  "recorded_at": "2026-11-08T04:41:52.613757+00:00",
+  "scope": "Infrastructure #27 isolated monitoring; HOU4 local-only",
+  "hosts": {
+    "hou1_vpn": "100.91.0.10",
+    "hou4_vpn": "100.91.0.22",
+    "hou4_public": "136.0.42.245"
+  },
+  "netbird_version": "0.82.0",
+  "tests": {
+    "hou1_suite": {
+      "count": 136,
+      "seconds": 325.268,
+      "skipped": 1,
+      "passed": true,
+      "log_sha256": "2f3f12ec9ed3bc44550c72c9064f367820c89cf5ed099d96f81584062e70b57f"
+    },
+    "hou1_monitoring_focused": {
+      "count": 4,
+      "seconds": 1.943,
+      "skipped": 0,
+      "passed": true,
+      "log_sha256": "21c7c2bbde91e44083db89df859db990d8f8a8740c0675cc860a383438d4a02b"
+    },
+    "hou4_suite": {
+      "count": 38,
+      "seconds": 116.399,
+      "skipped": 0,
+      "passed": true,
+      "log_sha256": "fdf0f92ba8e60032d8592612174dfadc0852fbfb1ffdb759cf0c81ff0b57d113"
+    }
+  },
+  "ansible": {
+    "hou1_initial": [
+      "rehearsal_vps              : ok=32   changed=11   unreachable=0    failed=0    skipped=3    rescued=0    ignored=0"
+    ],
+    "hou1_final": [
+      "rehearsal_vps              : ok=31   changed=0    unreachable=0    failed=0    skipped=3    rescued=0    ignored=0"
+    ],
+    "hou4_initial": [
+      "test_hou4                  : ok=99   changed=16   unreachable=0    failed=0    skipped=25   rescued=0    ignored=0"
+    ],
+    "hou4_final": [
+      "test_hou4                  : ok=95   changed=0    unreachable=0    failed=0    skipped=25   rescued=0    ignored=0"
+    ]
+  },
+  "metrics": {
+    "environment": "test",
+    "recorded_at": "2026-11-08T04:39:10.140409+00:00",
+    "checks": {
+      "hou1_exporter": true,
+      "collector": true,
+      "postgresql": true,
+      "renewal_status": true,
+      "healthy_containers": 7,
+      "collector_age": 63,
+      "renewal_metrics_age": 60,
+      "renewal_success_age": 847,
+      "local_authentik_backup_age": 7142,
+      "postgresql_database_size_bytes": 90534371.0,
+      "dashboard_queries": [
+        {
+          "title": "Metrics target health",
+          "series": 8
+        },
+        {
+          "title": "HTTPS service probes",
+          "series": 3
+        },
+        {
+          "title": "CPU usage",
+          "series": 2
+        },
+        {
+          "title": "Memory used",
+          "series": 2
+        },
+        {
+          "title": "Filesystem free",
+          "series": 2
+        },
+        {
+          "title": "Filesystem inodes free",
+          "series": 2
+        },
+        {
+          "title": "HOU1 container health",
+          "series": 7
+        },
+        {
+          "title": "Authentik PostgreSQL query health",
+          "series": 1
+        },
+        {
+          "title": "Authentik PostgreSQL connections",
+          "series": 1
+        },
+        {
+          "title": "Authentik PostgreSQL database size",
+          "series": 1
+        },
+        {
+          "title": "Authentik PostgreSQL commit rate",
+          "series": 1
+        },
+        {
+          "title": "Local Authentik backup age",
+          "series": 1
+        },
+        {
+          "title": "Grafana renewal last run (1 = success)",
+          "series": 1
+        },
+        {
+          "title": "Grafana renewal last success age",
+          "series": 1
+        },
+        {
+          "title": "Grafana certificate lifetime remaining",
+          "series": 1
+        },
+        {
+          "title": "Firing alerts",
+          "series": 1
+        }
+      ]
+    }
+  },
+  "isolation": {
+    "environment": "test",
+    "recorded_at": "2026-11-08T04:30:54.172065+00:00",
+    "public_ports": [
+      {
+        "host": "139.177.151.12",
+        "port": 9100,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 22,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 80,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 443,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 3000,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 9090,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 9093,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 9094,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 9100,
+        "reachable": false
+      },
+      {
+        "host": "136.0.42.245",
+        "port": 9115,
+        "reachable": false
+      }
+    ],
+    "administrator_peer_metrics_denied": true,
+    "monitoring_peer_metrics_proven_by_prometheus": true
+  },
+  "hou1_runtime": {
+    "units": {
+      "hou1-monitoring-collect.service": [
+        "Result=success",
+        "ActiveState=inactive",
+        "UnitFileState=static"
+      ],
+      "hou1-monitoring-collect.timer": [
+        "Result=success",
+        "ActiveState=active",
+        "UnitFileState=enabled"
+      ],
+      "prometheus-node-exporter.service": [
+        "Result=success",
+        "ActiveState=active",
+        "UnitFileState=enabled"
+      ]
+    },
+    "listeners": "tcp LISTEN 0      4096   100.91.0.10:9100 0.0.0.0:*",
+    "firewall": [
+      "100.91.0.10 9100/tcp on wt0 ALLOW       100.91.0.22               "
+    ]
+  },
+  "netbird_policy": {
+    "exact_metrics_groups": {
+      "hou1-monitoring-test": [
+        "100.91.0.22"
+      ],
+      "hou1-metrics-test": [
+        "100.91.0.10"
+      ]
+    },
+    "policy": "hou1-monitoring-test-metrics",
+    "one_direction": true,
+    "protocol": "tcp",
+    "ports": [
+      9100
+    ],
+    "default_allow_all_enabled": false,
+    "readback_matches_plan": true,
+    "unrelated_policy_count": 5
+  },
+  "receiver": {
+    "only_active_receiver": "discord",
+    "send_resolved": true,
+    "redirects_disabled": true,
+    "config_mode": "0640",
+    "webhook_value_withheld": true
+  },
+  "renewal_delivery": {
+    "environment": "test",
+    "fault": "numeric renewal last-run status only; no ACME/cert/VPN service fault",
+    "before": {
+      "sent": 0,
+      "failed": 0,
+      "alerts": []
+    },
+    "recorded_at": "2026-11-08T04:38:09.568423+00:00",
+    "fault_injected": {
+      "self_recovery_seconds": 240
+    },
+    "firing_delivered": {
+      "sent": 1.0,
+      "failed": 0,
+      "alerts": [
+        {
+          "name": "Hou4CertificateRenewalFailed",
+          "state": "firing"
+        }
+      ]
+    },
+    "restored": {
+      "publisher_restarted": true
+    },
+    "resolved_delivered": {
+      "sent": 2.0,
+      "failed": 0,
+      "alerts": []
+    },
+    "passed": true,
+    "result": {
+      "passed": true
+    },
+    "cleanup": {
+      "normal_timers_enabled_active": true,
+      "publisher_service_result": "success",
+      "transient_recovery_unit_absent": true,
+      "harness_note": "Initial post-success cleanup exited 5 while stopping an already expired transient timer; cleanup now discovers missing units before stopping. Final state independently verified without another fault."
+    }
+  },
+  "https": {
+    "hostname": "grafana-test.vps-test.pearlandpaws.com",
+    "authorized_admin_https": true,
+    "trusted_tls": true,
+    "secure_session_cookie": true,
+    "anonymous_denied": true,
+    "admin_login": true,
+    "datasource_loopback": true,
+    "prometheus_query_targets": 8,
+    "logout_invalidated_session": true,
+    "test_resolution": "--dns-servers 100.91.0.10:1053",
+    "provisioned_operations_dashboard": true,
+    "dashboard_panels": 16
+  },
+  "hou4_runtime": {
+    "environment": "test",
+    "recorded_at": "2026-11-08T04:39:08.099857+00:00",
+    "services": {
+      "netbird": "active",
+      "ssh": "active",
+      "prometheus-node-exporter": "active",
+      "prometheus-blackbox-exporter": "active",
+      "prometheus-alertmanager": "active",
+      "prometheus": "active",
+      "grafana-server": "active",
+      "hou4-test-alert-receiver": "active",
+      "nginx": "active"
+    },
+    "startup": {
+      "netbird": "enabled",
+      "ssh": "enabled",
+      "prometheus-node-exporter": "enabled",
+      "prometheus-blackbox-exporter": "enabled",
+      "prometheus-alertmanager": "enabled",
+      "prometheus": "enabled",
+      "grafana-server": "enabled",
+      "hou4-test-alert-receiver": "enabled",
+      "nginx": "enabled"
+    },
+    "netbird_version": "0.82.0",
+    "netbird_private_management": "passed",
+    "ssh_hardening": "passed",
+    "host_firewall": "active; private SSH and declared administrator-only HTTPS",
+    "monitoring_loopback_listeners": {
+      "18443": "127.0.0.1:18443",
+      "9100": "127.0.0.1:9100",
+      "9090": "127.0.0.1:9090",
+      "9093": "127.0.0.1:9093",
+      "9115": "127.0.0.1:9115",
+      "3000": "127.0.0.1:3000"
+    },
+    "grafana_https_listener": "100.91.0.22:443",
+    "prometheus_configuration_accepted": true,
+    "prometheus_retention": "15d or 2GiB",
+    "prometheus_targets": [
+      {
+        "job": "hou1-authentik-ready",
+        "health": "up"
+      },
+      {
+        "job": "hou1-netbird-api",
+        "health": "up"
+      },
+      {
+        "job": "hou1-node",
+        "health": "up"
+      },
+      {
+        "job": "hou1-staff-public-denied",
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-alertmanager",
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-blackbox",
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-prometheus",
+        "health": "up"
+      },
+      {
+        "job": "hou4-node",
+        "health": "up"
+      }
+    ],
+    "https_probes": [
+      {
+        "job": "hou1-authentik-ready",
+        "success": true
+      },
+      {
+        "job": "hou1-netbird-api",
+        "success": true
+      },
+      {
+        "job": "hou1-staff-public-denied",
+        "success": true
+      }
+    ],
+    "alert_states": {
+      "Hou4MetricsTargetDown": "inactive",
+      "Hou4HttpsProbeFailed": "inactive",
+      "Hou4TlsCertificateExpiring": "inactive",
+      "Hou4AlertDeliveryFailed": "inactive",
+      "Hou4MemoryPressure": "inactive",
+      "Hou4InodePressure": "inactive",
+      "Hou4DiskIoPressure": "inactive",
+      "Hou4NodeExporterDown": "inactive",
+      "Hou4FilesystemAlmostFull": "inactive",
+      "Hou1CollectorUnavailable": "inactive",
+      "Hou1ContainerUnhealthy": "inactive",
+      "Hou1PostgresqlUnavailable": "inactive",
+      "Hou1AuthentikBackupStale": "inactive",
+      "Hou4CertificateRenewalFailed": "inactive",
+      "Hou4CertificateRenewalOverdue": "inactive",
+      "Hou4RenewalMetricsStale": "inactive",
+      "Hou4GrafanaCertificateExpiring": "inactive"
+    },
+    "grafana_version": "13.3.0",
+    "grafana_https_settings": "passed",
+    "grafana_login_datasource_query_logout": "requires separate external HTTPS test",
+    "private_https_receiver": "passed",
+    "packages": [
+      "grafana 13.3.0",
+      "netbird 0.82.0",
+      "nginx 1.22.1-9+deb12u10",
+      "prometheus 2.42.0+ds-5+deb12u1",
+      "prometheus-alertmanager 0.25.0-1+b4",
+      "prometheus-blackbox-exporter 0.23.0-4+b4",
+      "prometheus-node-exporter 1.5.0-1+b6"
+    ],
+    "memory_kib": {
+      "MemTotal": 2014124,
+      "MemAvailable": 1144448
+    },
+    "root_disk_bytes": {
+      "total": 53618913280,
+      "available": 48047767552
+    },
+    "boot_id": "31076aa0-bf99-4544-961a-7367b3d2750d",
+    "uptime_seconds": 4402.87
+  },
+  "limitations": [
+    "Independent HOU4 outage detection explicitly deferred by operator.",
+    "Local encrypted Authentik backup freshness only; no offsite or other backup coverage claim.",
+    "Existing native HOU1 DNS fixture skipped because controller dnsmasq binary is unavailable.",
+    "Test deployment only; no production promotion.",
+    "Discord success counters prove provider HTTP acceptance, not human acknowledgement."
+  ],
+  "source_sha256": {
+    "hou1-iac/ansible/playbooks/filter_plugins/netbird_policies.py": "bbc68ca4a62f0dbf7ee78f30ce731b906e2e5dda4fa4f30e628d791e0d777435",
+    "hou1-iac/ansible/playbooks/roles/monitoring_exporter/files/collect.py": "d5df141c5b8f0926e2a421f602ebe38c02440557fd210651e18450305c4fc8fa",
+    "hou1-iac/ansible/playbooks/roles/monitoring_exporter/tasks/main.yml": "567a18a02360e636d7d822f3697e153aceff665313bcfa2d10b4c3070259102e",
+    "hou1-iac/tests/test_monitoring_exporter.py": "940a8dbef8ca91e590dbda28a94d3a1353d55f953f5110ede3a3b17360b2d1f7",
+    "hou4-iac/scripts/publish-renewal-metrics.py": "e42beb25d723819ae75ed8f6cd8dffbdd2aac4d0ab8707394893da8477abd498",
+    "hou4-iac/ansible/playbooks/roles/prometheus_node_exporter/templates/renewal-metrics.py.j2": "a9ff2333787b1079397a512e9080957346f123e453ec43146c9ac4453ca15923",
+    "hou4-iac/ansible/playbooks/roles/prometheus/templates/integration-rules.yml.j2": "5d4eb8022c43855c2ef19f76136caab9005c2528ad4cc55e2ecee9d8f503214d",
+    "hou4-iac/ansible/playbooks/roles/alertmanager/templates/alertmanager.yml.j2": "9751de2f1b13d6c21b3e0fc1f94ad68721b50d55ba34f0e6ad203dd56326edcc",
+    "hou4-iac/ansible/playbooks/roles/grafana/files/operations.json": "61786338a155bba689771dfcf64f0b4ae76fc25ecf5bbd4e56da58274ade6e7a",
+    "hou4-iac/ansible/playbooks/tasks/verify-monitoring.yml": "7b92cc1fea0c305b913d373c07b382df3dcd810f51d3002a87d6e8ca869a5762"
+  }
+}

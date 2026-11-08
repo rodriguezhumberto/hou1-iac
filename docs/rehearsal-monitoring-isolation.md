@@ -283,3 +283,5 @@ hashes and new encrypted recovery-point hashes in both mirrored rollout issues.
 Do not reinterpret earlier evidence as proving these later controls. Provider
 console recovery, sustained storage load, scheduled offsite retention and final
 production runbooks remain separate gates.
+
+The optional HOU4 VPN metrics integration is documented in [the private exporter workflow](rehearsal-vpn-monitoring.md), with [dated delivery/isolation evidence](monitoring-vpn-discord-renewal-2026-11-08.md).
