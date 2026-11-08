@@ -7,6 +7,32 @@ recipient shown in `.sops.yaml`. The repository contains ciphertext only.
 Private age identities stay in the operator's offline recovery store and are
 provided at deploy time through `SOPS_AGE_KEY_FILE`.
 
+The operator's public recipient is
+`age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7`.
+It is included alongside the environment deployment and offline recovery
+recipients in both repository files and `.sops.yaml`. Adding this recipient
+rewrapped the existing data keys; the encrypted values and decrypted contents
+were preserved. The operator private identity was not supplied to this
+controller, so operator-side decryption still needs local verification.
+
+With that private identity configured locally, verify access without printing
+secrets:
+
+```bash
+sops --decrypt ansible/secrets/authentik-test.enc.yaml >/dev/null
+sops --decrypt ansible/secrets/authentik-prod.enc.yaml >/dev/null
+```
+
+Set `SOPS_AGE_KEY_FILE` to the existing local identity file if SOPS does not
+already discover it. Retain the current deployment/recovery identities until
+operator decryption and recovery custody are confirmed. Runtime rehearsal
+bundles remain outside Git; the ciphertext-only operator handoff includes a
+local verifier. HOU4 certificate renewal's private `age_recipient` setting
+includes both current and operator recipients for future writes.
+See [recipient handoff evidence](evidence/operator-sops-recipient-2026-11-08.json).
+This recipient addition does not migrate Ansible Vault or re-encrypt existing
+non-SOPS backup archives; secrets consolidation remains infrastructure #45.
+
 Deploy an environment with its own identity file and never place that file in
 the repository or image:
 

@@ -2,8 +2,10 @@ creation_rules:
   - path_regex: ansible/secrets/authentik-test\.enc\.yaml$
     age: >-
       age1v06xxs6q36txslqkamzxskqzhxqglsx2lpg9cue7nsqjc46ggfpq9kz73z,
-      age1yshsxpfarz8ynpnzcw9tnum939ltthksk59sc8hu3yngzqe93d8qucthke
+      age1yshsxpfarz8ynpnzcw9tnum939ltthksk59sc8hu3yngzqe93d8qucthke,
+      age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7
   - path_regex: ansible/secrets/authentik-prod\.enc\.yaml$
     age: >-
       age1kc0nvfzr4pe9m8vesugkvl2lqxrner32qfwg5qxxkv2zc3fjxdus3gqqg4,
-      age1yshsxpfarz8ynpnzcw9tnum939ltthksk59sc8hu3yngzqe93d8qucthke
+      age1yshsxpfarz8ynpnzcw9tnum939ltthksk59sc8hu3yngzqe93d8qucthke,
+      age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7

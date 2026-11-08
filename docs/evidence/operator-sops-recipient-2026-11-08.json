@@ -1,0 +1,143 @@
+{
+  "operator_recipient": "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7",
+  "files": [
+    {
+      "path": "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+      "previous_recipient_count": 2,
+      "recipient_count": 3,
+      "sha256": "88a9f006a4968fc5f50cc3473568d277f63633f6cffd7eab4d032386ea3086cc",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+      "previous_recipient_count": 2,
+      "recipient_count": 3,
+      "sha256": "59d345be09bf634135659966a7490db8717d195536fbd4b54fab15385badd3b5",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "1eb8c4081ce2efb6ce90b3b830f34ac304f47e7ae072162f5dff86181c2e89e5",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "368982123b530445b5ed803dd1930f7bc56e0bca3ddd41b7db214d5195947a16",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "be0628f2e8ab38cd59c7f0c049099f79baab740dd7e51539965c9ccb0d351152",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "6a0758e527bb93de5e6f2440a4f275f72499479a452401d2d082412d73b51179",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "bafd1ea4c4d366a39aa84d8babfc235e4f6bc285658f8115091f6b0a174a7cc1",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "cac6a50ec38757eeee3ac29f37dceb8ba95cebf1555b7af5aac9e96d3321d8b9",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "a7aeec647b61784c815aeb505eea21110c587d611a54b603fbff270e70067fff",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "ffd5cda6b45168e6f18aec359d06afadf5c43de6010b5970b2ed92942ed15610",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "590b9bd96790c461d213735c2133f93268e6a6b85e7d94722c3e9cd89c921745",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "93832473c2af9019d2b7ff7529cf10b4e1cda25ef9aca2fd9f04315553052d98",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "0654637ab8f6f43156c516f6b28ef639c7ddb07fe3ea3fb02ffdaf5d687f891e",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/dns-token.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "39f1acddcb54403e1e0e7d83acff2976bbeff071e0fd67a867c56cc688877e2c",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-acme.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "833f012d37e433f1f6a8040d7ae4a232b6a1095cde942429cb307dd48c085ab3",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-tls.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "7f2ac1ddb2e99850fe5217b005c9997f421e6decdf666ba9b4ba1c6049765242",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-tls.previous.enc.json",
+      "previous_recipient_count": 1,
+      "recipient_count": 2,
+      "sha256": "55f6b237784a8a5139c11db94193d29e973d8c5ef40e5839d6f43d87e8de2a8e",
+      "checks": "recipient added; prior recipients retained; ciphertext values and plaintext unchanged; existing identities decrypt"
+    }
+  ],
+  "existing_recipients_retained": true,
+  "decrypted_contents_unchanged": true,
+  "encrypted_values_unchanged": true,
+  "controller_decryption_verified": true,
+  "operator_local_decryption": "pending user verification",
+  "renewal_config_recipient_persisted": true,
+  "native_renewal_future_write_preserves_both_recipients": true,
+  "native_renewal_future_write_decryption_passed": true,
+  "recorded_at": "2026-11-08T07:29:00.783299+00:00",
+  "artifact": {
+    "name": "operator-sops-handoff-2026-11-08.tar.gz",
+    "sha256": "e8f4d79a759015b392a850cc6fe7f0959c5af2dc317fe8347466084fb6db13f8",
+    "encrypted_documents": 17,
+    "private_identities_included": false,
+    "plaintext_secrets_included": false
+  },
+  "tracked_repository_ciphertext_environment_isolation_verified": true,
+  "plaintext_secret_and_private_identity_scan_passed": true,
+  "repository_focused_tests_passed": 3
+}
