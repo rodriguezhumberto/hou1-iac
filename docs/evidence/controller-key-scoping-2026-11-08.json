@@ -1,0 +1,568 @@
+{
+  "operator_recipient": "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7",
+  "scope": "Current controller SOPS access; Vault, SSH authorization and service credentials unchanged",
+  "historical_key_paths": [
+    "/tmp/hou1-test.age",
+    "/tmp/hou1-prod.age",
+    "/tmp/hou1-offline.age",
+    "/var/tmp/hou4-vps-test/age.key",
+    "/var/tmp/hou1-homelab-rehearsal/test-age.key",
+    "/var/tmp/hou1-homelab-rehearsal/backup-test.key",
+    "/var/tmp/hou1-vps-test/test-age.key",
+    "/var/tmp/hou1-vps-test/gates/host-age.key",
+    "/var/tmp/hou4-vps-2gb-test/age.key",
+    "/home/dev/.local/state/hou4-test-tls/age.key",
+    "/home/dev/.local/state/hou1-vps-test-monitor/test-age.key",
+    "/home/dev/.local/state/hou1-vps-test-monitor/host-recovery-age.key"
+  ],
+  "files": [
+    {
+      "path": "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "2c6890ac133e2501a24a2dcc3f0a767025b5d1201559d80cda5fc36e5c961fa7"
+    },
+    {
+      "path": "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "febedd6dc7e94daaf52d7ee20694a545478c4da29178e2788eebf07f3f64a745"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "4ddec64b2e14eb8467b68e2f1f8735bdf1305deeff0f50b9f347d800aa1bdd73"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "36fe4e3e69d9354ac856b5f6dc4a95986ad9933501bb65ab2b720f18d7d4b278"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "28b1227352d63e612d019bb77472b8a5f3f4e4185fff2a2bc32a453174dd87d1"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "f0ceda5d46d7c228fedb76de339e51244ef6bdb932fcb9a9de25dcdb7d96c65a"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "3a088ea58b87b0cb38e62fced3d5dc0bb31138f625d19743eda69aa054779702"
+    },
+    {
+      "path": "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "0c55c3b6d57778b1aaa03a60c50c729e49479c4834913a0bc906b2986e4db4f8"
+    },
+    {
+      "path": "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "e48445fbb13ab996f98502b46344545a7947c0a78240c1d5bd2571765eae0d8b"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "c211ecaafe12dadf98ede8f3cfd50fdc188f17d0dd4e2807358d78f8fc5fe86e"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "1f4a01c1b88c2e7f9064e5ad5479efc054100731defa7adaaa8e186ee208b6db"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "e547a5ee3ead7004e4e60b01382e8798f02435e9ec35f5149afce8f05e878999"
+    },
+    {
+      "path": "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json",
+      "recipients": [
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "46baa3042d723de9f0d3003baf4a6cd402ee6f5b41cbcea13ea8efa336183cab"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/dns-token.enc.json",
+      "recipients": [
+        "age19uly0pd0k88zykwwx35gjl2n8jzyrjfhqj3m68gk5240uqvzggrs3ezdmy",
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "b85e0889e6d13bd3345e3fadcc3628d89280fd2b48a7d9778ca6994bb3010fd8"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-acme.enc.json",
+      "recipients": [
+        "age19uly0pd0k88zykwwx35gjl2n8jzyrjfhqj3m68gk5240uqvzggrs3ezdmy",
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "21b6b860d78c7ece32dac54512c3c33b0f9b51f8821805a644e542c4c2240e01"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-tls.enc.json",
+      "recipients": [
+        "age19uly0pd0k88zykwwx35gjl2n8jzyrjfhqj3m68gk5240uqvzggrs3ezdmy",
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "0ea70be61e0add70a0bb5a7d07be6b4e5fe1e14e9b8d79e1bc2115cdec5086ed"
+    },
+    {
+      "path": "/home/dev/.local/state/hou4-test-tls/grafana-tls.previous.enc.json",
+      "recipients": [
+        "age19uly0pd0k88zykwwx35gjl2n8jzyrjfhqj3m68gk5240uqvzggrs3ezdmy",
+        "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7"
+      ],
+      "plaintext_unchanged": true,
+      "old_controller_identities_denied": true,
+      "sha256": "422b53d31950b9dee248c52ecfd685222ccab32ef37599470d53ce63844bb97d"
+    }
+  ],
+  "operator_only_files": [
+    "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+    "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+    "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+    "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+    "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+    "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+    "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+    "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+    "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+    "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+    "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+    "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+    "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json"
+  ],
+  "operator_escrow": {
+    "artifact": "controller-key-recovery-2026-11-08.tar.age",
+    "sha256": "5219ac3283daced263c435e939e506a8a80a319e9525f6a9dd900e28956c28dc",
+    "identities": 12,
+    "recipient": "age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7",
+    "local_operator_decryption": "pending"
+  },
+  "job_identities": {
+    "health": {
+      "key_file": "/home/dev/.local/state/hou1-vps-test-monitor/health-check.agekey",
+      "recipient": "age13sfc5pvwn5zqx7rtrg9yqex0z88d6jw50txvf5rcs026vu9x7grqhfm7hz"
+    },
+    "hou1_tls": {
+      "key_file": "/home/dev/.local/state/hou1-vps-test-monitor/tls-renewal.agekey",
+      "recipient": "age1qel4yqjglreralddr7kyy666kvm6ndz4ehu6xr5cpcgdkl539cls3ru57r"
+    },
+    "hou4_tls": {
+      "key_file": "/home/dev/.local/state/hou4-test-tls/renewal.agekey",
+      "recipient": "age19uly0pd0k88zykwwx35gjl2n8jzyrjfhqj3m68gk5240uqvzggrs3ezdmy"
+    }
+  },
+  "new_jobs": {
+    "health": {
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/health-check.enc.json",
+      "fields": [
+        "TEST_ADMIN_PASSWORD",
+        "TEST_READER_PASSWORD"
+      ]
+    },
+    "hou1_tls": {
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/dns-renewal.enc.json",
+      "fields": [
+        "CLOUDFLARE_DNS_API_TOKEN"
+      ]
+    }
+  },
+  "old_identities_retired": true,
+  "old_identities_retirement_requires_live_job_verification": true,
+  "scope_matrix": [
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/dns-token.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-acme.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.previous.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/health-check.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "health",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/dns-renewal.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/dns-token.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-acme.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.previous.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/health-check.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou1_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/dns-renewal.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-test.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/hou1-iac/ansible/secrets/authentik-prod.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/rebuild/netbird-token.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/authentik-host.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/gates/netbird-admission.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/operator.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou1-vps-test/offboarding/fixtures.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/secrets.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/receiver-pki.enc.yaml",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-acme.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/var/tmp/hou4-vps-2gb-test/grafana-tls.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/dns-token.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-acme.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou4-test-tls/grafana-tls.previous.enc.json",
+      "can_decrypt": true
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/health-check.enc.json",
+      "can_decrypt": false
+    },
+    {
+      "identity": "hou4_tls",
+      "ciphertext": "/home/dev/.local/state/hou1-vps-test-monitor/dns-renewal.enc.json",
+      "can_decrypt": false
+    }
+  ],
+  "native_renewal_write_scoped": true,
+  "hou1_tls_dns_only_input_verified": true,
+  "live_health_monitor": {
+    "firing_rules": [
+      "controller_tls_renewal"
+    ]
+  },
+  "preexisting_hou1_renewal_finding": {
+    "rule": "controller_tls_renewal",
+    "consecutive_failures": 213,
+    "timer": "disabled before this change; unchanged",
+    "scope": "Separate rollout finding; does not use staff health credentials"
+  },
+  "old_identities_removed": 12,
+  "remaining_discovered_identities": [
+    "/home/dev/.local/state/hou1-vps-test-monitor/health-check.agekey",
+    "/home/dev/.local/state/hou1-vps-test-monitor/tls-renewal.agekey",
+    "/home/dev/.local/state/hou4-test-tls/renewal.agekey"
+  ],
+  "controller_has_passwordless_sudo": true,
+  "isolation_limit": "Same-UID or sudo-capable agents can read routine keys and existing test-host credentials. Production/operator identities must stay off this machine. Underlying credentials and SSH authorizations were not rotated; historical access cannot be retroactively revoked.",
+  "operator_recovery_escrow_verification": "pending user-side age decryption",
+  "scoped_handoff": {
+    "artifact": "controller-scoped-handoff-2026-11-08.tar.gz",
+    "sha256": "aa504a46d69f981f2f4d3dcb68cd7850d116031f9866b05f9946d5f138eb5e9a",
+    "sops_documents": 19,
+    "escrow_included_encrypted": true,
+    "private_operator_identity_required": "stays local"
+  },
+  "age_private_identity_environment_set": false,
+  "recorded_at": "2026-11-08T07:50:47.141336+00:00",
+  "tests": {
+    "repository_tests": 140,
+    "passed": 139,
+    "skipped": 1,
+    "skip": "Existing optional dnsmasq integration binary not installed",
+    "native_scope_matrix_checks": 57,
+    "native_renewal_check_config": true,
+    "native_renewal_metrics_publication": true,
+    "native_systemd_unit_verify": true,
+    "full_live_hou1_tls_renewal": "not run; existing disabled timer recorded"
+  },
+  "source_refs": {
+    "/home/dev/hou1-iac": "700ff91ba8147cbd91f9578909ed8d6285fffba5",
+    "/home/dev/hou4-iac": "b016bbf375b437787efd4e5b1a5cbdaeba11c172"
+  },
+  "separate_rollout_findings": [
+    "HOU1 legacy renewal timer disabled before this change; last successful receipt 2026-11-06T22:55:05.113352+00:00 is older than 26 hours."
+  ],
+  "production_promoted": false,
+  "related_pr": "https://github.com/rodriguezhumberto/hou1-iac/pull/52"
+}

@@ -10,10 +10,14 @@ import subprocess
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("--config", required=True)
 p.add_argument("--enable", action="store_true")
+p.add_argument("--tls-config", help="Separate private test TLS config with DNS-only secret inputs")
 a = p.parse_args()
 config = Path(a.config).resolve()
 assert json.loads(config.read_text())["environment"] == "test"
 root = config.parent
+tls_config = Path(a.tls_config).resolve() if a.tls_config else config
+assert json.loads(tls_config.read_text())["environment"] == "test"
+assert tls_config.parent.stat().st_mode & 0o077 == 0
 assert root.stat().st_mode & 0o077 == 0
 program = root / "monitor.py"
 shutil.copyfile(Path(__file__).with_name("rehearsal-monitor.py"), program)
@@ -63,7 +67,7 @@ files["hou1-test-tls.service"] = f"""[Unit]
 Description=Controller-only isolated test certificate renewal
 [Service]
 Type=oneshot
-ExecStart=/usr/bin/python3 {tls_program} --config {config} --renew
+ExecStart=/usr/bin/python3 {tls_program} --config {tls_config} --renew
 TimeoutStartSec=900
 UMask=0077
 NoNewPrivileges=yes
