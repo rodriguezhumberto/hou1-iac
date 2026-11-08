@@ -56,11 +56,16 @@ verified; the password delivery file was deleted afterward.
    the existing admission policy before disabling manual approval. Reconcile
    explicit staff roles and network groups after those Google users first log in.
    The initial `rehearse-vps.yml` run starts bootstrap ingress only. After verifying
-   administrative SSH over the new VPN, run the complete `hou1.yml` against the
-   private target with the fresh secrets loaded in memory. This applies the
-   existing security role and builds/starts the application. Finish with the
+   administrative SSH over the new VPN, run the complete `hou1.yml` with the
+   bootstrap inventory and `node_bootstrap: true`. Its existing security role
+   proves a fresh private administrative connection, switches Ansible to that
+   connection and removes its bounded recovery timer before finishing the app.
+   Pass fresh secrets through a mode-0600 file in a private RAM-backed directory
+   and remove it in `finally`; Ansible resolves piped `/dev/stdin` to an
+   inaccessible pipe path in this controller version. Finish with the
    private `rehearsal-gates.yml` and `monitoring.yml` entry points; never close
-   bootstrap SSH before proving its private replacement.
+   bootstrap SSH before proving its private replacement. The gate removes the
+   exact controller-source bootstrap firewall rule declared by the seed playbook.
 7. Record the manual CMS seed input, command, image/commit, counts and resulting
    page checks. The app initializes its schema; staff content is the manual step.
    The staff repository's `docs/cms-import.md` describes isolated synthetic seed

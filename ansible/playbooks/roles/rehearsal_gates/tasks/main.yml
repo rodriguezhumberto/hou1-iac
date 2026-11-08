@@ -12,6 +12,15 @@
       - rehearsal_controller_managed_tls | bool
     fail_msg: Monitoring and egress gates require a private isolated test target and controller-managed DNS credentials.
 
+- name: Remove the declared public bootstrap SSH allowance after private handoff
+  community.general.ufw:
+    rule: allow
+    port: '22'
+    proto: tcp
+    src: "{{ rehearsal_bootstrap_admin_cidr }}"
+    delete: true
+  when: rehearsal_bootstrap_admin_cidr is defined
+
 - name: Verify NetBird can start using both cached geolocation databases
   ansible.builtin.import_tasks: ../../netbird_control_plane/tasks/rehearsal-cache.yml
 
