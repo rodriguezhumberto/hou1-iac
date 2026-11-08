@@ -140,10 +140,41 @@ independent confirmation of message display at the destination.
 The reboot check passed: HOU1 recovered VPN-only SSH and metrics, NetBird,
 Authentik discovery and the persistent isolation/collector services without a
 public SSH fallback or alert silence. Fresh access and Google endpoint checks
-are repeated after reboot. Operator decryption and personal SSH-key access must
-still be confirmed before retiring the temporary deployment grant.
+are repeated after reboot. The operator confirmed local decryption and personal SSH-key access. The
+temporary deployment grant has been retired; see the handoff checkpoint below.
 
 A brief post-boot disk-I/O headroom failure recovered without changing the 70%
 threshold (follow-up utilization 9.6%). The final synthetic monitor reports only
 the deliberately outstanding backup-freshness rule; no alert deliveries are
 pending. Human Google sign-in was confirmed by the operator.
+
+## Operator handoff checkpoint
+
+The operator's selected connected MacBook peer was added to the existing
+administrators group after verifying its approved Google owner. Only that device
+was added; other memberships, policies and its regular NetBird user role were
+preserved. The operator confirmed both personal SSH access and local decryption
+of the delivered operator-only credential archive.
+
+The temporary key was removed from both root and dev authorized keys, and a
+fresh connection using only that identity received authentication denial. The
+operator and ongoing job keys remain installed. Four active controller SOPS
+sources were re-encrypted with fresh data keys to the operator alone; the old
+temporary identity could no longer decrypt them before deletion. The temporary
+deployment age key, local host-age copy, SSH private key and duplicate plaintext
+certificate seed state were deleted. The host's distinct runtime identity and
+the unchanged operator-encrypted recovery archive remain available.
+
+Private inventories no longer contain the temporary public key or enable
+bootstrap mode. Ongoing health and renewal identities are retained separately.
+Their existing SSH access still has passwordless sudo, so this handoff does not
+complete the remaining controller-isolation gate. Backups/restore, manual CMS
+seeding and the other recorded rehearsal gates remain outstanding.
+
+Post-retirement checks passed for the host runtime secret boundary, denial of
+public SSH on both nodes, the HOU1 renewal service and HOU4 renewal-metrics
+publication. All four existing monitoring/renewal timers remain active. Health
+and DNS jobs still decrypt only their respective two-password and one-token
+bundles. The synthetic monitor reports only the known missing-backup alert,
+with no pending alert deliveries. No application or infrastructure code changed
+for this handoff; the earlier repository test results remain applicable.

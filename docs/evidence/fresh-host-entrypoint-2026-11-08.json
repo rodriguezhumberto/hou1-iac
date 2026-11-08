@@ -1,5 +1,5 @@
 {
-  "recorded_at": "2026-11-08T09:50:59.989666+00:00",
+  "recorded_at": "2026-11-08T10:14:35.520504+00:00",
   "environment": "test",
   "infra_ref": "a0233db39f40a48ce760d69d1fd0d95783675534",
   "staff_ref": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
@@ -260,6 +260,67 @@
       "google_policy_checks": 5,
       "manual_approval_required": false,
       "existing_allowlisted_pending_users_reconciled": 0
+    },
+    "deployment_grant_retirement": {
+      "environment": "test",
+      "recorded_at": "2026-11-08T10:12:22.668576+00:00",
+      "operator_confirmed_local_decryption": true,
+      "operator_confirmed_personal_ssh": true,
+      "operator_selected_peer_authorized": true,
+      "operator_ssh_public_key_preserved": true,
+      "temporary_ssh_removed_from_host": {
+        "dev": {
+          "temporary_key_absent": true,
+          "removed": 1
+        },
+        "root": {
+          "temporary_key_absent": true,
+          "removed": 1
+        }
+      },
+      "fresh_temporary_ssh_authentication_denied": true,
+      "active_sources_reencrypted_operator_only": 4,
+      "temporary_age_cannot_decrypt_active_sources": true,
+      "temporary_deployment_age_identity_deleted": true,
+      "controller_host_age_copy_deleted": true,
+      "host_runtime_identity_retained_on_host": true,
+      "temporary_ssh_private_key_deleted": true,
+      "temporary_public_key_removed_from_inventories": true,
+      "plaintext_certificate_seed_copy_removed": true,
+      "ongoing_job_identities_preserved": true,
+      "operator_only_handoff_archive_unchanged": true,
+      "limitation": "Existing ongoing job SSH still has privileged sudo; this retirement does not establish complete controller isolation."
+    },
+    "post_retirement_monitor": {
+      "recorded_at": "2026-11-08T10:13:28.992558+00:00",
+      "unhealthy_rules": [
+        "authentik_backup_fresh"
+      ],
+      "pending_events": 0
+    },
+    "post_retirement_boundaries": {
+      "host_runtime_decrypts": true,
+      "dns_capability_absent": true,
+      "hou1_public_ssh_denied": true,
+      "hou4_public_ssh_denied": true
+    },
+    "post_retirement_job_scopes": {
+      "health_secret_scope_verified": true,
+      "tls_secret_scope_verified": true
+    },
+    "post_retirement_jobs": {
+      "live_runs": {
+        "hou1-test-tls.service": {
+          "Result": "success",
+          "ExecMainStatus": "0"
+        },
+        "hou4-test-tls-metrics.service": {
+          "Result": "success",
+          "ExecMainStatus": "0"
+        }
+      },
+      "all_four_existing_timers_active": true,
+      "alerts_silenced": false
     }
   },
   "tests": [
@@ -333,17 +394,19 @@
     "timers_enabled": true,
     "plaintext_extra_vars_removed": true,
     "ongoing_ssh_sudo": "existing-privileged-access-is-a-production-isolation-limitation",
-    "temporary_deployment_key": "pending-operator-decryption-and-access-verification-before-retirement"
+    "temporary_deployment_key": "retired: recipient removed, private key deleted, temporary SSH rejected"
   },
   "operator_handoff": {
     "operator_only_encrypted_documents": 5,
     "temporary_deployment_key_cannot_decrypt_handoff": true,
-    "private_keys_or_passwords_in_public_evidence": false
+    "private_keys_or_passwords_in_public_evidence": false,
+    "local_decryption_confirmed": true,
+    "personal_ssh_confirmed": true,
+    "temporary_deployment_grant_retired": true
   },
   "outstanding": [
     "Backups and restore drill explicitly deferred by operator",
     "Manual staff/CMS content seeding",
-    "Operator local age decryption and SSH-key verification; then retire temporary deployment grant",
     "Remaining production controller-isolation gates",
     "Fresh real-time signing-key overlap/cache-expiry and outage/rollback drills not rerun in this checkpoint"
   ],
