@@ -125,7 +125,7 @@
   "decrypted_contents_unchanged": true,
   "encrypted_values_unchanged": true,
   "controller_decryption_verified": true,
-  "operator_local_decryption": "pending user verification",
+  "operator_local_decryption": "confirmed by operator",
   "renewal_config_recipient_persisted": true,
   "native_renewal_future_write_preserves_both_recipients": true,
   "native_renewal_future_write_decryption_passed": true,
@@ -139,5 +139,6 @@
   },
   "tracked_repository_ciphertext_environment_isolation_verified": true,
   "plaintext_secret_and_private_identity_scan_passed": true,
-  "repository_focused_tests_passed": 3
+  "repository_focused_tests_passed": 3,
+  "operator_confirmation_recorded_at": "2026-11-08T07:38:03.213730+00:00"
 }
