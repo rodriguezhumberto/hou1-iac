@@ -6,8 +6,13 @@ passed. Existing production data is never used as a test seed.
 
 The [live HOU4 rehearsal](evidence/hou4-backup-live-2026-11-08.json) collected a
 32.4 MB encrypted point, verified transfer integrity, and passed Discord recovery
-and HOU4 reboot checks. Actual offline decryption, a clean full-stack restore,
-and interrupted HOU1 preparation recovery remain open gates.
+and HOU4 reboot checks. The [interruption rehearsal](evidence/hou1-backup-interruption-2026-11-08.json)
+then passed live writer SIGTERM/SIGKILL recovery and durable-intent recovery
+after reboot, preserving the completed ciphertext. The receiver also passed
+local process-kill/retry checks during transfer and before commit. Actual offline
+decryption, a clean full-stack restore, and a live interrupted HOU4 transfer
+remain open gates. The reboot used a hard-killed capture followed by normal OS
+reboot; no provider-level power cut was tested.
 
 HOU1 prepares one encrypted recovery point locally at 02:00 UTC. HOU4 collects
 the completed file at 03:00 UTC; both timers use up to five minutes of jitter
@@ -26,10 +31,21 @@ NetBird management while copying its state. Compression runs after NetBird
 restarts. Its integrated relay also stops during capture, so preparation runs
 as a local systemd job, independently of SSH. An SSH transfer never stops
 NetBird. Each stop has a restart in a
-`finally` block, including failed stops and snapshot errors. Ingress and the
-host NetBird peer remain running. A process killed with SIGKILL or a host power
-loss cannot execute that cleanup; the reboot and interrupted-backup drill must
-confirm normal service recovery. These are consistent component snapshots
+`finally` block, including failed stops and snapshot errors. Before stopping a
+writer, preparation fsyncs a root-only `restart-intent.json` containing only its
+fixed component name. `ExecStopPost` runs the same helper with `--recover` after
+termination, including SIGKILL. The enabled `hou1-backup-recover.service` replays
+an outstanding intent after Docker starts at boot, before another preparation.
+Recovery selects service names and project paths from fixed code/root-owned
+configuration, verifies they are running, reports the interrupted attempt as
+failed, and removes partial plaintext and ciphertext. It never replaces the
+previous `ready.export` and preserves the last successful capture timestamp.
+An invalid intent or failed restart leaves the intent for investigation.
+
+Ingress and the host NetBird peer remain running during capture. A process
+killed with SIGKILL or a host power loss cannot execute Python cleanup; durable
+intent, service cleanup and boot recovery cover those interruption boundaries.
+These are consistent component snapshots
 within one recovery set, not a distributed database transaction. Schedule
 operator identity/policy changes outside the capture window.
 
@@ -130,6 +146,14 @@ recipient, public transport key and server public host key are public inputs.
    preserves its completed ciphertext. A failed run retries on the next nightly schedule;
    after correcting the fault, an operator can start the service immediately.
 
+For an interrupted capture, inspect the result of `hou1-backup-prepare.service`
+and `hou1-backup-recover.service` privately. The latter must be enabled at boot.
+`sudo /usr/local/libexec/hou1-backup-prepare --recover` resumes only a recorded
+writer group and clears partial files under the same preparation lock; it
+does not create or acknowledge a new recovery point. Correct an invalid intent
+or failed restart before retrying preparation. Do not delete the intent or
+publish a partial archive as a manual shortcut.
+
 The transport uses TCP22 on HOU1. Review the exact NetBird policy readback and
 prove that the backup identity cannot start a shell, forward a port, read an
 arbitrary file, alter retained data on HOU4, or impersonate another VPN source.
@@ -191,4 +215,4 @@ and transport policy guards. The full two-node restore and outage drill remains
 a live rehearsal gate; #27 must stay open until it passes.
 
 [Recorded local evidence](evidence/hou4-backup-protocol-2026-11-08.json) separates
-completed tests from live gates. HOU4 implementation is local commit `dbc728a`.
+completed tests from live gates. HOU4 receiver interruption coverage is recorded at commit `96f80c0`.

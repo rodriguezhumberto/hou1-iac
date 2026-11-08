@@ -1,10 +1,11 @@
 [Unit]
 Description=Prepare one offline-encrypted HOU1 recovery point locally
-Requires=docker.service
-After=docker.service
+Requires=docker.service hou1-backup-recover.service
+After=docker.service hou1-backup-recover.service
 [Service]
 Type=oneshot
 ExecStart=/usr/local/libexec/hou1-backup-prepare
+ExecStopPost=/usr/local/libexec/hou1-backup-prepare --recover
 TimeoutStartSec=1900
 TimeoutStopSec=180
 UMask=0077

@@ -1,0 +1,35 @@
+---
+- name: Require established source configuration before upgrading recovery
+  ansible.builtin.stat:
+    path: /etc/hou1-backup/source.json
+  register: hou1_backup_source_config
+- name: Require configured private source inputs
+  ansible.builtin.assert:
+    that: hou1_backup_source_config.stat.isreg | default(false)
+- name: Install interruption-safe preparation and fixed recovery
+  ansible.builtin.copy:
+    src: export.py
+    dest: /usr/local/libexec/hou1-backup-prepare
+    owner: root
+    group: root
+    mode: '0700'
+- name: Install local preparation separately from the SSH ciphertext reader
+  ansible.builtin.template:
+    src: '{{ item }}.j2'
+    dest: '/etc/systemd/system/{{ item }}'
+    owner: root
+    group: root
+    mode: '0644'
+  loop: [hou1-backup-prepare.service, hou1-backup-prepare.timer, hou1-backup-recover.service]
+- name: Recover interrupted writers at boot and before enabling local capture
+  ansible.builtin.systemd_service:
+    name: hou1-backup-recover.service
+    daemon_reload: true
+    enabled: true
+    state: started
+- name: Enable nightly local capture before off-host collection
+  ansible.builtin.systemd_service:
+    name: hou1-backup-prepare.timer
+    daemon_reload: true
+    enabled: true
+    state: started

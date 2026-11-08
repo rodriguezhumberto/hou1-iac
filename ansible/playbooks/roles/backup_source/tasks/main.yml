@@ -71,7 +71,6 @@
       loop:
         - {src: gateway.py, dest: hou1-backup-gateway, mode: '0755'}
         - {src: serve.py, dest: hou1-backup-export, mode: '0700'}
-        - {src: export.py, dest: hou1-backup-prepare, mode: '0700'}
     - name: Permit only the argument-free root export helper
       ansible.builtin.copy:
         dest: /etc/sudoers.d/hou1-backup
@@ -88,20 +87,8 @@
         owner: root
         group: root
         mode: '0600'
-    - name: Install local preparation separately from the SSH ciphertext reader
-      ansible.builtin.template:
-        src: '{{ item }}.j2'
-        dest: '/etc/systemd/system/{{ item }}'
-        owner: root
-        group: root
-        mode: '0644'
-      loop: [hou1-backup-prepare.service, hou1-backup-prepare.timer]
-    - name: Enable nightly local capture before off-host collection
-      ansible.builtin.systemd_service:
-        name: hou1-backup-prepare.timer
-        daemon_reload: true
-        enabled: true
-        state: started
+    - name: Install interruption-safe local preparation and recovery
+      ansible.builtin.import_tasks: recovery.yml
     - name: Allow only the receiver VPN peer to reach the SSH transport
       community.general.ufw:
         rule: allow

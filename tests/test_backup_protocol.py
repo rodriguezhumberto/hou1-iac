@@ -159,6 +159,68 @@ class BackupProtocolTest(unittest.TestCase):
                 with source.frozen(project,['astro-app']):raise ValueError('snapshot failed')
         self.assertEqual(run.call_args.args[0][-2:],['start','astro-app'])
 
+    def test_durable_intent_precedes_stop_and_survives_failed_restart(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);intent=root/'restart-intent.json';events=[]
+            project={'name':'fixture','root':'/fixture'}
+            def command(argv,**kwargs):
+                events.append(argv)
+                if 'ps' in argv:return b'astro-app\n'
+                if 'stop' in argv:self.assertEqual(json.loads(intent.read_text()),dict(schema=1,component='app'))
+                if 'start' in argv:raise RuntimeError('Synthetic restart failure')
+            with patch.object(source,'command',side_effect=command):
+                with self.assertRaises(RuntimeError):
+                    with source.frozen(project,['astro-app'],(intent,'app')):pass
+            self.assertTrue(intent.exists())
+
+    def test_recovery_restarts_only_recorded_writers_cleans_partials_and_preserves_complete_point(self):
+        for component,services in source.WRITERS.items():
+            with self.subTest(component=component),tempfile.TemporaryDirectory() as directory:
+                root=Path(directory);config=dict(work_root=str(root),**{name:dict(name=name+'-fixture',root='/fixture/'+name) for name in source.WRITERS})
+                (root/'restart-intent.json').write_text(json.dumps(dict(schema=1,component=component)))
+                (root/'last-export.json').write_text(json.dumps(dict(last_success=1234)))
+                (root/'ready.export').write_bytes(b'previous-complete-point')
+                (root/'.snapshot-fixture').mkdir();(root/'.snapshot-fixture/private').write_bytes(b'partial-plaintext')
+                (root/'.prepared-fixture').write_bytes(b'partial-ciphertext')
+                with patch.object(source,'command',side_effect=[b'',('\n'.join(services)+'\n').encode()]) as run:
+                    source.recover(config)
+                self.assertEqual(run.call_args_list[0].args[0],source.compose(config[component])+['start',*services])
+                self.assertEqual((root/'ready.export').read_bytes(),b'previous-complete-point')
+                self.assertEqual(json.loads((root/'last-export.json').read_text())['last_success'],1234)
+                self.assertEqual(json.loads((root/'last-export.json').read_text())['last_run_success'],0)
+                self.assertFalse((root/'restart-intent.json').exists())
+                self.assertFalse(list(root.glob('.snapshot-*')));self.assertFalse(list(root.glob('.prepared-*')))
+
+    def test_invalid_or_failed_recovery_keeps_intent_and_never_publishes_success(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);intent=root/'restart-intent.json'
+            for record in [dict(schema=1,component='unknown'),dict(schema=1,component='app',command='sh')]:
+                intent.write_text(json.dumps(record))
+                with patch.object(source,'command') as command:
+                    with self.assertRaises(ValueError):source.recover(dict(work_root=str(root)))
+                    command.assert_not_called()
+            intent.write_text(json.dumps(dict(schema=1,component='app')))
+            with patch.object(source,'command',return_value=b''):
+                with self.assertRaises(RuntimeError):source.recover(dict(work_root=str(root),app=dict(name='app',root='/fixture')))
+            self.assertTrue(intent.exists())
+
+    def test_systemd_recovers_after_termination_and_at_boot(self):
+        import yaml
+        role=ROOT/'ansible/playbooks/roles/backup_source'
+        prepare=(role/'templates/hou1-backup-prepare.service.j2').read_text()
+        boot=(role/'templates/hou1-backup-recover.service.j2').read_text()
+        self.assertIn('ExecStopPost=/usr/local/libexec/hou1-backup-prepare --recover',prepare)
+        self.assertIn('Requires=docker.service hou1-backup-recover.service',prepare)
+        self.assertIn('After=docker.service',boot)
+        self.assertIn('WantedBy=multi-user.target',boot)
+        self.assertIn('ExecStart=/usr/local/libexec/hou1-backup-prepare --recover',boot)
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory)
+            for name,text in [('hou1-backup-prepare.service',prepare),('hou1-backup-recover.service',boot)]:
+                (root/name).write_text(text.replace('/usr/local/libexec/hou1-backup-prepare','/usr/bin/true'))
+            result=subprocess.run(['systemd-analyze','verify',str(root/'hou1-backup-prepare.service'),str(root/'hou1-backup-recover.service')],capture_output=True,text=True)
+            self.assertEqual(result.returncode,0,result.stderr)
+
     def test_transport_denies_shell_arguments_and_arbitrary_commands(self):
         for cmd in ['', 'sh', 'export-v1;id', 'export-v1 extra', 'cat /etc/shadow']:
             with patch.dict(os.environ,{'SSH_ORIGINAL_COMMAND':cmd}),patch.object(gateway.sys,'argv',['gateway']),patch.object(gateway.os,'execv') as execute:

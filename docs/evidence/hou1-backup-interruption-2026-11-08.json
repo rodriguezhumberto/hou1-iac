@@ -1,0 +1,173 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "environment": "isolated-test",
+  "issue": 27,
+  "hou1_public_ip": "139.177.151.12",
+  "hou1_vpn_ip": "100.91.0.10",
+  "source_process_interruption": {
+    "passed": true,
+    "checks": [
+      {
+        "component": "authentik",
+        "signal": "SIGTERM",
+        "interruption_observed_while_stopped": true,
+        "writers_recovered": true,
+        "previous_ciphertext_unchanged": true,
+        "partial_plaintext_removed": true,
+        "failed_attempt_reported": true,
+        "completed_at": 1794178229
+      },
+      {
+        "component": "authentik",
+        "signal": "SIGKILL",
+        "interruption_observed_while_stopped": true,
+        "writers_recovered": true,
+        "previous_ciphertext_unchanged": true,
+        "partial_plaintext_removed": true,
+        "failed_attempt_reported": true,
+        "completed_at": 1794178257
+      },
+      {
+        "component": "app",
+        "signal": "SIGKILL",
+        "interruption_observed_while_stopped": true,
+        "writers_recovered": true,
+        "previous_ciphertext_unchanged": true,
+        "partial_plaintext_removed": true,
+        "failed_attempt_reported": true,
+        "completed_at": 1794178324
+      },
+      {
+        "component": "netbird",
+        "signal": "SIGKILL",
+        "interruption_observed_while_stopped": true,
+        "writers_recovered": true,
+        "previous_ciphertext_unchanged": true,
+        "partial_plaintext_removed": true,
+        "failed_attempt_reported": true,
+        "completed_at": 1794178400
+      }
+    ]
+  },
+  "boot_interruption": {
+    "schema": 1,
+    "passed": true,
+    "mode": "SIGKILL with immediate recovery deliberately suppressed, followed by normal OS reboot; not a provider hard power cut",
+    "boot_id_before": "38a4e2b7-2ab2-4b36-8d32-8435c6eec69f",
+    "boot_id_after": "02427026-2aa6-4559-ace8-ab162b31ca26",
+    "hard_kill_while_app_stopped": true,
+    "durable_intent_replayed": true,
+    "production_boot_recovery_result": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "active"
+    },
+    "independent_fallback_executed": false,
+    "previous_ciphertext_unchanged": true,
+    "partial_plaintext_removed": true,
+    "failed_attempt_reported": true,
+    "last_success_preserved": 1794178489,
+    "seven_containers_running": true,
+    "health": {
+      "hou1-authentik-test-authentik-server-1": "starting",
+      "hou1-authentik-test-authentik-worker-1": "starting",
+      "hou1-authentik-test-postgresql-1": "healthy",
+      "hou1-netbird-test-netbird-server-1": "no-healthcheck",
+      "hou1-netbird-test-dashboard-1": "no-healthcheck",
+      "pearlandpaws-test-astro-app-1": "healthy",
+      "pearlandpaws-test-nginx-1": "no-healthcheck"
+    },
+    "recorded_at": 1794178709
+  },
+  "receiver_process_interruption": {
+    "location": "local controller fixture; not live HOU4",
+    "hou4_implementation": "96f80c0",
+    "tests": 9,
+    "passed": 9,
+    "optional_skips": 0,
+    "cases": [
+      "SIGKILL during a partial incoming stream",
+      "SIGKILL after verification before final commit"
+    ],
+    "previous_point_preserved": true,
+    "uncommitted_points_rejected": true,
+    "retry_removes_abandoned_staging": true
+  },
+  "checks": {
+    "hou1_full_suite": {
+      "total": 160,
+      "passed": 159,
+      "skipped": [
+        "optional dnsmasq integration dependency unavailable"
+      ]
+    },
+    "backup_focused": {
+      "total": 13,
+      "passed": 13
+    },
+    "ansible_syntax": "passed",
+    "systemd_unit_validation": "passed"
+  },
+  "restore": {
+    "status": "pending operator-encrypted temporary recovery copy",
+    "actual_offhost_point": "20261108T220342Z-0fc8cd69479a",
+    "controller_has_operator_private_key": false,
+    "temporary_recipient_scope": "single recovery drill; identity kept off both VPSs"
+  },
+  "remaining_gates": [
+    "Actual off-host backup decryption and clean isolated full-stack restore",
+    "Identity, application and rollback validation against restored data; restore duration",
+    "Live HOU4 interrupted network transfer (local process-kill coverage passed)"
+  ],
+  "production_approved": false,
+  "post_drill": {
+    "recorded_at": 1794178896,
+    "unit": {
+      "Result": "success",
+      "ExecMainStatus": "0",
+      "ActiveState": "inactive"
+    },
+    "status": {
+      "schema": 1,
+      "last_run_success": 1,
+      "attempted": 1794178866,
+      "last_success": 1794178864
+    },
+    "success": true,
+    "completed_point": {
+      "schema": 1,
+      "environment": "test",
+      "created": 1794178864,
+      "id": "20261108T230104Z-79ac8cd7fa04",
+      "size": 32644316,
+      "sha256": "84815a99338b747a7a3dc2545e3b943a0bca8d22da0721d764a5285f731b301b"
+    },
+    "completed_ciphertext_verified": true,
+    "seven_containers_running": true,
+    "all_defined_container_healthchecks_healthy": true,
+    "temporary_fallback_removed": true,
+    "no_partial_snapshot": true,
+    "no_pending_intent": true,
+    "interruption_harness_removed": true,
+    "public_health": {
+      "public_netbird_api": {
+        "ok": true,
+        "status": 200
+      },
+      "public_authentik_discovery": {
+        "ok": true,
+        "status": 200
+      },
+      "public_nginx": {
+        "ok": true,
+        "status": 200
+      }
+    },
+    "host_health": {
+      "check_count": 23,
+      "failed_checks": []
+    },
+    "public_staff_access_denied_http": 403
+  }
+}
