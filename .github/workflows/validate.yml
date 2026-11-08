@@ -17,7 +17,7 @@ jobs:
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y age
-          curl --fail --silent --show-error --location \
+          curl --fail --silent --show-error --location --retry 3 --retry-delay 2 --retry-max-time 90 \
             https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64 \
             --output "$RUNNER_TEMP/sops"
           echo '775f1384d55decfad228e7196a3f683791914f92a473f78fc47700531c29dfef  '$RUNNER_TEMP'/sops' \

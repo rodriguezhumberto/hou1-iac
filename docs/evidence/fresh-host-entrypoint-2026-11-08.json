@@ -44,5 +44,13 @@
       ],
       "result": "passed"
     }
-  ]
+  ],
+  "ci_setup_finding": {
+    "run_id": 42465350269,
+    "failed_attempts": 2,
+    "stage": "SOPS release download",
+    "http_status": 504,
+    "resolution": "Bounded curl retry; binary version and SHA-256 pin unchanged",
+    "validation": "pending CI rerun"
+  }
 }
