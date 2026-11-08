@@ -66,6 +66,14 @@ def collect(config, now=None):
             latest=max(latest,marker.stat().st_mtime)
     for marker in directory.glob('authentik-*.failed'):
         failed=max(failed,marker.stat().st_mtime)
+    # A source export proves local capture only. HOU4 owns the off-host receipt/freshness checks.
+    if Path('/etc/hou1-backup/source.json').is_file():
+        try:
+            export = json.loads(Path('/var/lib/hou1-backup/last-export.json').read_text())
+            latest = float(export['last_success'])
+            failed = max(float(export['attempted']), latest + 1) if not export['last_run_success'] else 0
+        except Exception:
+            latest, failed = 0, now
     emit('hou1_backup_last_success_timestamp_seconds',latest,backup='authentik-local')
     emit('hou1_backup_last_attempt_success',int(latest>0 and latest>=failed),backup='authentik-local')
     if config.get('request_metrics_enabled'):

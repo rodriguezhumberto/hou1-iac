@@ -1,0 +1,26 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "issue": 27,
+  "environment": "local-disposable-fixtures",
+  "live_hosts_changed": false,
+  "hou4_local_commit": "dbc728a",
+  "source_checks": {
+    "full_repository": {"tests": 153, "result": "passed", "optional_skips": ["dnsmasq integration tool unavailable"]},
+    "final_backup_tests": {"tests": 7, "result": "passed", "includes": ["offline age round trip", "real PostgreSQL clean database import", "SQLite and media recovery", "restart after failed stop and failed snapshot", "restricted transport command", "exact NetBird TCP22 peer policy", "source preflight guard", "safe archive extraction"]},
+    "syntax": ["hou1.yml", "rehearse-vps.yml", "backups.yml"],
+    "python_compile": "passed",
+    "whitespace": "passed"
+  },
+  "receiver_checks": {
+    "repository_tests": 49,
+    "repository_result": "passed without skips",
+    "final_nginx_1_28_3_followup_tests": 11,
+    "final_nginx_followup_result": "passed",
+    "includes": ["all six pinned containers ready", "config validation using production helper", "private listeners and read-only filesystem definitions", "persistent permissions", "restart", "disabled service removal", "atomic PEM visibility and reload", "TLS source ACL and header checks", "renewal rollback", "authenticated local firing and resolved delivery", "ciphertext size/checksum/age/environment/replay checks", "failed SSH and partial transfer rejection", "real-directory retention pruning", "budget and free-space guard", "missing backup PromQL alert"]
+  },
+  "defaults": {"capture": "nightly 03:00 UTC with up to 300 seconds jitter", "daily_points": 7, "weekly_points": 4, "ciphertext_budget_gib": 60, "max_incoming_gib": 10, "minimum_free_gib": 15},
+  "live_gates_pending": ["fresh HOU4 deployment and private SSH handoff", "pair generated transport public key", "actual VPN backup collection and receipt", "actual Discord failure/recovery delivery", "reboot and interrupted export recovery", "clean isolated full-stack restore", "NetBird rollback and application identity checks", "measure archive size and restore duration"],
+  "production_approved": false,
+  "independent_hou4_outage_monitoring": "deferred by operator"
+}

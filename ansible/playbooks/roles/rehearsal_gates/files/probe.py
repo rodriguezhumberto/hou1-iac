@@ -135,6 +135,10 @@ def collect(c):
     check("io_headroom", io)
 
     def backup():
+        if Path('/etc/hou1-backup/source.json').is_file():
+            state = json.loads(Path('/var/lib/hou1-backup/last-export.json').read_text())
+            age = datetime.datetime.now(datetime.timezone.utc).timestamp() - state['last_success']
+            return state['last_run_success'] == 1 and 0 <= age < c['backup_max_age_hours'] * 3600
         markers = list(Path(c["backup_directory"]).glob("authentik-*.success"))
         return (
             bool(markers)

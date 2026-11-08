@@ -123,6 +123,43 @@ def monitoring_plan(groups, peers, policies, monitor_ip, server_ip):
     return dict(groups=planned, policy=policy)
 
 
+def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environment):
+    """Only one enrolled receiver can reach one source on TCP22; never grant admin membership."""
+    from ipaddress import IPv4Address, IPv4Network
+    network = IPv4Network(subnet)
+    if environment not in ('test', 'production') or receiver_ip == source_ip or any(
+            IPv4Address(ip) not in network for ip in (receiver_ip, source_ip)):
+        raise AnsibleFilterError('Backup transport requires distinct private environment peers')
+    parent = [g for g in groups if g['name'] == ('test-servers' if environment == 'test' else 'prod-servers')]
+    if len(parent) != 1: raise AnsibleFilterError('Missing backup environment group')
+    members = {p['id'] if isinstance(p, dict) else p for p in parent[0].get('peers', [])}
+    planned = []
+    for suffix, address in [('receiver', receiver_ip), ('source', source_ip)]:
+        found_peers = [p for p in peers if p['ip'] == address]
+        if len(found_peers) != 1 or found_peers[0]['id'] not in members:
+            raise AnsibleFilterError('Backup peers must be unique enrolled environment servers')
+        name = 'hou1-backup-' + environment + '-' + suffix
+        matches = [g for g in groups if g['name'] == name]
+        peer_id = found_peers[0]['id']
+        if len(matches) > 1 or (matches and {p['id'] if isinstance(p, dict) else p for p in matches[0].get('peers', [])} != {peer_id}):
+            raise AnsibleFilterError('Existing backup group has unexpected membership')
+        planned.append(dict(id=matches[0]['id'] if matches else None, body=dict(name=name, peers=[peer_id])))
+    policy = None
+    if all(g['id'] for g in planned):
+        name = 'hou1-backup-' + environment + '-ssh'
+        marker = 'Managed by hou1-iac backups.'
+        body = dict(name=name, description=marker, enabled=True, source_posture_checks=[], rules=[dict(
+            name=name, description=marker, enabled=True, action='accept', protocol='tcp',
+            bidirectional=False, sources=[planned[0]['id']], destinations=[planned[1]['id']], ports=['22'])])
+        matches = [p for p in policies if p['name'] == name]
+        if len(matches) > 1 or (matches and matches[0].get('description') != marker):
+            raise AnsibleFilterError('Backup policy collides with an operator policy')
+        current = matches[0] if matches else None
+        policy = dict(body=body, id=current['id'] if current else None,
+                      changed=not current or policy_body(current) != policy_body(body))
+    return dict(groups=planned, policy=policy)
+
+
 class FilterModule:
     def filters(self):
-        return {'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan}
+        return {'netbird_backup_plan': backup_plan, 'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan}

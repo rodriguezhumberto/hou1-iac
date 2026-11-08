@@ -178,3 +178,11 @@ and DNS jobs still decrypt only their respective two-password and one-token
 bundles. The synthetic monitor reports only the known missing-backup alert,
 with no pending alert deliveries. No application or infrastructure code changed
 for this handoff; the earlier repository test results remain applicable.
+
+## Prepared off-host recovery follow-up
+
+The [HOU4 backup protocol](hou4-backup-protocol.md) now provides the restricted
+encrypted source role, receiver contract and offline validation procedure. This
+is implementation/test preparation; the earlier live checkpoint still has no
+verified off-host backup or clean-node restore. Repeat the live gates after the
+fresh HOU4 deployment and key pairing before closing #27.
