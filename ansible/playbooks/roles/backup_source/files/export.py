@@ -71,9 +71,17 @@ def snapshot(config, work):
         # Save runtime configuration and TLS, never the live database or plaintext backup directory.
         archive_tree(work / 'app-config.tar.gz', app['root'],
                      ['.env', 'docker-compose.yml', 'docker-compose.override.yml', 'certbot/conf'])
-    # The NetBird outage is bounded to a local copy of its state; peers/SSH and ingress stay running.
+    # Copy while stopped, then compress after restart. Integrated relays also stop
+    # with this container, so preparation runs locally, independently of SSH.
+    netbird_copy = work / 'netbird-copy'; netbird_copy.mkdir()
     with frozen(netbird, ['netbird-server']):
-        archive_tree(work / 'netbird.tar.gz', netbird['root'], ['compose.yaml', 'config.yaml', 'dashboard.env', 'data'])
+        for name in ['compose.yaml', 'config.yaml', 'dashboard.env']:
+            shutil.copy2(Path(netbird['root']) / name, netbird_copy / name)
+        shutil.copytree(Path(netbird['root']) / 'data', netbird_copy / 'data', symlinks=True)
+    try:
+        archive_tree(work / 'netbird.tar.gz', netbird_copy, ['compose.yaml', 'config.yaml', 'dashboard.env', 'data'])
+    finally:
+        shutil.rmtree(netbird_copy)
     recovery = work / 'host-recovery'; recovery.mkdir()
     for number, name in enumerate(config['recovery_files']):
         path = Path(name)
@@ -144,6 +152,26 @@ def status(root, successful, manifest=None):
     temporary.replace(path)
 
 
+def prepare(config):
+    """Atomically replace one encrypted recovery point without depending on SSH."""
+    root = Path(config['work_root']); root.mkdir(mode=0o700, parents=True, exist_ok=True)
+    for old in root.glob('.prepared-*'):
+        if old.is_file() and not old.is_symlink(): old.unlink()
+    descriptor, name = tempfile.mkstemp(prefix='.prepared-', dir=root)
+    staged = Path(name)
+    try:
+        with os.fdopen(descriptor, 'wb') as stream:
+            manifest = export(config, stream)
+            stream.flush(); os.fsync(stream.fileno())
+        staged.replace(root / 'ready.export')
+        directory = os.open(root, os.O_DIRECTORY)
+        try: os.fsync(directory)
+        finally: os.close(directory)
+        return manifest
+    finally:
+        staged.unlink(missing_ok=True)
+
+
 def main():
     if os.geteuid() != 0 or len(sys.argv) != 1: raise PermissionError('Fixed root export only')
     os.umask(0o077)
@@ -153,7 +181,7 @@ def main():
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         config = json.loads(CONFIG.read_text())
         try:
-            manifest = export(config, sys.stdout.buffer)
+            manifest = prepare(config)
             status(config['work_root'], True, manifest)
         except Exception:
             status(config['work_root'], False)

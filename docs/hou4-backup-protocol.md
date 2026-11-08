@@ -4,9 +4,9 @@ This implements the off-host collection needed for the recovery rehearsal in
 #27. It does not establish production readiness until a fresh-node restore has
 passed. Existing production data is never used as a test seed.
 
-HOU4 initiates one nightly collection at 03:00 UTC, with up to five minutes of
-jitter and persistent missed-run handling. The source produces a fresh set on
-request. HOU4 retains the newest point from each of seven distinct UTC dates
+HOU1 prepares one encrypted recovery point locally at 02:00 UTC. HOU4 collects
+the completed file at 03:00 UTC; both timers use up to five minutes of jitter
+and persistent missed-run handling. HOU4 retains the newest point from each of seven distinct UTC dates
 and four distinct ISO weeks; a point can satisfy both tiers. There is one copy
 of each retained point, not daily/weekly duplicates. Nightly capture permits
 up to approximately a day of lost changes; an unsuccessful night increases that
@@ -17,7 +17,10 @@ window and raises an alert.
 HOU1 briefly stops Authentik server/worker writers, uses `pg_dump` against the
 running PostgreSQL service and copies Authentik files. It separately stops the
 staff application while SQLite's backup API and the media copy run, then stops
-NetBird management while copying its state. Each stop has a restart in a
+NetBird management while copying its state. Compression runs after NetBird
+restarts. Its integrated relay also stops during capture, so preparation runs
+as a local systemd job, independently of SSH. An SSH transfer never stops
+NetBird. Each stop has a restart in a
 `finally` block, including failed stops and snapshot errors. Ingress and the
 host NetBird peer remain running. A process killed with SIGKILL or a host power
 loss cannot execute that cleanup; the reboot and interrupted-backup drill must
@@ -43,8 +46,11 @@ PTY/forwarding, and an exact sudo helper. NetBird grants only that enrolled
 receiver peer TCP22 to the enrolled source peer. It does not add HOU4 to the
 administrators group or allow staff application access.
 
-The source records local export status for the existing HOU1 collector and
-synthetic freshness check. That status proves local capture/stream completion,
+The source atomically replaces one root-only `ready.export` ciphertext file;
+a failed preparation preserves the previous completed point. The fixed SSH
+reader checks freshness (six hours), size and checksum before sending data and
+performs no service mutations. The source records local preparation status for
+the existing HOU1 collector and synthetic freshness check. That status proves local capture,
 not off-host retention; HOU4 receipts and alerts remain authoritative.
 
 The helper accepts only `export-v1`. A bounded JSON manifest followed by exactly
@@ -107,11 +113,16 @@ recipient, public transport key and server public host key are public inputs.
    Refresh the existing HOU1 monitoring and rehearsal-gate roles from the same
    revision so their local checks read the new export status. Preserve their
    existing private deployment inputs.
-5. On HOU4 start `sudo systemctl start hou4-backup.service` and confirm its result,
+5. On HOU1 start `sudo systemctl start --no-block hou1-backup-prepare.service`.
+   Its NetBird restart can briefly disconnect relay-based SSH/VPN sessions;
+   reconnect and check its result and `/var/lib/hou1-backup/last-export.json`.
+   Confirm `hou1-backup-prepare.timer` is enabled. Then on HOU4 start
+   `sudo systemctl start hou4-backup.service` and confirm its result,
    committed receipt, source timestamp, off-host backup dashboard panels, and
    resolved backup-freshness alert. No backup succeeds until pairing is complete.
    The receiver timer is `hou4-backup.timer`; disabling the receiver stops the
-   timer and retains all data. A failed run retries on the next nightly schedule;
+   timer and retains all data. Disabling HOU1 preparation stops its timer and
+   preserves its completed ciphertext. A failed run retries on the next nightly schedule;
    after correcting the fault, an operator can start the service immediately.
 
 The transport uses TCP22 on HOU1. Review the exact NetBird policy readback and

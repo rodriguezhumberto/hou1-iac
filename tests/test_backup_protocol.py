@@ -19,6 +19,7 @@ def load(name,path):
 
 
 source=load('backup_export',ROOT/'ansible/playbooks/roles/backup_source/files/export.py')
+reader=load('backup_reader',ROOT/'ansible/playbooks/roles/backup_source/files/serve.py')
 gateway=load('backup_gateway',ROOT/'ansible/playbooks/roles/backup_source/files/gateway.py')
 recovery=load('backup_recovery',ROOT/'scripts/verify-recovery.py')
 policies=load('backup_policies',ROOT/'ansible/playbooks/filter_plugins/netbird_policies.py')
@@ -58,7 +59,14 @@ class BackupProtocolTest(unittest.TestCase):
                 if argv[0]=='git':return b'0123456789012345678901234567890123456789\n'
                 return b''
             stream=io.BytesIO()
-            with patch.object(source,'command',side_effect=command):source.export(config,stream)
+            archive_tree=source.archive_tree
+            def archive_after_restart(output,directory,names):
+                if Path(output).name=='netbird.tar.gz':
+                    self.assertEqual(events[-1][-2:],['start','netbird-server'])
+                return archive_tree(output,directory,names)
+            with patch.object(source,'command',side_effect=command),patch.object(source,'archive_tree',side_effect=archive_after_restart):
+                source.prepare(config)
+            reader.serve(config,stream)
             stream.seek(0);manifest=json.loads(stream.readline());archive=root/'recovery.age';archive.write_bytes(stream.read())
             self.assertNotIn(b'synthetic-private-config',archive.read_bytes())
             metadata=root/'manifest.json';metadata.write_text(json.dumps(manifest));output=root/'restore'
@@ -72,10 +80,38 @@ class BackupProtocolTest(unittest.TestCase):
             self.assertEqual((output/'host-recovery/0').read_text(),'synthetic-host-runtime-key')
             stops=[e for e in events if 'stop' in e];starts=[e for e in events if 'start' in e]
             self.assertEqual(len(stops),3);self.assertEqual(len(starts),3)
-            self.assertFalse(list((root/'work').iterdir()))
+            self.assertEqual([p.name for p in (root/'work').iterdir()],['ready.export'])
             for env,changes in [('production',{}),('test',{'size':manifest['size']+1}),('test',{'sha256':'0'*64})]:
                 metadata.write_text(json.dumps({**manifest,**changes}))
                 with self.assertRaises(ValueError):recovery.verify(archive,metadata,key,root/'failed',env)
+
+    def test_failed_preparation_preserves_previous_completed_ciphertext(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);ready=root/'ready.export';ready.write_bytes(b'previous-complete-point')
+            def fail(config,stream):
+                stream.write(b'partial-new-point');raise RuntimeError('Interrupted local preparation')
+            with patch.object(source,'export',side_effect=fail):
+                with self.assertRaises(RuntimeError):source.prepare({'work_root':str(root)})
+            self.assertEqual(ready.read_bytes(),b'previous-complete-point')
+            self.assertEqual(list(root.iterdir()),[ready])
+
+    def test_reader_rejects_stale_corrupt_partial_wrong_environment_and_symlink_before_streaming(self):
+        import hashlib
+        payload=b'age-encryption.org/v1\nfixture-only-ciphertext';now=1800000000
+        manifest=dict(schema=1,environment='test',id='20270115T080000Z-abcdef123456',created=now,
+                      size=len(payload),sha256=hashlib.sha256(payload).hexdigest())
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);config=dict(work_root=str(root),environment='test',max_archive_bytes=10000)
+            for changes,body in [({'created':now-21601},payload),({'created':now+61},payload),
+                                 ({'environment':'production'},payload),({'sha256':'0'*64},payload),
+                                 ({},payload[:-1]),({},payload+b'extra')]:
+                (root/'ready.export').write_bytes(json.dumps({**manifest,**changes}).encode()+b'\n'+body)
+                output=io.BytesIO()
+                with self.assertRaises(ValueError):reader.serve(config,output,now=now)
+                self.assertEqual(output.getvalue(),b'')
+            (root/'outside').write_bytes(json.dumps(manifest).encode()+b'\n'+payload)
+            (root/'ready.export').unlink();(root/'ready.export').symlink_to(root/'outside')
+            with self.assertRaises(OSError):reader.serve(config,io.BytesIO(),now=now)
 
     @unittest.skipUnless(shutil.which('docker') and shutil.which('age'),'Docker/age required')
     def test_real_postgresql_clean_import_from_encrypted_recovery(self):

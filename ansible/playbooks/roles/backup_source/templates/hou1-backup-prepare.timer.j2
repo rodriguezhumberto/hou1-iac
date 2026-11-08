@@ -1,0 +1,8 @@
+[Unit]
+Description=Capture HOU1 nightly before HOU4 collection
+[Timer]
+OnCalendar=*-*-* 02:00:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+[Install]
+WantedBy=timers.target

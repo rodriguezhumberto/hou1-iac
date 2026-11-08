@@ -70,7 +70,8 @@
         mode: '{{ item.mode }}'
       loop:
         - {src: gateway.py, dest: hou1-backup-gateway, mode: '0755'}
-        - {src: export.py, dest: hou1-backup-export, mode: '0700'}
+        - {src: serve.py, dest: hou1-backup-export, mode: '0700'}
+        - {src: export.py, dest: hou1-backup-prepare, mode: '0700'}
     - name: Permit only the argument-free root export helper
       ansible.builtin.copy:
         dest: /etc/sudoers.d/hou1-backup
@@ -87,6 +88,20 @@
         owner: root
         group: root
         mode: '0600'
+    - name: Install local preparation separately from the SSH ciphertext reader
+      ansible.builtin.template:
+        src: '{{ item }}.j2'
+        dest: '/etc/systemd/system/{{ item }}'
+        owner: root
+        group: root
+        mode: '0644'
+      loop: [hou1-backup-prepare.service, hou1-backup-prepare.timer]
+    - name: Enable nightly local capture before off-host collection
+      ansible.builtin.systemd_service:
+        name: hou1-backup-prepare.timer
+        daemon_reload: true
+        enabled: true
+        state: started
     - name: Allow only the receiver VPN peer to reach the SSH transport
       community.general.ufw:
         rule: allow
@@ -103,3 +118,16 @@
       loop:
         - 'Pearland Paws {{ cms_environment }} CMS backup'
         - 'HOU1 Authentik {{ authentik_environment }} encrypted backup'
+- name: Stop disabled local preparation without deleting retained ciphertext
+  when: not (hou1_backup_enabled | bool)
+  block:
+    - name: Discover an existing preparation timer
+      ansible.builtin.stat:
+        path: /etc/systemd/system/hou1-backup-prepare.timer
+      register: hou1_backup_prepare_timer
+    - name: Stop an existing preparation timer
+      ansible.builtin.systemd_service:
+        name: hou1-backup-prepare.timer
+        enabled: false
+        state: stopped
+      when: hou1_backup_prepare_timer.stat.exists

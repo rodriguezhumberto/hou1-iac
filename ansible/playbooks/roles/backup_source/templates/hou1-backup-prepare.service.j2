@@ -1,0 +1,17 @@
+[Unit]
+Description=Prepare one offline-encrypted HOU1 recovery point locally
+Requires=docker.service
+After=docker.service
+[Service]
+Type=oneshot
+ExecStart=/usr/local/libexec/hou1-backup-prepare
+TimeoutStartSec=1900
+TimeoutStopSec=180
+UMask=0077
+Nice=10
+IOSchedulingClass=idle
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/hou1-backup /run/lock
