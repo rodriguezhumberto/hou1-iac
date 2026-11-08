@@ -55,6 +55,12 @@ verified; the password delivery file was deleted afterward.
    the control-plane reset, keeping console recovery available. Apply and test
    the existing admission policy before disabling manual approval. Reconcile
    explicit staff roles and network groups after those Google users first log in.
+   The initial `rehearse-vps.yml` run starts bootstrap ingress only. After verifying
+   administrative SSH over the new VPN, run the complete `hou1.yml` against the
+   private target with the fresh secrets loaded in memory. This applies the
+   existing security role and builds/starts the application. Finish with the
+   private `rehearsal-gates.yml` and `monitoring.yml` entry points; never close
+   bootstrap SSH before proving its private replacement.
 7. Record the manual CMS seed input, command, image/commit, counts and resulting
    page checks. The app initializes its schema; staff content is the manual step.
    The staff repository's `docs/cms-import.md` describes isolated synthetic seed

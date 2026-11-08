@@ -1,0 +1,48 @@
+{
+  "recorded_at": "2026-11-08T09:00:57.165706+00:00",
+  "environment": "test",
+  "infra_ref": "a0233db39f40a48ce760d69d1fd0d95783675534",
+  "staff_ref": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+  "identity_policy_handoff": "validated-and-encrypted-no-plaintext-output",
+  "old_operator_only_bundles_unchanged": true,
+  "phases": {
+    "prepare": {
+      "result": "passed",
+      "ok": 27,
+      "changed": 13,
+      "failed": 0,
+      "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0"
+    },
+    "certificates": "in-progress",
+    "full_stack": "not-started",
+    "cms_seed": "manual-pending",
+    "restore": "outstanding-operator-deferred",
+    "hou4_reenrollment": "pending-console-access"
+  },
+  "tests": [
+    {
+      "command": "NGINX_BIN=/var/tmp/hou1-offboarding-tools/nginx-validator python3 -m unittest discover -s tests -v",
+      "result": "passed",
+      "tests_run": 147,
+      "skipped": 1,
+      "log_sha256": "05de40e8efcb05ee751bd84947e75745763a5a6e31529d8d574cbfa0240f3345"
+    },
+    {
+      "command": "npm test",
+      "repository": "pearland-paws/astro-app",
+      "result": "passed",
+      "tests_passed": 93,
+      "failed": 0,
+      "skipped": 0,
+      "log_sha256": "767be23c0a0160acdcd888e3fd3b549e0561fa4e5671b58d333eb2c64e4b012c"
+    },
+    {
+      "command": "ansible-playbook --syntax-check",
+      "playbooks": [
+        "rehearsal-prepare.yml",
+        "rehearse-vps.yml"
+      ],
+      "result": "passed"
+    }
+  ]
+}
