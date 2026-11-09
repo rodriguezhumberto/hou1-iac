@@ -95,5 +95,19 @@
   "rollout_issues_remain_open": [
     "hou1-iac#27",
     "pearland-paws#39"
-  ]
+  ],
+  "ci_setup_followup": {
+    "run_id": 42566602802,
+    "failed_attempts": 2,
+    "stage": "pinned SOPS release download",
+    "failure": "GitHub release URL returned HTTP 504 on all curl retries, before repository tests",
+    "fix": "Download the same pinned asset through gh release download with three bounded attempts; retain SHA-256 verification",
+    "local_validation": {
+      "workflow_yaml_parsed": true,
+      "step_bash_syntax": "passed",
+      "release_api_download": "passed",
+      "download_sha256": "775f1384d55decfad228e7196a3f683791914f92a473f78fc47700531c29dfef"
+    },
+    "remote_deployment_started": false
+  }
 }
