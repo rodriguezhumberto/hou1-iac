@@ -207,3 +207,34 @@ See [attempt evidence](evidence/fresh-host-stopped-2026-11-09.json). The fix has
 not been deployed: another operator-confirmed wipe is required before starting
 again from preparation. This stopped attempt does not satisfy the rollout or
 recovery gates in #27 and staff #39.
+
+## Fresh-wipe attempt stopped at Authentik bootstrap (2026-11-09 UTC)
+
+Attempt `2026-11-09-02` used merged infrastructure `5cb8318` and staff
+`c3b51ec`. Preparation passed 27 tasks, encrypted seeding passed 17, and the
+corrected NetBird cache guard passed live. NetBird initialized its owner, groups
+and policies; Authentik's database, server and worker became healthy. The first
+failure was the Authentik identity-bootstrap command. The controller stopped
+immediately, without retrying or applying the local fix to the failed host.
+
+The original exception was hidden by `no_log`. Read-only API request evidence
+places the failure after reading the default provider flows and signing
+certificate, before creating OAuth providers. Later exact-match reads found
+all three defaults. This suggests asynchronous default-object readiness but
+does not prove which object was missing. The local fix waits for required
+built-in objects before identity writes, with a 180-second polling deadline.
+API/authentication errors and duplicate objects fail immediately; mutations
+are never retried.
+
+Focused tests passed 17 cases, the full suite passed 164 with one optional
+dnsmasq skip, and eight playbook syntax checks passed. See the
+[attempt evidence](evidence/fresh-host-authentik-stopped-2026-11-09.json).
+These are local checks; fresh-host validation remains pending.
+
+Immediate termination bypassed Ansible cleanup, so only the generated root-only
+bootstrap manifest was removed and verified absent. No deployment resumed.
+HOU4 at `209.135.170.2` remained unchanged with alerts enabled. The operator
+selected its provider console for later VPN re-enrollment; no console commands
+were issued during this attempt. Another confirmed HOU1-only wipe is required
+before restarting at preparation. Production approval and both rollout issues
+remain open.

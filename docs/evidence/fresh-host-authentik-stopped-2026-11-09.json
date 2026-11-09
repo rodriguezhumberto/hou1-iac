@@ -1,0 +1,98 @@
+{
+  "recorded_at": "2026-11-09T06:23:01.586849+00:00",
+  "attempt": "2026-11-09-02",
+  "environment": "test",
+  "infra_ref": "5cb8318c90f3f5430a766826b6a3244dcf700682",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "host_fingerprint": "SHA256:MoPzolrYy8cnAuYhStPwimUI+JB0Si36enxgpV5bYtA",
+  "hou4_preserved": true,
+  "alerts_silenced": false,
+  "stop_at_first_error": true,
+  "promotion_approved": false,
+  "phases": {
+    "rehearsal-prepare": {
+      "phase": "rehearsal-prepare",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T05:42:59.635312+00:00",
+      "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0",
+      "counts": {
+        "ok": 27,
+        "failed": 0,
+        "unreachable": 0
+      }
+    },
+    "rehearsal-seeds": {
+      "phase": "rehearsal-seeds",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T05:45:05.074362+00:00",
+      "log_sha256": "a6c77c34ee67559765420dde1099a1cb2a2a0071fc39ef87dc65689fc9b09d4b",
+      "counts": {
+        "ok": 17,
+        "failed": 0,
+        "unreachable": 0
+      }
+    },
+    "rehearse-vps": {
+      "phase": "rehearse-vps",
+      "exit_code": 2,
+      "finished_at": "2026-11-09T06:06:14.818464+00:00",
+      "counts": {
+        "failed": 1,
+        "recap_unavailable": "Immediate-stop callback exited before recap"
+      },
+      "log_sha256": "731f545f10cf27c7e1e0a932f22c6bc7683af9c95010b820297bbdf59a87ed0d"
+    }
+  },
+  "cache_guard_live_passed": true,
+  "bootstrap_status": "failed",
+  "status": "failed-awaiting-fresh-wipe",
+  "netbird_version": "0.82.0",
+  "failure": {
+    "task": "authentik : Apply Authentik groups, claims, scopes, users, and clients idempotently",
+    "original_exception_captured": false,
+    "diagnosis": "Suspected asynchronous Authentik default-object readiness; exact missing object is unconfirmed.",
+    "evidence": "Bootstrap created groups, fixture users and mappings, then read default provider flows and signing certificates with HTTP 200 and exited before provider requests. Later read-only exact-match queries found all three defaults present.",
+    "corrective_change": "Wait for required built-in defaults before identity writes; poll only missing objects, propagate API/authentication/duplicate-object errors, and never retry mutations.",
+    "live_revalidation": "awaiting-operator-confirmed-fresh-wipe"
+  },
+  "execution_policy": {
+    "stop_at_first_task_failure": true,
+    "resumed_after_failure": false,
+    "live_fix_applied": false,
+    "credential_cleanup_only": "Removed the generated root-only /opt/hou1-authentik/test/bootstrap.json manifest; verified absent.",
+    "next_attempt_requires_operator_confirmed_fresh_wipe": true
+  },
+  "hou4": {
+    "address": "209.135.170.2",
+    "preserved": true,
+    "changed_this_attempt": false,
+    "alerting_silenced": false,
+    "reenrollment_method": "provider-console-after-successful-HOU1-bootstrap"
+  },
+  "validation": {
+    "focused": {
+      "tests_run": 17,
+      "passed": 17,
+      "log_sha256": "8188beb602b118322e3194b7d12b1d80c9291d8730e93149d0b4c86cbc113835"
+    },
+    "syntax_checks": {
+      "passed": 8,
+      "remote_tasks_run": false,
+      "log_sha256": "0834e595b33610658edc6af545ccdf040d1523dd0992d87906a65784f214cec3"
+    },
+    "full_repository_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou1-offboarding-tools/nginx-validator python3 -m unittest discover -s tests -v",
+      "tests_run": 165,
+      "passed": 164,
+      "skipped": 1,
+      "skip_reason": "Optional dnsmasq binary not configured",
+      "duration_seconds": 336.054,
+      "log_sha256": "a42eefd27af49e925f341cf0138a85630022df381facc79c01248c3769b74abc"
+    },
+    "diff_check": "passed"
+  },
+  "rollout_issues_remain_open": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ]
+}

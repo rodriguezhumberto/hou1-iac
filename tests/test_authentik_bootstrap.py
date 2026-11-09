@@ -3,7 +3,10 @@ import json
 import importlib.util
 import py_compile
 import unittest
+from unittest.mock import patch
+from functools import partial
 from types import SimpleNamespace
+from urllib.error import HTTPError
 from urllib.parse import parse_qs, urlsplit
 import tempfile
 import yaml
@@ -114,6 +117,73 @@ class AuthentikBootstrapTest(unittest.TestCase):
         self.assertEqual(len(api.writes), first_count)
         self.assertEqual(len(api.objects['sources/oauth']), 1)
         self.assertEqual(len(api.objects['policies/bindings']), 2)
+
+    def test_delayed_defaults_finish_before_any_identity_write(self):
+        for resource, field, value in [
+                ('flows/instances', 'slug', 'default-provider-authorization-implicit-consent'),
+                ('flows/instances', 'slug', 'default-provider-invalidation-flow'),
+                ('crypto/certificatekeypairs', 'name', 'authentik Self-signed Certificate'),
+                ('propertymappings/provider/scope', 'scope_name', 'openid'),
+                ('propertymappings/provider/scope', 'scope_name', 'email'),
+                ('flows/instances', 'slug', 'default-source-authentication'),
+                ('flows/instances', 'slug', 'default-source-enrollment'),
+                ('stages/identification', 'name', 'default-authentication-identification'),
+                ('stages/user_write', 'name', 'default-source-enrollment-write')]:
+            with self.subTest(default=value):
+                api = self.google_api()
+                obj = next(x for x in api.objects[resource] if x[field] == value)
+                api.objects[resource].remove(obj)
+                elapsed = [0]
+
+                def initialize(delay):
+                    self.assertEqual(api.writes, [])
+                    elapsed[0] += delay
+                    api.objects[resource].append(obj)
+
+                with patch.object(bootstrap.time, 'monotonic', side_effect=lambda: elapsed[0]), \
+                        patch.object(bootstrap.time, 'sleep', side_effect=initialize) as sleep:
+                    result = bootstrap.apply(self.google_manifest(), api, {
+                        'STAFF_OIDC_CLIENT_SECRET': 'test-staff',
+                        'NETBIRD_OIDC_CLIENT_SECRET': 'test-netbird',
+                        'GOOGLE_OAUTH_CLIENT_SECRET': 'test-google'})
+                sleep.assert_called_once_with(2)
+                self.assertEqual(result['providers'], 2)
+                self.assertTrue(api.objects['sources/oauth'][0]['enabled'])
+
+    def test_default_readiness_timeout_leaves_identity_unmodified(self):
+        api = self.google_api()
+        api.objects['crypto/certificatekeypairs'] = []
+        elapsed = [0]
+        delays = []
+
+        def advance(delay):
+            self.assertEqual(api.writes, [])
+            delays.append(delay)
+            elapsed[0] += delay
+
+        wait = partial(bootstrap.wait_for_defaults, timeout=5)
+        with patch.object(bootstrap.time, 'monotonic', side_effect=lambda: elapsed[0]), \
+                patch.object(bootstrap.time, 'sleep', side_effect=advance), \
+                patch.object(bootstrap, 'wait_for_defaults', wait):
+            with self.assertRaisesRegex(TimeoutError, 'authentik Self-signed Certificate'):
+                bootstrap.apply(self.google_manifest(), api, {})
+        self.assertEqual(delays, [2, 2, 1])
+        self.assertEqual(api.writes, [])
+
+    def test_default_readiness_does_not_retry_api_errors_or_duplicate_objects(self):
+        api = self.google_api()
+        with patch.object(api, 'request', side_effect=HTTPError(
+                'http://fixture.invalid/api', 401, 'Unauthorized', {}, None)), \
+                patch.object(bootstrap.time, 'sleep') as sleep:
+            with self.assertRaises(HTTPError):
+                bootstrap.apply(self.google_manifest(), api, {})
+            sleep.assert_not_called()
+        api.objects['crypto/certificatekeypairs'] *= 2
+        with patch.object(bootstrap.time, 'sleep') as sleep:
+            with self.assertRaisesRegex(ValueError, 'multiple exact matches'):
+                bootstrap.apply(self.google_manifest(), api, {})
+            sleep.assert_not_called()
+        self.assertEqual(api.writes, [])
 
     def test_google_source_policy_rejects_unverified_and_unlisted_accounts(self):
         api = self.google_api()
