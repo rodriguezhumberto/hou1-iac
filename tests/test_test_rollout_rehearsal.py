@@ -1,7 +1,9 @@
 import argparse
+import copy
 import json
 from pathlib import Path
 import runpy
+import sys
 import tempfile
 import unittest
 import yaml
@@ -30,6 +32,48 @@ def args(**overrides):
 
 
 class TestRolloutRehearsal(unittest.TestCase):
+    def test_provider_initialization_finishes_before_package_installation(self):
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-prepare.yml').read_text())[0]['pre_tasks']
+        detect = next(task for task in tasks if task.get('register') == 'rehearsal_cloud_init')
+        wait = next(task for task in tasks if task.get('when') == 'rehearsal_cloud_init.stat.exists')
+        install = next(task for task in tasks if 'ansible.builtin.apt' in task)
+        self.assertLess(tasks.index(detect), tasks.index(wait))
+        self.assertLess(tasks.index(wait), tasks.index(install))
+        for scenario in ('pending', 'failed', 'timeout', 'absent'):
+            with self.subTest(scenario=scenario), tempfile.TemporaryDirectory() as directory:
+                fixture = Path(directory)
+                binary = fixture / 'cloud-init'
+                lock = fixture / 'provider-package-job'
+                installed = fixture / 'packages-installed'
+                if scenario != 'absent':
+                    lock.touch()
+                    binary.write_text(
+                        f'#!{sys.executable}\nimport sys, time\nfrom pathlib import Path\n'
+                        'assert sys.argv[1:] == ["status", "--wait"]\n'
+                        + ('sys.exit(2)\n' if scenario == 'failed' else
+                           'time.sleep(30)\n' if scenario == 'timeout' else
+                           f'time.sleep(0.2)\nPath({str(lock)!r}).unlink()\n'))
+                    binary.chmod(0o700)
+                probe, ready = copy.deepcopy(detect), copy.deepcopy(wait)
+                probe['ansible.builtin.stat']['path'] = str(binary)
+                argv = ready['ansible.builtin.command']['argv']
+                argv[1] = '0.3' if scenario == 'timeout' else '3'
+                argv[2] = str(binary)
+                # Exercise the real readiness tasks, replacing package mutation
+                # with a probe that refuses to overlap the provider's job.
+                package_probe = {'name': 'Fixture package installation', 'ansible.builtin.command': {
+                    'argv': [sys.executable, '-c',
+                             f'from pathlib import Path; assert not Path({str(lock)!r}).exists(); '
+                             f'Path({str(installed)!r}).touch()']}}
+                result = run_plays([{'tasks': [probe, ready, package_probe]}])
+                if scenario in ('pending', 'absent'):
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    self.assertTrue(installed.exists())
+                else:
+                    self.assertNotEqual(result.returncode, 0)
+                    self.assertIn(wait['name'], result.stdout)
+                    self.assertFalse(installed.exists())
+
     def test_fresh_vps_entrypoint_rejects_production_and_mutable_source(self):
         playbook = yaml.safe_load((ROOT / 'ansible/playbooks/rehearse-vps.yml').read_text())[0]
         guard = playbook['pre_tasks'][0]

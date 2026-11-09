@@ -1,0 +1,104 @@
+{
+  "recorded_at": "2026-11-09T08:03:58.679312+00:00",
+  "attempt": "2026-11-09-04",
+  "environment": "test",
+  "infra_ref": "566d812c4d3ccaa3c4a6a5d3617c269b6ae2479b",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "netbird_version": "0.82.0",
+  "host_fingerprint": "SHA256:FypFqEQylUVVy9CfTKVdfmlAgY87n8hkRhbjZj0rhT8",
+  "hou4_preserved": true,
+  "alerts_silenced": false,
+  "promotion_approved": false,
+  "stop_at_first_error": true,
+  "phases": {
+    "rehearsal-prepare": {
+      "phase": "rehearsal-prepare",
+      "exit_code": 2,
+      "finished_at": "2026-11-09T07:54:37.861177+00:00",
+      "log_sha256": "880f4bd08a41dd0d2c742b2d77a24a96641a3739aecf972085996f810a52b05f"
+    }
+  },
+  "failure": {
+    "kind": "failed",
+    "task": "Install dependencies used before the full-stack entry point",
+    "action": "ansible.builtin.apt",
+    "host": "rehearsal_vps",
+    "return_code": 100,
+    "message": "Unable to acquire the dpkg frontend lock after the default 60-second wait.",
+    "cause": "Provider cloud-init was still installing packages through apt-get under cloud-final.service."
+  },
+  "status": "failed-awaiting-fresh-wipe",
+  "readonly_diagnosis": {
+    "method": "Read /proc process status/cgroup ancestry and systemd service state; no raw cloud-init or service logs read.",
+    "lock_holder": {
+      "pid": 703,
+      "name": "apt-get",
+      "parent_pid": 580,
+      "parent_name": "cloud-init",
+      "systemd_unit": "cloud-final.service"
+    },
+    "cloud_final_state": "activating/start",
+    "apt_daily_state": "inactive/dead",
+    "apt_daily_upgrade_state": "inactive/dead"
+  },
+  "execution_policy": {
+    "resumed_after_failure": false,
+    "live_fix_applied": false,
+    "package_jobs_killed": false,
+    "package_lock_files_removed": false,
+    "next_attempt_requires_operator_confirmed_fresh_wipe": true
+  },
+  "phases_not_started": [
+    "rehearsal-seeds",
+    "rehearse-vps",
+    "hou1",
+    "hou4-reenrollment",
+    "monitoring",
+    "backups",
+    "rehearsal-gates"
+  ],
+  "hou4": {
+    "address": "209.135.170.2",
+    "preserved": true,
+    "changed_this_attempt": false,
+    "alerting_silenced": false,
+    "provider_console_commands_sent": false
+  },
+  "corrective_change": {
+    "entry_point": "ansible/playbooks/rehearsal-prepare.yml",
+    "cloud_init": "Detect /usr/bin/cloud-init and run timeout 900 cloud-init status --wait before package installation when present; nonzero exit stops deployment.",
+    "initial_apt_lock_timeout_seconds": 300,
+    "live_revalidation": "awaiting-another-confirmed-HOU1-wipe"
+  },
+  "validation": {
+    "focused": {
+      "tests_run": 6,
+      "passed": 6,
+      "scenarios": [
+        "delayed provider completion before package installation",
+        "provider initialization failure stops package installation",
+        "bounded timeout stops package installation",
+        "cloud-init absent skips readiness command"
+      ],
+      "log_sha256": "07b2cefa6449584d4a997963cc5a53c96a1cd72a2d0dde5d41d6064781d2f15e"
+    },
+    "syntax_checks": {
+      "passed": 8,
+      "remote_tasks_run": false,
+      "log_sha256": "0e98a500ac90b6639d1a885dfe92bfad552fec341dc29efade7c850759a6ce3c"
+    },
+    "full_repository_suite": {
+      "tests_run": 166,
+      "passed": 165,
+      "skipped": 1,
+      "skip_reason": "Optional dnsmasq binary not configured",
+      "duration_seconds": 341.191,
+      "log_sha256": "c1a9c942583b66c65afc03bca2abec55e48919efe524d56d007f0db6cb209fe1"
+    },
+    "diff_check": "passed"
+  },
+  "rollout_issues_remain_open": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ]
+}
