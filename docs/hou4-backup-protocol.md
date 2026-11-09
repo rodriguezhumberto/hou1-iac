@@ -163,6 +163,11 @@ must not depend on that same control plane being available.
 
 ## Offline validation and clean-host restore
 
+For the repeatable **isolated component drill** on the running test host, use
+[the recovery playbook](reproducible-recovery-drill.md). It implements the tested
+component sequence with private staging and evidence collection. Its local
+regressions do not replace a fresh live run or the clean-host steps below.
+
 From HOU4's provider console or an independent operator access path, copy one
 complete directory (`recovery.age`, `manifest.json`, `receipt.json`) to an operator
 machine. A recovery receipt alone is insufficient. With the offline age identity:
