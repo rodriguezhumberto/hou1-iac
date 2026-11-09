@@ -1,0 +1,156 @@
+{
+  "recorded_at": "2026-11-09T07:39:47.820586+00:00",
+  "attempt": "2026-11-09-03",
+  "environment": "test",
+  "infra_ref": "46aff114e9a522891c3c4331435cce46fa8fe061",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "netbird_version": "0.82.0",
+  "host_fingerprint": "SHA256:diVIz7+VHj8ftykZSuqmLP7ry+5FxUIrKBgEBaqE3qc",
+  "hou4_preserved": true,
+  "alerts_silenced": false,
+  "promotion_approved": false,
+  "stop_at_first_error": true,
+  "phases": {
+    "rehearsal-prepare": {
+      "phase": "rehearsal-prepare",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T07:03:59.270872+00:00",
+      "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0",
+      "counts": {
+        "ok": 27,
+        "changed": 13,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 0,
+        "rescued": 0,
+        "ignored": 0
+      }
+    },
+    "rehearsal-seeds": {
+      "phase": "rehearsal-seeds",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T07:04:46.131642+00:00",
+      "log_sha256": "a6c77c34ee67559765420dde1099a1cb2a2a0071fc39ef87dc65689fc9b09d4b",
+      "counts": {
+        "ok": 17,
+        "changed": 9,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 0,
+        "rescued": 0,
+        "ignored": 0
+      }
+    },
+    "rehearse-vps": {
+      "phase": "rehearse-vps",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T07:27:29.813151+00:00",
+      "log_sha256": "b81072857e57790f53be4f7a1b9d05f4d4dba125a84c8699713bdcfb0322c81f",
+      "counts": {
+        "ok": 252,
+        "changed": 74,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 23,
+        "rescued": 0,
+        "ignored": 0
+      }
+    },
+    "hou1": {
+      "phase": "hou1",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T07:33:13.620095+00:00",
+      "log_sha256": "c47f174f0cf1324ef203a845a2cfa6e2a6abcd933e42cfd0d6c979f7fbdedef6",
+      "counts": {
+        "ok": 121,
+        "changed": 20,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 22,
+        "rescued": 0,
+        "ignored": 0
+      }
+    },
+    "monitoring": {
+      "phase": "monitoring",
+      "exit_code": 2,
+      "finished_at": "2026-11-09T07:34:09.191800+00:00",
+      "log_sha256": "014abbedb8d50aab97609420ee14c8c02a89401ce56d284e89c304523f6ca89d"
+    }
+  },
+  "failure": {
+    "kind": "failed",
+    "task": "monitoring_exporter : Plan the two exact metrics groups",
+    "action": "ansible.builtin.set_fact",
+    "host": "rehearsal_vps",
+    "message": "Metrics peers must be unique enrolled test servers",
+    "cause": "Controller invoked monitoring before preserved HOU4 was re-enrolled in the rebuilt control plane.",
+    "classification": "controller-sequencing-error",
+    "policy_guard": "correctly refused missing peer before monitoring policy writes or exporter installation"
+  },
+  "status": "failed-awaiting-fresh-wipe",
+  "execution_policy": {
+    "resumed_after_failure": false,
+    "live_fix_applied": false,
+    "next_attempt_requires_operator_confirmed_fresh_wipe": true,
+    "credential_cleanup_needed": false,
+    "bootstrap_manifest_removed_by_successful_role": true
+  },
+  "live_checkpoints": {
+    "authentik_identity_bootstrap_passed": true,
+    "administrative_peer_reenrolled": true,
+    "administrative_peer_ip": "100.91.205.101",
+    "administrative_setup_key_revoked": true,
+    "private_ssh_and_sudo_verified_before_hardening": true,
+    "hou4_reenrolled": false,
+    "monitoring_passed": false,
+    "admission_reconciliation_run": false
+  },
+  "operator_report": {
+    "google_authentication": "succeeded",
+    "netbird_client_enrollment": "rejected: user pending approval cannot add peers",
+    "interpretation": "Admission reconciliation had not run; client enrollment is not a passed gate."
+  },
+  "hou4": {
+    "address": "209.135.170.2",
+    "preserved": true,
+    "changed_this_attempt": false,
+    "alerting_silenced": false,
+    "provider_console_commands_sent": false
+  },
+  "corrective_action": {
+    "infrastructure_policy_changed": false,
+    "checklist": "Require HOU4 reenrollment and verified private SSH before monitoring/backups, and tested allowlist admission before human client enrollment.",
+    "local_controller_guard": "Block monitoring/backups before invoking Ansible unless current-attempt HOU4 enrollment and private SSH evidence pass, then recheck private SSH.",
+    "live_revalidation": "awaiting-another-confirmed-HOU1-wipe"
+  },
+  "preplaybook_helper_error": {
+    "description": "Controller helper had a Python newline-quoting error; remote script failed parsing before any statement executed.",
+    "remote_changes_before_correction": false,
+    "corrected_and_compile_checked_before_first_playbook": true
+  },
+  "validation": {
+    "monitoring_policy": {
+      "tests_run": 4,
+      "passed": 4,
+      "duration_seconds": 1.707,
+      "log_sha256": "48566dfa0ece4f1b47ebc6bb8cb2210f06784c900887d7330adc36be7dd2fe03"
+    },
+    "admission_and_staff_access": {
+      "tests_run": 9,
+      "passed": 9,
+      "duration_seconds": 0.186,
+      "log_sha256": "237e51e5d70a88dfc588b3309eebcc216f4f23d45bc22f826c64ee84127a6cb8"
+    },
+    "local_controller_prerequisites": {
+      "cases_passed": 16,
+      "remote_calls_executed": false,
+      "report_sha256": "56d2dbb5c919291b046c2ac53f96e62afa7b5a5c195e0279d5c7b1a088d89458"
+    },
+    "diff_check": "passed"
+  },
+  "rollout_issues_remain_open": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ]
+}

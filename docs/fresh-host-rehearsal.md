@@ -66,6 +66,18 @@ verified; the password delivery file was deleted afterward.
    private `rehearsal-gates.yml` and `monitoring.yml` entry points; never close
    bootstrap SSH before proving its private replacement. The gate removes the
    exact controller-source bootstrap firewall rule declared by the seed playbook.
+   Before invoking `monitoring.yml` or `backups.yml`, re-enroll preserved HOU4
+   through its provider console, revoke the one-time setup key, and verify
+   private SSH. Require exactly one connected HOU4 peer at `100.91.0.22` in
+   `test-servers`. If console recovery is pending, wait before starting either
+   playbook. Their existing peer-policy guards must remain enforced.
+   A first Google web login creates the fresh identity; it does not prove device
+   enrollment. Run `scripts/rehearsal-netbird-admission.py` with the encrypted
+   admission inputs and verify its positive/negative policy checks, disabled
+   approval requirement, exact pending-user reconciliation, and explicit staff
+   assignments before asking the operator to test a NetBird client. Until then,
+   the initial approval gate can reject peer creation despite successful Google
+   authentication. See the [admission procedure](rehearsal-monitoring-isolation.md).
 7. Record the manual CMS seed input, command, image/commit, counts and resulting
    page checks. The app initializes its schema; staff content is the manual step.
    The staff repository's `docs/cms-import.md` describes isolated synthetic seed
@@ -238,3 +250,28 @@ selected its provider console for later VPN re-enrollment; no console commands
 were issued during this attempt. Another confirmed HOU1-only wipe is required
 before restarting at preparation. Production approval and both rollout issues
 remain open.
+
+## Fresh-wipe attempt stopped before monitoring changes (2026-11-09 UTC)
+
+Attempt `2026-11-09-03` used infrastructure `46aff11` and staff `c3b51ec`.
+Preparation passed 27 tasks, encrypted seeding passed 17, bootstrap passed 252,
+and the full private-access/application playbook passed 121, all without
+failures. The Authentik readiness fix passed live. The administrative peer
+re-enrolled and private SSH/sudo were verified before hardening.
+
+The controller invoked monitoring before preserved HOU4 had re-enrolled. Its
+existing guard correctly rejected the missing metrics peer before policy writes
+or exporter installation. This was a controller sequencing error. Execution
+stopped immediately; no live correction or retry followed. HOU4 was unchanged
+and alerts were not silenced. Another HOU1-only wipe is required under the
+operator's stop-on-error rule.
+
+The operator reported successful Google authentication, followed by a NetBird
+client rejection because the user was pending approval. Admission reconciliation
+had not run. This records an intermediate state, not a passed client-login gate.
+The checklist now makes both enrollment and admission prerequisites explicit.
+Local controller prerequisite checks cover 16 missing/invalid/ready HOU4 cases
+without remote calls. The infrastructure policy remains unchanged.
+
+See [attempt evidence](evidence/fresh-host-monitoring-stopped-2026-11-09.json).
+Production approval and rollout issues remain open.
