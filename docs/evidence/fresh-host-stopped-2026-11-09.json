@@ -1,0 +1,113 @@
+{
+  "recorded_at": "2026-11-09T05:18:31.507786+00:00",
+  "environment": "test",
+  "attempt": "2026-11-09-01",
+  "infra_ref": "58520a464c7b60542dfa98b452cecf7ed3c13185",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "netbird_version": "0.82.0",
+  "host": {
+    "address": "139.177.151.12",
+    "os": "Debian 12",
+    "vcpus": 4,
+    "memory_mib": 16005,
+    "root_disk_available_gib": 75,
+    "ed25519_fingerprint": "SHA256:E3B3pG9rp6Q1DHU3zKO9kSWybS3oicU08qNNr6UmG2o",
+    "trust": "operator-authorized-TOFU"
+  },
+  "hou4": {
+    "address": "209.135.170.2",
+    "preserved": true,
+    "alerting_silenced": false
+  },
+  "execution_policy": {
+    "stop_at_first_task_failure": true,
+    "ignored_failures_also_stop": true,
+    "resumed_after_failure": false,
+    "live_fix_applied": false,
+    "next_attempt_requires_operator_confirmed_fresh_wipe": true
+  },
+  "phases": {
+    "rehearsal-prepare": {
+      "phase": "rehearsal-prepare",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T05:02:04.226682+00:00",
+      "counts": {
+        "ok": 27,
+        "changed": 13,
+        "failed": 0,
+        "unreachable": 0
+      },
+      "log_sha256": "bd8db9bf99f6956bdbaf1be4763cb6e13f5c0fc6a4ad8dc57a739dc1f9343cd0"
+    },
+    "rehearsal-seeds": {
+      "phase": "rehearsal-seeds",
+      "exit_code": 0,
+      "finished_at": "2026-11-09T05:02:57.262796+00:00",
+      "counts": {
+        "ok": 17,
+        "changed": 9,
+        "failed": 0,
+        "unreachable": 0
+      },
+      "log_sha256": "a6c77c34ee67559765420dde1099a1cb2a2a0071fc39ef87dc65689fc9b09d4b"
+    },
+    "rehearse-vps": {
+      "phase": "rehearse-vps",
+      "exit_code": 2,
+      "finished_at": "2026-11-09T05:09:51.036151+00:00",
+      "counts": {
+        "failed": 1,
+        "recap_unavailable": "controller callback stopped Ansible immediately"
+      },
+      "log_sha256": "8eadae2ea89ea5d33e6645828545d9dc03d1171e4adb9463fec58a201a4397dc"
+    }
+  },
+  "failure": {
+    "task": "netbird_control_plane : Never regenerate encryption keys for existing server data",
+    "message": "Server data exists without secrets.json. Restore the original secrets from backup.",
+    "cause": "The existing-data guard counted the two seeded geolocation cache files as account state. No account databases were imported.",
+    "corrective_change": "Allow only regular files with the two dated geolocation cache names; all other entries still require the original secrets.json.",
+    "live_revalidation": "awaiting-another-fresh-wipe"
+  },
+  "validation": {
+    "focused": {
+      "tests_run": 8,
+      "passed": 8,
+      "log_sha256": "bfc6407d32c6968fb81f4671592fd905054975be842d0251e99bdfaccfed367f"
+    },
+    "syntax_checks": {
+      "passed": 8,
+      "remote_tasks_run": false,
+      "log_sha256": "0834e595b33610658edc6af545ccdf040d1523dd0992d87906a65784f214cec3"
+    },
+    "full_repository_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou1-offboarding-tools/nginx-validator python3 -m unittest discover -s tests -v",
+      "tests_run": 162,
+      "passed": 161,
+      "skipped": 1,
+      "skip_reason": "Optional dnsmasq binary not configured",
+      "duration_seconds": 334.08,
+      "log_sha256": "f41510d19aca1a2f3295a6c332e74b4532b8f4fcfc06ba7448a9448fcd39679b"
+    },
+    "diff_check": "passed"
+  },
+  "promotion_approved": false,
+  "rollout_issues_remain_open": [
+    "hou1-iac#27",
+    "pearland-paws#39"
+  ],
+  "ci_setup_followup": {
+    "run_id": 42566602802,
+    "failed_attempts": 2,
+    "stage": "pinned SOPS release download",
+    "failure": "GitHub release URL returned HTTP 504 on all curl retries, before repository tests",
+    "fix": "Download the same pinned asset through gh release download with three bounded attempts; retain SHA-256 verification",
+    "local_validation": {
+      "workflow_yaml_parsed": true,
+      "step_bash_syntax": "passed",
+      "release_api_download": "passed",
+      "download_sha256": "775f1384d55decfad228e7196a3f683791914f92a473f78fc47700531c29dfef"
+    },
+    "remote_deployment_started": false
+  }
+}

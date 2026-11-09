@@ -14,12 +14,19 @@ jobs:
         with:
           python-version: '3.12'
       - name: Install SOPS/age test tools
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
           sudo apt-get update
           sudo apt-get install --no-install-recommends -y age
-          curl --fail --silent --show-error --location --retry 3 --retry-delay 2 --retry-max-time 90 \
-            https://github.com/getsops/sops/releases/download/v3.11.0/sops-v3.11.0.linux.amd64 \
-            --output "$RUNNER_TEMP/sops"
+          for attempt in 1 2 3; do
+            if gh release download v3.11.0 --repo getsops/sops \
+              --pattern sops-v3.11.0.linux.amd64 --output "$RUNNER_TEMP/sops" --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 2
+          done
           echo '775f1384d55decfad228e7196a3f683791914f92a473f78fc47700531c29dfef  '$RUNNER_TEMP'/sops' \
             | sha256sum --check --strict
           sudo install -m 0755 "$RUNNER_TEMP/sops" /usr/local/bin/sops

@@ -60,7 +60,13 @@
 
 - name: Never regenerate encryption keys for existing server data
   ansible.builtin.assert:
-    that: netbird_secrets_stat.stat.exists or netbird_existing_data.matched == 0
+    # Dated geolocation databases are disposable caches, not encrypted account
+    # state. Only regular files qualify; directories and links still block init.
+    that: >-
+      netbird_secrets_stat.stat.exists or
+      (netbird_existing_data.files | selectattr('isreg', 'equalto', true) |
+       selectattr('path', 'search', '/(GeoLite2-City_[0-9]{8}\.mmdb|geonames_[0-9]{8}\.db)$') |
+       list | length) == netbird_existing_data.matched
     fail_msg: Server data exists without secrets.json. Restore the original secrets from backup.
 
 - name: Install the one-time secret generator

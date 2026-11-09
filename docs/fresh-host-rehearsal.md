@@ -186,3 +186,24 @@ encrypted source role, receiver contract and offline validation procedure. This
 is implementation/test preparation; the earlier live checkpoint still has no
 verified off-host backup or clean-node restore. Repeat the live gates after the
 fresh HOU4 deployment and key pairing before closing #27.
+
+## Fresh-wipe attempt stopped at NetBird initialization (2026-11-09 UTC)
+
+The next fresh Debian 12 run used merged infrastructure `58520a4` and staff
+`c3b51ec`. HOU4 at `209.135.170.2` was preserved with alerting enabled.
+Preparation passed 27 tasks and encrypted seeding passed 17, with no failures.
+The first cold application build and bootstrap ingress completed, but NetBird's
+missing-secrets guard counted the two seeded geolocation cache files as account
+state and refused initialization. An immediate-stop controller callback ended
+the run at that assertion; no later tasks, live fixes or retries were run.
+
+The corrected guard permits only regular files named `GeoLite2-City_YYYYMMDD.mmdb`
+or `geonames_YYYYMMDD.db` without `secrets.json`. Any other entry, including
+directories, links, hidden files and cache-like WAL names, still requires the
+original secrets. Existing secrets are never replaced. Regression tests exercise
+the real Ansible guard and generator against these cases.
+
+See [attempt evidence](evidence/fresh-host-stopped-2026-11-09.json). The fix has
+not been deployed: another operator-confirmed wipe is required before starting
+again from preparation. This stopped attempt does not satisfy the rollout or
+recovery gates in #27 and staff #39.
