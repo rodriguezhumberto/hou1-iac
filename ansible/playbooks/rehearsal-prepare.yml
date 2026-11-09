@@ -18,11 +18,23 @@
         fail_msg: Preparation requires the explicit fresh Debian 12 test fixture.
       tags: [always]
 
+    - name: Detect provider cloud-init before package installation
+      ansible.builtin.stat:
+        path: /usr/bin/cloud-init
+      register: rehearsal_cloud_init
+
+    - name: Wait for provider initialization before acquiring package locks
+      ansible.builtin.command:
+        argv: [/usr/bin/timeout, '900', /usr/bin/cloud-init, status, --wait]
+      when: rehearsal_cloud_init.stat.exists
+      changed_when: false
+
     - name: Install dependencies used before the full-stack entry point
       ansible.builtin.apt:
         name: [systemd-resolved, ufw, age, python3-yaml, jq, sysstat, dnsutils]
         update_cache: true
         state: present
+        lock_timeout: 300
 
     - name: Copy the controller's verified SOPS binary for encrypted seeding
       ansible.builtin.copy:

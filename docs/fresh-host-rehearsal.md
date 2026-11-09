@@ -42,6 +42,11 @@ verified; the password delivery file was deleted afterward.
    `rehearsal-seeds.yml`, then `rehearse-vps.yml`. Use the same pinned infrastructure
    checkout for each invocation and save redacted output. Enable the Authentik
    bootstrap and `authentik_google_enabled` in the isolated test inventory.
+   Preparation detects provider cloud-init and waits up to 15 minutes for it
+   to finish before installing packages. A failed or timed-out initialization
+   stops deployment. The initial package task also allows up to five minutes
+   for other package jobs to release their locks; never kill those jobs or
+   remove their lock files to force deployment through.
    Preparation installs Debian's resolver and encryption dependencies before the
    common role or encrypted seeds need them. Create the staff Git bundle from
    `main` (or explicitly set `rehearsal_staff_bundle_ref`); `rehearsal_staff_ref`
@@ -275,3 +280,21 @@ without remote calls. The infrastructure policy remains unchanged.
 
 See [attempt evidence](evidence/fresh-host-monitoring-stopped-2026-11-09.json).
 Production approval and rollout issues remain open.
+
+## Fresh-wipe attempt stopped at the provider package lock (2026-11-09 UTC)
+
+Attempt `2026-11-09-04` used infrastructure `566d812` and staff `c3b51ec`.
+The first preparation package task failed after its default 60-second lock
+wait. Read-only process ancestry and cgroup checks identified the lock holder
+as the provider's `apt-get` under `cloud-final.service`, which was still
+activating. Deployment stopped immediately. No retry, lock removal, package-job
+termination or live correction followed. Seeding and application deployment
+never started; HOU4 remained unchanged and alerts were not silenced.
+
+Preparation now waits for cloud-init when installed, then gives the initial
+package task a bounded lock wait. Local Ansible fixtures cover delayed successful
+initialization, failed initialization, timeout and hosts without cloud-init.
+The corrected order for HOU4 enrollment and allowlist admission remains required.
+See [attempt evidence](evidence/fresh-host-package-lock-stopped-2026-11-09.json).
+Fresh-host validation requires another confirmed HOU1-only wipe; production
+approval and rollout issues remain open.
