@@ -9,9 +9,10 @@ The [live HOU4 rehearsal](evidence/hou4-backup-live-2026-11-08.json) collected a
 and HOU4 reboot checks. The [interruption rehearsal](evidence/hou1-backup-interruption-2026-11-08.json)
 then passed live writer SIGTERM/SIGKILL recovery and durable-intent recovery
 after reboot, preserving the completed ciphertext. The receiver also passed
-local process-kill/retry checks during transfer and before commit. Actual offline
-decryption, a clean full-stack restore, and a live interrupted HOU4 transfer
-remain open gates. The reboot used a hard-killed capture followed by normal OS
+local process-kill/retry checks during transfer and before commit. The subsequent
+[restore rehearsal](evidence/hou1-recovery-restore-2026-11-08.json) records actual
+offline decryption and clean isolated component recovery. A live interrupted
+HOU4 transfer remains untested. The reboot used a hard-killed capture followed by normal OS
 reboot; no provider-level power cut was tested.
 
 HOU1 prepares one encrypted recovery point locally at 02:00 UTC. HOU4 collects
@@ -187,6 +188,14 @@ Restore on a clean **isolated** HOU1 with matching IaC/app refs and pinned image
    path in `recovery.json`; keep it root-only. Reconstruct deployment inputs from
    the operator's SOPS handoff. Controller DNS/renewal secrets are recovered from
    the separate controller handoff, not from either VPS.
+   Resolve runnable image identifiers with `docker image inspect` and record the
+   immutable image/index digest. A running container's `Image` identifier can
+   differ from the cached OCI index and may not resolve directly in Compose.
+   The recovery set contains data/configuration and a Git revision, not image
+   layers or a source checkout. Keep access to matching artifacts or build the
+   saved Git revision with its lockfiles and saved public build arguments. The
+   rehearsal used existing base images/build cache; a cold dependency download
+   was not tested.
 2. Prepare the saved Authentik Compose/env and its persistent directories from
    `authentik-files`, with the UIDs in the existing Authentik role. Start only
    PostgreSQL in a new empty data directory. Import
@@ -203,7 +212,34 @@ Restore on a clean **isolated** HOU1 with matching IaC/app refs and pinned image
    inventory. Apply the storage UID/modes from the webstack role before starting
    `astro-app`. Restore the saved certificate symlinks/lineage together. Do not
    manually seed the database over restored data.
-5. Run discovery/JWKS and Google sign-in, approved role and VPN access, revocation,
+5. Before opening restored traffic, invalidate backed-up staff sessions and
+   Authentik sessions, authorization codes, access-token records and refresh tokens.
+   Perform identity cleanup while Authentik server/worker are stopped, after the
+   SQL import. On the pinned Authentik schema, the tested database-only cleanup is:
+
+   ```sql
+   BEGIN;
+   TRUNCATE django_session, authentik_core_authenticatedsession,
+     authentik_providers_oauth2_authorizationcode,
+     authentik_providers_oauth2_accesstoken,
+     authentik_providers_oauth2_refreshtoken CASCADE;
+   COMMIT;
+   ```
+
+   Run it only against the explicitly selected **restored** PostgreSQL database;
+   confirm each table is empty before starting Authentik. For the restored staff
+   database, while `astro-app` is stopped, set `revoked_at` on every unrevoked row
+   in `staff_sessions` to the current Unix time in milliseconds. This preserves
+   subject blocks and audit records while requiring fresh sign-in. Repeat after
+   any database rollback. The ORM deletion attempt did not exit promptly in the
+   isolated drill; the SQL transaction provided bounded, verified cleanup.
+
+   Reconcile every user disable/offboarding and access-policy change since the
+   recovery point against the operator's current record, including NetBird users,
+   groups and device grants, before accepting traffic. Backup recovery can undo
+   changes made after capture; retaining a signing key or clearing local sessions
+   does not replay those decisions or invalidate every already-issued external JWT.
+6. Run discovery/JWKS and Google sign-in, approved role and VPN access, revocation,
    staff content/media and form-data checks, public-denial tests, metrics/Discord
    delivery, renewal, reboot and NetBird rollback gates. Record duration and
    data recovered. Test corrupt/wrong-key archives, interrupted export, and
@@ -211,8 +247,41 @@ Restore on a clean **isolated** HOU1 with matching IaC/app refs and pinned image
 
 Local tests exercise encrypted round trips, a real PostgreSQL logical import
 into a new database, SQLite/media recovery, failure restart, retention, corruption
-and transport policy guards. The full two-node restore and outage drill remains
-a live rehearsal gate; #27 must stay open until it passes.
+and transport policy guards. The clean isolated component restore is recorded separately from replacement-host,
+Google/VPN end-user and traffic-cutover drills. Keep #27 open until its remaining
+live gates pass.
 
 [Recorded local evidence](evidence/hou4-backup-protocol-2026-11-08.json) separates
 completed tests from live gates. HOU4 receiver interruption coverage is recorded at commit `96f80c0`.
+
+
+## Recorded recovery rehearsal
+
+The [actual-point restore](evidence/hou1-recovery-restore-2026-11-08.json) imported
+187 Authentik tables into an empty PostgreSQL database, recovered its signing and
+client secrets plus local emergency-admin password, and preserved NetBird's
+account/user/group/peer/policy counts. The runtime age identity recovered inside
+the archive decrypted its matching SOPS bundle. Wrong-key, modified-ciphertext
+and wrong-environment attempts were rejected without publishing plaintext.
+
+The isolated stack passed 25 HTTP/application checks plus four session-reset
+assertions. They cover administrator/reader OIDC login, authorization, logout,
+media upload/private preview, restart persistence, and rollback of SQLite/media
+back to the real point. CMS content was empty in this backup; disposable fixture
+records exercised write/persistence/rollback only in the restored copy. Clean
+component startup took 113 seconds, the candidate image build 81 seconds, and
+staff database/media rollback 50 seconds. These measured phases exclude provider
+provisioning and operator pauses; they are not a replacement-host recovery time.
+
+The drill found that the saved app revision rejected OIDC sessions on media
+upload/preview. [Staff PR #56](https://github.com/rodriguezhumberto/pearland-paws/pull/56)
+fixes those guards; the final application checks used candidate `590a05b` with
+the original recovery data. Merge/deploy that fix before promotion. The live
+application was not replaced by this drill. All recovery containers/network,
+plaintext copies and the temporary recovery age identity were removed afterward.
+
+External Google/VPN end-user login and replacement-host/provider-console recovery
+remain separate gates. The restored stack used an internal-only network with
+outbound TCP denied and no published ports. Live HOU4 interrupted-transfer testing
+also remains open; local receiver process-kill tests passed. HOU1 #27 and staff
+#39 remain open, and this rehearsal does not approve production promotion.
