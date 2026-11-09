@@ -117,6 +117,86 @@ class ControlPlaneTest(unittest.TestCase):
             self.assertNotEqual(result.returncode, 0)
             self.assertEqual(path.read_bytes(), original)
 
+    def initialization_tasks(self):
+        tasks = yaml.safe_load((ROLES / 'netbird_control_plane/tasks/main.yml').read_text())
+        first = next(i for i, task in enumerate(tasks)
+                     if task.get('register') == 'netbird_secrets_stat')
+        last = next(i for i, task in enumerate(tasks)
+                    if task.get('name') == 'Never regenerate encryption keys for existing server data')
+        generate = next(task for task in tasks
+                        if task.get('name') == 'Generate persistent random encryption secrets only once')
+        generate['ansible.builtin.command']['argv'][1] = str(
+            ROLES / 'netbird_control_plane/files/create-secrets.py')
+        return tasks[first:last + 1] + [generate]
+
+    def test_cache_only_data_allows_initial_secret_generation(self):
+        with tempfile.TemporaryDirectory() as directory:
+            plays, roots = [], []
+            for label, caches, existing in [
+                    ('empty', [], False),
+                    ('cache-only', ['GeoLite2-City_20261013.mmdb', 'geonames_20261013.db'], False),
+                    ('multiple-dates', ['geonames_20261013.db', 'geonames_20261101.db'], False),
+                    ('existing', ['GeoLite2-City_20261013.mmdb', 'geonames_20261013.db'], True)]:
+                root = Path(directory) / label
+                (root / 'data').mkdir(parents=True)
+                for name in caches:
+                    (root / 'data' / name).write_bytes(b'fixture-cache')
+                if existing:
+                    (root / 'secrets.json').write_bytes(b'existing-secret-material')
+                    (root / 'data' / 'store.db').write_bytes(b'existing-account-data')
+                roots.append((root, caches, existing))
+                # Repeating the real guard and generator proves existing keys
+                # survive both a cache-only bootstrap and an established store.
+                plays.append(dict(variables={'netbird_control_plane_directory': str(root)},
+                                  tasks=self.initialization_tasks() * 2))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for root, caches, existing in roots:
+                secret = root / 'secrets.json'
+                if existing:
+                    self.assertEqual(secret.read_bytes(), b'existing-secret-material')
+                    self.assertEqual((root / 'data/store.db').read_bytes(), b'existing-account-data')
+                else:
+                    self.assertEqual(secret.stat().st_mode & 0o777, 0o600)
+                    self.assertTrue(all(len(base64.b64decode(value)) == 32
+                                        for value in json.loads(secret.read_bytes()).values()))
+                for name in caches:
+                    self.assertEqual((root / 'data' / name).read_bytes(), b'fixture-cache')
+
+    def test_account_data_without_secrets_is_not_reinitialized(self):
+        with tempfile.TemporaryDirectory() as directory:
+            plays, roots = [], []
+            for label, name, kind in [
+                    ('database', 'store.db', 'file'),
+                    ('json', 'store.json', 'file'),
+                    ('hidden', '.state', 'file'),
+                    ('directory', 'store', 'directory'),
+                    ('cache-directory', 'geonames_20261013.db', 'directory'),
+                    ('cache-link', 'GeoLite2-City_20261013.mmdb', 'link'),
+                    ('unknown-cache-name', 'geonames_archive.db', 'file'),
+                    ('city-wal', 'GeoLite2-City_20261013.mmdb-wal', 'file'),
+                    ('geonames-wal', 'geonames_20261013.db-wal', 'file')]:
+                root = Path(directory) / label
+                data = root / 'data'
+                data.mkdir(parents=True)
+                (data / 'GeoLite2-City_20261101.mmdb').write_bytes(b'fixture-cache')
+                (data / 'geonames_20261101.db').write_bytes(b'fixture-cache')
+                entry = data / name
+                if kind == 'directory':
+                    entry.mkdir()
+                    (entry / 'state.db').write_bytes(b'account-state')
+                elif kind == 'link':
+                    entry.symlink_to(data / 'GeoLite2-City_20261101.mmdb')
+                else:
+                    entry.write_bytes(b'account-state')
+                roots.append(root)
+                plays.append(guard_play(
+                    {'netbird_control_plane_directory': str(root)}, self.initialization_tasks(),
+                    'Never regenerate encryption keys for existing server data'))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(all(not (root / 'secrets.json').exists() for root in roots))
+
     def test_rendered_stack_and_ingress(self):
         nginx = os.environ.get('NGINX_BIN') or shutil.which('nginx')
         compose = ([os.environ['COMPOSE_BIN']] if os.environ.get('COMPOSE_BIN') else
