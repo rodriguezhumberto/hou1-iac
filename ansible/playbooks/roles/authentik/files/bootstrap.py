@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import ssl
+import time
 import urllib.parse
 import urllib.request
 
@@ -130,7 +131,39 @@ def apply_google(google, api, secret):
         api.request('PATCH', f'/stages/identification/{identification["pk"]}/', {'sources': sources})
 
 
+def wait_for_defaults(manifest, api, timeout=180, poll_interval=2):
+    """Health can pass before the worker finishes installing default objects."""
+    required = [
+        ('flows/instances', 'slug', 'default-provider-authorization-implicit-consent'),
+        ('flows/instances', 'slug', 'default-provider-invalidation-flow'),
+        ('crypto/certificatekeypairs', 'name', 'authentik Self-signed Certificate'),
+    ]
+    managed_scopes = {mapping['scope_name'] for mapping in manifest['scope_mappings']}
+    required += [('propertymappings/provider/scope', 'scope_name', scope)
+                 for scope in ('openid', 'profile', 'email') if scope not in managed_scopes]
+    if manifest.get('google'):
+        required += [
+            ('flows/instances', 'slug', 'default-source-authentication'),
+            ('flows/instances', 'slug', 'default-source-enrollment'),
+            ('stages/identification', 'name', 'default-authentication-identification'),
+            ('stages/user_write', 'name', 'default-source-enrollment-write'),
+        ]
+    deadline = time.monotonic() + timeout
+    while True:
+        # Only missing defaults are polled. Authentication/API errors and
+        # duplicate identities still fail immediately; writes are never retried.
+        missing = [value for resource, field, value in required
+                   if api.find(resource, field, value) is None]
+        if not missing:
+            return
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            raise TimeoutError('Authentik defaults were not ready before bootstrap: ' + ', '.join(missing))
+        time.sleep(min(poll_interval, remaining))
+
+
 def apply(manifest, api, secrets):
+    wait_for_defaults(manifest, api)
     groups = {}
     for group in manifest['groups']:
         groups[group['name']] = api.ensure('core/groups', 'name', group['name'], {'name': group['name'], 'attributes': group.get('attributes', {})})
