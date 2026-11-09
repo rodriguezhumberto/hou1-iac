@@ -39,6 +39,11 @@ class FixtureAPI(bootstrap.AuthentikAPI):
         parts = parsed.path.strip('/').split('/')
         if method == 'GET':
             resource = '/'.join(parts)
+            if resource == 'policies/bindings' and 'target' in parse_qs(parsed.query):
+                # The pinned API's filter uses the inherited model UUID, not
+                # the child flow UUID used by its serializer and POST payload.
+                parent_ids = {f.get('pbm_uuid') for f in self.objects['flows/instances']}
+                assert all(target in parent_ids for target in parse_qs(parsed.query)['target'])
             if resource == 'core/applications':
                 assert parse_qs(parsed.query)['superuser_full_list'] == ['true']
             # Authentik's search filters can return partial matches.
@@ -71,8 +76,8 @@ class AuthentikBootstrapTest(unittest.TestCase):
     def google_api(self):
         api = FixtureAPI()
         api.objects['flows/instances'] += [
-            {'pk': 'source-auth', 'slug': 'default-source-authentication', 'policy_engine_mode': 'any'},
-            {'pk': 'source-enroll', 'slug': 'default-source-enrollment', 'policy_engine_mode': 'any'},
+            {'pk': 'source-auth', 'pbm_uuid': 'auth-parent', 'slug': 'default-source-authentication', 'policy_engine_mode': 'any'},
+            {'pk': 'source-enroll', 'pbm_uuid': 'enroll-parent', 'slug': 'default-source-enrollment', 'policy_engine_mode': 'any'},
         ]
         api.objects['stages/identification'] = [
             {'pk': 'identify', 'name': 'default-authentication-identification', 'sources': ['other-source']}]

@@ -1,0 +1,139 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "environment": "isolated-test",
+  "hou1_issue": 27,
+  "hou1_implementation": "2b67190",
+  "hou4_implementation": "cb20e39",
+  "hou4_public_ip": "209.135.170.2",
+  "hou4_vpn_ip": "100.91.0.22",
+  "checks": {
+    "hou1": {
+      "total": 156,
+      "passed": 155,
+      "optional_skips": [
+        "dnsmasq integration tool unavailable"
+      ],
+      "initial_dependency_failure": "NGINX_BIN was unset for the ingress parser test",
+      "dependency_recheck": {
+        "tests": 6,
+        "result": "passed",
+        "NGINX_BIN": "/var/tmp/hou4-pinned-tools/nginx"
+      },
+      "final_backup_regressions": {
+        "tests": 9,
+        "result": "passed"
+      }
+    },
+    "hou4": {
+      "tests": 52,
+      "result": "passed without skips",
+      "renewal_followup": {
+        "tests": 7,
+        "result": "passed"
+      },
+      "bootstrap_timer_guard": "live suspend and re-enable passed"
+    }
+  },
+  "capture": {
+    "mode": "local systemd preparation; atomic completed ciphertext; fixed read-only SSH export",
+    "source_schedule": "02:00 UTC nightly + up to 300s jitter",
+    "receiver_schedule": "03:00 UTC nightly + up to 300s jitter",
+    "daily": 7,
+    "weekly": 4,
+    "local_preparation_result": "success",
+    "local_preparation_exit": 0,
+    "source_remains_without_offline_recovery_identity": true
+  },
+  "backup": {
+    "points": [
+      {
+        "manifest": {
+          "schema": 1,
+          "environment": "test",
+          "created": 1794175422,
+          "id": "20261108T220342Z-0fc8cd69479a",
+          "size": 32398032,
+          "sha256": "124c89106f7de5ca2909a3a01f1e573400488058a46a0411b4b5d229ae09ba4c"
+        },
+        "receipt": {
+          "schema": 1,
+          "received": 1794175452,
+          "sha256": "124c89106f7de5ca2909a3a01f1e573400488058a46a0411b4b5d229ae09ba4c",
+          "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+        },
+        "ciphertext_checksum_verified": true
+      }
+    ],
+    "service_result": "success",
+    "timer_enabled": "enabled"
+  },
+  "archive_handoff_checksum_verified": true,
+  "discord_failure": {
+    "recorded_at": 1794175234,
+    "active_alerts": [
+      {
+        "name": "Hou1OffhostBackupStale",
+        "state": "active"
+      },
+      {
+        "name": "Hou1OffhostBackupFailed",
+        "state": "active"
+      }
+    ],
+    "discord_counters": {
+      "alertmanager_notifications_failed_total": 0.0,
+      "alertmanager_notifications_total": 3.0
+    }
+  },
+  "discord_recovery": {
+    "active_alerts": [],
+    "discord_counters": {
+      "alertmanager_notifications_failed_total": 0.0,
+      "alertmanager_notifications_total": 6.0
+    },
+    "recorded_at": 1794175453,
+    "backup_failure_and_staleness_recovered": true
+  },
+  "transport_scope": {
+    "account": "hou1-backup",
+    "restricted_commands": {
+      "shell": "denied",
+      "arbitrary_sudo": "denied",
+      "read_config": "denied",
+      "extra_arguments": "denied",
+      "forward": "denied"
+    },
+    "recorded_at": 1794174722
+  },
+  "hou4_reboot": {
+    "boot_id_before": "62ce6440-8f5b-4b6e-9878-422507700c7c",
+    "boot_id_after": "eaa146d3-b86b-416e-afd0-58d01abaa7d1",
+    "private_ssh_recovered": true,
+    "recorded_at": 1794175754
+  },
+  "temporary_keys": {
+    "temporary_age_identity_deleted": true,
+    "temporary_ssh_identity_deleted": true,
+    "deployment_bundles_operator_only": true,
+    "renewal_identity_cannot_decrypt_handoff_bundles": true,
+    "ongoing_scoped_renewal_retained": true,
+    "recorded_at": 1794176059
+  },
+  "findings_fixed": [
+    "isolated Nginx validation can test its VPN bind without sharing live host networking",
+    "Ansible-tagged retention integers pass preflight",
+    "renewal jobs suspend before replacement-host access changes",
+    "local preparation prevents NetBird relay restarts from breaking the backup transfer",
+    "NetBird restarts before archive compression"
+  ],
+  "remaining_gates": [
+    "operator offline decryption of this actual recovery point",
+    "clean isolated full-stack restore and identity/application checks",
+    "HOU1 interrupted-preparation/hard-kill and power-loss recovery",
+    "full restore/rollback duration evidence"
+  ],
+  "production_approved": false,
+  "independent_hou4_outage_monitoring": "deferred by operator",
+  "other_controller_access": "Preexisting HOU1 administrative health SSH grant is retained; this is not global controller privilege retirement."
+}

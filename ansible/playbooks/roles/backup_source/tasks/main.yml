@@ -1,0 +1,120 @@
+---
+- name: Configure explicit offline-encrypted HOU1 recovery exports
+  when: hou1_backup_enabled | bool
+  block:
+    - name: Validate backup source and exact private receiver before changes
+      ansible.builtin.assert:
+        that:
+          - hou1_backup_environment in ['test', 'production']
+          - hou1_backup_environment == cms_environment
+          - authentik_environment == ('test' if cms_environment == 'test' else 'prod')
+          - not (node_bootstrap | bool)
+          - hou1_backup_receiver_ip is ansible.utils.ipv4
+          - (hou1_backup_receiver_ip | ansible.utils.ipaddr(netbird_subnet)) is truthy
+          - hou1_backup_receiver_ip != netbird_ip
+          - hou1_backup_transport_public_key is match('^ssh-ed25519 [A-Za-z0-9+/]{68,}={0,2}( [^\r\n]+)?$')
+          - hou1_backup_recipient is match('^age1[0-9a-z]{58}$')
+          - hou1_backup_max_archive_bytes | int > 0
+          - hou1_backup_minimum_free_bytes | int > hou1_backup_max_archive_bytes | int
+        fail_msg: Supply the offline age recipient and a dedicated HOU4 export-only SSH key on established VPN hosts.
+    - name: Reconcile the narrow backup transport policy
+      ansible.builtin.import_tasks: policy.yml
+    - name: Install snapshot and transport dependencies
+      ansible.builtin.apt:
+        name: [age, python3, sudo]
+        state: present
+    - name: Create fixed private backup directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+      loop: [/etc/hou1-backup, /var/lib/hou1-backup]
+    - name: Ensure shared executable directory exists
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Create a dedicated non-administrative transport account
+      ansible.builtin.user:
+        name: hou1-backup
+        home: /var/lib/hou1-backup-transport
+        shell: /bin/sh
+        password: '*'
+        create_home: true
+        system: true
+    - name: Keep transport authorized keys outside account control
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: [/var/lib/hou1-backup-transport, /var/lib/hou1-backup-transport/.ssh]
+    - name: Install the export-only key restricted to the receiver VPN address
+      ansible.builtin.copy:
+        dest: /var/lib/hou1-backup-transport/.ssh/authorized_keys
+        owner: root
+        group: root
+        mode: '0644'
+        content: 'restrict,from="{{ hou1_backup_receiver_ip }}",command="/usr/local/libexec/hou1-backup-gateway" {{ hou1_backup_transport_public_key }}'
+    - name: Install the transport gateway and fixed exporter
+      ansible.builtin.copy:
+        src: '{{ item.src }}'
+        dest: '/usr/local/libexec/{{ item.dest }}'
+        owner: root
+        group: root
+        mode: '{{ item.mode }}'
+      loop:
+        - {src: gateway.py, dest: hou1-backup-gateway, mode: '0755'}
+        - {src: serve.py, dest: hou1-backup-export, mode: '0700'}
+    - name: Permit only the argument-free root export helper
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/hou1-backup
+        owner: root
+        group: root
+        mode: '0440'
+        content: |
+          hou1-backup ALL=(root) NOPASSWD: /usr/local/libexec/hou1-backup-export ""
+        validate: /usr/sbin/visudo -csf %s
+    - name: Configure the fixed recovery sources without offline private keys
+      ansible.builtin.template:
+        src: source.json.j2
+        dest: /etc/hou1-backup/source.json
+        owner: root
+        group: root
+        mode: '0600'
+    - name: Install interruption-safe local preparation and recovery
+      ansible.builtin.import_tasks: recovery.yml
+    - name: Allow only the receiver VPN peer to reach the SSH transport
+      community.general.ufw:
+        rule: allow
+        direction: in
+        interface: '{{ netbird_interface }}'
+        from_ip: '{{ hou1_backup_receiver_ip }}'
+        to_ip: '{{ netbird_ip }}'
+        to_port: '22'
+        proto: tcp
+    - name: Remove legacy CMS and Authentik schedules after selecting unified encrypted recovery
+      ansible.builtin.cron:
+        name: '{{ item }}'
+        state: absent
+      loop:
+        - 'Pearland Paws {{ cms_environment }} CMS backup'
+        - 'HOU1 Authentik {{ authentik_environment }} encrypted backup'
+- name: Stop disabled local preparation without deleting retained ciphertext
+  when: not (hou1_backup_enabled | bool)
+  block:
+    - name: Discover an existing preparation timer
+      ansible.builtin.stat:
+        path: /etc/systemd/system/hou1-backup-prepare.timer
+      register: hou1_backup_prepare_timer
+    - name: Stop an existing preparation timer
+      ansible.builtin.systemd_service:
+        name: hou1-backup-prepare.timer
+        enabled: false
+        state: stopped
+      when: hou1_backup_prepare_timer.stat.exists

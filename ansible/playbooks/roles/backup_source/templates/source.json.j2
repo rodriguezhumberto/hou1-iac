@@ -1,0 +1,11 @@
+{{ {
+ 'schema': 1, 'environment': hou1_backup_environment, 'recipient': hou1_backup_recipient,
+ 'work_root': '/var/lib/hou1-backup', 'max_archive_bytes': hou1_backup_max_archive_bytes | int,
+ 'minimum_free_bytes': hou1_backup_minimum_free_bytes | int,
+ 'authentik': {'name': authentik_compose_project_prefix ~ '-' ~ authentik_environment,
+              'root': authentik_project_root_base ~ '/' ~ authentik_environment,
+              'data': authentik_data_root_base ~ '/' ~ authentik_environment},
+ 'netbird': {'name': netbird_control_plane_project, 'root': netbird_control_plane_directory},
+ 'app': {'name': hou1_backup_app_project, 'root': app_directory, 'database': cms_database_directory, 'media': cms_media_directory},
+ 'recovery_files': hou1_backup_recovery_files
+} | to_nice_json }}

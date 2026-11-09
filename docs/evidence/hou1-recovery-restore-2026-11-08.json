@@ -1,0 +1,321 @@
+{
+  "schema": 1,
+  "date": "2026-11-08",
+  "date_timezone": "America/Chicago",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "scope": "Actual off-host recovery point restored into empty PostgreSQL and separate SQLite/media/NetBird state on existing HOU1; internal-only Docker network and no published ports",
+  "original_point": {
+    "schema": 1,
+    "environment": "test",
+    "created": 1794175422,
+    "id": "20261108T220342Z-0fc8cd69479a",
+    "size": 32398032,
+    "sha256": "124c89106f7de5ca2909a3a01f1e573400488058a46a0411b4b5d229ae09ba4c"
+  },
+  "offline_verification": {
+    "verified": true,
+    "environment": "test",
+    "staff_revision": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+    "database": "sqlite-integrity-ok",
+    "offline_decryption": true,
+    "original_manifest_matches_retained_point": true,
+    "decryption_verification_seconds": 1.429
+  },
+  "negative_archive_checks": {
+    "wrong-key": {
+      "rejected": true,
+      "no_recovered_plaintext_published": true
+    },
+    "authenticated-ciphertext-corruption": {
+      "rejected": true,
+      "no_recovered_plaintext_published": true
+    },
+    "wrong-environment": {
+      "rejected": true,
+      "no_recovered_plaintext_published": true
+    }
+  },
+  "recovered_runtime_identity_decrypts_authentik_sops": true,
+  "startup": {
+    "schema": 1,
+    "environment": "test",
+    "started": 1794191316,
+    "stack_started": 1794191429,
+    "restore_startup_seconds": 112.981,
+    "postgres_imported_into_empty_database": true,
+    "postgres_tables": 187,
+    "identity_counts": {
+      "authentik_core_user": 6,
+      "authentik_core_group": 5,
+      "authentik_core_application": 2,
+      "authentik_providers_oauth2_oauth2provider": 2,
+      "authentik_crypto_certificatekeypair": 2
+    },
+    "staff_revision": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+    "tested_app_revision": "590a05bd2ed7a193a9818d19409e53fe1726ed1d",
+    "images": {
+      "postgresql": "sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef",
+      "authentik-server": "sha256:4b4f9ae106dbda902b836aa7a79d2f456b8302f090b862f7ad1bf268402730b2",
+      "authentik-worker": "sha256:4b4f9ae106dbda902b836aa7a79d2f456b8302f090b862f7ad1bf268402730b2",
+      "netbird-server": "sha256:7b5b53b2dc8bc25639f791cf72d47cf86911894ff3f8a97cb79bab9be958109c",
+      "dashboard": "sha256:340b13c00b84349572a2acc5605e907cb09250a9e6461c757097eabdb8e02f2c",
+      "astro-app": "sha256:9ff566ac4e4224274279f6621a4ef943a47c13e1be44c6f38e4076c2c2da5a68",
+      "proxy": "sha256:30f1c0d78e0ad60901648be663a710bdadf19e4c10ac6782c235200619158284"
+    },
+    "all_seven_running": true,
+    "internal_network": true,
+    "published_ports": 0,
+    "all_mounts_private": true,
+    "only_drill_containers_attached": true,
+    "live_services_untouched": true
+  },
+  "identity_material": {
+    "google_source_secret_recovered": true,
+    "signing_private_keys_parse": true,
+    "local_emergency_admin_password_recovered": true,
+    "both_oidc_client_secrets_recovered": true,
+    "existing_internal_test_identities_recovered": true,
+    "no_identity_rebootstrap": true
+  },
+  "application_checks": {
+    "restored_staff_sessions_invalidated_before_login_and_after_rollback": true,
+    "schema": 1,
+    "passed": true,
+    "environment": "test",
+    "recorded_at": 1794191934,
+    "checks": {
+      "initial": {
+        "external_egress_denied": true,
+        "restored_discovery": true,
+        "restored_signing_key_matches_reference": true,
+        "netbird_api_discovery_and_jwks": true,
+        "netbird_dashboard": true,
+        "unauthenticated_staff_denied": true,
+        "restored_reader_login_and_read": true,
+        "reader_write_denied": true,
+        "reader_logout_revoked_session": true,
+        "restored_admin_login_and_read": true,
+        "empty_snapshot_content_preserved": true,
+        "admin_private_media_preview": true,
+        "reader_private_media_preview": true,
+        "reader_media_write_denied": true,
+        "admin_media_upload": true,
+        "admin_content_write": true
+      },
+      "after_restart": {
+        "identity_aware_session_survives_app_restart": true,
+        "content_survives_app_restart": true,
+        "media_survives_app_restart": true,
+        "private_preview_survives_app_restart": true
+      },
+      "after_rollback": {
+        "post_snapshot_session_absent_after_database_rollback": true,
+        "snapshot_content_restored_after_rollback": true,
+        "snapshot_media_restored_after_rollback": true,
+        "login_after_rollback": true,
+        "logout_revoked_session_after_rollback": true
+      }
+    },
+    "check_count": 25,
+    "runtime_identity_and_application_checks_seconds": 98.591,
+    "staff_database_media_rollback_seconds": 50.069,
+    "rollback_scope": "Restored-copy staff SQLite/media to the actual recovery point; not a live HOU1 traffic cutover",
+    "original_cms_table_counts": {
+      "access_codes": 0,
+      "cms_blog_posts": 0,
+      "cms_media": 0,
+      "cms_pets": 0,
+      "cms_schema_migrations": 2,
+      "cms_services": 0,
+      "intake_forms": 0,
+      "push_subscriptions": 0,
+      "staff_offboarding_audit": 0,
+      "staff_session_revocations": 1,
+      "staff_sessions": 770,
+      "staff_subject_blocks": 0,
+      "submissions": 0
+    },
+    "original_netbird_table_counts": {
+      "events.db": {
+        "deleted_users": 0,
+        "events": 53
+      },
+      "geonames_20261013.db": {
+        "geonames": 77291
+      },
+      "idp.db": {
+        "auth_code": 0,
+        "auth_request": 1,
+        "auth_session": 0,
+        "client": 2,
+        "connector": 2,
+        "device_request": 0,
+        "device_token": 0,
+        "keys": 1,
+        "migrations": 23,
+        "offline_session": 0,
+        "password": 1,
+        "refresh_token": 0,
+        "user_identity": 2
+      },
+      "access_logs.db": {
+        "access_log_entries": 0
+      },
+      "store.db": {
+        "account_onboardings": 1,
+        "accounts": 1,
+        "agent_network_access_log": 0,
+        "agent_network_access_log_group": 0,
+        "agent_network_budget_rules": 0,
+        "agent_network_consumption": 0,
+        "agent_network_guardrails": 0,
+        "agent_network_policies": 0,
+        "agent_network_providers": 0,
+        "agent_network_request_usage": 0,
+        "agent_network_request_usage_group": 0,
+        "agent_network_settings": 0,
+        "domains": 0,
+        "extra_settings": 0,
+        "group_peers": 13,
+        "groups": 9,
+        "installations": 1,
+        "jobs": 0,
+        "name_server_groups": 1,
+        "network_addresses": 0,
+        "network_resources": 0,
+        "network_routers": 0,
+        "networks": 0,
+        "peers": 4,
+        "personal_access_tokens": 1,
+        "policies": 7,
+        "policy_rules": 7,
+        "posture_checks": 0,
+        "proxies": 0,
+        "proxy_access_tokens": 0,
+        "records": 0,
+        "routes": 0,
+        "services": 0,
+        "setup_keys": 0,
+        "targets": 0,
+        "user_invites": 0,
+        "users": 3,
+        "zones": 0
+      }
+    }
+  },
+  "session_reset": {
+    "passed": true,
+    "recorded_at": 1794192059,
+    "pre_reset_identity_counts": {
+      "django_session": 0,
+      "authentik_core_authenticatedsession": 8,
+      "authentik_providers_oauth2_authorizationcode": 0,
+      "authentik_providers_oauth2_accesstoken": 5,
+      "authentik_providers_oauth2_refreshtoken": 0
+    },
+    "staff_sessions_revoked": 1,
+    "session_and_token_tables_verified_empty_before_fresh_login": true,
+    "checks": {
+      "active_staff_and_idp_login_before_session_reset": true,
+      "pre_reset_staff_session_denied": true,
+      "fresh_oidc_login_after_session_reset": true,
+      "fresh_logout_revokes_session": true
+    },
+    "method": "fixed-table PostgreSQL transaction plus staff SQLite revocation in isolated copy"
+  },
+  "netbird_and_isolation": {
+    "schema": 1,
+    "passed": true,
+    "recorded_at": 1794192072,
+    "netbird_integrity": true,
+    "netbird_critical_table_counts_preserved": {
+      "accounts": 1,
+      "users": 3,
+      "groups": 9,
+      "group_peers": 13,
+      "peers": 4,
+      "policies": 7,
+      "policy_rules": 7,
+      "routes": 0,
+      "setup_keys": 0,
+      "personal_access_tokens": 1
+    },
+    "live_container_ids_and_start_times_unchanged": true,
+    "internal_network_reverified": true,
+    "no_published_ports": true,
+    "only_drill_mounts_and_network_members": true
+  },
+  "staff_fix": {
+    "pr": "https://github.com/rodriguezhumberto/pearland-paws/pull/56",
+    "original_backup_revision": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+    "candidate": {
+      "candidate_revision": "590a05bd2ed7a193a9818d19409e53fe1726ed1d",
+      "image_id": "sha256:9ff566ac4e4224274279f6621a4ef943a47c13e1be44c6f38e4076c2c2da5a68",
+      "build_seconds": 81.234,
+      "original_backup_revision": "77ae9aeac0158b994da91f3e068c1a99e30dad66",
+      "scope": "OIDC-aware media upload/private preview guards; no database schema change"
+    },
+    "finding": "Media upload and private preview rejected opaque OIDC sessions with 401 because they still required a legacy signed cookie",
+    "resolution": "Validate the opaque cookie against the restored SQLite session store; reject revoked/unknown/legacy sessions in OIDC mode",
+    "unit_tests": {
+      "passed": 94,
+      "skipped": 0
+    },
+    "http_integration_tests": {
+      "passed": 9,
+      "skipped": 0
+    },
+    "build": "passed",
+    "active_test_deployment_changed": false
+  },
+  "image_reference_finding": {
+    "container_image_identifier_lookup_failed": "sha256:9656a2053bc8538f14471426c67910d2b82d50df6023666a19c328765ba9b326",
+    "cached_tag_image_index": "sha256:126224deb1a67ad0a5421ae1977eaf8dd6168fc65618d68766645f88c22e6436",
+    "tagged_image_was_present": true,
+    "resolution": "Rebuilt the saved Git revision and then the narrow media-fix candidate; pinned runnable OCI image/index identifiers in the recovery Compose project",
+    "original_revision_rebuild_seconds": 9.932,
+    "build_cache_available": true,
+    "cold_dependency_download_tested": false
+  },
+  "timings": {
+    "clean_component_startup_seconds": 112.981,
+    "candidate_build_seconds": 81.234,
+    "application_checks_seconds": 98.591,
+    "staff_database_media_rollback_seconds": 50.069,
+    "measurement_scope": "Separate measured phases after harness corrections; excludes operator pauses, provider provisioning, OS/bootstrap, DNS changes and external Google/VPN login. Not a replacement-host RTO."
+  },
+  "cleanup": {
+    "controller": {
+      "temporary_recovery_identity_deleted": true,
+      "controller_plaintext_recovery_removed": true,
+      "temporary_health_input_removed": true,
+      "received_drill_ciphertext_copy_removed": true,
+      "operator_attachment_preserved": true,
+      "recorded_at": 1794192164
+    },
+    "vps": {
+      "drill_containers_removed": true,
+      "drill_network_removed": true,
+      "temporary_image_tags_removed": true,
+      "remote_plaintext_recovery_directory_removed": true,
+      "temporary_runtime_identity_copy_removed": true,
+      "recorded_at": 1794192182
+    }
+  },
+  "after_cleanup_host_health": {
+    "checks": 23,
+    "failed_checks": [],
+    "initial_transient_failed_checks": [
+      "io_headroom"
+    ],
+    "recheck_after_cleanup_io_drained": "passed"
+  },
+  "remaining_gates": [
+    "Merge/deploy the staff media fix before promotion; the active test app still uses its prior revision",
+    "Live HOU4 interrupted network-transfer check; local SIGKILL coverage is recorded separately",
+    "Replacement-host/provider-console recovery and post-restore Google/VPN user checks, with current offboarding/access-policy reconciliation"
+  ],
+  "production_approved": false
+}

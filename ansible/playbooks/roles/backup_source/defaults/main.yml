@@ -1,0 +1,11 @@
+---
+hou1_backup_enabled: false
+hou1_backup_environment: '{{ cms_environment }}'
+hou1_backup_receiver_ip: ''
+hou1_backup_transport_public_key: ''
+hou1_backup_recipient: ''
+hou1_backup_max_archive_bytes: 10737418240
+hou1_backup_minimum_free_bytes: 16106127360
+# Include the runtime identity inside the offline-encrypted archive for clean recovery.
+hou1_backup_recovery_files: ['{{ authentik_age_key_file }}']
+hou1_backup_app_project: "{{ 'pearlandpaws-test' if cms_environment == 'test' else 'pearlandpaws' }}"

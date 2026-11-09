@@ -196,6 +196,7 @@
     minute: "{{ authentik_backup_schedule_minute }}"
     hour: "{{ authentik_backup_schedule_hour }}"
     job: "{{ authentik_project_root }}/backup.sh >> /var/log/hou1-authentik-backup-{{ authentik_environment }}.log 2>&1"
+  when: not (hou1_backup_enabled | default(false) | bool)
 
 - name: Validate the Authentik Compose model before startup
   ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml config

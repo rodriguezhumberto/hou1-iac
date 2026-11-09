@@ -75,6 +75,7 @@
     minute: "{{ cms_backup_schedule_minute }}"
     hour: "{{ cms_backup_schedule_hour }}"
     job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
+  when: not (hou1_backup_enabled | default(false) | bool)
 
 - name: Seed initial replacement CMS media (will NOT overwrite existing production media)
   copy:

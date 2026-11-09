@@ -1,0 +1,14 @@
+---
+- name: Prepare HOU1 for restricted encrypted HOU4 backup collection
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  become: true
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Validate established VPN management
+      ansible.builtin.import_role:
+        name: netbird_common
+  roles:
+    - role: backup_source

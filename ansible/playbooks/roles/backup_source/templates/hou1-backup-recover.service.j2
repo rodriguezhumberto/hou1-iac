@@ -1,0 +1,18 @@
+[Unit]
+Description=Recover HOU1 writers interrupted by backup preparation
+Requires=docker.service
+After=docker.service
+Before=hou1-backup-prepare.service
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/libexec/hou1-backup-prepare --recover
+TimeoutStartSec=180
+UMask=0077
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=read-only
+ReadWritePaths=/var/lib/hou1-backup /run/lock
+[Install]
+WantedBy=multi-user.target

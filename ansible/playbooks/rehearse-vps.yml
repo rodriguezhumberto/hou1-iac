@@ -104,7 +104,7 @@
 
     - name: Refresh the rehearsal source ref from the transferred bundle
       ansible.builtin.command:
-        argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, /opt/hou1-test-source/staff.bundle, 'refs/heads/issue-39-homelab-rehearsal:refs/heads/rehearsal']
+        argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, /opt/hou1-test-source/staff.bundle, "{{ rehearsal_staff_bundle_ref | default('refs/heads/main') }}:refs/heads/rehearsal"]
       changed_when: false
 
     - name: Import fresh test certificate seeds only after materializing the app checkout
