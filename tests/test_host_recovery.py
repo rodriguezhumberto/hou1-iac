@@ -234,16 +234,49 @@ class HostRecoveryRuntimeTest(unittest.TestCase):
             with patch.object(restore, 'ROOT', root), patch.object(restore, 'install'), \
                  patch.object(restore, 'dc', side_effect=dc), patch.object(restore, 'wait_database'), \
                  patch.object(restore, 'sql', side_effect=['0', '187']), \
-                 patch.object(restore, 'revoke_sessions', side_effect=lambda path: events.append(('revoke', ()))):
+                 patch.object(restore, 'revoke_sessions', side_effect=lambda path: events.append(('revoke', ()))), \
+                 patch.object(restore, 'reset_peer_connections', side_effect=lambda path: events.append(('reset-peers', ())) or 2):
                 report = restore.restore(inputs())
             imported = next(i for i, event in enumerate(events) if event[1] and event[1][0] == 'exec' and 'psql' in event[1])
             revoked = events.index(('revoke', ()))
             started = next(i for i, event in enumerate(events) if 'authentik-server' in event[1])
             self.assertLess(imported, revoked)
             self.assertLess(revoked, started)
+            reset = events.index(('reset-peers', ()))
+            netbird_started = next(i for i, event in enumerate(events) if event[0] == 'netbird' and 'up' in event[1])
+            self.assertLess(reset, netbird_started)
+            self.assertTrue(report['netbird_connection_flags_reset_before_server'])
+            self.assertEqual(report['netbird_stale_connections_cleared'], 2)
             self.assertEqual(report['postgres_tables'], 187)
             self.assertFalse(report['identity_bootstrap_run'])
             self.assertFalse(report['cms_seed_run'])
+
+    def test_stale_peer_status_cleared_offline_without_changing_identity(self):
+        with tempfile.TemporaryDirectory() as temp:
+            path = Path(temp) / 'store.db'
+            with sqlite3.connect(path) as db:
+                db.executescript('''CREATE TABLE peers (id TEXT, key TEXT, peer_status_connected INTEGER,
+                    peer_status_last_seen TEXT, user_id TEXT);
+                    INSERT INTO peers VALUES ('lost', 'key-a', 1, '2026-11-09', 'owner-a');
+                    INSERT INTO peers VALUES ('retained', 'key-b', 0, '2026-11-08', 'owner-b');
+                    CREATE TABLE group_peers (group_id TEXT, peer_id TEXT);
+                    INSERT INTO group_peers VALUES ('admins', 'retained');''')
+            with patch.object(restore, 'run', return_value=b'live-server'):
+                with self.assertRaises(ValueError):
+                    restore.reset_peer_connections(path)
+            with sqlite3.connect(path) as db:
+                self.assertEqual(db.execute('SELECT peer_status_connected FROM peers WHERE id="lost"').fetchone(), (1,))
+            with patch.object(restore, 'run', return_value=b''):
+                self.assertEqual(restore.reset_peer_connections(path), 1)
+            with sqlite3.connect(path) as db:
+                self.assertEqual(db.execute('SELECT * FROM peers ORDER BY id').fetchall(), [
+                    ('lost', 'key-a', 0, '2026-11-09', 'owner-a'),
+                    ('retained', 'key-b', 0, '2026-11-08', 'owner-b')])
+                self.assertEqual(db.execute('SELECT * FROM group_peers').fetchall(), [('admins', 'retained')])
+            with patch.object(restore, 'run', return_value=b''):
+                with self.assertRaises(sqlite3.OperationalError):
+                    restore.reset_peer_connections(Path(temp) / 'missing.db')
+                self.assertFalse((Path(temp) / 'missing.db').exists())
 
     def test_live_writers_refused_and_real_sqlite_sessions_revoked(self):
         with tempfile.TemporaryDirectory() as temp:

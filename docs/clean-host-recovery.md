@@ -89,6 +89,11 @@ into an empty schema, with TCP query readiness and `ON_ERROR_STOP`.
 
 Backed-up IdP sessions/codes/tokens and staff sessions are cleared while restored
 writers are stopped. Authentik policy bootstrap and CMS seeding are never run.
+Saved NetBird connection flags are also cleared while its server is stopped:
+the backup's `connected` values describe old transport sessions. Peer IDs, keys,
+authorization, group membership and last-seen timestamps are preserved. Peers
+must reconnect before they can be reported as connected. The later deletion
+guard continues to refuse a connected peer.
 The saved database/media pair is recovered even when the original CMS was empty.
 Nginx and NetBird STUN bind to **loopback only**. UFW alone cannot prevent Docker
 from exposing published ports. The initial restore also applies the existing

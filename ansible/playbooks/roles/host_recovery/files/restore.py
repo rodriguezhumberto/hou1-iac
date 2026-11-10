@@ -94,6 +94,22 @@ def revoke_sessions(database):
             raise ValueError('Restored staff sessions remain')
 
 
+def reset_peer_connections(database):
+    # A backup records old transport status, not live sessions. Clear it offline
+    # so peers must reconnect before the API can report them as connected.
+    if run('docker', 'ps', '-q', '--filter', 'label=com.docker.compose.project=' + PROJECTS['netbird'][0],
+           '--filter', 'label=com.docker.compose.service=netbird-server').strip():
+        raise ValueError('Stop restored NetBird before clearing connection flags')
+    with sqlite3.connect(database.as_uri() + '?mode=rw', uri=True) as db:
+        if db.execute('PRAGMA integrity_check').fetchall() != [('ok',)]:
+            raise ValueError('Restored NetBird SQLite integrity failed')
+        count = db.execute('SELECT count(*) FROM peers WHERE peer_status_connected <> 0').fetchone()[0]
+        db.execute('UPDATE peers SET peer_status_connected = 0 WHERE peer_status_connected <> 0')
+        if db.execute('SELECT count(*) FROM peers WHERE peer_status_connected <> 0').fetchone()[0]:
+            raise ValueError('Saved NetBird connection flags remain')
+    return count
+
+
 def saved_environment(path):
     return {key: value.strip().strip('"').strip("'") for line in path.read_text().splitlines()
             if line and not line.startswith('#') and '=' in line for key, value in [line.split('=', 1)]}
@@ -205,12 +221,15 @@ def restore(cfg):
     if tables < 1:
         raise ValueError('Empty recovered PostgreSQL schema')
     revoke_sessions(APP / 'database/forms.db')
+    stale_connections = reset_peer_connections(VPN / 'data/store.db')
     dc('auth', 'up', '-d', '--pull', 'never', '--wait', '--wait-timeout', '900', 'authentik-server', 'authentik-worker', timeout=1000)
     dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server', 'dashboard')
     dc('app', 'up', '-d', '--pull', 'never', '--wait', '--wait-timeout', '180', 'astro-app', 'nginx')
     dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
     report = dict(passed=True, environment='test', staff_revision=cfg['staff_revision'], postgres_tables=tables,
                   sessions_revoked_before_writers=True, identity_bootstrap_run=False, cms_seed_run=False,
+                  netbird_connection_flags_reset_before_server=True,
+                  netbird_stale_connections_cleared=stale_connections,
                   cold_registry_pulls=True, cold_application_build=True, ports_bound_to_loopback=True,
                   restore_seconds=round(time.monotonic() - started, 3),
                   next='Reconcile access changes, explicitly publish, replace only the lost HOU1 peer, then finalize VPN/security/monitoring/backups')
