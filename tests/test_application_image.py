@@ -50,6 +50,25 @@ def add_receipt(payload, revision):
 
 
 class ApplicationArtifactTest(unittest.TestCase):
+    def test_existing_node_image_update_preserves_runtime_and_rejects_missing_file(self):
+        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        names = ['Check the retained runtime file for an image-only update',
+                 'Require an existing regular runtime file before preserving it',
+                 'Inject production .env file for Astro']
+        selected = [task for task in tasks if task['name'] in names]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            env = root / '.env'; original = b'FIXTURE=preserve-existing-runtime\n'
+            env.write_bytes(original)
+            variables = dict(app_directory=directory, webstack_preserve_runtime_environment=True)
+            result = run_plays([dict(variables=variables, tasks=selected)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(env.read_bytes(), original)
+            env.unlink()
+            result = run_plays([dict(variables=variables, tasks=selected)])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Require an existing regular runtime file before preserving it', result.stdout)
+
     def test_tagged_webstack_deployment_cannot_skip_artifact_verification(self):
         task = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[0]
         task['tags'] = ['deploy']

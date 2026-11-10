@@ -40,6 +40,14 @@ the verified image, and runs Compose with `--no-build` and existing health check
 Storage and ingress overrides continue to apply. The successful deployment writes
 `application-image.json` alongside Compose.
 
+For an existing node's image-only update, set
+`webstack_preserve_runtime_environment: true` to retain its `.env` byte for byte.
+This requires an existing regular file; it does not initialize a fresh host.
+Select only the existing app/proxy services for the isolated rehearsal
+(`webstack_bootstrap_ingress_only: true`), so unrelated optional services are not
+started as a side effect. Full provisioning continues to render the declared
+runtime settings by default.
+
 To roll back application code, select the previous validated release's digest
 and revision together, then run the existing Ansible deployment entry point with
 that release's variables. Do not move a tag or rebuild. Database migrations must

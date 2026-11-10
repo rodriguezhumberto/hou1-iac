@@ -97,6 +97,20 @@
     force: no
   when: seed_cms_media_source_path is defined
 
+- name: Check the retained runtime file for an image-only update
+  ansible.builtin.stat:
+    path: '{{ app_directory }}/.env'
+  register: webstack_retained_runtime
+  when: webstack_preserve_runtime_environment | default(false) | bool
+
+- name: Require an existing regular runtime file before preserving it
+  ansible.builtin.assert:
+    that:
+      - webstack_retained_runtime.stat.isreg | default(false)
+      - not (webstack_retained_runtime.stat.islnk | default(false))
+    fail_msg: An image-only update requires the existing runtime file; use normal provisioning on a fresh host.
+  when: webstack_preserve_runtime_environment | default(false) | bool
+
 - name: Inject production .env file for Astro
   copy:
     dest: "{{ app_directory }}/.env"
@@ -146,6 +160,7 @@
       CMS_MEDIA_DIR=/var/data/media
       CMS_UPLOAD_MAX_BYTES={{ cms_upload_max_bytes }}
   no_log: true
+  when: not (webstack_preserve_runtime_environment | default(false) | bool)
 
 - name: Ensure Certbot directories exist before installing credentials
   ansible.builtin.file:
