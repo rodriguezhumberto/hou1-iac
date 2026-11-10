@@ -1,0 +1,116 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T07:53:58.591182+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "attempt": "replacement-20261110-03",
+  "immutable_refs": {
+    "restore": "7312d380021269ff292f08d1b1e3a5a275080bbd",
+    "publication_and_monitoring": "d055e1eaae99c2efcad5b906c168703782e561e0",
+    "staff": "c3b51ec297e318f3d12d07e341c95bb976dc492f"
+  },
+  "pre_publication_correction": {
+    "scope": "Moved VPN readiness check after the SSH firewall rule before this phase started",
+    "ci_run": 42774273269,
+    "ci_passed": true,
+    "failed_live_phase_retried": false
+  },
+  "restore": {
+    "passed": true,
+    "ansible_ok": 50,
+    "ansible_changed": 24,
+    "ansible_failed": 0,
+    "ansible_ignored": 0,
+    "ansible_rescued": 0,
+    "postgres_tables": 187,
+    "containers_running": 7,
+    "restore_seconds": 938.713,
+    "cold_registry_pulls": true,
+    "cold_application_build": true,
+    "sessions_revoked_before_writers": true,
+    "saved_netbird_transport_flags_cleared": 4,
+    "actual_loopback_bindings_verified": true,
+    "payload_cleanup_verified": true,
+    "selected_authorization_tables_match": 13
+  },
+  "publication": {
+    "passed": true,
+    "ansible_ok": 148,
+    "ansible_changed": 51,
+    "ansible_failed": 0,
+    "ansible_rescued": 0,
+    "ansible_ignored": 0,
+    "pinned_lost_peer_replacement_passed": true,
+    "replacement_ip": "100.91.0.10",
+    "vpn_readiness_before_cutover_passed": true,
+    "final_fresh_vpn_ssh_passed": true,
+    "vpn_only_ssh_verified": true,
+    "public_fallback_retired": true,
+    "persistent_isolation_and_google_egress_restored": true
+  },
+  "operator_checks": {
+    "approved_google_signin_passed": true,
+    "netbird_client_connection_passed": true,
+    "personal_hou1_ssh_after_this_restore_not_yet_confirmed": true
+  },
+  "hou4": {
+    "retained_peer_reconnected": true,
+    "private_ssh_verified": true,
+    "wiped": false,
+    "modified_by_this_attempt": false,
+    "backup_source_pin_update_pending": true
+  },
+  "health_before_monitoring": {
+    "core_checks_passed": 22,
+    "backup_freshness_pending_first_capture": true
+  },
+  "monitoring": {
+    "passed": false,
+    "ansible_ok": 13,
+    "ansible_changed": 0,
+    "ansible_failed": 1,
+    "ansible_rescued": 0,
+    "ansible_ignored": 0,
+    "failed_task": "Plan the two exact metrics groups",
+    "cause": "Retiring the old peer empties its existing dedicated metrics and backup source groups; NetBird serializes empty membership as null. The ordinary planner refused this state before mutations.",
+    "backups_playbook_started": false
+  },
+  "local_fix": {
+    "pin_only_exact_managed_source_groups_before_lost_peer_deletion": true,
+    "require_sole_pinned_lost_peer_and_no_resource_grants": true,
+    "require_same_group_identity_and_empty_membership_after_enrollment": true,
+    "recheck_exact_policy_before_binding_replacement": true,
+    "preserve_group_and_policy_ids": true,
+    "ordinary_planners_still_refuse_empty_or_foreign_membership": true,
+    "normalize_null_empty_membership_for_guard_diagnostic": true,
+    "focused_tests_passed": 32,
+    "publication_syntax_passed": true,
+    "mock_api_uses_real_ansible_before_after_tasks": true,
+    "intervening_member_resource_identity_policy_changes_rejected_before_writes": true,
+    "live_deployment_retry_performed": false
+  },
+  "temporary_recovery_grant_retained": true,
+  "operator_long_lived_age_identity_retained": false,
+  "alerts_silenced": false,
+  "next_wipe_checkpoint_released": false,
+  "next_clean_attempt_requires_operator_confirmation": true,
+  "live_clean_host_recovery_gate_passed": false,
+  "production_promotion_approved": false,
+  "source_sha256": {
+    "ansible/playbooks/filter_plugins/netbird_policies.py": "98644301fd32454d486a5a723e61537ae347d8f3892e4ddbcb8f76e310725c9a",
+    "ansible/playbooks/publish-test-recovery.yml": "fe396e8891b87d14f8d30aaac2d51a51e15de6ea68129b6110710a1ad7d59f20",
+    "ansible/playbooks/roles/host_recovery/tasks/peer-groups-before.yml": "27526346de027df64a6df890f81d71679e79d4e161c239604cacc2c28003c527",
+    "ansible/playbooks/roles/host_recovery/tasks/peer-groups-after.yml": "9fdefd66434fb2493b8f06966da7e6d9f971501ffbc631a742e65ddf5f2a5eac",
+    "tests/test_recovery_peer_groups.py": "8f797c5d01fef93f31297b22e4327b8f692ef671db1a02df488ae8a217b9aefa"
+  },
+  "validation_log_sha256": {
+    "restore-private.log": "b8196fee4869b611545ee0e203a786954e86c0e25aa69df018a029736d87c163",
+    "publish-private.log": "34540a7e254128264f0fb3ddccefb1a33a2302106e40c39f7c92346b84edc65b",
+    "monitoring-private.log": "b73b7bff95c7b828566035b5070088b5c0a028a728325856773d11d9ae723544",
+    "group-recovery-tests.log": "b394c55aeb364c78e46bae2e9c1d10b0b9c8cd3d5549f4fa60f8758ba1386131",
+    "monitoring-regression-tests.log": "829403d4e6ac9c9a4ed12ede9241e947ecb9ac5f49fd0b1465a4f8c2d982c4bf",
+    "backup-regression-tests.log": "9a334ce1605abc0800130bda23f5cbd5603884b8cdde3f34c66ef1cae5332ec1",
+    "host-regression-tests.log": "bb6519ad9862df65c9ee2c88ffbbcc7039385fa266f2a47a5d7b6b761f4af3b7"
+  }
+}

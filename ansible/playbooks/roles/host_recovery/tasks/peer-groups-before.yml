@@ -1,0 +1,16 @@
+---
+- name: Read policy ownership and source membership before peer retirement
+  ansible.builtin.uri:
+    url: '{{ netbird_api_url }}/api/{{ item }}'
+    headers: '{{ netbird_api_headers }}'
+    status_code: 200
+  loop: [groups, peers, policies]
+  register: host_recovery_policy_state
+
+- name: Require exact managed policies and single lost-peer source groups
+  ansible.builtin.set_fact:
+    host_recovery_source_groups: >-
+      {{ host_recovery_policy_state.results[0].json |
+         netbird_recovery_source_groups(host_recovery_policy_state.results[1].json,
+         host_recovery_policy_state.results[2].json, hou1_backup_receiver_ip,
+         netbird_ip, netbird_subnet, host_recovery_lost_peer_id) }}

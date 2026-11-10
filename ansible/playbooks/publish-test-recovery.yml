@@ -69,6 +69,8 @@
               - host_recovery_old_peer.json.name == host_recovery_lost_peer_name
               - not (host_recovery_old_peer.json.connected | bool)
             fail_msg: The selected peer is not the disconnected lost HOU1 identity.
+        - name: Pin exact managed monitoring and backup groups before retiring the peer
+          ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-groups-before.yml
         - name: Retire that lost peer to release its declared address
           ansible.builtin.uri:
             url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'
@@ -80,6 +82,13 @@
     - name: Enroll the replacement through the existing pinned client role
       ansible.builtin.include_role:
         name: netbird_client
+    - name: Reattach only the pinned lost peer's managed source groups
+      delegate_to: localhost
+      become: false
+      no_log: true
+      block:
+        - name: Verify empty groups and bind the enrolled replacement
+          ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-groups-after.yml
     - name: Reconcile private DNS through the existing role
       ansible.builtin.include_role:
         name: netbird_dns

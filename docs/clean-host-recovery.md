@@ -111,7 +111,13 @@ ansible-playbook -i /private/point/inventory.yml \
 Publication accepts only the expected loopback port baseline. Enrollment then
 requires the pinned lost peer to match its ID/name/IP and be disconnected before
 deleting that identity. The existing NetBird client role enrolls the replacement
-and restores its declared address/group. Existing DNS and security roles verify
+and restores its declared address/group. Before deletion, recovery pins the two
+existing metrics/backup source groups only if their policies exactly match the
+managed policies, their sole member is the lost peer, and they have no resource
+grants. After enrollment, those same groups must be empty and their policies
+must still match before binding only the replacement. Group IDs and policies stay intact; ordinary monitoring and
+backup roles retain their strict membership checks.
+Existing DNS and security roles verify
 fresh administrative VPN SSH before retiring public bootstrap access. Existing
 rehearsal gates restore persistent isolation and bounded Google egress.
 
