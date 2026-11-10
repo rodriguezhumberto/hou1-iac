@@ -168,6 +168,10 @@ must not depend on that same control plane being available.
 
 ## Offline validation and clean-host restore
 
+The guarded [clean test-host workflow](clean-host-recovery.md) implements the
+fresh-OS rehearsal with saved configuration and an explicit publication/access
+checkpoint. Its live replacement-host validation remains pending.
+
 For the repeatable **isolated component drill** on the running test host, use
 [the recovery playbook](reproducible-recovery-drill.md). It implements the tested
 component sequence with private staging and evidence collection. Its local

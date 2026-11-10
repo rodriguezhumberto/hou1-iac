@@ -1,9 +1,17 @@
 ---
-- name: Ensure resolv.conf is unlocked before modifying
-  file:
+- name: Inspect resolver attributes without following a provider symlink
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+    follow: false
+  register: hou1_resolver_stat
+
+- name: Ensure an immutable resolver file is unlocked before modifying
+  ansible.builtin.file:
     path: /etc/resolv.conf
     attributes: -i
-  ignore_errors: yes 
+  when:
+    - hou1_resolver_stat.stat.isreg | default(false)
+    - "'immutable' in (hou1_resolver_stat.stat.attributes | default([]))"
 
 - name: Create the systemd-resolved drop-in directory
   ansible.builtin.file:

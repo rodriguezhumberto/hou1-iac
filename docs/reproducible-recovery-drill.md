@@ -11,6 +11,9 @@ checkout, cached base images, Git, OpenSSL and Docker Compose. It does not
 replace the primary services, change their databases, expose ports, enroll VPN
 peers or change DNS. Clean-OS recovery and production traffic cutover remain
 separate work. Do not use this test playbook as a production restore command.
+Use the [clean-host procedure](clean-host-recovery.md) for the separate fresh-OS
+gate; it restores the original projects and host management instead of another
+isolated Compose project.
 
 ## Controller inputs
 

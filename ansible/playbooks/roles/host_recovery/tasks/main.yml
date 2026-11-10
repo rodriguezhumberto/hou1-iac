@@ -1,0 +1,114 @@
+---
+- name: Require the fixed new test recovery root
+  ansible.builtin.assert:
+    that:
+      - host_recovery_root == '/var/lib/hou1-host-recovery/' + host_recovery_id
+      - host_recovery_evidence_directory is match('^/')
+
+- name: Require an unused cold Docker installation
+  ansible.builtin.command:
+    argv: [python3, -c, "import subprocess; assert not subprocess.check_output(['docker','ps','-aq']).strip(); assert not subprocess.check_output(['docker','image','ls','-aq']).strip()"]
+  changed_when: false
+
+- name: Install the firewall executable before restoring isolated workloads
+  ansible.builtin.apt:
+    name: nftables
+    state: present
+    lock_timeout: 300
+
+- name: Create private controller recovery staging
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: hou1-host-recovery-
+  delegate_to: localhost
+  become: false
+  register: host_recovery_staging
+
+- name: Prepare and restore only this new attempt
+  block:
+    - name: Authenticate and safely extract the selected recovery point
+      ansible.builtin.command:
+        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/verify-recovery.py', --archive, '{{ host_recovery_archive }}', --manifest, '{{ host_recovery_manifest }}', --identity, '{{ host_recovery_identity }}', --output, '{{ host_recovery_staging.path }}/payload', --environment, test]
+      delegate_to: localhost
+      become: false
+      no_log: true
+      changed_when: true
+
+    - name: Write explicit recovery inputs without controller credentials
+      ansible.builtin.copy:
+        dest: '{{ host_recovery_staging.path }}/request.json'
+        mode: '0600'
+        content: "{{ {'id': host_recovery_id, 'environment': 'test', 'staff_revision': rehearsal_staff_ref, 'test_suffix': primary_domain, 'netbird_subnet': netbird_subnet, 'bootstrap_cidr': rehearsal_bootstrap_admin_cidr, 'runtime_age_path': authentik_age_key_file, 'deny_cidrs': rehearsal_deny_cidrs, 'test_addresses': rehearsal_test_addresses, 'allow_local_cidrs': rehearsal_allow_local_cidrs, 'allow_update_cidrs': rehearsal_allow_update_cidrs} | to_nice_json }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Prepare pinned source saved configuration and ingress
+      ansible.builtin.command:
+        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/files/prepare.py', --request, '{{ host_recovery_staging.path }}/request.json', --payload, '{{ host_recovery_staging.path }}/payload', --source-bundle, '{{ host_recovery_source_bundle }}', --image-lock, '{{ host_recovery_image_lock }}', --output, '{{ host_recovery_staging.path }}/bundle']
+      delegate_to: localhost
+      become: false
+      no_log: true
+      changed_when: true
+
+    - name: Claim the new attempt without resuming an earlier failure
+      ansible.builtin.command:
+        argv: [mkdir, -p, -m, '0700', /var/lib/hou1-host-recovery]
+      changed_when: true
+
+    - name: Atomically create the attempt marker
+      ansible.builtin.command:
+        argv: [mkdir, -m, '0700', '{{ host_recovery_root }}']
+      register: host_recovery_claim
+      changed_when: true
+
+    - name: Transfer the protected recovery bundle
+      ansible.builtin.copy:
+        src: '{{ host_recovery_staging.path }}/bundle/bundle.tar'
+        dest: '{{ host_recovery_root }}/bundle.tar'
+        mode: '0600'
+      no_log: true
+
+    - name: Extract only into the empty root-owned attempt directory
+      ansible.builtin.unarchive:
+        src: '{{ host_recovery_root }}/bundle.tar'
+        dest: '{{ host_recovery_root }}'
+        remote_src: true
+        extra_opts: [--no-same-owner]
+      no_log: true
+
+    - name: Restore the empty host and stop at the private publication checkpoint
+      ansible.builtin.command:
+        argv: [python3, '{{ host_recovery_root }}/restore.py']
+      no_log: true
+      changed_when: true
+  always:
+    - name: Preserve remote diagnostics and remove controller plaintext
+      block:
+        - name: Create a private controller evidence directory
+          ansible.builtin.file:
+            path: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}'
+            state: directory
+            mode: '0700'
+          delegate_to: localhost
+          become: false
+        - name: Find recovery reports and protected diagnostics
+          ansible.builtin.find:
+            paths: '{{ host_recovery_root }}'
+            patterns: ['*-report.json', first-error.json, private.log]
+          when: host_recovery_claim is defined and host_recovery_claim is changed
+          register: host_recovery_reports
+          no_log: true
+        - name: Fetch reports to the operator evidence directory
+          ansible.builtin.fetch:
+            src: '{{ item.path }}'
+            dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/{{ item.path | basename }}'
+            flat: true
+          loop: '{{ host_recovery_reports.files | default([]) }}'
+          no_log: true
+      always:
+        - name: Remove controller plaintext even when evidence transfer fails
+          ansible.builtin.file:
+            path: '{{ host_recovery_staging.path }}'
+            state: absent
+          delegate_to: localhost
+          become: false

@@ -1,0 +1,74 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T05:06:36.062746+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "scope": "Clean replacement-host recovery preparation; no fresh-OS live run yet",
+  "staff_revision": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "selected_original_recovery_point": "20261109T095132Z-dd7fe78119c3",
+  "offline_archive_authenticated": true,
+  "source_bundle_saved_commit_verified": true,
+  "registry_descriptor_preflight": {
+    "unique_images": 6,
+    "all_available": true,
+    "old_host_image_layers_copied": false
+  },
+  "saved_configuration_preflight": {
+    "auth_compose_valid": true,
+    "public_ports_still_loopback": true,
+    "netbird_compose_valid": true,
+    "app_compose_valid": true,
+    "exact_nginx_image_configuration_valid": true,
+    "no_ports_published_by_validation": true
+  },
+  "read_only_authorization_preflight": {
+    "selected_tables_compared": 13,
+    "all_match": true,
+    "scope_limit": "Only the listed authorization tables and columns; reconcile later changes before publication."
+  },
+  "local_tests": {
+    "full_suite_run": 186,
+    "full_suite_passed": 185,
+    "full_suite_skipped": 1,
+    "skip_reason": "Optional dnsmasq resolver integration unavailable",
+    "final_focused_recovery_tests_passed": 11,
+    "note": "The full suite preceded the final lost-peer guard and resolver-unlock regression; both are covered in the final 11-test focused run."
+  },
+  "syntax_checks": [
+    "restore-test-host.yml",
+    "publish-test-recovery.yml"
+  ],
+  "source_sha256": {
+    "ansible/playbooks/restore-test-host.yml": "461338208d0d64047cb4c0e14b12b97fc2c747d28f06559539c9f1a7a97a7175",
+    "ansible/playbooks/publish-test-recovery.yml": "ddcc3e590391c963f0eae3af1fa423fa6b110d764af90b94bf78c1bdad885476",
+    "ansible/playbooks/roles/host_recovery/tasks/main.yml": "7bcb11e25bc65927dd35d8ae3d5170604e15df4367d7f6ce5e1540eb1949a927",
+    "ansible/playbooks/roles/host_recovery/files/prepare.py": "b83a833f7593b8d9a60b3010c7417e878388ee37efe3b29636365205b0105e49",
+    "ansible/playbooks/roles/host_recovery/files/restore.py": "87ce9060af846b80fffb2d335c37db1fcc29206ebde9ed78f90f25a15a0dfa60",
+    "tests/test_host_recovery.py": "62c841094fd3d68d87a03a0b5c73af7189a1910afd49bcabe2c4594864248e1e",
+    "ansible/playbooks/roles/common/tasks/main.yml": "1b3845bb3afd0effe5817f6da2527e057aed2a2ff7c7f242c3a0dda2bb0966e2"
+  },
+  "validation_log_sha256": {
+    "full-tests.log": "eb2985e14f479213a1f95216c24a4514c9d2da6eb007f19916dbd93389fcc2b1",
+    "local-tests.log": "fe6c7f6bae8bf2703d15e2a3ce168bef7ae31dceee4ec5e515800b21ed236cf2",
+    "render-report.json": "f1d380dcc5cfbb5a70889560c616775a8ebf97916270cd6a72c68d62bc503140",
+    "registry-preflight.json": "b271428d13fc37952e7de843eedffd6e6e79749bf9edc518609a8a6207d96b68",
+    "local-tests-final.log": "ec50f64e9b9accd066bd9a73b850a3805eec56d6d95fc5f1a47cc603f3b47877",
+    "restore-syntax-final.log": "c83f7b516134e6e510ae4a399c220b4d1a44c3e0b1ccd11de19a68cd190a38f0",
+    "publish-syntax-final.log": "970649d0e98f6a5a319e5c2b03d7febdfa0f0b4c4eecb6285a2769c2d65ebc3b"
+  },
+  "independent_hou4_console_operator_confirmed": true,
+  "temporary_recovery_grant_retained_for_authorized_followup": true,
+  "operator_private_identity_file_retained": false,
+  "live_nodes_modified": false,
+  "live_clean_host_restore_passed": false,
+  "wipe_checkpoint_released": false,
+  "production_promotion_approved": false,
+  "first_error_review": {
+    "ignored_resolver_unlock_removed": true,
+    "normal_files_and_symlinks_skip_unlock": true,
+    "needed_unlock_failure_stops_later_tasks": true,
+    "existing_rescues_end_in_failure": true,
+    "immediate_exit_callback_enabled": false
+  }
+}
