@@ -71,6 +71,11 @@
             fail_msg: The selected peer is not the disconnected lost HOU1 identity.
         - name: Pin exact managed monitoring and backup groups before retiring the peer
           ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-groups-before.yml
+        - name: Preserve the verified source-group plan before irreversible retirement
+          ansible.builtin.copy:
+            dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/source-groups-before.json'
+            content: "{{ {'lost_peer_id': host_recovery_lost_peer_id, 'source_groups': host_recovery_source_groups} | to_nice_json }}\n"
+            mode: '0600'
         - name: Retire that lost peer to release its declared address
           ansible.builtin.uri:
             url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'

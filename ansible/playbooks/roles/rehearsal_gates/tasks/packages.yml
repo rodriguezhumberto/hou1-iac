@@ -1,0 +1,6 @@
+---
+- name: Install the existing host inspection utilities
+  ansible.builtin.apt:
+    name: [nftables, curl, sysstat]
+    state: present
+

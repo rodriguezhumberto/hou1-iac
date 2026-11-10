@@ -126,6 +126,20 @@ Existing DNS and security roles verify
 fresh administrative VPN SSH before retiring public bootstrap access. Existing
 rehearsal gates restore persistent isolation and bounded Google egress.
 
+Once isolation is active, package tasks resolve the fixed Debian, Docker and
+NetBird repository names **on the target**, pin those same answers in a managed
+`/etc/hosts` block, and allow host TCP 80/443 to those addresses for at most
+30 minutes. Production denies still take precedence; containers gain no new
+forwarding permission. Ansible removes the pins and allowance in `always`,
+including when a package task fails. Production and hosts without an active
+test policy use ordinary package management.
+
+An interrupted controller can leave a protected lease receipt at
+`/var/lib/hou1-test-package-access.json`; firewall entries expire independently.
+Before retrying, finish cleanup using that receipt's token and the same policy:
+`python3 /usr/local/sbin/hou1-test-package-access POLICY --close-packages TOKEN`.
+Do not delete the receipt or hosts block to bypass a live concurrent operation.
+
 After private DNS reconciliation and the VPN SSH firewall rule, a bounded SSH
 readiness check waits for the restored VPN path before changing listeners. It polls only recognized transport
 errors; authentication, host-key and unexpected errors stop immediately. The
@@ -176,6 +190,11 @@ empty-host restore over installed databases.
 
 For a failure after publication, inspect the existing state and make only the
 verified repair needed before rerunning the affected management playbook.
+Publication itself is not replayable after it has exposed ingress or deleted
+the lost peer. If it stops before enrollment, preserve that failure and recover
+the exact pre-deletion source-group/policy plan from the selected recovery point
+before invoking the remaining roles in a separately recorded troubleshooting
+run. Empty groups alone do not establish ownership or authorize reassignment.
 Reapply `monitoring.yml` and `backups.yml` over VPN, then HOU4's backup receiver
 role with the verified HOU1 SSH host key. Existing group membership and policy
 ownership guards still apply; do not bypass them to adopt unknown groups.

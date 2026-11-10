@@ -1,0 +1,10 @@
+---
+- name: Install the native private exporter and collector dependencies
+  ansible.builtin.apt:
+    name: [prometheus-node-exporter, python3, logrotate]
+    state: present
+    policy_rc_d: 101
+    install_recommends: false
+    update_cache: true
+    cache_valid_time: 3600
+

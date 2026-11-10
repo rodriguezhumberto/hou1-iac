@@ -1,0 +1,64 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T09:34:13.248293+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "recovery_id": "replacement-20261110-04",
+  "infra_ref": "7cf3f0ea2216ed0e5189c477dbaa38da3e609c2d",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "clean_host_gate_complete": false,
+  "production_approved": false,
+  "restore": {
+    "succeeded": true,
+    "ok": 50,
+    "changed": 24,
+    "failed": 0,
+    "rescued": 0,
+    "ignored": 0,
+    "driver_seconds": 724.691,
+    "postgresql_tables": 187,
+    "cold_image_pull_and_uncached_build": true,
+    "sessions_reset_before_writers": true,
+    "identity_bootstrap_and_cms_seeding_run": false,
+    "authorization_comparisons_matched": 13
+  },
+  "publication": {
+    "succeeded": false,
+    "ok": 28,
+    "changed": 2,
+    "failed": 1,
+    "task": "netbird_client : Install NetBird repository prerequisites",
+    "cause": "VPS Docker CDN DNS answers absent from the controller-resolved package update allowlist; global APT cache refresh blocked.",
+    "ingress_already_published": true,
+    "lost_peer_already_deleted": true,
+    "replacement_peer_enrolled": false,
+    "two_exact_managed_source_groups_pinned_before_deletion": true,
+    "failed_phase_not_replayed": true
+  },
+  "controller_preflight": {
+    "helper_error_preserved": true,
+    "production_private_address_was_incorrectly_required_global": true,
+    "all_resolved_production_destinations_verified_denied_before_restore": true,
+    "actual_restore_inventory_preserved": true
+  },
+  "fix_validation": {
+    "target_resolved_fixed_repositories": 4,
+    "target_nft_check_exit": 0,
+    "focused_tests_passed": 5,
+    "repository_tests": 202,
+    "repository_tests_failed": 0,
+    "repository_tests_skipped": 1,
+    "playbook_syntax_checks_passed": 10
+  },
+  "remaining": "Validate repository access repair and continue existing-host troubleshooting; an uninterrupted clean-host gate remains pending.",
+  "continuation_preflight": {
+    "saved_source_group_plan_recovered": true,
+    "source_groups": 2,
+    "current_stored_policies_match_selected_snapshot": true,
+    "all_group_membership_changes_only_lost_peer_removal": true,
+    "lost_peer_absent_and_address_available": true,
+    "live_changes_made": false,
+    "original_failure_preserved": true
+  }
+}

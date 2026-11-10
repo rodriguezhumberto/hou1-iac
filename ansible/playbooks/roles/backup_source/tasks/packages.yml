@@ -1,0 +1,5 @@
+---
+- name: Install snapshot and transport dependencies
+  ansible.builtin.apt:
+    name: [age, python3, sudo]
+    state: present

@@ -19,10 +19,11 @@
         fail_msg: Supply the offline age recipient and a dedicated HOU4 export-only SSH key on established VPN hosts.
     - name: Reconcile the narrow backup transport policy
       ansible.builtin.import_tasks: policy.yml
-    - name: Install snapshot and transport dependencies
-      ansible.builtin.apt:
-        name: [age, python3, sudo]
-        state: present
+    - name: Install dependencies through bounded test repository access
+      ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
+      vars:
+        rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
+
     - name: Create fixed private backup directories
       ansible.builtin.file:
         path: '{{ item }}'
