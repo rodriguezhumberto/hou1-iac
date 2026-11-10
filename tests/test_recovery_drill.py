@@ -42,6 +42,17 @@ def request():
 
 
 class RecoveryPreparationTest(unittest.TestCase):
+    def test_origin_validation_precedes_default_port_normalization(self):
+        host = 'netbird-test.' + request()['test_suffix']
+        for value in ['https://' + host, 'https://' + host + ':443/']:
+            with self.subTest(value=value):
+                self.assertEqual(prepare.isolated_origin(value, request()['test_suffix']), 'https://' + host)
+        for value in ['http://' + host, 'https://' + host + ':8443',
+                      'https://user:password@' + host, 'https://netbird.example.invalid:443',
+                      'https://' + host + '.foreign.invalid', 'https://unsafe_host.' + request()['test_suffix']]:
+            with self.subTest(value=value), self.assertRaises(ValueError):
+                prepare.isolated_origin(value, request()['test_suffix'])
+
     def fixture(self, root):
         for folder in ['authentik', 'netbird-files/data', 'app-config/certbot/conf/live/shared',
                        'cms/database', 'cms/media']:
@@ -68,6 +79,25 @@ class RecoveryPreparationTest(unittest.TestCase):
                         '-keyout', str(cert / 'privkey.pem'), '-out', str(cert / 'fullchain.pem')],
                        capture_output=True, check=True)
         return root
+
+    @unittest.skipUnless(shutil.which('openssl'), 'openssl required')
+    def test_saved_netbird_default_port_matches_discovery_issuer(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            payload = self.fixture(root / 'payload')
+            origin = 'https://netbird-test.' + request()['test_suffix']
+            (payload / 'netbird-files/config.yaml').write_text(
+                yaml.safe_dump({'server': {'exposedAddress': origin + ':443'}}))
+            env = payload / 'app-config/.env'
+            env.write_text(env.read_text().replace(
+                'https://auth-test.vps-test.example.invalid/',
+                'https://auth-test.vps-test.example.invalid:443/'))
+            stage = root / 'stage'
+            prepare.prepare(request(), payload, stage)
+            cfg = json.loads((stage / 'drill-input.json').read_text())
+            self.assertEqual(cfg['netbird_origin'] + '/oauth2', origin + '/oauth2')
+            self.assertEqual(cfg['issuer'],
+                             'https://auth-test.vps-test.example.invalid:443/application/o/staff/')
 
     @unittest.skipUnless(shutil.which('openssl'), 'openssl required')
     def test_saved_shared_certificate_and_app_runtime_survive_preparation(self):

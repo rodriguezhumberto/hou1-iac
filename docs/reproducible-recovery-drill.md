@@ -131,3 +131,13 @@ database readiness, writer-stopped session cleanup, first-error refusal and
 controller cleanup after remote failure. A fresh live run of this committed
 entry point remains required, followed by the separate clean-OS recovery,
 external Google/VPN reconnection and cutover checks. Issue #27 remains open.
+
+The first Ansible run stopped at the NetBird discovery issuer assertion: the
+saved endpoint retained `:443`, while discovery omits the default HTTPS port.
+Preparation now validates saved URLs before canonicalizing service origins;
+the saved staff issuer and exact issuer checks are preserved. Eleven focused
+regressions and the recovery playbook syntax check pass. Cleanup preserved all
+primary container IDs/start times; subsequent health checks passed 23/23 with
+eight monitoring targets up and no active alerts. The corrected live attempt
+is pending operator authorization; no host wipe is required. See the
+[failed-attempt evidence](evidence/hou1-recovery-ansible-2026-11-10.json).

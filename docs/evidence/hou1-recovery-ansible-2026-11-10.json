@@ -1,0 +1,40 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T00:34:39.170659+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "attempt": "ansible-20261110-01",
+  "tested_infrastructure_revision": "932572e81da5cdf4dab0166402d956515d9e72fa",
+  "live_result": "failed-stopped-without-retry",
+  "ansible_exit_code": 2,
+  "failure": {
+    "phase": "http/initial",
+    "check": "NetBird discovery issuer exact match",
+    "cause": "Saved exposedAddress includes the default HTTPS port; discovery issuer omits it.",
+    "local_correction": "Validate original saved URLs, then canonicalize HTTPS service origins without :443; preserve saved staff issuer and exact issuer comparisons.",
+    "corrected_live_execution": "pending operator authorization"
+  },
+  "cleanup": {
+    "drill_containers_removed": true,
+    "drill_network_removed": true,
+    "primary_ids_starttimes_unchanged": true
+  },
+  "post_failure_health": {
+    "primary_checks_passed": 23,
+    "primary_checks_total": 23,
+    "monitoring_targets_up": 8,
+    "monitoring_targets_total": 8,
+    "active_alerts": 0
+  },
+  "local_validation": {
+    "focused_recovery_tests_passed": 11,
+    "recovery_playbook_syntax_check": "passed",
+    "logs_sha256": {
+      "default-port-recovery-tests.log": "5a32d42e5e017476af5d8218a500a219a1d1c268f268f2e9764ff5059a6f4653",
+      "default-port-syntax.log": "e0d41b5d724e71c8c1762a789478383b0a6ca5443e138638420b1f24a6aee271"
+    }
+  },
+  "host_wipe_required_for_this_failure": false,
+  "production_promotion_approved": false
+}

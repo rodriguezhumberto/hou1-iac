@@ -28,6 +28,17 @@ def environment(path):
     return values
 
 
+def isolated_origin(value, suffix):
+    # Validate the saved URL before reducing it to an origin. Discovery issuers
+    # omit the default HTTPS port; token validation still uses the exact issuer.
+    url = urlsplit(value)
+    if (url.scheme != 'https' or url.port not in (None, 443) or url.username or url.password
+            or not url.hostname or not url.hostname.endswith('.' + suffix)
+            or not re.fullmatch(r'[a-z0-9.-]+', url.hostname)):
+        raise ValueError('Recovered endpoint is outside the declared isolated test suffix')
+    return 'https://' + url.hostname
+
+
 def validate(request, metadata):
     project = request['project']
     if (request['environment'] != 'test' or metadata['environment'] != 'test'
@@ -62,17 +73,14 @@ def prepare(request, payload, output):
     app = environment(payload / 'app-config/.env')
     netbird = yaml.safe_load((payload / 'netbird-files/config.yaml').read_text())
     origins = {
-        'auth_origin': 'https://' + urlsplit(app['STAFF_OIDC_ISSUER']).hostname,
-        'staff_origin': 'https://' + urlsplit(app['STAFF_OIDC_REDIRECT_URI']).hostname,
-        'netbird_origin': netbird['server']['exposedAddress'].rstrip('/'),
-        'public_origin': app['PUBLIC_SITE_ORIGIN'].rstrip('/'),
+        key: isolated_origin(value, request['test_suffix'])
+        for key, value in {
+            'auth_origin': app['STAFF_OIDC_ISSUER'],
+            'staff_origin': app['STAFF_OIDC_REDIRECT_URI'],
+            'netbird_origin': netbird['server']['exposedAddress'],
+            'public_origin': app['PUBLIC_SITE_ORIGIN'],
+        }.items()
     }
-    for value in [*origins.values(), app['STAFF_OIDC_ISSUER'], app['STAFF_OIDC_REDIRECT_URI']]:
-        url = urlsplit(value)
-        if (url.scheme != 'https' or url.port not in (None, 443) or url.username or url.password
-                or not url.hostname or not url.hostname.endswith('.' + request['test_suffix'])
-                or not re.fullmatch(r'[a-z0-9.-]+', url.hostname)):
-            raise ValueError('Recovered endpoint is outside the declared isolated test suffix')
     if len(set(origins.values())) != 4:
         raise ValueError('Use distinct test service origins')
     root = request['root']
