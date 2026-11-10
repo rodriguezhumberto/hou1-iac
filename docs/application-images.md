@@ -96,3 +96,14 @@ Before closing #60: publish from merged `main`, deploy the digest to the existin
 test host, exercise rollback, collect a new encrypted recovery point, and run the
 component restore against its recorded artifact. Then prepare the clean-OS replay.
 Local fixtures do not replace these live gates.
+
+The existing-node rehearsal passed on 2026-11-10: private publication and pull,
+digest deployment, rollback to the retained pre-CI image, redeployment and an
+isolated digest-backed restore. All 29 recovery checks passed; the primary stack
+then passed 23 health checks and seven staff login/role checks, with eight
+monitoring targets up and no active alerts. Runtime bytes and primary storage
+were preserved. The temporary deployment age identity was removed. See the
+[recorded evidence](evidence/ci-image-deployment-2026-11-10.json).
+
+This first migration did not test rollback between two published CI digests.
+The clean-OS replay remains separate, and PR #61 stays dependent on PR #59.
