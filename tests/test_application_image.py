@@ -50,6 +50,16 @@ def add_receipt(payload, revision):
 
 
 class ApplicationArtifactTest(unittest.TestCase):
+    def test_tagged_webstack_deployment_cannot_skip_artifact_verification(self):
+        task = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[0]
+        task['tags'] = ['deploy']
+        variables = dict(application_image_reference='mutable:latest', application_image_revision='main',
+                         deploy_ref='main', application_image_registry_secret_source='/fixture/pull.enc.json',
+                         application_image_registry_age_key_file='/fixture/scoped.agekey')
+        result = run_plays([dict(variables=variables, tasks=[task])], extra_args=['--tags', 'deploy'])
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Require a CI digest and matching immutable source selection', result.stdout)
+
     def test_ansible_rejects_mutable_or_mismatched_source_selections_before_pull(self):
         task = yaml.safe_load((ROLES / 'application_image/tasks/main.yml').read_text())[0]
         valid = dict(application_image_reference=IMAGE, application_image_revision=REVISION, deploy_ref=REVISION,

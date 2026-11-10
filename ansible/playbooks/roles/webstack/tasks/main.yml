@@ -2,6 +2,8 @@
 - name: Verify the CI-built application before modifying the deployment
   ansible.builtin.include_role:
     name: application_image
+    apply:
+      tags: [deploy, webstack, ssl]
 
 - name: Pull from GitHub
   git:
