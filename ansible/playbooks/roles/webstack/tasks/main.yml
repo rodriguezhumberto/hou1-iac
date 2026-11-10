@@ -10,6 +10,8 @@
     repo: "{{ app_repo_pat }}"
     dest: "{{ app_directory }}"
     version: "{{ application_image_revision }}"
+    # A recovered checkout may retain a fetch rule for its old recovery branch.
+    refspec: "+{{ application_image_revision }}:refs/remotes/origin/hou1-deployment"
     update: yes
     force: yes
   no_log: true

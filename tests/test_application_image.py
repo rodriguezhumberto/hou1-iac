@@ -50,6 +50,29 @@ def add_receipt(payload, revision):
 
 
 class ApplicationArtifactTest(unittest.TestCase):
+    def test_recovered_single_branch_checkout_can_fetch_the_next_exact_release(self):
+        task = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[1]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'source'; checkout = root / 'checkout'; mirror = root / 'mirror.git'
+            def git(*args):
+                return subprocess.check_output(['git', *map(str, args)], stderr=subprocess.DEVNULL, text=True).strip()
+            git('init', '--initial-branch=recovery', source)
+            git('-C', source, 'config', 'user.name', 'Release fixture')
+            git('-C', source, 'config', 'user.email', 'fixture@example.invalid')
+            (source / 'README').write_text('old recovery release\n')
+            git('-C', source, 'add', 'README'); git('-C', source, 'commit', '-m', 'old')
+            git('clone', '--single-branch', '--branch', 'recovery', source, checkout)
+            (source / 'README').write_text('new CI release\n')
+            git('-C', source, 'commit', '-am', 'new')
+            git('-C', source, 'branch', '-m', 'release')
+            revision = git('-C', source, 'rev-parse', 'HEAD')
+            git('clone', '--bare', source, mirror)
+            self.assertIn('refs/heads/recovery:', git('-C', checkout, 'config', '--get', 'remote.origin.fetch'))
+            result = run_plays([dict(variables={'app_repo_pat': str(mirror), 'app_directory': str(checkout),
+                                                'application_image_revision': revision}, tasks=[task])])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(git('-C', checkout, 'rev-parse', 'HEAD'), revision)
+
     def test_existing_node_image_update_preserves_runtime_and_rejects_missing_file(self):
         tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
         names = ['Check the retained runtime file for an image-only update',
