@@ -16,6 +16,12 @@ include the package-access and controller-transport fixes, successful recovery,
 backup collection, real outage alerts and reboot. Its original failures remain
 preserved; it does not complete uninterrupted clean-host acceptance.
 
+The [CI-image clean attempt](evidence/hou1-ci-clean-host-recovery-2026-11-10-01.json)
+restored 187 PostgreSQL tables and matched 13 authorization tables. HOU4
+reconnected with its retained peer. Publication stopped because controller DNS
+verification preceded private resolver installation; that ordering is corrected.
+The failed attempt remains stopped, and a new clean run is required.
+
 ## Before wiping HOU1
 
 1. Confirm HOU4 provider-console login independently of NetBird. Restoring
@@ -158,7 +164,9 @@ old peer key at the same VPN address. Reconnect that client to refresh its map;
 extending SSH retries cannot fix the stale key. A dedicated test controller may
 declare `host_recovery_management_refresh_argv` in its private inventory. The
 publication play runs that command after replacement enrollment/group attachment
-and before private SSH verification, and stops if it fails. Do not target an
+and private resolver setup, before private SSH verification, and stops if it fails.
+The controller's split-DNS checks require the restored resolver to be running.
+Do not target an
 operator's personal VPN device. Check retained HOU4's map too and reconnect its
 NetBird daemon if necessary; preserve its monitoring data, identity and backups.
 

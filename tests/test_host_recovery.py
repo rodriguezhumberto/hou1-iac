@@ -176,6 +176,30 @@ class HostRecoveryPreparationTest(unittest.TestCase):
                 prepare.prepare(cfg, payload, bundle, images, root / 'escaped')
             self.assertFalse((root / 'escaped').exists())
 
+    def test_publication_starts_dns_before_controller_refresh_and_private_ssh(self):
+        play = yaml.safe_load((FILES.parents[2] / 'publish-test-recovery.yml').read_text())[0]
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            resolver, refreshed, cutover = [root / name for name in ['resolver', 'refreshed', 'cutover']]
+            tasks = []
+            for task in play['tasks']:
+                role = task.get('ansible.builtin.include_role', {}).get('name')
+                if role == 'netbird_dns':
+                    tasks.append({'ansible.builtin.file': {'path': str(resolver), 'state': 'touch'}})
+                elif task.get('ansible.builtin.include_tasks') == 'roles/host_recovery/tasks/refresh-management.yml':
+                    tasks.append({'ansible.builtin.include_tasks': str(FILES.parent / 'tasks/refresh-management.yml')})
+                elif role == 'security':
+                    tasks.append({'ansible.builtin.command': {'argv': ['python3', '-c',
+                        'from pathlib import Path; import sys; assert Path(sys.argv[1]).is_file(); Path(sys.argv[2]).touch()',
+                        str(refreshed), str(cutover)]}})
+            self.assertEqual(len(tasks), 3)
+            command = ['python3', '-c',
+                       'from pathlib import Path; import sys; assert Path(sys.argv[1]).is_file(); Path(sys.argv[2]).touch()',
+                       str(resolver), str(refreshed)]
+            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': command}, tasks=tasks)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(cutover.is_file())
+
     def test_live_inventory_and_missing_console_are_refused(self):
         plays = yaml.safe_load((FILES.parents[2] / 'restore-test-host.yml').read_text())
         guard = plays[0]['pre_tasks'][0]

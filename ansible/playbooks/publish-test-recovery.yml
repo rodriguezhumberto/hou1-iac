@@ -94,11 +94,11 @@
       block:
         - name: Verify empty groups and bind the enrolled replacement
           ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-groups-after.yml
-    - name: Refresh an explicitly configured dedicated controller VPN transport
-      ansible.builtin.include_tasks: roles/host_recovery/tasks/refresh-management.yml
     - name: Reconcile private DNS through the existing role
       ansible.builtin.include_role:
         name: netbird_dns
+    - name: Refresh an explicitly configured dedicated controller VPN transport
+      ansible.builtin.include_tasks: roles/host_recovery/tasks/refresh-management.yml
     - name: Verify private SSH before retiring bootstrap access
       ansible.builtin.include_role:
         name: security
