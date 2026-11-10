@@ -1,0 +1,21 @@
+---
+# Only publish-test-recovery.yml invokes this, after its isolated-test guards.
+- name: Validate the optional dedicated controller VPN reconnect command
+  ansible.builtin.assert:
+    that:
+      - host_recovery_management_refresh_argv is sequence
+      - host_recovery_management_refresh_argv is not string
+      - host_recovery_management_refresh_argv | length > 0
+      - host_recovery_management_refresh_argv | reject('string') | list | length == 0
+    fail_msg: Supply argv for the dedicated test controller transport only, without credentials.
+  when: host_recovery_management_refresh_argv is defined
+
+- name: Refresh the dedicated controller transport after replacing the remote peer key
+  ansible.builtin.command:
+    argv: '{{ host_recovery_management_refresh_argv }}'
+  delegate_to: localhost
+  become: false
+  timeout: 120
+  changed_when: true
+  no_log: true
+  when: host_recovery_management_refresh_argv is defined

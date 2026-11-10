@@ -66,6 +66,26 @@ class HostRecoveryPreparationTest(unittest.TestCase):
             self.assertTrue(marker.exists())
             self.assertFalse(later.exists())
 
+    def test_controller_refresh_is_explicit_and_failure_stops_handoff(self):
+        tasks = [{'ansible.builtin.include_tasks': str(FILES.parent / 'tasks/refresh-management.yml')}]
+        with tempfile.TemporaryDirectory() as directory:
+            marker = Path(directory) / 'refreshed'
+            command = ['python3', '-c', 'from pathlib import Path; import sys; Path(sys.argv[1]).touch()', str(marker)]
+            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': command}, tasks=tasks)])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(marker.exists())
+            plays = [guard_play({'host_recovery_management_refresh_argv': value}, tasks,
+                                'Validate the optional dedicated controller VPN reconnect command')
+                     for value in ['shell command', [], ['valid', 7]]]
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            marker.unlink()
+            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': ['false']}, tasks=tasks + [
+                {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}},
+            ])])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(marker.exists())
+
     def values(self):
         cfg = inputs()
         metadata = dict(environment='test', staff_revision=cfg['staff_revision'], recovery_files=[cfg['runtime_age_path']])

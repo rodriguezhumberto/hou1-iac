@@ -53,7 +53,8 @@
     "dns_regressions": {
       "passed": 3,
       "skipped": 1
-    }
+    },
+    "host_recovery_tests_passed": 13
   },
   "remaining": "Validate repository access repair and continue existing-host troubleshooting; an uninterrupted clean-host gate remains pending.",
   "continuation_preflight": {
@@ -83,6 +84,18 @@
       "infrastructure_revision": "799d4d69f0433848f562ae7cda7d9e2c7043f581"
     },
     "netbird_package_lease_cleanup_verified": true,
+    "original_failure_preserved": true
+  },
+  "continuation_02": {
+    "infra_ref": "44b078f9dd6546db1fafaaaf44197b15bb20adaa",
+    "dns_package_access_and_verification_passed": true,
+    "exit_code": 2,
+    "task": "security : Connect as the administrative user over NetBird from the controller",
+    "ssh_listeners_not_changed": true,
+    "cause": "Retained dedicated controller client cached the old HOU1 peer key at the replacement VPN address. Management connected did not imply an up-to-date peer map.",
+    "cached_peer_key_mismatch_verified": true,
+    "dedicated_controller_restart_refreshed_key": true,
+    "fresh_private_ssh_succeeded_after_reconnect": true,
     "original_failure_preserved": true
   }
 }

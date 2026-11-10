@@ -67,6 +67,9 @@ host_recovery_evidence_directory: /private/point/evidence
 host_recovery_access_reviewed: false      # remains false until reconciliation
 host_recovery_lost_peer_id: <pinned lost HOU1 peer ID>
 host_recovery_lost_peer_name: <pinned lost HOU1 peer name>
+# Optional argv to reconnect the dedicated test controller VPN client after
+# enrollment replaces HOU1's key. No shell expansion or credentials in argv.
+# host_recovery_management_refresh_argv: [path/to/dedicated-test-client-reconnect]
 ```
 
 Retain the existing `rehearsal_*`, `netbird_*`, `authentik_*`, operator key,
@@ -145,6 +148,15 @@ readiness check waits for the restored VPN path before changing listeners. It po
 errors; authentication, host-key and unexpected errors stop immediately. The
 final private SSH check after the listener change remains a single attempt.
 SSH rollback also disarms its fallback timer after restoring the old settings.
+
+A retained client can report management connected while caching the lost host's
+old peer key at the same VPN address. Reconnect that client to refresh its map;
+extending SSH retries cannot fix the stale key. A dedicated test controller may
+declare `host_recovery_management_refresh_argv` in its private inventory. The
+publication play runs that command after replacement enrollment/group attachment
+and before private SSH verification, and stops if it fails. Do not target an
+operator's personal VPN device. Check retained HOU4's map too and reconnect its
+NetBird daemon if necessary; preserve its monitoring data, identity and backups.
 
 ## Complete the recovery gate
 
