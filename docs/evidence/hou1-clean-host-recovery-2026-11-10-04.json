@@ -97,5 +97,136 @@
     "dedicated_controller_restart_refreshed_key": true,
     "fresh_private_ssh_succeeded_after_reconnect": true,
     "original_failure_preserved": true
+  },
+  "continued_private_handoff": {
+    "infra_ref": "af53719b1c636bdb4bcc245b269acd247a400282",
+    "exit_code": 0,
+    "ok": 81,
+    "changed": 33,
+    "failed": 0,
+    "public_checks": {
+      "staff_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "authentik_admin_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "netbird_api_public_ready": {
+        "status": 200,
+        "passed": true
+      },
+      "public_tcp_22_closed": {
+        "passed": true
+      },
+      "public_tcp_9100_closed": {
+        "passed": true
+      }
+    },
+    "operator_confirmations": {
+      "google_sign_in_succeeded": true,
+      "vpn_reconnect_succeeded": true,
+      "personal_hou1_ssh_key_succeeded": true,
+      "reported_at": "2026-11-10T10:02:57.238350+00:00"
+    },
+    "google_endpoint_connectivity": {
+      "authentik_container_verified_google_https": true,
+      "endpoints": {
+        "discovery": 200,
+        "token_endpoint": 404,
+        "signing_keys": 200
+      },
+      "token_request_without_credentials": true,
+      "recorded_at": "2026-11-10T09:57:17.186523+00:00"
+    }
+  },
+  "continued_operations": {
+    "monitoring_exit": 0,
+    "backup_source_exit": 0,
+    "hou4_backup_exit": 0,
+    "capture": {
+      "capture_succeeded": true,
+      "fresh_marker_verified": true,
+      "vpn_reachable_after_capture": true,
+      "duration_seconds": 106.12,
+      "recorded_at": "2026-11-10T10:03:35.104962+00:00"
+    },
+    "collection": {
+      "receipt": {
+        "schema": 1,
+        "received": 1794305072,
+        "sha256": "452a88283da7bc8dbfda4dc80dcddf91a6cb1462dd33f91f3119d190fd87060f",
+        "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+      },
+      "manifest": {
+        "schema": 1,
+        "environment": "test",
+        "created": 1794305005,
+        "id": "20261110T100325Z-2c2c91acd367",
+        "size": 29335107,
+        "sha256": "452a88283da7bc8dbfda4dc80dcddf91a6cb1462dd33f91f3119d190fd87060f"
+      },
+      "retained_points": 2,
+      "receiver_timer_enabled": true
+    },
+    "dashboard": {
+      "authenticated_dashboard_readback": true,
+      "title": "HOU1 Operations",
+      "provisioned": true,
+      "panels": 24
+    },
+    "real_discord_delivery": {
+      "fault": "operator-authorized HOU1 wipe and clean recovery",
+      "firing_delivery_accepted": true,
+      "resolved_delivery_accepted": true,
+      "before": {
+        "fault": "operator-authorized HOU1 wipe and clean recovery",
+        "observed_at": "2026-11-10T09:39:55.525563+00:00",
+        "sample": {
+          "pre_wipe_sent": 37.0,
+          "pre_wipe_failed": 0.0,
+          "firing": [
+            "Hou1CollectorUnavailable",
+            "Hou1PostgresqlUnavailable",
+            "Hou1RequestMetricsUnavailable",
+            "Hou4MetricsTargetDown"
+          ],
+          "alertmanager_active": [
+            "Hou1CollectorUnavailable",
+            "Hou1PostgresqlUnavailable",
+            "Hou1RequestMetricsUnavailable",
+            "Hou4MetricsTargetDown"
+          ],
+          "sent": 45.0,
+          "failed": 0.0
+        },
+        "required_alerts_observed": [
+          "Hou1CollectorUnavailable",
+          "Hou1PostgresqlUnavailable",
+          "Hou1RequestMetricsUnavailable",
+          "Hou4MetricsTargetDown"
+        ],
+        "alerts_remained_enabled": true
+      },
+      "resolved": {
+        "pre_wipe_sent": 37.0,
+        "pre_wipe_failed": 0.0,
+        "firing": [],
+        "alertmanager_active": [],
+        "sent": 49.0,
+        "failed": 0.0
+      },
+      "notification_failures_delta": 0,
+      "proof": "Real outage and recovery plus Alertmanager Discord acceptance counters; no operator screenshot of receipt",
+      "recorded_at": "2026-11-10T10:07:54.249873+00:00"
+    }
+  },
+  "controller_probe_finding": {
+    "routine_staff_probe_failed": true,
+    "cause": "Bare musl container did not apply OS split DNS. Public fallback resolvers raced private answers; using only the local split resolver then prevented public Authentik resolution.",
+    "scoped_fix": "Dedicated reconnect helper verifies private records through NetBird DNS and manages only those hosts pins while retaining public DNS.",
+    "private_mapping_and_public_dns_regressions_passed": 3,
+    "live_recheck_pending": true
   }
 }

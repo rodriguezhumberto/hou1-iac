@@ -158,6 +158,16 @@ and before private SSH verification, and stops if it fails. Do not target an
 operator's personal VPN device. Check retained HOU4's map too and reconnect its
 NetBird daemon if necessary; preserve its monitoring data, identity and backups.
 
+For this rehearsal's bare `hou1-vps-admin-test` container, use
+`[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --ssh-host,
+dev@192.168.0.151]` as the refresh argv. The helper restores public DNS before
+reconnecting, verifies the declared private records through NetBird DNS, then
+pins those records in a managed hosts block while retaining public resolution
+for Authentik. This avoids musl racing public DNS fallbacks against private
+answers. It preserves unmanaged hosts entries and the original resolver file,
+and refuses other management domains or client addresses. Normal OS VPN clients
+use their existing split-DNS integration instead.
+
 ## Complete the recovery gate
 
 Verify HOU4 reconnects with its retained peer; use its console if re-enrollment
