@@ -128,9 +128,9 @@ motivated this versioned workflow. It is not a live pass of this refactored role
 Local regression tests use generated certificates, synthetic databases and
 Ansible tasks. They cover shared certificate selection, preserved app runtime,
 database readiness, writer-stopped session cleanup, first-error refusal and
-controller cleanup after remote failure. A fresh live run of this committed
-entry point remains required, followed by the separate clean-OS recovery,
-external Google/VPN reconnection and cutover checks. Issue #27 remains open.
+controller cleanup after remote failure. The live result below covers this
+entry point; separate clean-OS recovery, external Google/VPN reconnection and
+cutover checks remain. Issue #27 remains open.
 
 The first Ansible run stopped at the NetBird discovery issuer assertion: the
 saved endpoint retained `:443`, while discovery omits the default HTTPS port.
@@ -138,6 +138,15 @@ Preparation now validates saved URLs before canonicalizing service origins;
 the saved staff issuer and exact issuer checks are preserved. Eleven focused
 regressions and the recovery playbook syntax check pass. Cleanup preserved all
 primary container IDs/start times; subsequent health checks passed 23/23 with
-eight monitoring targets up and no active alerts. The corrected live attempt
-is pending operator authorization; no host wipe is required. See the
+eight monitoring targets up and no active alerts. No host wipe was needed. See the
 [failed-attempt evidence](evidence/hou1-recovery-ansible-2026-11-10.json).
+
+The operator-authorized corrected attempt passed at infrastructure revision
+`95ca59eeb78d365001c407aa8736ffe4512b9c27`: Ansible completed 26 tasks with no
+failures, importing 187 PostgreSQL tables and passing six identity assertions
+and all 29 application/session/media/restart/rollback checks. Cleanup removed
+the drill containers, network and plaintext; primary container IDs/start times
+were unchanged. Post-test checks passed 23/23 with eight monitoring targets up
+and no active alerts. The temporary recovery identity was retired after the
+checks; the operator's encrypted archive remains intact. See the
+[successful-attempt evidence](evidence/hou1-recovery-ansible-2026-11-10-02.json).

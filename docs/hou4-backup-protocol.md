@@ -4,6 +4,11 @@ This implements the off-host collection needed for the recovery rehearsal in
 #27. It does not establish production readiness until a fresh-node restore has
 passed. Existing production data is never used as a test seed.
 
+The [versioned recovery playbook rehearsal](evidence/hou1-recovery-ansible-2026-11-10-02.json)
+passed all 29 application checks and six identity assertions on the existing
+test host. This proves isolated component recovery; clean-host recovery remains
+a separate gate.
+
 The [live HOU4 rehearsal](evidence/hou4-backup-live-2026-11-08.json) collected a
 32.4 MB encrypted point, verified transfer integrity, and passed Discord recovery
 and HOU4 reboot checks. The [interruption rehearsal](evidence/hou1-backup-interruption-2026-11-08.json)
