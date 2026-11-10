@@ -8,6 +8,9 @@ commands. Keep HOU4 and its retained backups intact.
 The isolated component drill in [PR #59](https://github.com/rodriguezhumberto/hou1-iac/pull/59)
 already passed. This clean-host workflow still needs its own live evidence.
 Local preparation, syntax checks and fixture tests do not complete that gate.
+The [continued-host troubleshooting evidence](evidence/hou1-recovery-iteration-2026-11-10-01.json)
+records the repaired host's monitoring, backup, alert, component recovery and
+reboot checks separately from an uninterrupted clean-host run.
 
 ## Before wiping HOU1
 

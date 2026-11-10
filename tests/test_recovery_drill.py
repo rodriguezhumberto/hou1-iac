@@ -261,6 +261,20 @@ class RecoveryRuntimeTest(unittest.TestCase):
                 self.assertNotIn(secrets['TEST_ADMIN_PASSWORD'], path.read_text())
                 self.assertNotIn(secrets['TEST_READER_PASSWORD'], path.read_text())
 
+    def test_missing_fixture_inputs_latch_failure_without_starting_authentication(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            (root / 'health-input.json').write_text('{}')
+            (root / 'start-result.json').write_text('{}')
+            with patch.object(driver, 'ROOT', root), patch.object(driver, 'config', return_value=request()), \
+                 patch.object(driver.subprocess, 'run') as execute:
+                with self.assertRaises(RuntimeError):
+                    driver.run('identity')
+                with self.assertRaises(ValueError):
+                    driver.run('identity')
+                execute.assert_not_called()
+            self.assertEqual(json.loads((root / 'first-error.json').read_text())['phase'], 'identity')
+
     def runtime(self, root):
         (root / 'drill-input.json').write_text(json.dumps(request()))
         path = root / 'runtime.py'

@@ -68,18 +68,18 @@ def run(phase):
     index = phases.index(phase)
     if index and not (ROOT / (phases[index - 1] + '-result.json')).exists():
         raise ValueError('Previous recovery phase has not passed')
-    inputs = None
-    if phase == 'identity':
-        command = compose(cfg, 'exec', '-T', '-e', 'RECOVERY_ADMIN_USERNAME=' + cfg['admin_username'],
-                          '-e', 'RECOVERY_READER_USERNAME=' + cfg['reader_username'], 'authentik-server', 'ak', 'shell')
-        probe = json.loads((ROOT / 'health-input.json').read_text())
-        credentials = {key: probe[key] for key in ('TEST_ADMIN_PASSWORD', 'TEST_READER_PASSWORD')}
-        # Send credentials through captured stdin, never Compose arguments or logs.
-        inputs = ('recovery_probe_secrets = ' + repr(credentials) + '\n').encode() + (ROOT / 'identity_smoke.py').read_bytes()
-    else:
-        command = [sys.executable, str(ROOT / {'build': 'build.py', 'start': 'runtime.py', 'http': 'check.py'}[phase])]
     result = {'phase': phase, 'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
     try:
+        inputs = None
+        if phase == 'identity':
+            command = compose(cfg, 'exec', '-T', '-e', 'RECOVERY_ADMIN_USERNAME=' + cfg['admin_username'],
+                              '-e', 'RECOVERY_READER_USERNAME=' + cfg['reader_username'], 'authentik-server', 'ak', 'shell')
+            probe = json.loads((ROOT / 'health-input.json').read_text())
+            credentials = {key: probe[key] for key in ('TEST_ADMIN_PASSWORD', 'TEST_READER_PASSWORD')}
+            # Send credentials through captured stdin, never Compose arguments or logs.
+            inputs = ('recovery_probe_secrets = ' + repr(credentials) + '\n').encode() + (ROOT / 'identity_smoke.py').read_bytes()
+        else:
+            command = [sys.executable, str(ROOT / {'build': 'build.py', 'start': 'runtime.py', 'http': 'check.py'}[phase])]
         with (ROOT / (phase + '-private.log')).open('xb') as output:
             process = subprocess.run(command, input=inputs, stdout=output, stderr=subprocess.STDOUT, timeout=1000)
         if process.returncode:
