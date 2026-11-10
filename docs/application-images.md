@@ -50,6 +50,12 @@ the verified image, and runs Compose with `--no-build` and existing health check
 Storage and ingress overrides continue to apply. The successful deployment writes
 `application-image.json` alongside Compose.
 
+The manifest digest is the portable artifact identity. The receipt's `image_id`
+records the local Docker engine's ID, which can differ between classic and
+containerd image stores for the same manifest. Recovery verifies the exact saved
+digest and runtime labels, then records the destination engine's ID for local
+container and future backup checks.
+
 For an existing node's image-only update, set
 `webstack_preserve_runtime_environment: true` to retain its `.env` byte for byte.
 This requires an existing regular file; it does not initialize a fresh host.

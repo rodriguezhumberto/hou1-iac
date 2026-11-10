@@ -141,9 +141,8 @@ def install(cfg):
     if receipt is not None:
         spec = importlib.util.spec_from_file_location('application_artifact', ROOT / 'artifact.py')
         artifact = importlib.util.module_from_spec(spec); spec.loader.exec_module(artifact)
-        artifact.validate_receipt(receipt, cfg['staff_revision'])
-        if artifact.verify(receipt['image'], cfg['staff_revision']) != receipt:
-            raise ValueError('Pulled application artifact differs from the recovery receipt')
+        receipt = artifact.verify_saved(receipt, cfg['staff_revision'])
+        cfg['application_image'] = receipt
     else:
         env = saved_environment(payload / 'app-config/.env')
         keys = ['PUBLIC_HCAPTCHA_SITE_KEY', 'PUBLIC_VAPID_PUBLIC_KEY', 'PUBLIC_SITE_ORIGIN',

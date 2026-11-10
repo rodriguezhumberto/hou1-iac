@@ -6,8 +6,8 @@ spec=importlib.util.spec_from_file_location('start',ROOT/'runtime.py');m=importl
 cfg=json.loads((ROOT/'drill-input.json').read_text());started=time.time()
 if 'application_image' in cfg:
  spec=importlib.util.spec_from_file_location('application_artifact',ROOT/'artifact.py');artifact=importlib.util.module_from_spec(spec);spec.loader.exec_module(artifact)
- receipt=artifact.validate_receipt(cfg['application_image'],cfg['staff_revision'])
- assert artifact.verify(receipt['image'],cfg['staff_revision'],pull=True)==receipt,'Pulled artifact differs from recovery receipt'
+ receipt=artifact.verify_saved(cfg['application_image'],cfg['staff_revision'],pull=True)
+ cfg['application_image']=receipt
  image=receipt['image_id']
  compose=json.loads((ROOT/'compose.json').read_text());compose['services']['astro-app']['image']=receipt['image'];(ROOT/'compose.json').write_text(json.dumps(compose,indent=2))
  (ROOT/'build-report.json').write_text(json.dumps(dict(staff_revision=cfg['staff_revision'],image_id=image,application_image=receipt,source='saved CI image digest',host_build=False),indent=2))

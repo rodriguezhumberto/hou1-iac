@@ -75,6 +75,17 @@ def running(root):
     return receipt
 
 
+def verify_saved(receipt, revision, pull=False):
+    """Verify the portable digest and record this Docker engine's local ID.
+
+    Classic Docker reports the config digest as Id; its containerd image store
+    can report the manifest digest. Both must resolve the saved manifest and
+    pass the same source, platform and runtime checks.
+    """
+    validate_receipt(receipt, revision)
+    return verify(receipt['image'], revision, pull=pull)
+
+
 def validate_compose(root, receipt):
     import yaml
     root = Path(root)

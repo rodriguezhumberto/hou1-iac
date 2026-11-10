@@ -153,6 +153,16 @@ class ApplicationArtifactTest(unittest.TestCase):
             with patch.object(artifact, 'run', side_effect=command), self.assertRaises(ValueError):
                 artifact.running(root)
 
+    def test_recovery_preserves_manifest_identity_across_docker_image_stores(self):
+        info = image_info(); info['Id'] = IMAGE.rsplit('@', 1)[1]
+        with patch.object(artifact, 'run', return_value=json.dumps([info]).encode()) as docker:
+            local = artifact.verify_saved(receipt(), REVISION)
+        self.assertEqual(local, {**receipt(), 'image_id': info['Id']})
+        self.assertEqual(docker.call_args.args, ('docker', 'image', 'inspect', IMAGE))
+        info['RepoDigests'] = [artifact.REPOSITORY + '@sha256:' + 'd' * 64]
+        with patch.object(artifact, 'run', return_value=json.dumps([info]).encode()), self.assertRaises(ValueError):
+            artifact.verify_saved(receipt(), REVISION)
+
     def test_image_compose_preserves_storage_ingress_and_other_services(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -231,7 +241,8 @@ class ApplicationArtifactTest(unittest.TestCase):
             (root / 'artifact.py').write_text((ROLES / 'application_image/files/artifact.py').read_text())
             (root / 'drill-input.json').write_text(json.dumps(dict(project='fixture', staff_revision=REVISION, application_image=receipt())))
             (root / 'compose.json').write_text(json.dumps({'services': {'astro-app': {'image': IMAGE}}}))
-            response = root / 'image.json'; response.write_text(json.dumps([image_info()]))
+            destination_image = image_info(); destination_image['Id'] = IMAGE.rsplit('@', 1)[1]
+            response = root / 'image.json'; response.write_text(json.dumps([destination_image]))
             log = root / 'commands'
             docker = root / 'docker'
             docker.write_text('#!/bin/sh\nprintf "%s\\n" "$*" >> "$COMMAND_LOG"\ncase "$1 $2" in\n "pull --platform") exit 0;;\n "image inspect") cat "$IMAGE_RESPONSE";;\n *) exit 91;;\nesac\n')
@@ -241,6 +252,7 @@ class ApplicationArtifactTest(unittest.TestCase):
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             report = json.loads((root / 'build-report.json').read_text())
             self.assertFalse(report['host_build'])
-            self.assertEqual(report['application_image'], receipt())
+            self.assertEqual(report['application_image'], {**receipt(), 'image_id': destination_image['Id']})
+            self.assertEqual(json.loads((root / 'drill-input.json').read_text())['app_image'], destination_image['Id'])
             self.assertEqual(log.read_text().splitlines(), ['pull --platform linux/amd64 ' + IMAGE, 'image inspect ' + IMAGE])
             self.assertFalse((root / 'build').exists())
