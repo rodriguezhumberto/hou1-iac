@@ -11,6 +11,10 @@ Local preparation, syntax checks and fixture tests do not complete that gate.
 The [continued-host troubleshooting evidence](evidence/hou1-recovery-iteration-2026-11-10-01.json)
 records the repaired host's monitoring, backup, alert, component recovery and
 reboot checks separately from an uninterrupted clean-host run.
+The [latest attempt and continued checks](evidence/hou1-clean-host-recovery-2026-11-10-04.json)
+include the package-access and controller-transport fixes, successful recovery,
+backup collection, real outage alerts and reboot. Its original failures remain
+preserved; it does not complete uninterrupted clean-host acceptance.
 
 ## Before wiping HOU1
 
