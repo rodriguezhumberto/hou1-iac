@@ -13,6 +13,37 @@ from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
+    def test_recovery_waits_after_vpn_firewall_before_listener_cutover(self):
+        security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
+        index = next(i for i, task in enumerate(security) if task['name'] ==
+                     'Wait for the restored VPN path before changing SSH listeners')
+        publish = yaml.safe_load((ROOT / 'ansible/playbooks/publish-test-recovery.yml').read_text())[0]
+        role = next(task for task in publish['tasks'] if task.get('ansible.builtin.include_role', {}).get('name') == 'security')
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            firewall, listener, proof = (root / name for name in ['vpn-firewall', 'listener', 'proof'])
+            listener.write_text('public-bootstrap')
+            ssh = root / 'ssh'
+            ssh.write_text('#!' + sys.executable + '\n' +
+                           'from pathlib import Path\n' +
+                           f'assert Path({str(firewall)!r}).exists(), "VPN SSH firewall rule missing"\n' +
+                           f'assert Path({str(listener)!r}).read_text()=="public-bootstrap", "Listener changed too soon"\n' +
+                           f'Path({str(proof)!r}).touch()\n')
+            ssh.chmod(0o755)
+            tasks = copy.deepcopy(security[:index + 1])
+            for task in tasks:
+                if 'community.general.ufw' in task:
+                    task.pop('community.general.ufw')
+                    # Substitute only host firewall mutation, retaining task order.
+                    task['ansible.builtin.file'] = {'path': str(firewall if task['name'] == 'Allow SSH through NetBird' else root / 'public-firewall'), 'state': 'touch'}
+                if 'ansible.builtin.include_tasks' in task:
+                    task['ansible.builtin.include_tasks'] = str(ROLES / 'security/tasks/verify-access.yml')
+            result = run_play({**netbird_vars(), **role['vars']}, [{
+                'block': tasks, 'environment': {'PATH': directory + ':' + os.environ['PATH']}}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(proof.exists())
+            self.assertEqual(listener.read_text(), 'public-bootstrap')
+
     def test_initial_bootstrap_arms_public_fallback_until_netbird_probe(self):
         source = ROLES / 'security/tasks/main.yml'
         security = yaml.safe_load(source.read_text())

@@ -83,13 +83,11 @@
     - name: Reconcile private DNS through the existing role
       ansible.builtin.include_role:
         name: netbird_dns
-    - name: Wait for the restored VPN path before changing SSH listeners
-      ansible.builtin.include_tasks: roles/security/tasks/verify-access.yml
-      vars:
-        security_netbird_wait_for_transport: true
     - name: Verify private SSH before retiring bootstrap access
       ansible.builtin.include_role:
         name: security
+      vars:
+        security_netbird_wait_before_cutover: true
     - name: Use the verified private management path for subsequent tasks
       ansible.builtin.set_fact:
         ansible_host: '{{ netbird_ip }}'

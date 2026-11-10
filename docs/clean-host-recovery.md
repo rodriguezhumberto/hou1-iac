@@ -115,8 +115,8 @@ and restores its declared address/group. Existing DNS and security roles verify
 fresh administrative VPN SSH before retiring public bootstrap access. Existing
 rehearsal gates restore persistent isolation and bounded Google egress.
 
-After private DNS reconciliation, a bounded SSH readiness check waits for the
-restored VPN path before changing listeners. It polls only recognized transport
+After private DNS reconciliation and the VPN SSH firewall rule, a bounded SSH
+readiness check waits for the restored VPN path before changing listeners. It polls only recognized transport
 errors; authentication, host-key and unexpected errors stop immediately. The
 final private SSH check after the listener change remains a single attempt.
 SSH rollback also disarms its fallback timer after restoring the old settings.
