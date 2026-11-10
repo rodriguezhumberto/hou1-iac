@@ -89,7 +89,8 @@ def prepare(request, payload, source_bundle, image_lock, output):
     web = yaml.safe_load((payload / 'app-config/docker-compose.yml').read_text())
     if (set(auth['services']) != {'postgresql', 'authentik-server', 'authentik-worker'}
             or set(vpn['services']) != {'netbird-server', 'dashboard'}
-            or vpn['services']['netbird-server']['image'] != 'netbirdio/netbird-server:0.82.0'
+            or vpn['services']['netbird-server']['image'] not in (
+                'netbirdio/netbird-server:0.82.0', lock['netbird-server'])
             or set(web['services']) != {'astro-app', 'nginx', 'uptime-kuma'}):
         raise ValueError('Unexpected saved services or NetBird release')
     for config in [auth, vpn, web]:

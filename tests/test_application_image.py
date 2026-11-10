@@ -208,6 +208,10 @@ class ApplicationArtifactTest(unittest.TestCase):
             add_receipt(payload, cfg['staff_revision'])
             lock = json.loads(lock_path.read_text()); lock.pop('node'); lock['astro-app'] = IMAGE
             lock_path.write_text(json.dumps(lock))
+            vpn_path = payload / 'netbird-files/compose.yaml'
+            vpn = yaml.safe_load(vpn_path.read_text())
+            vpn['services']['netbird-server']['image'] = lock['netbird-server']
+            vpn_path.write_text(yaml.safe_dump(vpn))
             output = root / 'prepared'
             host.prepare.prepare(cfg, payload, bundle, lock_path, output)
             self.assertFalse((output / 'Dockerfile.recovery').exists())
