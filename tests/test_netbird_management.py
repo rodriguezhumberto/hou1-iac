@@ -4,16 +4,58 @@ Run: python3 -m unittest discover -s tests -v
 No VPS, VPN enrollment, credentials, or Docker daemon is used.
 """
 import base64
+import copy
 import json
 import os
 from pathlib import Path
 import tempfile
 import unittest
 
+import yaml
+
 from helpers import ROLES, guard_play, netbird_vars, run_play, run_plays
 
 
 class ManagementTest(unittest.TestCase):
+    def test_recovery_ssh_readiness_retries_only_transport_errors(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            counter = root / 'attempts'
+            ssh = root / 'ssh'
+            ssh.write_text('''#!/usr/bin/python3
+from pathlib import Path
+import os,sys
+path=Path(os.environ['PROBE_COUNTER'])
+count=int(path.read_text())+1 if path.exists() else 1
+path.write_text(str(count))
+mode=os.environ['PROBE_MODE']
+if mode=='transient' and count>1:sys.exit(0)
+errors={'transient':'Connection closed by UNKNOWN port 65535',
+        'auth':'Permission denied (publickey).',
+        'hostkey':'Host key verification failed; connection timed out',
+        'unexpected':'Bad configuration option: fixture',
+        'unavailable':'Connection refused'}
+print(errors[mode],file=sys.stderr)
+sys.exit(255)
+''')
+            ssh.chmod(0o755)
+            tasks = yaml.safe_load((ROLES / 'security/tasks/verify-access.yml').read_text())
+            for mode, polling, expected_count, success in [
+                ('transient', True, 2, True), ('auth', True, 1, False),
+                ('hostkey', True, 1, False), ('unexpected', True, 1, False),
+                ('unavailable', True, 13, False), ('transient', False, 1, False),
+            ]:
+                with self.subTest(mode=mode, polling=polling):
+                    counter.unlink(missing_ok=True)
+                    fixture = copy.deepcopy(tasks)
+                    fixture[0]['delay'] = 0  # Preserve retry/error logic, shorten only fixture time.
+                    fixture[0]['environment'] = {
+                        'PATH': directory + ':' + os.environ['PATH'],
+                        'PROBE_COUNTER': str(counter), 'PROBE_MODE': mode}
+                    result = run_play({**netbird_vars(), 'security_netbird_wait_for_transport': polling}, fixture)
+                    self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
+                    self.assertEqual(int(counter.read_text()), expected_count)
+
     def test_fresh_ssh_probe_preserves_pinned_proxy_arguments(self):
         with tempfile.TemporaryDirectory() as directory:
             capture = Path(directory) / 'argv.json'

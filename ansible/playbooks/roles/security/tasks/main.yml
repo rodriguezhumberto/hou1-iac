@@ -282,6 +282,13 @@
         name: ssh
         state: reloaded
 
+    - name: Disarm the bootstrap fallback after restoring SSH on failure
+      ansible.builtin.systemd:
+        name: ansible-ssh-bootstrap-fallback.timer
+        enabled: false
+        state: stopped
+      when: node_bootstrap | bool
+
     - name: Stop after restoring the previous listener
       ansible.builtin.fail:
         msg: >-
