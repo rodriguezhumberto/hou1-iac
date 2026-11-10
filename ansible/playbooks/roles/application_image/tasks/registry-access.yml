@@ -1,0 +1,39 @@
+---
+- name: Default to ordinary registry access outside active test isolation
+  ansible.builtin.set_fact:
+    application_image_isolation_config: ''
+    application_image_registry_lease: {}
+
+- name: Locate only the explicitly isolated test policy
+  when:
+    - cms_environment | default('') == 'test'
+    - inventory_hostname in groups.get('isolated_test_vps', [])
+    - inventory_hostname not in groups.get('prod_env', [])
+  block:
+    - name: Check installed and replacement-host isolation inputs
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - /etc/hou1-test-gates/isolation.json
+        - '/var/lib/hou1-host-recovery/{{ host_recovery_id | default("not-selected") }}/isolation.json'
+      register: application_image_isolation_configs
+    - name: Select the existing policy without broadening persistent egress
+      ansible.builtin.set_fact:
+        application_image_isolation_config: '{{ (application_image_isolation_configs.results | selectattr("stat.exists") | map(attribute="item") | list | first) | default("") }}'
+
+- name: Open bounded host-only HTTPS access to the fixed GHCR endpoints
+  when: application_image_isolation_config | length > 0
+  block:
+    - name: Install the test registry lease helper
+      ansible.builtin.copy:
+        src: '{{ role_path }}/../rehearsal_gates/files/isolation.py'
+        dest: /usr/local/libexec/hou1-test-registry-access
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Resolve and pin GHCR for this artifact operation
+      ansible.builtin.command:
+        argv: [python3, /usr/local/libexec/hou1-test-registry-access, '{{ application_image_isolation_config }}', --open-registry]
+      register: application_image_registry_lease
+      changed_when: true
+      no_log: true

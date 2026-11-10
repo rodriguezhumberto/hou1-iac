@@ -13,6 +13,9 @@
 
 - name: Use registry access only for this operation
   block:
+    - name: Lease fixed registry destinations only on isolated test hosts
+      ansible.builtin.include_tasks: registry-access.yml
+
     - name: Read the scoped pull credential on the controller
       ansible.builtin.command:
         argv: [sops, --decrypt, --output-type, json, '{{ application_image_registry_secret_source }}']
@@ -45,12 +48,23 @@
       changed_when: true
       no_log: true
   always:
-    - name: Remove the registry credential directory even after a failed pull
-      ansible.builtin.file:
-        path: '{{ application_image_docker_config.path }}'
-        state: absent
-      no_log: true
-    - name: Discard the decrypted pull credential from subsequent task variables
-      ansible.builtin.set_fact:
-        application_image_registry_secrets: {}
-      no_log: true
+    - name: Remove both credential and network leases even if either cleanup fails
+      block:
+        - name: Remove the registry credential directory even after a failed pull
+          ansible.builtin.file:
+            path: '{{ application_image_docker_config.path }}'
+            state: absent
+          no_log: true
+        - name: Discard the decrypted pull credential from subsequent task variables
+          ansible.builtin.set_fact:
+            application_image_registry_secrets: {}
+          no_log: true
+      always:
+        - name: Close temporary registry destinations and DNS pins after success or failure
+          ansible.builtin.command:
+            argv: [python3, /usr/local/libexec/hou1-test-registry-access, '{{ application_image_isolation_config }}', --close-registry, '{{ (application_image_registry_lease.stdout | from_json).token }}']
+          when:
+            - application_image_isolation_config | default('') | length > 0
+            - application_image_registry_lease.rc | default(-1) == 0
+          changed_when: true
+          no_log: true

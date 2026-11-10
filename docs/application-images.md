@@ -32,6 +32,16 @@ operation, including ordinary failure paths. A hard controller/process interrupt
 may require removing its leftover `hou1-ghcr-*` directory from target `/tmp` and
 revoking the temporary pull credential.
 
+On an already isolated test node, the registry operation resolves and pins only
+`ghcr.io` and `pkg-containers.githubusercontent.com`. It grants the host HTTPS
+access to those addresses for at most 30 minutes and removes its DNS pins and
+temporary destinations after success or failure. Explicit production denies
+still win; workload container egress is not granted. This avoids relying on stale
+CDN addresses in the test allowlist. A controller interruption can leave the
+root-only `/var/lib/hou1-test-registry-access.json` lease receipt and its marked
+`/etc/hosts` block: finish cleanup with the installed helper and receipt token
+before retrying. Firewall destination entries expire even if cleanup is interrupted.
+
 Ansible pulls the explicit digest and checks its architecture, source repository,
 source revision, unprivileged runtime user and offboarding schema before changing
 the application deployment. It keeps the matching source checkout for Compose,
