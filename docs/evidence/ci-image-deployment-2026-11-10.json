@@ -1,0 +1,55 @@
+{
+  "scope": "Controller-only validation of CI image deployment and recovery integration",
+  "tested_code_revision": "f4789547ce83f8a23a79781dfde252a6ef9566a5",
+  "base_recovery_revision": "31e35b4118737b62865c67eafbbbcc145b1e6fc6",
+  "application_issue": "https://github.com/rodriguezhumberto/pearland-paws/issues/57",
+  "application_pr": "https://github.com/rodriguezhumberto/pearland-paws/pull/58",
+  "registry": "private GHCR",
+  "publication": "manual workflow_dispatch from main; deployment remains explicit",
+  "checks": {
+    "ansible_syntax": {
+      "passed": 8
+    },
+    "initial_repository_suite": {
+      "total": 215,
+      "passed": 213,
+      "failed": 1,
+      "skipped": 1,
+      "failure": "Nginx parser was not configured on this controller",
+      "skip": "Native dnsmasq integration: DNSMASQ_BIN unavailable"
+    },
+    "nginx_and_final_focused_recheck": {
+      "passed": 31,
+      "nginx_parser": "Docker nginx:1.28-alpine wrapper, as in CI"
+    },
+    "final_artifact_and_encrypted_backup_recheck": {
+      "passed": 23
+    },
+    "final_private_registry_guards": {
+      "passed": 9
+    },
+    "diff_check": "passed"
+  },
+  "verified": [
+    "Mutable/untrusted image refs rejected before pull",
+    "Source labels, architecture and runtime contract checked",
+    "Compose keeps persistent mounts, ingress and other services while removing app build",
+    "Private registry credentials cleaned after operation failure without log disclosure",
+    "Encrypted recovery capture/extraction preserves artifact receipt",
+    "Component image phase uses exact saved digest without git archive or Docker build",
+    "Cold recovery preparation requires saved app digest instead of Node build-base lock",
+    "Incomplete or contradictory digest recovery metadata rejected"
+  ],
+  "vps_changes": false,
+  "live_registry_publication": false,
+  "live_authenticated_pull": false,
+  "live_digest_deployment": false,
+  "live_digest_restore": false,
+  "remaining": [
+    "Merge prerequisites and rebase dependent infrastructure PR before final CI",
+    "Manually publish app release from merged main and verify private GHCR metadata",
+    "Supply scoped SOPS read-only registry access",
+    "Test digest deployment and rollback on existing test HOU1",
+    "Capture and restore a digest-backed recovery point before final clean-host replay"
+  ]
+}
