@@ -41,8 +41,10 @@ Local preparation, syntax checks and fixture tests do not complete that gate.
    reinstall; establish key authentication before running Ansible.
 
 The controller must finish these checks and explicitly release the wipe
-checkpoint. Wipe **HOU1 only**. A failure later requires stopping, preserving
-evidence, fixing locally and waiting for a new operator-confirmed clean attempt.
+checkpoint. Wipe **HOU1 only**. A failure ends that clean attempt. Preserve its
+evidence before fixing the problem; a new clean attempt needs another
+operator-confirmed wipe. The operator may instead authorize the troubleshooting
+workflow below while keeping the current nodes.
 
 ## Inputs
 
@@ -145,6 +147,13 @@ accepting the restored system. Record time and data recovered separately from
 provisioning and operator pauses. Keep issues #27/#39 open until their criteria
 are met; this workflow does not authorize production promotion.
 
+For the component drill, supply the test fixture passwords associated with the
+selected recovery point, from its recovered encrypted application bundle. A
+controller's current health-check credentials may belong to another deployment.
+The identity phase verifies both supplied passwords against the recovered hashes
+without changing them, before attempting OIDC logins. A mismatch needs corrected
+private probe inputs, never password resets or fresh identity seeds.
+
 ## First error and cleanup
 
 Use one controller invocation per phase and latch any nonzero result before
@@ -152,7 +161,30 @@ proceeding. The restore driver also writes `first-error.json` and refuses a
 second attempt or completed phase. Script failures stop the restored ingress
 and application/IdP/NetBird writers, retaining protected diagnostics. Do not
 remove failure markers and resume. Keep the failed host until evidence is saved;
-after correction, wait for operator approval of the next clean attempt.
+after correction, wait for operator approval of the next clean attempt or
+explicit authorization to troubleshoot on the existing hosts.
+
+### Troubleshooting without another wipe
+
+Keep the original failure marker, logs and immutable phase refs. Record each
+subsequent invocation in a separate private iteration directory with its actual
+revision and result. Never clear a failed recovery marker or rerun the
+empty-host restore over installed databases.
+
+For a failure after publication, inspect the existing state and make only the
+verified repair needed before rerunning the affected management playbook.
+Reapply `monitoring.yml` and `backups.yml` over VPN, then HOU4's backup receiver
+role with the verified HOU1 SSH host key. Existing group membership and policy
+ownership guards still apply; do not bypass them to adopt unknown groups.
+Preserve the checked repair separately from the automated recovery evidence.
+
+Use these iterations to prove metrics, backup capture/collection, alert delivery,
+component restore and reboot behavior. Continue until those downstream checks
+pass or another failure needs diagnosis. A further wipe becomes useful when
+the remaining question is whether the corrected sequence works from empty
+Debian, including retiring the lost peer and reassigning its groups. Passing
+downstream checks on a repaired host does not prove that transition or complete
+the uninterrupted clean-host gate. Leave HOU4 intact throughout.
 
 The shared preparation role checks resolver attributes before attempting an
 immutable-file unlock; an unlock failure is fatal. Existing bounded readiness

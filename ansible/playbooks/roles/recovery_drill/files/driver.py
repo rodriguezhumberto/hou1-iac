@@ -72,7 +72,10 @@ def run(phase):
     if phase == 'identity':
         command = compose(cfg, 'exec', '-T', '-e', 'RECOVERY_ADMIN_USERNAME=' + cfg['admin_username'],
                           '-e', 'RECOVERY_READER_USERNAME=' + cfg['reader_username'], 'authentik-server', 'ak', 'shell')
-        inputs = (ROOT / 'identity_smoke.py').read_bytes()
+        probe = json.loads((ROOT / 'health-input.json').read_text())
+        credentials = {key: probe[key] for key in ('TEST_ADMIN_PASSWORD', 'TEST_READER_PASSWORD')}
+        # Send credentials through captured stdin, never Compose arguments or logs.
+        inputs = ('recovery_probe_secrets = ' + repr(credentials) + '\n').encode() + (ROOT / 'identity_smoke.py').read_bytes()
     else:
         command = [sys.executable, str(ROOT / {'build': 'build.py', 'start': 'runtime.py', 'http': 'check.py'}[phase])]
     result = {'phase': phase, 'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
@@ -87,6 +90,8 @@ def run(phase):
                     write('identity-report.json', json.loads(line.split('=', 1)[1]))
             if not (ROOT / 'identity-report.json').exists():
                 raise ValueError('Missing identity assertions')
+            if not json.loads((ROOT / 'identity-report.json').read_text()).get('fixture_passwords_match_recovery_point'):
+                raise ValueError('Missing recovered fixture credential verification')
         if phase == 'http':
             report = json.loads((ROOT / 'http-report.json').read_text())
             if not report['passed']:

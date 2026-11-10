@@ -1,5 +1,7 @@
 """Recovery regressions use generated certificates and synthetic data, never VPS keys."""
+import ast
 import copy
+import hashlib
 import importlib.util
 import json
 import os
@@ -216,6 +218,49 @@ class RecoveryPreparationTest(unittest.TestCase):
 
 
 class RecoveryRuntimeTest(unittest.TestCase):
+    def test_saved_fixture_hashes_are_checked_without_resetting_users_or_exposing_values(self):
+        tree = ast.parse((FILES / 'identity_smoke.py').read_text())
+        function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'verify_fixture_passwords')
+        namespace = {}
+        exec(compile(ast.Module(body=[function], type_ignores=[]), '<fixture-check>', 'exec'), namespace)
+        credentials = {'TEST_ADMIN_PASSWORD': 'fixture-admin-password', 'TEST_READER_PASSWORD': 'fixture-reader-password'}
+        digest = lambda value: hashlib.sha256(value.encode()).hexdigest()
+        users = [(SimpleNamespace(password=digest(value)), key) for key, value in credentials.items()]
+        before = [user.password for user, _ in users]
+        verify = namespace['verify_fixture_passwords']
+        checker = lambda raw, encoded: digest(raw) == encoded
+        verify(users, credentials, checker)
+        for supplied in [{}, {**credentials, 'TEST_ADMIN_PASSWORD': 'stale-fixture-password'},
+                         {**credentials, 'TEST_READER_PASSWORD': None}]:
+            with self.subTest(keys=list(supplied)), self.assertRaises(ValueError) as error:
+                verify(users, supplied, checker)
+            self.assertIn('selected point', str(error.exception))
+            for value in [*credentials.values(), *before, 'stale-fixture-password']:
+                self.assertNotIn(value, str(error.exception))
+        self.assertEqual([user.password for user, _ in users], before)
+
+    def test_fixture_credentials_use_stdin_before_any_http_login(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            secrets = {'TEST_ADMIN_PASSWORD': 'synthetic-admin', 'TEST_READER_PASSWORD': 'synthetic-reader'}
+            (root / 'health-input.json').write_text(json.dumps(secrets))
+            (root / 'identity_smoke.py').write_text('# fixture identity verification\n')
+            (root / 'start-result.json').write_text('{}')
+            def execute(command, **kwargs):
+                self.assertNotIn(secrets['TEST_ADMIN_PASSWORD'], ' '.join(command))
+                self.assertNotIn(secrets['TEST_READER_PASSWORD'], ' '.join(command))
+                payload = ast.parse(kwargs['input'].decode())
+                self.assertEqual(ast.literal_eval(payload.body[0].value), secrets)
+                kwargs['stdout'].write(b'RECOVERY_IDENTITY_REPORT={"fixture_passwords_match_recovery_point": true}\n')
+                return subprocess.CompletedProcess(command, 0)
+            with patch.object(driver, 'ROOT', root), patch.object(driver, 'config', return_value=request()), \
+                 patch.object(driver.subprocess, 'run', side_effect=execute):
+                self.assertTrue(driver.run('identity')['passed'])
+            self.assertFalse((root / 'http-result.json').exists())
+            for path in root.glob('*-report.json'):
+                self.assertNotIn(secrets['TEST_ADMIN_PASSWORD'], path.read_text())
+                self.assertNotIn(secrets['TEST_READER_PASSWORD'], path.read_text())
+
     def runtime(self, root):
         (root / 'drill-input.json').write_text(json.dumps(request()))
         path = root / 'runtime.py'
