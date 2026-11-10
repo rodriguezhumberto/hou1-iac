@@ -103,9 +103,13 @@ def endpoint_batch(hosts, existing_sets, prefix, ttl, ports):
 
 
 def package_sets():
+    return {item['set']['name'] for item in table_items() if 'set' in item}
+
+
+def table_items():
     result = subprocess.run(['nft', '-j', 'list', 'table', 'inet', TABLE],
                             check=True, capture_output=True, text=True, timeout=15)
-    return {item['set']['name'] for item in json.loads(result.stdout)['nftables'] if 'set' in item}
+    return json.loads(result.stdout)['nftables']
 
 
 def close_packages(token):
@@ -142,11 +146,25 @@ def open_packages(config):
     print(json.dumps(receipt))
 
 
+def registry_cleanup_batch(items):
+    lines = []
+    names = {'registry4', 'registry6'}
+    for item in items:
+        rule = item.get('rule', {})
+        if any('"@' + name + '"' in json.dumps(rule.get('expr', [])) for name in names):
+            assert rule['family'] == 'inet' and rule['table'] == TABLE
+            assert rule['chain'] in {'host_output', 'egress_guard'}
+            lines.append(f"delete rule inet {TABLE} {rule['chain']} handle {int(rule['handle'])}")
+    for name in sorted({item['set']['name'] for item in items if 'set' in item} & names):
+        lines.append(f'delete set inet {TABLE} {name}')
+    return '\n'.join(lines) + '\n'
+
+
 def close_registry(token):
     receipt = json.loads(REGISTRY_RECEIPT.read_text())
     assert secrets.compare_digest(receipt['token'], token), 'Registry lease token mismatch'
     package_hosts({}, REGISTRY_BEGIN, REGISTRY_END)
-    load_batch(endpoint_batch({}, package_sets(), 'registry', REGISTRY_TTL_SECONDS, '443'))
+    load_batch(registry_cleanup_batch(table_items()))
     REGISTRY_RECEIPT.unlink()
 
 

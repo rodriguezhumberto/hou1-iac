@@ -55,6 +55,7 @@ class RegistryIsolationTest(unittest.TestCase):
                     patch.object(isolation, 'REGISTRY_RECEIPT', receipt), \
                     patch.object(isolation, 'endpoint_targets', return_value={'ghcr.io': ['140.82.113.33']}), \
                     patch.object(isolation, 'package_sets', return_value={'registry4', 'registry6'}), \
+                    patch.object(isolation, 'table_items', return_value=[{'set': {'name': 'registry4'}}, {'set': {'name': 'registry6'}}]), \
                     patch.object(isolation, 'load_batch') as nft, contextlib.redirect_stdout(io.StringIO()):
                 isolation.open_registry(config()); token = json.loads(receipt.read_text())['token']
                 self.assertEqual(receipt.stat().st_mode & 0o777, 0o600)
@@ -75,6 +76,7 @@ class RegistryIsolationTest(unittest.TestCase):
                     patch.object(isolation, 'REGISTRY_RECEIPT', receipt), \
                     patch.object(isolation, 'endpoint_targets', return_value={'ghcr.io': ['140.82.113.33']}), \
                     patch.object(isolation, 'package_sets', return_value={'registry4', 'registry6'}), \
+                    patch.object(isolation, 'table_items', return_value=[{'set': {'name': 'registry4'}}, {'set': {'name': 'registry6'}}]), \
                     patch.object(isolation, 'load_batch', side_effect=[RuntimeError('open failed'), None]):
                 with self.assertRaisesRegex(RuntimeError, 'open failed'): isolation.open_registry(config())
                 self.assertFalse(receipt.exists())
@@ -82,6 +84,22 @@ class RegistryIsolationTest(unittest.TestCase):
                 with patch.object(isolation, 'load_batch', side_effect=RuntimeError('cleanup failed')):
                     with self.assertRaisesRegex(RuntimeError, 'cleanup failed'): isolation.close_registry('fixture')
                 self.assertTrue(receipt.exists())
+
+    def test_cleanup_removes_only_registry_rules_and_sets_preserving_deny_order(self):
+        def rule(chain, handle, target):
+            return {'rule': {'family': 'inet', 'table': isolation.TABLE, 'chain': chain,
+                             'handle': handle, 'expr': [{'match': {'right': '@' + target}}]}}
+        items = [rule('egress_guard', 10, 'registry4'), rule('host_output', 11, 'registry6'),
+                 rule('egress_guard', 12, 'denied4'), rule('egress_guard', 13, 'denied6'),
+                 rule('host_output', 14, 'packages4'),
+                 *({'set': {'name': name}} for name in ['registry4', 'registry6', 'packages4', 'denied4'])]
+        batch = isolation.registry_cleanup_batch(items)
+        self.assertEqual(batch.splitlines(), [
+            f'delete rule inet {isolation.TABLE} egress_guard handle 10',
+            f'delete rule inet {isolation.TABLE} host_output handle 11',
+            f'delete set inet {isolation.TABLE} registry4',
+            f'delete set inet {isolation.TABLE} registry6',
+        ])
 
     def test_ansible_closes_registry_lease_when_login_fails(self):
         tasks = yaml.safe_load((ROLES / 'application_image/tasks/registry-command.yml').read_text())
