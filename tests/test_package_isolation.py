@@ -130,6 +130,26 @@ class PackageIsolationTest(unittest.TestCase):
             self.assertIn('expected-package-failure', result.stdout)
             self.assertTrue(marker.exists(), result.stdout + result.stderr)
 
+    def test_borrowed_wrapper_keeps_calling_role_path_and_skips_production_lease(self):
+        with tempfile.TemporaryDirectory() as directory:
+            role = Path(directory) / 'fixture-role'
+            (role / 'tasks').mkdir(parents=True)
+            (role / 'tasks/main.yml').write_text(yaml.safe_dump([{
+                'ansible.builtin.include_tasks': str(FILES.parent / 'tasks/package-access.yml'),
+                'vars': {'rehearsal_package_tasks': '{{ role_path }}/tasks/packages.yml'},
+            }]))
+            (role / 'tasks/packages.yml').write_text(yaml.safe_dump([
+                {'ansible.builtin.set_fact': {'fixture_package_tasks_ran': True}},
+            ]))
+            result = run_plays([dict(variables={'cms_environment': 'production'}, tasks=[
+                {'ansible.builtin.include_role': {'name': str(role)}},
+                {'ansible.builtin.assert': {'that': [
+                    'fixture_package_tasks_ran | bool', "rehearsal_package_config == ''",
+                    'rehearsal_package_lease is skipped',
+                ]}},
+            ])])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
 
 if __name__ == '__main__':
     unittest.main()

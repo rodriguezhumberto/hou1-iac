@@ -1,0 +1,7 @@
+---
+- name: Install the resolver binary and DNS verification tool
+  ansible.builtin.apt:
+    name: [dnsmasq-base, dnsutils]
+    state: present
+    update_cache: true
+

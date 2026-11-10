@@ -45,11 +45,15 @@
   "fix_validation": {
     "target_resolved_fixed_repositories": 4,
     "target_nft_check_exit": 0,
-    "focused_tests_passed": 5,
+    "focused_tests_passed": 6,
     "repository_tests": 202,
     "repository_tests_failed": 0,
     "repository_tests_skipped": 1,
-    "playbook_syntax_checks_passed": 10
+    "playbook_syntax_checks_passed": 10,
+    "dns_regressions": {
+      "passed": 3,
+      "skipped": 1
+    }
   },
   "remaining": "Validate repository access repair and continue existing-host troubleshooting; an uninterrupted clean-host gate remains pending.",
   "continuation_preflight": {
@@ -59,6 +63,26 @@
     "all_group_membership_changes_only_lost_peer_removal": true,
     "lost_peer_absent_and_address_available": true,
     "live_changes_made": false,
+    "original_failure_preserved": true
+  },
+  "continuation_01": {
+    "infra_ref": "799d4d69f0433848f562ae7cda7d9e2c7043f581",
+    "mode": "separate checked troubleshooting run",
+    "exit_code": 99,
+    "stopped_by_controller_at": "netbird_dns : Install the resolver binary and DNS verification tool",
+    "reason": "DNS role also refreshed global APT cache outside temporary repository lease; stopped rather than waiting through the same blocked CDN retries.",
+    "netbird_0_82_0_installed_and_connected": true,
+    "source_group_and_policy_verification": {
+      "same_managed_source_group_ids": true,
+      "exact_managed_policy_grants_preserved": true,
+      "source_membership_only_replacement": true,
+      "lost_peer_retired": true,
+      "new_hou1_peer_connected": true,
+      "checked_plan_recovered_from_selected_snapshot": true,
+      "uninterrupted_clean_gate": false,
+      "infrastructure_revision": "799d4d69f0433848f562ae7cda7d9e2c7043f581"
+    },
+    "netbird_package_lease_cleanup_verified": true,
     "original_failure_preserved": true
   }
 }
