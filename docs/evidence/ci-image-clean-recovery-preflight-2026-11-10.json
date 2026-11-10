@@ -1,0 +1,105 @@
+{
+  "scope": "Controller preparation for the CI-digest clean-host test recovery; no wipe or restore performed",
+  "recorded_at": "2026-11-10T23:14:13.538949+00:00",
+  "tested_code_revision": "99e5db35e572f68d19d9669339c6e78ef14b6ff4",
+  "infrastructure_issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/60",
+  "recovery_issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/27",
+  "recovery_point": {
+    "schema": 1,
+    "environment": "test",
+    "created": 1794351628,
+    "id": "20261110T230028Z-184f657a1db7",
+    "size": 29572621,
+    "sha256": "b59e7c0c9e0959bc2b089933bec02dd5dd213320f46c31c8571e28970c59eed3"
+  },
+  "capture": {
+    "separate_authorized_test_point": true,
+    "encrypted_to_operator_and_new_temporary_recipient": true,
+    "nightly_recipient_remains_operator_only": true,
+    "hou4_copy_and_controller_copy_sha256_verified": true,
+    "offline_authenticated_decryption_and_sqlite_integrity_verified": true,
+    "one_time_wrapper_removed": true
+  },
+  "cold_preparation": {
+    "prepared": true,
+    "staff_revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+    "services_published": false,
+    "application_build_removed": true,
+    "node_base_image_not_required": true,
+    "docker_cache_used": false,
+    "source_recovery_branch_verified": true,
+    "certificate_lineages_verified": true
+  },
+  "registry": {
+    "remote_manifests_verified": 7,
+    "private_application_authenticated": true,
+    "credential_scope": "read:packages",
+    "netbird_lock_matches_official_0_82_0": true,
+    "local_docker_cache_used": false,
+    "layer_download_on_clean_host_still_pending": true
+  },
+  "policy": {
+    "selected_authorization_tables_compared": 13,
+    "all_selected_tables_match": true,
+    "lost_hou1_peer_matches_selected_point": true,
+    "managed_source_groups_verified": 2,
+    "review_after_restore_still_required": true
+  },
+  "controller_inputs": {
+    "deployment_dns_renewal_monitoring_and_probe_inputs_preserved_under_sops": true,
+    "operator_private_key_used": false,
+    "fixture_passwords_match_recovered_authentik_hashes": true,
+    "personal_administrator_public_key_retained": true,
+    "new_expiring_source_restricted_bootstrap_key_prepared": true,
+    "fresh_inventory_precedence_and_eight_syntax_checks_passed": true,
+    "decrypted_payload_and_prepared_tar_removed": true,
+    "temporary_scoped_keys_retained_until_authorized_gate": true
+  },
+  "preflight_finding": {
+    "failure": "A prior restore saved the locked NetBird digest; cold preparation accepted only the 0.82.0 tag spelling.",
+    "fix": "Accept the existing tag or the exact validated image-lock digest; reject different digests, repositories and version tags.",
+    "regression_coverage": "Repeated restore and CI-artifact preparation from a digest-pinned NetBird backup.",
+    "original_private_failure_evidence_preserved": true
+  },
+  "validation": {
+    "repository_suite": {
+      "total": 229,
+      "passed_after_dependency_correction": 228,
+      "skipped": 1,
+      "unresolved_failures": 0,
+      "initial_invocation": {
+        "tests": 229,
+        "failed": 1,
+        "skipped": 1,
+        "duration_seconds": 411.658,
+        "failure": "Controller lacked NGINX_BIN required by the existing ingress-parser test."
+      },
+      "corrected_check": {
+        "test": "test_netbird_control_plane.ControlPlaneTest.test_rendered_stack_and_ingress",
+        "passed": 1,
+        "validator": "Same disposable nginx:1.28-alpine parser wrapper as CI"
+      },
+      "skip": "Native dnsmasq integration unavailable on controller"
+    },
+    "ansible_syntax_checks_passed": 8,
+    "live_health": {
+      "primary_containers_running": 7,
+      "nightly_recipient_unchanged": true,
+      "one_time_wrapper_removed": true,
+      "backup_timer_active": true,
+      "monitoring": {
+        "targets_up": 8,
+        "active_alerts": 0
+      },
+      "recorded_at": "2026-11-10T23:08:37.717060+00:00"
+    }
+  },
+  "acceptance": {
+    "clean_host_restore_started": false,
+    "uninterrupted_clean_host_gate_passed": false,
+    "hou4_must_remain_intact": true,
+    "alerts_enabled": true,
+    "hou4_independent_console_access_previously_confirmed_by_operator": true,
+    "wipe_release": "Separate controller checkpoint after all preconditions and PR checks pass."
+  }
+}

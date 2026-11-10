@@ -107,3 +107,9 @@ were preserved. The temporary deployment age identity was removed. See the
 
 This first migration did not test rollback between two published CI digests.
 The clean-OS replay remains separate, and PR #61 stays dependent on PR #59.
+
+The next [clean-host preflight](evidence/ci-image-clean-recovery-preflight-2026-11-10.json)
+verified a fresh encrypted point, remote image manifests, saved access policy and
+controller inputs. It also fixed preparation of backups taken after a prior
+restore: NetBird's saved image may use the exact recovery-lock digest. The
+clean-host restore itself remains pending.
