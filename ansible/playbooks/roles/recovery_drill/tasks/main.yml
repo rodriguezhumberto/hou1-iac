@@ -135,11 +135,12 @@
         mode: '0600'
 
     # Separate tasks are deliberate: Ansible loops continue after a failed item.
-    - name: Build the exact saved staff revision
-      ansible.builtin.command:
-        argv: [python3, "{{ recovery_drill_root }}/driver.py", build]
-      changed_when: true
-      no_log: true
+    - name: Obtain the saved staff artifact with temporary registry access
+      ansible.builtin.include_role:
+        name: application_image
+        tasks_from: registry-command
+      vars:
+        application_image_command_argv: [python3, '{{ recovery_drill_root }}/driver.py', build]
 
     - name: Import into empty PostgreSQL and start the isolated restored stack
       ansible.builtin.command:

@@ -1,12 +1,19 @@
 ---
+- name: Verify the CI-built application before modifying the deployment
+  ansible.builtin.include_role:
+    name: application_image
+
 - name: Pull from GitHub
   git:
     repo: "{{ app_repo_pat }}"
     dest: "{{ app_directory }}"
-    version: "{{ deploy_ref | default(deploy_branch | default('main')) }}"
+    version: "{{ application_image_revision }}"
     update: yes
     force: yes
   no_log: true
+
+- name: Configure the verified application image without source builds
+  ansible.builtin.import_tasks: image-compose.yml
 
 - name: Validate CMS environment and the existing database mount
   ansible.builtin.assert:
@@ -228,15 +235,30 @@
   changed_when: false
   no_log: true
 
+- name: Refuse unexpected build definitions in the rendered deployment
+  ansible.builtin.assert:
+    that:
+      - (cms_compose_config.stdout | from_json).services.values() | selectattr('build', 'defined') | list | length == 0
+      - (cms_compose_config.stdout | from_json).services['astro-app'].image == application_image_reference
+    fail_msg: Deployment requires the verified digest and no host-side builds.
+
 - name: Freeze and archive this project's retired Directus service
   ansible.builtin.import_tasks: retire-directus.yml
 
-- name: Rebuild and deploy updated Docker containers
+- name: Deploy the verified application without building on the host
   # Public bootstrap needs Nginx and its dependencies before NetBird exists.
   # Defer services that bind the NetBird IP until enrollment completes.
-  command: "docker compose up -d --build --wait --wait-timeout 120{{ ' nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}"
+  command: "docker compose up -d --no-build --wait --wait-timeout 120{{ ' nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}"
   args:
     chdir: "{{ app_directory }}"
+
+- name: Record the deployed artifact for encrypted backups and recovery
+  ansible.builtin.copy:
+    dest: '{{ app_directory }}/application-image.json'
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ application_image_verified | to_nice_json }}'
 
 # Nginx's entrypoint renders bind-mounted templates only at container startup.
 # Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.

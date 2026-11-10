@@ -1,0 +1,8 @@
+---
+# Copy image and revision from the CI image-release.json receipt.
+application_image_reference: ''
+application_image_revision: ''
+# CI deployments require a SOPS JSON bundle with GHCR_USERNAME and a dedicated
+# read:packages GHCR_TOKEN. Legacy source-built recovery may omit both inputs.
+application_image_registry_secret_source: ''
+application_image_registry_age_key_file: ''

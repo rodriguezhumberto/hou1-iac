@@ -1,5 +1,9 @@
 # Clean test-host recovery
 
+For CI-built recovery points, follow the digest and registry requirements in
+[Application images](application-images.md). Source-build instructions below
+apply to retained legacy recovery points.
+
 Issue #27's replacement-host gate uses `restore-test-host.yml`, followed by
 `publish-test-recovery.yml`. These entry points recover the selected test point
 on fresh Debian 12 at the same HOU1 address. They are not production restore

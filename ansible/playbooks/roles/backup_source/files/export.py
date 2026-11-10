@@ -70,6 +70,16 @@ def archive_tree(output, directory, names):
             archive.add(Path(directory) / name, arcname=name)
 
 
+def application_receipt(root):
+    import importlib.util
+    helper = Path(__file__).with_name('hou1-application-artifact.py')
+    if not helper.exists():
+        helper = Path(__file__).resolve().parents[2] / 'application_image/files/artifact.py'
+    spec = importlib.util.spec_from_file_location('application_artifact', helper)
+    artifact = importlib.util.module_from_spec(spec); spec.loader.exec_module(artifact)
+    return artifact.running(root)
+
+
 def snapshot(config, work):
     auth, app, netbird = (config[key] for key in ('authentik', 'app', 'netbird'))
     auth_work = work / 'authentik'; auth_work.mkdir()
@@ -83,6 +93,7 @@ def snapshot(config, work):
             shutil.copyfile(Path(auth['root']) / name, auth_work / name)
     cms = work / 'cms'; (cms / 'database').mkdir(parents=True)
     with frozen(app, WRITERS['app'], (intent, 'app')):
+        application_image = application_receipt(app['root'])
         database = Path(app['database']) / 'forms.db'
         with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as source:
             with closing(sqlite3.connect(cms / 'database/forms.db')) as target:
@@ -92,8 +103,10 @@ def snapshot(config, work):
                     raise RuntimeError('Invalid SQLite snapshot')
         shutil.copytree(app['media'], cms / 'media', symlinks=True)
         # Save runtime configuration and TLS, never the live database or plaintext backup directory.
-        archive_tree(work / 'app-config.tar.gz', app['root'],
-                     ['.env', 'docker-compose.yml', 'docker-compose.override.yml', 'certbot/conf'])
+        files = ['.env', 'docker-compose.yml', 'docker-compose.override.yml', 'certbot/conf']
+        if application_image is not None:
+            files.append('application-image.json')
+        archive_tree(work / 'app-config.tar.gz', app['root'], files)
     # Copy while stopped, then compress after restart. Integrated relays also stop
     # with this container, so preparation runs locally, independently of SSH.
     netbird_copy = work / 'netbird-copy'; netbird_copy.mkdir()
@@ -111,9 +124,14 @@ def snapshot(config, work):
         if not path.is_file(): raise ValueError('Missing required host recovery input')
         shutil.copyfile(path, recovery / str(number))
     revision = command(['git', '-C', app['root'], 'rev-parse', 'HEAD']).decode().strip()
-    (work / 'recovery.json').write_text(json.dumps({'schema': 1, 'environment': config['environment'],
+    metadata = {'schema': 1, 'environment': config['environment'],
         'staff_revision': revision, 'recovery_files': config['recovery_files'],
-        'components': ['authentik', 'netbird', 'cms', 'app-config', 'host-recovery']}))
+        'components': ['authentik', 'netbird', 'cms', 'app-config', 'host-recovery']}
+    if application_image is not None:
+        if application_image['revision'] != revision:
+            raise ValueError('Source revision changed during the backup')
+        metadata['application_image'] = application_image
+    (work / 'recovery.json').write_text(json.dumps(metadata))
 
 
 def estimate_bytes(config):

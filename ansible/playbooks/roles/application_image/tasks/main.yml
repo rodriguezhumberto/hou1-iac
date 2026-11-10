@@ -1,0 +1,35 @@
+---
+- name: Require a CI digest and matching immutable source selection
+  ansible.builtin.assert:
+    that:
+      - application_image_reference is match('^ghcr\.io/rodriguezhumberto/pearland-paws/app@sha256:[a-f0-9]{64}$')
+      - application_image_revision is match('^[a-f0-9]{40}$')
+      - (deploy_ref | default(application_image_revision)) == application_image_revision
+      - application_image_registry_secret_source is match('^/')
+      - application_image_registry_age_key_file is match('^/')
+    fail_msg: Supply the CI digest and matching revision, plus private controller SOPS inputs for read-only GHCR access.
+
+- name: Ensure the root-owned helper directory exists
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the artifact verification helper
+  ansible.builtin.copy:
+    src: artifact.py
+    dest: /usr/local/libexec/hou1-application-artifact.py
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Pull and verify the application before changing deployment configuration
+  ansible.builtin.include_tasks: registry-command.yml
+  vars:
+    application_image_command_argv: [python3, /usr/local/libexec/hou1-application-artifact.py, --pull, --image, '{{ application_image_reference }}', --revision, '{{ application_image_revision }}']
+
+- name: Retain only the verified nonsecret artifact identity
+  ansible.builtin.set_fact:
+    application_image_verified: '{{ application_image_command_result.stdout | from_json }}'

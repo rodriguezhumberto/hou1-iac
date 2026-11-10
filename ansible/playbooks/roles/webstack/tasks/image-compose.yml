@@ -1,0 +1,16 @@
+---
+- name: Read the selected source Compose configuration
+  ansible.builtin.slurp:
+    src: '{{ app_directory }}/docker-compose.yml'
+  register: application_image_source_compose
+
+- name: Preserve the source service configuration and remove all application build settings
+  ansible.builtin.set_fact:
+    application_image_compose: '{{ application_image_source_compose.content | b64decode | from_yaml }}'
+    application_image_service: "{{ (application_image_source_compose.content | b64decode | from_yaml).services['astro-app'] | dict2items | rejectattr('key', 'equalto', 'build') | items2dict | combine({'image': application_image_reference}) }}"
+
+- name: Write the image-only deployment Compose configuration
+  ansible.builtin.copy:
+    dest: '{{ app_directory }}/docker-compose.yml'
+    mode: '0644'
+    content: "{{ application_image_compose | combine({'services': application_image_compose.services | combine({'astro-app': application_image_service})}) | to_nice_yaml }}"

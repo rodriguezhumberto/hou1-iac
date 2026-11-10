@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Restore a fresh test host once; leave published ports on loopback for review."""
 import argparse
+import importlib.util
 import datetime
 import json
 import os
@@ -125,7 +126,8 @@ def install(cfg):
     if run('docker', 'ps', '-aq').strip() or run('docker', 'image', 'ls', '-aq').strip():
         raise ValueError('Cold-host recovery requires empty container and image stores')
     payload = ROOT / 'payload'
-    # Pull from registries and build without the old host's image or npm cache.
+    # CI-backed recovery pulls the saved application artifact; legacy archives
+    # retain their explicitly recorded source-build recovery method.
     for image in sorted(set(cfg['image_lock'].values())):
         run('docker', 'pull', '--platform', 'linux/amd64', image, timeout=900)
     run('git', 'clone', '--branch', 'recovery', '--single-branch', str(ROOT / 'staff.bundle'), str(APP))
@@ -135,20 +137,31 @@ def install(cfg):
     for path in [APP, *APP.rglob('*')]:
         if not path.is_symlink() and '.git' not in path.relative_to(APP).parts:
             path.chmod(0o755 if path.is_dir() or path.stat().st_mode & 0o111 else 0o644)
-    env = saved_environment(payload / 'app-config/.env')
-    keys = ['PUBLIC_HCAPTCHA_SITE_KEY', 'PUBLIC_VAPID_PUBLIC_KEY', 'PUBLIC_SITE_ORIGIN',
-            'STAFF_OIDC_ISSUER', 'STAFF_OIDC_CLIENT_ID', 'STAFF_OIDC_REDIRECT_URI',
-            'STAFF_OIDC_POST_LOGOUT_REDIRECT_URI', 'STAFF_OIDC_SCOPES']
-    command = ['docker', 'build', '--no-cache', '--pull', '--platform', 'linux/amd64',
-               '--label', 'org.opencontainers.image.revision=' + cfg['staff_revision'],
-               '-t', 'hou1-restored-staff:' + cfg['staff_revision'], '-f', str(ROOT / 'Dockerfile.recovery')]
-    for key in keys:
-        command += ['--build-arg', key]
-    run(*command, str(APP), env={**os.environ, **{key: env.get(key, '') for key in keys}}, timeout=1200)
+    receipt = cfg.get('application_image')
+    if receipt is not None:
+        spec = importlib.util.spec_from_file_location('application_artifact', ROOT / 'artifact.py')
+        artifact = importlib.util.module_from_spec(spec); spec.loader.exec_module(artifact)
+        artifact.validate_receipt(receipt, cfg['staff_revision'])
+        if artifact.verify(receipt['image'], cfg['staff_revision']) != receipt:
+            raise ValueError('Pulled application artifact differs from the recovery receipt')
+    else:
+        env = saved_environment(payload / 'app-config/.env')
+        keys = ['PUBLIC_HCAPTCHA_SITE_KEY', 'PUBLIC_VAPID_PUBLIC_KEY', 'PUBLIC_SITE_ORIGIN',
+                'STAFF_OIDC_ISSUER', 'STAFF_OIDC_CLIENT_ID', 'STAFF_OIDC_REDIRECT_URI',
+                'STAFF_OIDC_POST_LOGOUT_REDIRECT_URI', 'STAFF_OIDC_SCOPES']
+        command = ['docker', 'build', '--no-cache', '--pull', '--platform', 'linux/amd64',
+                   '--label', 'org.opencontainers.image.revision=' + cfg['staff_revision'],
+                   '-t', 'hou1-restored-staff:' + cfg['staff_revision'], '-f', str(ROOT / 'Dockerfile.recovery')]
+        for key in keys:
+            command += ['--build-arg', key]
+        run(*command, str(APP), env={**os.environ, **{key: env.get(key, '') for key in keys}}, timeout=1200)
     # Runtime secret files never enter the application build context.
     for name in ['.env', 'docker-compose.override.yml']:
         shutil.copyfile(payload / 'app-config' / name, APP / name)
         (APP / name).chmod(0o600)
+    if receipt is not None:
+        (APP / 'application-image.json').write_text(json.dumps(receipt, indent=2) + '\n')
+        (APP / 'application-image.json').chmod(0o644)
     certs = APP / 'certbot/conf'
     certs.parent.mkdir(mode=0o700, exist_ok=True)
     if certs.exists():
@@ -230,7 +243,8 @@ def restore(cfg):
                   sessions_revoked_before_writers=True, identity_bootstrap_run=False, cms_seed_run=False,
                   netbird_connection_flags_reset_before_server=True,
                   netbird_stale_connections_cleared=stale_connections,
-                  cold_registry_pulls=True, cold_application_build=True, ports_bound_to_loopback=True,
+                  cold_registry_pulls=True, cold_application_build='application_image' not in cfg,
+                  application_image=cfg.get('application_image'), ports_bound_to_loopback=True,
                   restore_seconds=round(time.monotonic() - started, 3),
                   next='Reconcile access changes, explicitly publish, replace only the lost HOU1 peer, then finalize VPN/security/monitoring/backups')
     write('restore-report.json', report)

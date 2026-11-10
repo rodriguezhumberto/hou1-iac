@@ -26,6 +26,30 @@ policies=load('backup_policies',ROOT/'ansible/playbooks/filter_plugins/netbird_p
 
 
 class BackupProtocolTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('age'),'age required')
+    def test_digest_receipt_survives_encrypted_capture_and_offline_extraction(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); config, key = self.fixture(root)
+            revision = 'a' * 40
+            receipt = dict(schema=1, image='ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:' + 'b' * 64,
+                           revision=revision, platform='linux/amd64', image_id='sha256:' + 'c' * 64)
+            (Path(config['app']['root']) / 'application-image.json').write_text(json.dumps(receipt))
+            def command(argv, output=None, timeout=300):
+                if 'ps' in argv: return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
+                if 'pg_dump' in argv: output.write(b'CREATE TABLE restored (value text);'); return b''
+                if argv[0] == 'git': return revision.encode()
+                return b''
+            stream = io.BytesIO()
+            with patch.object(source, 'command', side_effect=command), patch.object(source, 'application_receipt', return_value=receipt):
+                source.export(config, stream)
+            stream.seek(0)
+            manifest = root / 'manifest.json'; manifest.write_bytes(stream.readline())
+            archive = root / 'recovery.age'; archive.write_bytes(stream.read())
+            output = root / 'extracted'
+            recovery.verify(archive, manifest, key, output, 'test')
+            self.assertEqual(json.loads((output / 'recovery.json').read_text())['application_image'], receipt)
+            self.assertEqual(json.loads((output / 'app-config/application-image.json').read_text()), receipt)
+
     def fixture(self,root):
         app,auth,data,netbird=[root/p for p in ['app','auth','authdata','netbird']]
         for p in [app/'database',app/'media',auth,data/'media',data/'templates',data/'certs',data/'config',netbird/'data']:p.mkdir(parents=True,exist_ok=True)
@@ -64,7 +88,7 @@ class BackupProtocolTest(unittest.TestCase):
                 if Path(output).name=='netbird.tar.gz':
                     self.assertEqual(events[-1][-2:],['start','netbird-server'])
                 return archive_tree(output,directory,names)
-            with patch.object(source,'command',side_effect=command),patch.object(source,'archive_tree',side_effect=archive_after_restart):
+            with patch.object(source,'command',side_effect=command),patch.object(source,'archive_tree',side_effect=archive_after_restart),patch.object(source,'application_receipt',return_value=None):
                 source.prepare(config)
             reader.serve(config,stream)
             stream.seek(0);manifest=json.loads(stream.readline());archive=root/'recovery.age';archive.write_bytes(stream.read())
@@ -133,7 +157,7 @@ class BackupProtocolTest(unittest.TestCase):
                     if argv[0]=='git':return b'0123456789012345678901234567890123456789'
                     return b''
                 output=io.BytesIO()
-                with patch.object(source,'command',side_effect=command):source.export(config,output)
+                with patch.object(source,'command',side_effect=command),patch.object(source,'application_receipt',return_value=None):source.export(config,output)
                 output.seek(0);manifest=root/'manifest.json';manifest.write_bytes(output.readline());archive=root/'recovery.age';archive.write_bytes(output.read())
                 recovery.verify(archive,manifest,key,root/'restored','test')
                 subprocess.run(['docker','exec',name,'createdb','-U','authentik','recovered'],check=True,capture_output=True)
