@@ -127,6 +127,29 @@ def monitoring_plan(groups, peers, policies, monitor_ip, server_ip,
     return dict(groups=planned, policy=policy)
 
 
+def staff_probe_plan(groups, peers, policies, monitor_ip, server_ip, subnet, server_group, enabled):
+    """Use existing single-peer metrics groups for optional HTTPS probing only."""
+    if type(enabled) is not bool:
+        raise AnsibleFilterError('Staff probe enable flag must be boolean')
+    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet, server_group)
+    if metrics['policy'] is None or metrics['policy']['changed']:
+        raise AnsibleFilterError('Staff probe requires the verified exact metrics groups and policy')
+    suffix = 'test' if server_group == 'test-servers' else 'production'
+    name = 'hou1-monitoring-' + suffix + '-staff-probe'
+    marker = 'Managed by hou1-iac staff probe.'
+    matches = [policy for policy in policies if policy['name'] == name]
+    if len(matches) > 1 or (matches and matches[0].get('description') != marker):
+        raise AnsibleFilterError('Duplicate or operator-owned staff probe policy')
+    current = matches[0] if matches else None
+    if not enabled and current is None:
+        return None
+    body = dict(name=name, description=marker, enabled=enabled, source_posture_checks=[], rules=[dict(
+        name=name, description=marker, enabled=enabled, action='accept', protocol='tcp', bidirectional=False,
+        sources=[metrics['groups'][0]['id']], destinations=[metrics['groups'][1]['id']], ports=['443'])])
+    return dict(body=body, id=current['id'] if current else None,
+                changed=not current or policy_body(current) != policy_body(body))
+
+
 def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environment):
     """Only one enrolled receiver can reach one source on TCP22; never grant admin membership."""
     from ipaddress import IPv4Address, IPv4Network
@@ -187,4 +210,4 @@ def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subne
 
 class FilterModule:
     def filters(self):
-        return {'netbird_backup_plan': backup_plan, 'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan, 'netbird_recovery_source_groups': recovery_source_groups}
+        return {'netbird_backup_plan': backup_plan, 'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan, 'netbird_staff_probe_plan': staff_probe_plan, 'netbird_recovery_source_groups': recovery_source_groups}

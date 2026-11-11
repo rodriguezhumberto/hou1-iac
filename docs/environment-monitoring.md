@@ -14,6 +14,7 @@ Select these public inputs explicitly:
 | `hou1_monitoring_enabled` | Boolean `true`; collection is otherwise refused. |
 | `hou1_monitoring_peer_ip` | HOU4's enrolled VPN IPv4 address, different from HOU1. |
 | `hou1_request_metrics_enabled` | Boolean opt-in for the existing credential-free Nginx request schema. |
+| `hou1_staff_probe_enabled` | Boolean opt-in for HOU4-to-HOU1 TCP/443 using the exact existing metrics peer groups; see [staff-login-probe.md](staff-login-probe.md). |
 
 Keep organization-specific deployment roots, domains, allowlists, receiver URLs
 and credentials in encrypted inputs. `app_directory` supplies the application
@@ -58,8 +59,10 @@ Before clearing the production monitoring gate, record the selected HOU1/HOU4
 refs and live evidence: successful private scrapes and source collection;
 public and unrelated-peer denial; service failure and recovery notifications;
 backup freshness; and request/login metrics. Configure separate production
-synthetic identities and an environment-bound login probe before relying on
-end-to-end login monitoring. Controller TLS renewal and production recovery
+synthetic identities and enable the [environment-bound login probe](staff-login-probe.md)
+before relying on end-to-end login monitoring. Its offline checks are implemented;
+live identity provisioning, fresh login and Discord delivery still need evidence.
+Controller TLS renewal and production recovery
 remain separate gates. The rehearsal-only probe/renewal helpers retain their
 existing safety guards.
 

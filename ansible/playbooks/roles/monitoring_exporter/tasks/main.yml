@@ -22,6 +22,7 @@
       - hou1_monitoring_peer_ip != (netbird_subnet | ansible.utils.ipaddr('network'))
       - hou1_monitoring_peer_ip != (netbird_subnet | ansible.utils.ipaddr('broadcast'))
       - hou1_monitoring_exporter_port == 9100
+      - (hou1_staff_probe_enabled | default(false)) is boolean
       - hou1_request_metrics_enabled is boolean
       - hou1_tls_metrics_enabled is boolean
       - not hou1_tls_metrics_enabled or hou1_controller_managed_tls | bool
