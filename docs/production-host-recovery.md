@@ -5,7 +5,10 @@ restore engine with the rehearsal, but require an explicit production contract.
 [Offline fixture evidence](evidence/production-host-recovery-2026-11-11.json)
 records the implementation checks; a live production restore is still a release
 gate. Neither this procedure nor a successful test restore authorizes a wipe or
-production promotion. Keep `restore-test-host.yml`, `publish-test-recovery.yml`
+production promotion. [Production snapshot preparation](evidence/production-recovery-preflight-2026-11-11.json)
+records the saved source/image/certificate checks and the environment-specific
+geolocation correction; it does not prove a clean-host restore.
+Keep `restore-test-host.yml`, `publish-test-recovery.yml`
 and the component drill's test-only guards intact.
 
 ## Before the replacement
@@ -112,8 +115,11 @@ the existing host/runtime prerequisites, verifies the encrypted point, and
 performs the cold restore. It imports PostgreSQL only into an empty schema,
 revokes restored IdP/staff sessions before writers start, and clears stale VPN
 connection flags without replacing identities, keys or group memberships. It
-never runs fresh identity bootstrap or CMS seeds. Public HTTP/HTTPS and STUN stay
-bound to loopback; bootstrap SSH is limited to the declared controller /32.
+never runs fresh identity bootstrap or CMS seeds. NetBird retains its saved
+geolocation updater policy; production can use its normal outbound connection
+for updates. Isolated test recovery still requires offline geolocation startup.
+Public HTTP/HTTPS and STUN stay bound to loopback; bootstrap SSH is limited to
+the declared controller /32.
 
 Review the protected restore report, certificate report and diagnostics. Saved
 certificate/key pairs must still cover the declared hostnames and be unexpired;

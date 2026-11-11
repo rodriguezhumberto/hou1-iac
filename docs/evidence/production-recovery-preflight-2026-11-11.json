@@ -1,0 +1,61 @@
+{
+  "issue": 22,
+  "scope": "Production recovery preparation preserves the saved NetBird geolocation update policy",
+  "finding": "Production snapshots omit the rehearsal-only offline-update setting. The shared validator incorrectly required that setting for production and rejected the saved point before restore.",
+  "correction": "Require offline geolocation startup only for isolated test recovery; preserve production saved configuration unchanged.",
+  "base_ref": "56ec4c7ca7a7e087cfda887d131100e9e13dc60d",
+  "tested_prepare_sha256": "7404fe4f2bec31794569c8f409ea57e8b4935e917bac3ddb6f4a46bcd63951d6",
+  "actual_production_point_preparation": {
+    "passed": true,
+    "complete_production_bundle_preparation": true,
+    "saved_source_revision_verified": true,
+    "runtime_images_pinned_from_running_services": 7,
+    "saved_application_image_matches_running_digest": true,
+    "certificate_lineages_checked": true,
+    "encrypted_contract_preserved": true,
+    "source_bundle_sha256": "01e43a46fcc159f47098e8855616a6db7fc9516f4c89df73f241774b43f14285",
+    "runtime_lock_sha256": "fb433ee0b5cb54434f9ed371a184e0ad25c4d1e84541e1f075d0f9e4f03ce9e2",
+    "live_nodes_changed": false,
+    "prepared_bundle_contains_plaintext_removed_after_validation": true,
+    "registry_pull_access_checked": false,
+    "publication_entrypoint_reviewed": false,
+    "wipe_ready": false,
+    "completed_at": "2026-11-11T22:01:37.927388+00:00"
+  },
+  "read_only_dependencies": {
+    "passed": true,
+    "registry_saved_app_manifest_access": true,
+    "registry_manifest_schema": 2,
+    "cold_blob_pull_proven": false,
+    "registry_credentials_removed": true,
+    "hou1_and_hou4_connected_before_wipe": true,
+    "managed_backup_metrics_group_plan_verified": true,
+    "live_peer_policy_snapshot_encrypted": true,
+    "live_nodes_changed": false,
+    "completed_at": "2026-11-11T22:03:08.333635+00:00"
+  },
+  "focused_tests": {
+    "command": "python3 -m unittest discover -s tests -p 'test*host_recovery.py'",
+    "tests": 25,
+    "result": "passed"
+  },
+  "production_config_cases": [
+    "setting absent",
+    "updates enabled",
+    "updates disabled"
+  ],
+  "test_recovery_rejections": [
+    "setting absent",
+    "updates enabled",
+    "nonboolean setting"
+  ],
+  "live_nodes_changed": false,
+  "clean_host_restore_proven": false,
+  "wipe_authorized_by_this_record": false,
+  "remaining": [
+    "Merge and pin the reviewed recovery fix after CI",
+    "Finish the executable recovery and management handoff inputs",
+    "Confirm independent console access remains available before a wipe"
+  ],
+  "recorded_at": "2026-11-11T22:04:21.396406+00:00"
+}
