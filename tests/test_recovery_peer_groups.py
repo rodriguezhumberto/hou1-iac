@@ -20,7 +20,7 @@ def fixture():
                                    ('backup-receiver', 'hou1-backup-test-receiver', 'monitor'),
                                    ('backup-source', 'hou1-backup-test-source', 'lost')]:
         groups.append(dict(id=identifier, name=name, peers=[{'id': peer}], resources=None))
-    metrics = POLICY['monitoring_plan'](groups, peers, [], '100.91.0.22', '100.91.0.10')['policy']['body']
+    metrics = POLICY['monitoring_plan'](groups, peers, [], '100.91.0.22', '100.91.0.10', '100.91.0.0/16', 'test-servers')['policy']['body']
     backup = POLICY['backup_plan'](groups, peers, [], '100.91.0.22', '100.91.0.10', '100.91.0.0/16', 'test')['policy']['body']
     return dict(groups=groups, peers=peers, policies=[dict(id='metrics-policy', **metrics), dict(id='backup-policy', **backup)])
 
@@ -57,7 +57,7 @@ class RecoveryPeerGroupsTest(unittest.TestCase):
         state['groups'][2]['peers'] = None
         state['groups'][4]['peers'] = None
         with self.assertRaisesRegex(Exception, 'unexpected members'):
-            POLICY['monitoring_plan'](state['groups'], state['peers'], state['policies'], '100.91.0.22', '100.91.0.10')
+            POLICY['monitoring_plan'](state['groups'], state['peers'], state['policies'], '100.91.0.22', '100.91.0.10', '100.91.0.0/16', 'test-servers')
         with self.assertRaisesRegex(Exception, 'unexpected membership'):
             POLICY['backup_plan'](state['groups'], state['peers'], state['policies'], '100.91.0.22', '100.91.0.10', '100.91.0.0/16', 'test')
 

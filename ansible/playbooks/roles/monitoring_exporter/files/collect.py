@@ -3,6 +3,7 @@
 import grp
 import json
 import os
+import re
 from pathlib import Path
 import subprocess
 import sys
@@ -14,24 +15,70 @@ SELECT json_build_object('connections',numbackends,'commits',xact_commit,
 'rollbacks',xact_rollback,'blocks_read',blks_read,'blocks_hit',blks_hit,
 'deadlocks',deadlocks,'database_size',pg_database_size(current_database()))
 FROM pg_stat_database WHERE datname=current_database(); COMMIT;"""
-INSPECT = '''{"running":{{json .State.Running}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}"none"{{end}},"project":{{json (index .Config.Labels "com.docker.compose.project")}}}'''
+INSPECT = '''{"running":{{json .State.Running}},"health":{{if .State.Health}}{{json .State.Health.Status}}{{else}}"none"{{end}},"labels":{{json .Config.Labels}}}'''
+
+
+def validate_config(config):
+    if config.get('environment') not in ('test', 'production'):
+        raise ValueError('Unknown monitoring environment')
+    containers = config.get('containers')
+    if not isinstance(containers, dict) or 'postgresql' not in containers:
+        raise ValueError('Missing aggregate sources')
+    for label, source in containers.items():
+        if (not re.fullmatch(r'[a-z0-9-]+', label) or not isinstance(source, dict)
+                or set(source) != {'directory', 'service'}
+                or not re.fullmatch(r'/[a-zA-Z0-9_/-]+', source['directory'])
+                or '..' in Path(source['directory']).parts
+                or not re.fullmatch(r'[a-z0-9-]+', source['service'])):
+            raise ValueError('Invalid Compose selector')
+    for key in ('authentik_backup_directory', 'request_metrics_log'):
+        value = config.get(key, '')
+        if not isinstance(value, str) or not re.fullmatch(r'/[a-zA-Z0-9_./-]+', value) or '..' in Path(value).parts:
+            raise ValueError('Invalid aggregate path')
+    if not isinstance(config.get('request_metrics_enabled'), bool):
+        raise ValueError('Invalid request metrics flag')
+
+
+def source_container(source):
+    # Include stopped containers: duplicates/stale replacements must fail closed.
+    ids = command(['docker', 'ps', '--all', '--quiet', '--no-trunc',
+                   '--filter', 'label=com.docker.compose.project.working_dir=' + source['directory'],
+                   '--filter', 'label=com.docker.compose.service=' + source['service']]).split()
+    if len(ids) != 1 or not re.fullmatch(r'[a-f0-9]{64}', ids[0]):
+        raise ValueError('Expected exactly one Compose service container')
+    state = json.loads(command(['docker', 'inspect', '--format', INSPECT, ids[0]]))
+    labels = state['labels']
+    if (labels.get('com.docker.compose.project.working_dir') != source['directory']
+            or labels.get('com.docker.compose.service') != source['service']
+            or not labels.get('com.docker.compose.project')
+            or labels.get('com.docker.compose.oneoff', '').lower() != 'false'):
+        raise ValueError('Unexpected Compose identity')
+    return ids[0], state
+
 
 
 def command(argv):
     return subprocess.run(argv,capture_output=True,text=True,check=True,timeout=10).stdout
 
 
+def reopen_nginx(config):
+    container, state = source_container(config['containers']['nginx'])
+    if not state['running']:
+        raise ValueError('Nginx is stopped')
+    command(['docker', 'exec', container, 'nginx', '-s', 'reopen'])
+
+
 def collect(config, now=None):
     now=time.time() if now is None else now
-    samples=[];success=True
+    samples=[];success=True;resolved={}
     def emit(name,value,**labels):
         tags='{'+','.join(k+'='+json.dumps(v) for k,v in sorted(labels.items()))+'}' if labels else ''
         samples.append(name+tags+' '+str(float(value)))
     for label,item in config['containers'].items():
         running=healthy=defined=0
         try:
-            state=json.loads(command(['docker','inspect','--format',INSPECT,item['name']]))
-            if state['project']!=item['project']:raise ValueError('Unexpected container project')
+            container,state=source_container(item)
+            resolved[label]=container
             running=int(state['running']);defined=int(state['health']!='none')
             healthy=int(running and state['health'] in ('healthy','none'))
         except Exception:
@@ -41,7 +88,7 @@ def collect(config, now=None):
         emit('hou1_container_healthcheck_defined',defined,service=label)
     database_up=0
     try:
-        rows=command(['docker','exec',config['containers']['postgresql']['name'],
+        rows=command(['docker','exec',resolved['postgresql'],
             'psql','-XqAt','-v','ON_ERROR_STOP=1','-U','authentik','-d','authentik','-c',SQL])
         data=json.loads(rows.strip())
         fields={'connections':('hou1_postgresql_connections','gauge'),
@@ -104,7 +151,12 @@ def write(path,text):
 if __name__=='__main__':
     try:
         config=json.loads(Path('/etc/hou1-monitoring/collector.json').read_text())
-        if config['environment']!='test':raise ValueError('Only isolated test data is authorized')
+        validate_config(config)
+        if sys.argv[1:] == ['--reopen-nginx']:
+            reopen_nginx(config)
+            raise SystemExit(0)
+        if sys.argv[1:]:
+            raise ValueError('Unknown collector action')
         text,success=collect(config)
         write('/var/lib/prometheus/node-exporter/hou1.prom',text)
         if not success:raise RuntimeError('A collector source failed')

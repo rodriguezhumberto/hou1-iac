@@ -1,31 +1,58 @@
 ---
-- name: Require an explicit isolated private metrics deployment
+- name: Require an explicit environment and private metrics target
   ansible.builtin.assert:
     that:
       - hou1_monitoring_enabled is boolean and hou1_monitoring_enabled
-      - cms_environment == 'test'
-      - groups.get('isolated_test_vps', []) | length == 1
-      - inventory_hostname not in groups.get('prod_env', [])
+      - cms_environment in ['test', 'production']
+      - hou1_monitoring_identity_profile in ['test', 'prod']
+      - hou1_monitoring_identity_profile in authentik_identity_profiles
+      - groups.get(hou1_monitoring_inventory_group, []) == [inventory_hostname]
+      - ansible_play_hosts_all == [inventory_hostname]
+      - >-
+        (cms_environment == 'test' and inventory_hostname not in groups.get('prod_env', []) and
+         netbird_server_group == 'test-servers') or
+        (cms_environment == 'production' and inventory_hostname in groups.get('prod_env', []) and
+         netbird_server_group == 'prod-servers')
       - ansible_host == netbird_ip
       - not (node_bootstrap | bool)
-      - netbird_subnet == '100.91.0.0/16'
       - hou1_monitoring_peer_ip is ansible.utils.ipv4
+      - "'/' not in hou1_monitoring_peer_ip"
       - (hou1_monitoring_peer_ip | ansible.utils.ipaddr(netbird_subnet)) is truthy
       - hou1_monitoring_peer_ip != netbird_ip
-      - hou1_monitoring_exporter_port | int == 9100
-      - hou1_monitoring_backup_directory == '/var/backups/hou1-authentik/test'
+      - hou1_monitoring_peer_ip != (netbird_subnet | ansible.utils.ipaddr('network'))
+      - hou1_monitoring_peer_ip != (netbird_subnet | ansible.utils.ipaddr('broadcast'))
+      - hou1_monitoring_exporter_port == 9100
       - hou1_request_metrics_enabled is boolean
-      - hou1_request_metrics_log == '/opt/pearlandpaws-test/nginx-logs/metrics.jsonl'
       - not ansible_check_mode
-    fail_msg: Use the isolated private HOU1 target and one declared HOU4 VPN peer.
+    fail_msg: Select one matching environment inventory group, identity profile and HOU4 VPN peer.
 
-- name: Require test-only fixed container projects
+- name: Require sources to match the selected deployment
   ansible.builtin.assert:
     that:
-      - item.key is match('^[a-z0-9-]+$')
-      - item.value.name is match('^[a-z0-9-]+-test-[a-z0-9-]+-1$')
-      - item.value.project in ['hou1-authentik-test', 'hou1-netbird-test', 'pearlandpaws-test']
-  loop: '{{ hou1_monitoring_containers | dict2items }}'
+      - authentik_identity_profiles[hou1_monitoring_identity_profile].environment == hou1_monitoring_identity_profile
+      - cms_environment == ('test' if hou1_monitoring_identity_profile == 'test' else 'production')
+      - netbird_subnet == authentik_identity_profiles[hou1_monitoring_identity_profile].netbird_subnet
+      - hou1_monitoring_backup_directory == authentik_backup_root_base ~ '/' ~ hou1_monitoring_identity_profile
+      - hou1_request_metrics_log == app_directory ~ '/nginx-logs/metrics.jsonl'
+      - hou1_monitoring_containers | length == 7
+      - >-
+        hou1_monitoring_containers.postgresql == {'directory': authentik_project_root_base ~ '/' ~ hou1_monitoring_identity_profile, 'service': 'postgresql'}
+      - >-
+        hou1_monitoring_containers['authentik-server'] == {'directory': authentik_project_root_base ~ '/' ~ hou1_monitoring_identity_profile, 'service': 'authentik-server'}
+      - >-
+        hou1_monitoring_containers['authentik-worker'] == {'directory': authentik_project_root_base ~ '/' ~ hou1_monitoring_identity_profile, 'service': 'authentik-worker'}
+      - >-
+        hou1_monitoring_containers['staff-app'] == {'directory': app_directory, 'service': 'astro-app'}
+      - >-
+        hou1_monitoring_containers.nginx == {'directory': app_directory, 'service': 'nginx'}
+      - >-
+        hou1_monitoring_containers.netbird == {'directory': netbird_control_plane_directory, 'service': 'netbird-server'}
+      - >-
+        hou1_monitoring_containers['netbird-dashboard'] == {'directory': netbird_control_plane_directory, 'service': 'dashboard'}
+      - app_directory is match('^/[a-zA-Z0-9_/-]+$')
+      - netbird_control_plane_directory is match('^/[a-zA-Z0-9_/-]+$')
+    fail_msg: Metrics must use the declared Compose deployment roots and credential-free log.
+  no_log: true
 
 - name: Prepare controller API context without reenrolling any peer
   ansible.builtin.import_tasks: ../../netbird_client/tasks/api-context.yml
@@ -33,7 +60,7 @@
 - name: Reconcile only the two metrics peer groups and their single-port policy
   ansible.builtin.import_tasks: policy.yml
 
-- name: Install dependencies through bounded test repository access
+- name: Install dependencies through existing package access policy
   ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
   vars:
     rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
@@ -58,7 +85,8 @@
     owner: root
     group: root
     mode: '0600'
-    content: "{{ {'environment': 'test', 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory, 'request_metrics_enabled': hou1_request_metrics_enabled, 'request_metrics_log': hou1_request_metrics_log} | to_nice_json }}"
+    content: "{{ {'environment': cms_environment, 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory, 'request_metrics_enabled': hou1_request_metrics_enabled, 'request_metrics_log': hou1_request_metrics_log} | to_nice_json }}"
+  no_log: true
 
 - name: Install the read-only aggregate collector
   ansible.builtin.copy:
@@ -84,6 +112,7 @@
     group: root
     mode: '0600'
   when: hou1_request_metrics_enabled
+  no_log: true
 
 - name: Check metric log size and retention hourly
   ansible.builtin.cron:

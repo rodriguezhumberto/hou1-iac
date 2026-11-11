@@ -1,7 +1,9 @@
 # Isolated HOU1 metrics for HOU4 (infrastructure #27)
 
 Run `ansible/playbooks/monitoring.yml` against the established private isolated
-inventory, with `hou1_monitoring_enabled: true` and the HOU4 NetBird address in
+inventory, with `hou1_monitoring_inventory_group` selecting that one-host group,
+`hou1_monitoring_identity_profile: test`, `hou1_monitoring_enabled: true` and
+the HOU4 NetBird address in
 `hou1_monitoring_peer_ip`. Retain the current encrypted controller PAT and age
 identity through the existing `netbird_token_vault_file` and
 `netbird_token_age_key_file` inputs. An old pre-rebuild PAT can return 404;
@@ -16,8 +18,8 @@ on `wt0`. It refuses public peers, ambiguous membership and operator-owned
 policy collisions. It does not change other groups, policies or enrollment.
 No database listener or Docker API is published. NetBird remains 0.82.0.
 
-A root-only minutely collector inspects fixed test container running/health
-state and performs a fixed PostgreSQL aggregate query under `BEGIN READ ONLY`.
+A root-only minutely collector discovers Compose services by their configured
+directory/service labels, inspects running/health state and performs a fixed PostgreSQL aggregate query under `BEGIN READ ONLY`.
 It publishes only numeric host/container/database/backup information through
 atomic root:prometheus-readable textfiles. No user rows, emails, passwords,
 connection strings or secrets enter metrics. Docker access is privileged even
@@ -45,7 +47,8 @@ marked `hou1-monitoring-test-metrics` policy and its two dedicated groups after
 checking they have no other references. Remove the installed collector/config,
 units, exporter override and textfiles if retiring this integration. Keep SSH,
 NetBird and all shared policies intact. This is an additive test integration;
-production needs its own reviewed target, secrets and rollout approval.
+production support and remaining live acceptance checks are described in
+[environment monitoring](environment-monitoring.md).
 
 See the dated evidence document for live results and known limits. Independent
 outage detection for HOU4 is explicitly deferred by the operator.
