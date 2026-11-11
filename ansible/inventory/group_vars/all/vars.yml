@@ -102,6 +102,54 @@ authentik_bootstrap_enabled: false
 authentik_staff_users: []
 authentik_google_enabled: false
 
+# Public deployment identity. Shared bootstrap/admission code consumes a selected
+# profile; account allowlists, assignments and OAuth secrets remain in SOPS.
+authentik_identity_profiles:
+  test:
+    environment: test
+    issuer_host: "auth-test.{{ primary_domain }}"
+    netbird_url: "https://netbird-test.{{ primary_domain }}"
+    netbird_subnet: 100.91.0.0/16
+    compose_project: "{{ authentik_compose_project_prefix }}-test"
+    compose_file: "{{ authentik_project_root_base }}/test/compose.yaml"
+    compose_service: authentik-server
+    staff:
+      client_id: pearland-paws-staff-test
+      application_name: Pearland Paws Staff Test
+      redirect_uris: ["https://staff-test.{{ primary_domain }}/api/staff/oidc/callback"]
+      logout_uris: ["https://staff-test.{{ primary_domain }}/staff/login"]
+    netbird:
+      client_id: netbird-test
+      application_name: NetBird Test
+      redirect_uris:
+        - "https://netbird-test.{{ primary_domain }}/oauth2/callback"
+        - "https://netbird-test.{{ primary_domain }}/nb-auth"
+        - "https://netbird-test.{{ primary_domain }}/nb-silent-auth"
+        - http://localhost:53000/
+      logout_uris: ["https://netbird-test.{{ primary_domain }}/nb-auth"]
+  prod:
+    environment: prod
+    issuer_host: "auth.{{ primary_domain }}"
+    netbird_url: "https://netbird.{{ primary_domain }}"
+    netbird_subnet: 100.90.0.0/16
+    compose_project: "{{ authentik_compose_project_prefix }}-prod"
+    compose_file: "{{ authentik_project_root_base }}/prod/compose.yaml"
+    compose_service: authentik-server
+    staff:
+      client_id: pearland-paws-staff
+      application_name: Pearland Paws Staff
+      redirect_uris: ["https://staff.{{ primary_domain }}/api/staff/oidc/callback"]
+      logout_uris: ["https://staff.{{ primary_domain }}/staff/login"]
+    netbird:
+      client_id: netbird-prod
+      application_name: NetBird Production
+      redirect_uris:
+        - "https://netbird.{{ primary_domain }}/oauth2/callback"
+        - "https://netbird.{{ primary_domain }}/nb-auth"
+        - "https://netbird.{{ primary_domain }}/nb-silent-auth"
+        - http://localhost:53000/
+      logout_uris: ["https://netbird.{{ primary_domain }}/nb-auth"]
+
 # Opt in only for isolated rehearsals with a Google source. Rules target the
 # running server container and expire unless its endpoint refresh succeeds.
 rehearsal_google_oauth_enabled: false

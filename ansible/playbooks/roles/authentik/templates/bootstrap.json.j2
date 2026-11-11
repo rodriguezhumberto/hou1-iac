@@ -1,0 +1,35 @@
+{
+  "environment": {{ authentik_environment | to_json }},
+  "groups": [
+    {"name": "pearland-paws-staff-admin"},
+    {"name": "pearland-paws-staff-editor"},
+    {"name": "pearland-paws-staff-reader"}
+  ],
+  "users": {{ authentik_staff_users | to_json }},
+{% if authentik_google_enabled | default(false) %}
+  "google": {
+    "client_id": {{ authentik_decrypted.GOOGLE_OAUTH_CLIENT_ID | to_json }},
+    "allowed_emails": {{ authentik_decrypted.GOOGLE_ALLOWED_EMAILS | to_json }}
+  },
+{% endif %}
+  "scope_mappings": [
+    {"name": "Pearland Paws profile {{ authentik_environment }}", "scope_name": "profile", "expression": "return {'name': user.name, 'preferred_username': user.username}"},
+    {"name": "Pearland Paws groups {{ authentik_environment }}", "scope_name": "groups", "expression": "return {'groups': [group.name for group in user.ak_groups.all() if group.name in ['pearland-paws-staff-admin', 'pearland-paws-staff-editor', 'pearland-paws-staff-reader']]}"},
+    {"name": "Pearland Paws audience {{ authentik_environment }}", "scope_name": "audience", "expression": "return {'aud': provider.client_id}"}
+  ],
+{% for name in ['staff', 'netbird'] %}
+{% set client = authentik_identity_profiles[authentik_environment][name] %}
+  "{{ name }}": {
+    "issuer_host": {{ authentik_identity_profiles[authentik_environment].issuer_host | to_json }},
+    "provider_name": {{ client.client_id | to_json }},
+    "application_name": {{ client.application_name | to_json }},
+    "application_slug": {{ client.client_id | to_json }},
+    "client_id": {{ client.client_id | to_json }},
+    "audience": {{ client.client_id | to_json }},
+    "secret_env": "{{ name | upper }}_OIDC_CLIENT_SECRET",
+    "scopes": ["profile", "groups", "audience"],
+    "redirect_uris": {{ client.redirect_uris | to_json }},
+    "logout_uris": {{ client.logout_uris | to_json }}
+  }{{ ',' if not loop.last else '' }}
+{% endfor %}
+}

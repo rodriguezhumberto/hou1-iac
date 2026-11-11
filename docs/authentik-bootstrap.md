@@ -14,13 +14,21 @@ ansible-playbook playbooks/authentik-bootstrap.yml \
 The bootstrap utility uses the Authentik API and only reconciles the named
 groups, users, property mappings, providers, and applications in the selected
 manifest. It never deletes or rewrites unrelated identities. Re-running it is
-idempotent. Test and production manifests use separate issuer hosts,
-certificates, client IDs, redirect/logout URIs, and SOPS-rendered secrets:
+idempotent. `authentik_identity_profiles` in inventory defines the public issuer,
+management endpoint, subnet, client IDs, callback/logout lists, and Compose
+selectors. One shared manifest template consumes the selected profile; bootstrap
+and admission share its validator. The default profiles are:
 
 | environment | staff client/audience | NetBird client/audience |
 | --- | --- | --- |
 | test | `pearland-paws-staff-test` | `netbird-test` |
 | prod | `pearland-paws-staff` | `netbird-prod` |
+
+Override deployment values in the inventory profile, rather than editing Python
+or maintaining a second manifest template. Keep test/production clients, domains,
+certificates and SOPS secrets separate. The role checks that its Compose selector
+matches its deployment path. Client/provider/application identifiers use the
+configured client ID; other naming conventions are not enforced in Python.
 
 The `groups` scope mapping emits only the exact staff group names. The staff
 application and NetBird client each have a distinct audience and redirect
@@ -41,7 +49,7 @@ the encrypted admission configuration still manages explicit roles after first
 login. Other login sources remain on the identification stage. This opt-in
 source bootstrap validates the environment's exact client IDs and callback/logout
 contract before API writes. Production uses its own Google OAuth client and
-secret; register `https://auth.<production-suffix>/source/oauth/callback/google/`
+secret; register `https://<profile-issuer-host>/source/oauth/callback/google/`
 as its Google authorized redirect URI. Do not reuse the rehearsal OAuth client.
 
 For production, select the production inventory and `deploy_environment=prod`,
@@ -56,13 +64,31 @@ using the [admission command](#google-admission-and-staffvpn-assignments).
 The historical filename `scripts/rehearsal-netbird-admission.py` supports both
 environments. It decrypts the configuration and endpoint-matched NetBird token
 only in memory; plaintext inputs and SOPS integrity failures are rejected.
+Export the public profile from the same inventory and variable overrides used
+for deployment. This playbook selects one host's variables and writes on the
+controller without connecting to that host:
+
+```bash
+ansible-playbook -i ansible/inventory/inventory.yml \
+  ansible/playbooks/export-identity-profile.yml \
+  -e target_hosts=hou1_prod -e deploy_environment=prod \
+  -e identity_profile_output=/private/identity-prod.json --ask-vault-pass
+```
+
+The exported profile contains no account allowlist, roles, OAuth secret or token.
+Treat it as trusted deployment configuration and protect it from modification;
+the command does not accept a profile embedded in the encrypted admission file
+as its expected destination. Refresh the export after inventory changes.
 
 ```bash
 python3 scripts/rehearsal-netbird-admission.py \
+  --profile /private/identity-prod.json \
   --config /private/admission-prod.enc.json --age-key-file /private/scoped-age-key
 ```
 
-Select these values inside the SOPS-encrypted configuration; never pass emails,
+The SOPS-encrypted admission configuration retains its environment and destination
+bindings. They must exactly match the independently exported profile; mismatches
+fail before API access. The default bindings are shown below. Never pass emails,
 role assignments or tokens on the command line:
 
 | Input | Test | Production |
@@ -77,11 +103,13 @@ Also supply `ssh` (the SSH argument list for the selected host),
 `netbird_token_file` (a separate SOPS-encrypted, endpoint-bound API token bundle),
 `age_key_file` (its scoped identity path), `google_emails` (exact lowercase approved
 addresses), and optional `staff_users` entries with `email` and `role`
-(`reader`, `editor`, or `admin`). The issuer and management endpoint must share
-the same DNS suffix. Ports, credentials, paths, queries and fragments are refused
-in the management origin. The Authentik container is derived from the environment;
-it cannot be supplied as an override. Use an authenticated SSH host/key binding
-and the approved environment-specific host inventory.
+(`reader`, `editor`, or `admin`). HTTPS origins, callback/logout lists and subnet
+syntax are validated, without prescribing hostname prefixes or DNS suffixes.
+Ports, credentials, paths, queries and fragments are refused in the management
+origin. The command discovers exactly one running Authentik container with
+`docker compose -p <profile-project> -f <profile-compose-file> ps -q <profile-service>`;
+there is no generated container-name assumption or fallback. Use an authenticated
+SSH host/key binding and the approved environment-specific host inventory.
 
 Reconciliation verifies both Google source bindings fail closed in ALL mode,
 then exercises the running policies for approved, unlisted and unverified
@@ -95,7 +123,7 @@ New identities are counted as awaiting first login. Rerun after their first
 Google/NetBird login, then refresh the staff session and verify the intended
 role and VPN reachability. Production application admission permits active,
 allowlisted Google-source users only; the local emergency identity is preserved
-and has no rehearsal-fixture bypass. Use the [offboarding command](operator-offboarding.md)
+and has no rehearsal-fixture bypass, regardless of profile settings. Use the [offboarding command](operator-offboarding.md)
 to revoke an existing identity and its sessions/devices; changing an allowlist
 alone does not revoke existing tokens or peers.
 

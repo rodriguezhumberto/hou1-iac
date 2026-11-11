@@ -13,6 +13,7 @@ import yaml
 
 from jinja2 import Environment
 from helpers import run_play
+from identity_fixtures import identity_profile, identity_manifest
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE = ROOT / 'ansible/playbooks/roles/authentik'
@@ -89,16 +90,11 @@ class AuthentikBootstrapTest(unittest.TestCase):
         return api
 
     def google_manifest(self, environment='test'):
-        env = Environment()
-        env.filters['to_json'] = json.dumps
-        return json.loads(env.from_string((ROLE / f'templates/bootstrap-{environment}.json.j2').read_text()).render(
-            primary_domain='example.invalid', authentik_staff_users=[], authentik_google_enabled=True,
-            authentik_decrypted={'GOOGLE_OAUTH_CLIENT_ID': 'fixture.apps.googleusercontent.com',
-                                 'GOOGLE_ALLOWED_EMAILS': ['allowed@example.invalid']}))
+        return identity_manifest(environment, google=True)
 
     def test_google_fresh_bootstrap_gates_flows_before_enabling_source_and_preserves_other_sources(self):
         manifest = self.google_manifest()
-        bootstrap.validate_manifest(manifest, 'test')
+        bootstrap.validate_manifest(manifest, 'test', identity_profile('test'))
         api = self.google_api()
         bootstrap.apply_google(manifest['google'], api, 'fixture-secret')
         source = api.objects['sources/oauth'][0]
@@ -256,11 +252,11 @@ class AuthentikBootstrapTest(unittest.TestCase):
                 manifest = self.google_manifest(environment)
                 manifest['google']['allowed_emails'] = value
                 with self.subTest(environment=environment, value=value), self.assertRaises(ValueError):
-                    bootstrap.validate_manifest(manifest, environment)
+                    bootstrap.validate_manifest(manifest, environment, identity_profile(environment))
 
     def test_production_google_bootstrap_is_idempotent_and_preserves_emergency_admin(self):
         manifest = self.google_manifest('prod')
-        bootstrap.validate_manifest(manifest, 'prod')
+        bootstrap.validate_manifest(manifest, 'prod', identity_profile('prod'))
         api = self.google_api()
         emergency = {'pk': 1, 'username': 'akadmin', 'is_superuser': True, 'groups': ['emergency']}
         api.objects['core/users'] = [emergency.copy()]
@@ -292,7 +288,81 @@ class AuthentikBootstrapTest(unittest.TestCase):
                 manifest = self.google_manifest('prod')
                 manifest[client_name][key] = self.google_manifest()[client_name][key]
                 with self.subTest(client=client_name, key=key), self.assertRaises(ValueError):
-                    bootstrap.validate_manifest(manifest, 'prod')
+                    bootstrap.validate_manifest(manifest, 'prod', identity_profile('prod'))
+
+    def test_inventory_values_drive_bootstrap_without_naming_conventions(self):
+        profile = identity_profile('prod')
+        profile.update(issuer_host='login.identity.invalid', netbird_url='https://vpn.edge.invalid',
+                       netbird_subnet='100.100.0.0/16', compose_project='custom-identity',
+                       compose_file='/opt/custom-identity/compose.yaml', compose_service='identity-api')
+        for name in ('staff', 'netbird'):
+            profile[name].update(client_id='custom-' + name, application_name='Custom ' + name,
+                                 redirect_uris=['https://' + name + '.edge.invalid/callback'],
+                                 logout_uris=['https://' + name + '.edge.invalid/logout'])
+        manifest = identity_manifest('prod', google=True, profile=profile)
+        bootstrap.validate_manifest(manifest, 'prod', profile)
+        api = self.google_api()
+        bootstrap.apply(manifest, api, {'STAFF_OIDC_CLIENT_SECRET': 'staff-fixture',
+                                      'NETBIRD_OIDC_CLIENT_SECRET': 'vpn-fixture',
+                                      'GOOGLE_OAUTH_CLIENT_SECRET': 'google-fixture'})
+        self.assertEqual({p['client_id'] for p in api.objects['providers/oauth2']},
+                         {'custom-staff', 'custom-netbird'})
+        self.assertEqual({a['slug'] for a in api.objects['core/applications']},
+                         {'custom-staff', 'custom-netbird'})
+        with self.assertRaises(ValueError):
+            bootstrap.validate_manifest(manifest, 'prod', identity_profile('prod'))
+
+    def test_profile_rejects_unsafe_endpoints_paths_and_client_contracts(self):
+        changes = [('issuer_host', 'user@auth.example.invalid'),
+                   ('netbird_url', 'https://vpn.example.invalid/extra'),
+                   ('netbird_url', 'https://vpn.example.invalid?query'),
+                   ('netbird_subnet', 'not-a-subnet'), ('netbird_subnet', '100.90.1.1/16'),
+                   ('compose_project', 'stack; echo unsafe'), ('compose_file', 'relative/compose.yaml'),
+                   ('compose_file', '/opt/../other/compose.yaml')]
+        for key, value in changes:
+            profile = identity_profile('prod')
+            profile[key] = value
+            with self.subTest(key=key, value=value), self.assertRaises(ValueError):
+                bootstrap.validate_profile(profile)
+        for key, value in [('client_id', 'unsafe/client'), ('redirect_uris', []),
+                           ('redirect_uris', ['http://staff.example.invalid/callback']),
+                           ('logout_uris', ['https://user@staff.example.invalid/logout'])]:
+            profile = identity_profile('prod')
+            profile['staff'][key] = value
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                bootstrap.validate_profile(profile)
+
+    def test_profile_export_renders_inventory_without_private_identity_values(self):
+        playbook = yaml.safe_load((ROOT / 'ansible/playbooks/export-identity-profile.yml').read_text())[0]
+        self.assertFalse(playbook['gather_facts'])
+        with tempfile.TemporaryDirectory() as directory:
+            output = Path(directory) / 'profile.json'
+            for environment in ('test', 'prod'):
+                result = run_play({'primary_domain': 'example.invalid', 'deploy_environment': environment,
+                                   'identity_profile_output': str(output)}, playbook['tasks'])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertEqual(json.loads(output.read_text()), identity_profile(environment))
+                self.assertEqual(output.stat().st_mode & 0o777, 0o600)
+                self.assertNotIn('google_emails', output.read_text())
+                self.assertNotIn('staff_users', output.read_text())
+            output.unlink()
+            result = run_play({'primary_domain': 'example.invalid', 'deploy_environment': 'unknown',
+                               'identity_profile_output': str(output)}, playbook['tasks'])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertFalse(output.exists())
+
+    def test_role_uses_configured_project_and_rejects_a_different_compose_path(self):
+        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())[:2]
+        profile = identity_profile('prod')
+        profile['compose_project'] = 'custom-identity'
+        variables = dict(authentik_environment='prod', authentik_identity_profiles={'prod': profile},
+                         authentik_age_key_file='/private/key', authentik_secret_source='/private/prod.enc.yaml')
+        result = run_play(variables, tasks + [{'ansible.builtin.assert': {
+            'that': "authentik_compose_project == 'custom-identity'"}}])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        profile['compose_file'] = '/opt/a-different-stack/compose.yaml'
+        result = run_play(variables, tasks)
+        self.assertNotEqual(result.returncode, 0)
 
     def test_production_google_opt_in_requires_bootstrap(self):
         task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
@@ -306,11 +376,8 @@ class AuthentikBootstrapTest(unittest.TestCase):
             self.assertEqual(result.returncode == 0, enabled, result.stdout + result.stderr)
 
     def test_pinned_schema_reconciles_twice_without_duplicate_objects(self):
-        env = Environment()
-        env.filters['to_json'] = json.dumps
-        manifest = json.loads(env.from_string((ROLE / 'templates/bootstrap-test.json.j2').read_text()).render(
-            primary_domain='example.invalid', authentik_staff_users=[]))
-        bootstrap.validate_manifest(manifest, 'test')
+        manifest = identity_manifest()
+        bootstrap.validate_manifest(manifest, 'test', identity_profile('test'))
         api = FixtureAPI()
         secrets = {'STAFF_OIDC_CLIENT_SECRET': 'test-staff', 'NETBIRD_OIDC_CLIENT_SECRET': 'test-netbird'}
         self.assertEqual(bootstrap.apply(manifest, api, secrets), {'groups': 3, 'users': 0, 'providers': 2})
@@ -345,11 +412,8 @@ class AuthentikBootstrapTest(unittest.TestCase):
         self.assertEqual(api.writes, [])
 
     def test_profile_does_not_duplicate_or_expand_staff_group_claims(self):
-        env = Environment()
-        env.filters['to_json'] = json.dumps
         for environment in ['test', 'prod']:
-            manifest = json.loads(env.from_string((ROLE / 'templates' / f'bootstrap-{environment}.json.j2').read_text()).render(
-                primary_domain='example.invalid', authentik_staff_users=[]))
+            manifest = identity_manifest(environment)
             user = SimpleNamespace(name='Reader', username='reader', ak_groups=SimpleNamespace(all=lambda: [
                 SimpleNamespace(name='pearland-paws-staff-reader'), SimpleNamespace(name='unrelated-admin')]))
             claims = []
@@ -367,19 +431,14 @@ class AuthentikBootstrapTest(unittest.TestCase):
             self.assertIn(required, script)
 
     def test_manifests_keep_clients_and_audiences_isolated(self):
-        for env in ['test', 'prod']:
-            content = (ROLE / 'templates' / f'bootstrap-{env}.json.j2').read_text()
-            self.assertIn(f'"environment": "{env}"', content)
-            self.assertIn('client_id', content)
-            self.assertIn('audience', content)
-            self.assertIn('redirect_uris', content)
-            self.assertIn('logout_uris', content)
-        test = (ROLE / 'templates/bootstrap-test.json.j2').read_text()
-        prod = (ROLE / 'templates/bootstrap-prod.json.j2').read_text()
-        self.assertIn('pearland-paws-staff-test', test)
-        self.assertIn('pearland-paws-staff', prod)
-        self.assertIn('netbird-test', test)
-        self.assertIn('netbird-prod', prod)
+        test, prod = identity_manifest('test'), identity_manifest('prod')
+        for name in ('staff', 'netbird'):
+            self.assertNotEqual(test[name]['client_id'], prod[name]['client_id'])
+            self.assertNotEqual(test[name]['issuer_host'], prod[name]['issuer_host'])
+            self.assertNotEqual(test[name]['redirect_uris'], prod[name]['redirect_uris'])
+            self.assertNotEqual(test[name]['logout_uris'], prod[name]['logout_uris'])
+        for environment, manifest in [('test', test), ('prod', prod)]:
+            bootstrap.validate_manifest(manifest, environment, identity_profile(environment))
 
     def test_bootstrap_is_disabled_for_base_compose_deployments(self):
         tasks = (ROLE / 'tasks/main.yml').read_text()

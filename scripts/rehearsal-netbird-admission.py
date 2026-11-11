@@ -2,14 +2,23 @@
 """Enforce environment-bound Authentik admission before disabling NetBird approvals."""
 
 import argparse
+import importlib.util
 import json
 import os
+from pathlib import Path
 import re
 import shlex
 import subprocess
 import sys
 import urllib.parse
 import urllib.request
+
+# Use the same profile validator as managed-host bootstrap.
+_spec = importlib.util.spec_from_file_location(
+    'hou1_identity', Path(__file__).resolve().parents[1] /
+    'ansible/playbooks/roles/authentik/files/bootstrap.py')
+identity = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(identity)
 
 AUTH_REQUEST = r'''
 import json, os, sys, urllib.request
@@ -46,30 +55,19 @@ def unique(items, key, value):
 STAFF_ROLES = {role: 'pearland-paws-staff-' + role for role in ('reader', 'editor', 'admin')}
 
 
-def deployment_profile(config):
-    """Bind every destination to one environment before any API call or write."""
-    environment = config.get('environment')
-    if environment not in ('test', 'prod'):
-        raise ValueError('Select an explicit test or prod environment')
-    prefix = 'netbird-test.' if environment == 'test' else 'netbird.'
-    origin = config.get('netbird_url', '')
-    nb = urllib.parse.urlsplit(origin)
-    host = nb.hostname or ''
-    suffix = host.removeprefix(prefix)
-    if (not host.startswith(prefix) or not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', suffix)
-            or origin != 'https://' + host):
-        raise ValueError('Expected the exact environment-specific HTTPS NetBird origin')
-    client = 'netbird-test' if environment == 'test' else 'netbird-prod'
-    auth_host = ('auth-test.' if environment == 'test' else 'auth.') + suffix
-    if config.get('authentik_issuer') != f'https://{auth_host}/application/o/{client}/':
-        raise ValueError('Issuer must match the environment, DNS suffix and client')
-    subnet = '100.91.0.0/16' if environment == 'test' else '100.90.0.0/16'
-    if config.get('netbird_subnet') != subnet:
-        raise ValueError('Subnet must match the selected environment')
-    if environment == 'prod' and config.get('fixture_users'):
+def deployment_profile(config, profile):
+    """Bind encrypted inputs to a separately selected, inventory-exported profile."""
+    identity.validate_profile(profile)
+    if config.get('environment') != profile['environment']:
+        raise ValueError('Configuration and inventory profile environments differ')
+    issuer = 'https://' + profile['issuer_host'] + '/application/o/' + profile['netbird']['client_id'] + '/'
+    if (config.get('netbird_url') != profile['netbird_url']
+            or config.get('authentik_issuer') != issuer
+            or config.get('netbird_subnet') != profile['netbird_subnet']):
+        raise ValueError('Endpoints, client and subnet must match the selected inventory profile')
+    if profile['environment'] == 'prod' and config.get('fixture_users'):
         raise ValueError('Production admission cannot include rehearsal fixtures')
-    return {'environment': environment, 'client': client,
-            'container': f'hou1-authentik-{environment}-authentik-server-1'}
+    return profile
 
 
 def auth_results(auth, path):
@@ -125,8 +123,8 @@ def configure_staff_access(assignments, users, provider, auth, netbird):
     return {'staff_users_configured': configured, 'staff_users_awaiting_first_login': waiting}
 
 
-def configure(config, auth, netbird):
-    profile = deployment_profile(config)
+def configure(config, auth, netbird, profile):
+    profile = deployment_profile(config, profile)
     emails = sorted(set(config['google_emails']))
     if not emails or any(e != e.lower() or e.count('@') != 1 or '*' in e or any(c.isspace() for c in e) for e in emails):
         raise ValueError('Supply explicit lowercase Google account addresses')
@@ -143,7 +141,7 @@ def configure(config, auth, netbird):
         if u['type'] != 'internal' or not u['email'].endswith('@example.invalid'):
             raise ValueError('Fixtures must be isolated internal test identities')
         fixture_ids.append(u['pk'])
-    app_path = 'core/applications/' + profile['client'] + '/'
+    app_path = 'core/applications/' + profile['netbird']['client_id'] + '/'
     app = auth('GET', app_path)
     source = auth('GET', 'sources/oauth/google/')
     if not source['enabled'] or source['provider_type'] != 'google':
@@ -259,17 +257,29 @@ def load_encrypted_config(path, age_key_file=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', required=True)
+    p.add_argument('--profile', required=True, help='Public JSON exported from the selected Ansible inventory')
     p.add_argument('--age-key-file', help='Age identity for config decryption (or SOPS_AGE_KEY_FILE)')
     args = p.parse_args()
     c = load_encrypted_config(args.config, args.age_key_file)
-    profile = deployment_profile(c)
+    with open(args.profile, encoding='utf-8') as stream:
+        profile = deployment_profile(c, json.load(stream))
     token = load_encrypted_config(c['netbird_token_file'], c['age_key_file'])
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')
 
+    container = None
+
     def auth(method, path, body=None):
+        nonlocal container
+        if container is None:
+            command = shlex.join(['sudo', '-n', 'docker', 'compose', '-p', profile['compose_project'],
+                                  '-f', profile['compose_file'], 'ps', '-q', profile['compose_service']])
+            result = subprocess.run(c['ssh'] + [command], capture_output=True, text=True, check=True, timeout=35)
+            container = result.stdout.strip()
+            if not re.fullmatch(r'[0-9a-f]{12,64}', container):
+                raise ValueError('Expected exactly one running Compose service container')
         command = shlex.join(['sudo', '-n', 'docker', 'exec', '-i',
-            profile['container'], 'python', '-c', AUTH_REQUEST])
+            container, 'python', '-c', AUTH_REQUEST])
         r = subprocess.run(c['ssh'] + [command], input=json.dumps({
             'method': method, 'path': path, 'body': body}), capture_output=True,
             text=True, check=True, timeout=35)
@@ -286,7 +296,7 @@ def main():
             data = r.read()
             return json.loads(data) if data else {}
 
-    print(json.dumps(configure(c, auth, netbird)))
+    print(json.dumps(configure(c, auth, netbird, profile)))
 
 
 if __name__ == '__main__':

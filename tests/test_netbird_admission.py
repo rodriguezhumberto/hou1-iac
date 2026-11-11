@@ -14,6 +14,7 @@ import textwrap
 import unittest
 from unittest.mock import patch
 from contextlib import redirect_stdout
+from identity_fixtures import identity_profile
 
 SPEC = importlib.util.spec_from_file_location('admission', Path(__file__).resolve().parents[1] / 'scripts/rehearsal-netbird-admission.py')
 m = importlib.util.module_from_spec(SPEC)
@@ -79,6 +80,7 @@ def evaluate(expression, user, context=None):
 
 class AdmissionTest(unittest.TestCase):
     def setUp(self):
+        self.profile = identity_profile('test')
         self.config = {'environment': 'test', 'google_emails': ['allowed@gmail.com'],
                        'netbird_url': 'https://netbird-test.example.invalid',
                        'fixture_users': ['test-admin'], 'authentik_issuer': 'https://auth-test.example.invalid/application/o/netbird-test/',
@@ -102,7 +104,7 @@ class AdmissionTest(unittest.TestCase):
         if path.startswith('core/users/?'): return {'results': copy.deepcopy(self.users)}
         if path == 'sources/oauth/google/': return {'enabled': True, 'provider_type': 'google', 'authentication_flow': 'login', 'enrollment_flow': 'enroll'}
         if path.startswith('flows/instances/?'): return {'results': self.flows}
-        client = 'netbird-test' if self.config['environment'] == 'test' else 'netbird-prod'
+        client = self.profile['netbird']['client_id']
         if path == 'core/applications/' + client + '/':
             if method == 'PATCH': self.app.update(body)
             return self.app
@@ -135,14 +137,14 @@ class AdmissionTest(unittest.TestCase):
         raise AssertionError((method, path))
 
     def test_only_allowlisted_users_join_and_other_settings_and_roles_survive(self):
-        report = m.configure(self.config, self.auth, self.netbird)
+        report = m.configure(self.config, self.auth, self.netbird, self.profile)
         self.assertEqual(report['existing_allowlisted_pending_users_reconciled'], 1)
         self.assertFalse(self.account['settings']['extra']['user_approval_required'])
         self.assertTrue(self.account['settings']['extra']['peer_approval_enabled'])
         self.assertFalse(self.account['settings']['local_auth_disabled'])
         self.assertEqual([u['role'] for u in self.nb_users], ['user', 'user'])
         self.assertEqual([u['pending_approval'] for u in self.nb_users], [False, True])
-        m.configure(self.config, self.auth, self.netbird)
+        m.configure(self.config, self.auth, self.netbird, self.profile)
         self.assertEqual(len(self.policies), 2)
         self.assertEqual(len(self.bindings), 3)
 
@@ -153,7 +155,7 @@ class AdmissionTest(unittest.TestCase):
                 if fault == 'source-flow': self.flows[0]['policy_engine_mode'] = 'any'
                 elif fault == 'fail-open-binding': self.bindings[0]['failure_result'] = True
                 else: self.fail_policy = True
-                with self.assertRaises(ValueError): m.configure(self.config, self.auth, self.netbird)
+                with self.assertRaises(ValueError): m.configure(self.config, self.auth, self.netbird, self.profile)
                 self.assertEqual(self.nb_calls, [])
                 self.assertTrue(self.account['settings']['extra']['user_approval_required'])
 
@@ -168,7 +170,7 @@ class AdmissionTest(unittest.TestCase):
         for overrides in [{'environment': 'staging'}, {'google_emails': []}, {'google_emails': ['*@gmail.com']}, {'fixture_users': ['allowed']}, {'staff_users': [{'email': 'other@gmail.com', 'role': 'admin'}]}, {'staff_users': [{'email': 'allowed@gmail.com', 'role': 'owner'}]}]:
             self.setUp()
             with self.subTest(overrides=overrides), self.assertRaises(ValueError):
-                m.configure({**self.config, **overrides}, self.auth, self.netbird)
+                m.configure({**self.config, **overrides}, self.auth, self.netbird, self.profile)
             self.assertEqual(self.nb_calls, [])
 
 
@@ -176,6 +178,7 @@ class ProductionAdmissionTest(AdmissionTest):
     """Run the full admission contract against the production profile too."""
     def setUp(self):
         super().setUp()
+        self.profile = identity_profile('prod')
         self.config.update(environment='prod', fixture_users=[],
                            netbird_url='https://netbird.example.invalid',
                            authentik_issuer='https://auth.example.invalid/application/o/netbird-prod/',
@@ -184,12 +187,33 @@ class ProductionAdmissionTest(AdmissionTest):
 
     def test_production_has_no_fixture_bypass_and_preserves_local_emergency_identity(self):
         original = copy.deepcopy(self.users[1])
-        report = m.configure(self.config, self.auth, self.netbird)
+        report = m.configure(self.config, self.auth, self.netbird, self.profile)
         self.assertEqual(report['environment'], 'prod')
         policy = next(p for p in self.policies if p['name'] == 'HOU1 prod NetBird allowlist')
         self.assertTrue(evaluate(policy['expression'], self.users[0]))
         self.assertFalse(evaluate(policy['expression'], self.users[1]))
         self.assertEqual(self.users[1], original)
+
+    def test_admission_accepts_inventory_values_without_environment_naming_conventions(self):
+        self.profile.update(issuer_host='login.identity.invalid', netbird_url='https://vpn.edge.invalid',
+                            netbird_subnet='100.100.0.0/16', compose_project='custom-identity',
+                            compose_file='/opt/custom/compose.yaml', compose_service='identity-api')
+        self.profile['netbird']['client_id'] = 'custom-vpn'
+        self.config.update(netbird_url=self.profile['netbird_url'], netbird_subnet=self.profile['netbird_subnet'],
+                           authentik_issuer='https://login.identity.invalid/application/o/custom-vpn/')
+        self.account['settings']['network_range'] = self.profile['netbird_subnet']
+        report = m.configure(self.config, self.auth, self.netbird, self.profile)
+        self.assertEqual(report['environment'], 'prod')
+        self.assertFalse(self.account['settings']['extra']['user_approval_required'])
+
+    def test_inventory_cannot_enable_a_production_fixture_bypass(self):
+        self.profile['allow_fixtures'] = True
+        self.config['fixture_users'] = ['test-admin']
+        with patch.object(self, 'auth') as auth, patch.object(self, 'netbird') as nb:
+            with self.assertRaises(ValueError):
+                m.configure(self.config, auth, nb, self.profile)
+            auth.assert_not_called()
+            nb.assert_not_called()
 
     def test_cross_environment_inputs_fail_before_either_api_is_called(self):
         bad = [
@@ -209,7 +233,7 @@ class ProductionAdmissionTest(AdmissionTest):
         for override in bad:
             with self.subTest(override=override), patch.object(self, 'auth') as auth, patch.object(self, 'netbird') as nb:
                 with self.assertRaises(ValueError):
-                    m.configure({**self.config, **override}, auth, nb)
+                    m.configure({**self.config, **override}, auth, nb, self.profile)
                 auth.assert_not_called()
                 nb.assert_not_called()
 
@@ -232,33 +256,50 @@ class ProductionAdmissionTest(AdmissionTest):
                 return value
 
             with self.subTest(fault=fault), self.assertRaises(ValueError):
-                m.configure(self.config, auth, netbird)
+                m.configure(self.config, auth, netbird, self.profile)
             self.assertTrue(self.account['settings']['extra']['user_approval_required'])
             self.assertFalse(any(method != 'GET' for method, _, _ in self.nb_calls))
 
-    def test_cli_binds_production_container_and_encrypted_token_to_origin(self):
+    def test_cli_discovers_compose_service_and_binds_encrypted_token_to_origin(self):
         config = {**self.config, 'ssh': ['ssh', 'operator@vpn-host'],
                   'netbird_token_file': 'token.enc.json', 'age_key_file': '/private/scoped.key'}
         token = {'netbird_management_url': config['netbird_url'], 'netbird_api_token': 'private-fixture'}
 
-        def configure(c, auth, netbird):
+        def configure(c, auth, netbird, profile):
+            self.assertEqual(profile, self.profile)
             self.assertEqual(c, config)
             self.assertEqual(auth('GET', 'core/users/'), {})
             return {'environment': 'prod'}
 
         output = io.StringIO()
-        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--age-key-file', '/private/scoped.key']), \
+        temp = tempfile.TemporaryDirectory()
+        self.addCleanup(temp.cleanup)
+        profile_file = Path(temp.name) / 'profile.json'
+        profile_file.write_text(json.dumps(self.profile))
+        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--age-key-file', '/private/scoped.key']), \
                 patch.object(m, 'load_encrypted_config', side_effect=[config, token]) as decrypt, \
                 patch.object(m, 'configure', side_effect=configure), \
-                patch.object(m.subprocess, 'run', return_value=SimpleNamespace(stdout='{}')) as run, redirect_stdout(output):
+                patch.object(m.subprocess, 'run', side_effect=[SimpleNamespace(stdout='a' * 64), SimpleNamespace(stdout='{}')]) as run, redirect_stdout(output):
             m.main()
         self.assertEqual(decrypt.call_args_list[1].args, ('token.enc.json', '/private/scoped.key'))
-        command = run.call_args.args[0]
-        self.assertIn('hou1-authentik-prod-authentik-server-1', command[-1])
-        self.assertNotIn('hou1-authentik-test-', command[-1])
+        discovery = run.call_args_list[0].args[0][-1]
+        self.assertIn('docker compose -p ' + self.profile['compose_project'], discovery)
+        self.assertIn('-f ' + self.profile['compose_file'], discovery)
+        self.assertIn('ps -q ' + self.profile['compose_service'], discovery)
+        command = run.call_args_list[1].args[0]
+        self.assertIn('a' * 64, command[-1])
+        self.assertNotIn('hou1-authentik-prod-authentik-server-1', command[-1])
         self.assertNotIn(token['netbird_api_token'], str(command) + output.getvalue())
+        for container in ('', 'not-a-container-id', 'a' * 64 + '\n' + 'b' * 64):
+            with self.subTest(container=container), \
+                    patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file)]), \
+                    patch.object(m, 'load_encrypted_config', side_effect=[config, token]), \
+                    patch.object(m.subprocess, 'run', return_value=SimpleNamespace(stdout=container)) as run:
+                with self.assertRaisesRegex(ValueError, 'exactly one running'):
+                    m.main()
+                self.assertEqual(run.call_count, 1)
         token['netbird_management_url'] = 'https://netbird-test.example.invalid'
-        with patch('sys.argv', ['admission', '--config', 'admission.enc.json']), \
+        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file)]), \
                 patch.object(m, 'load_encrypted_config', side_effect=[config, token]), \
                 patch.object(m, 'configure') as configure, patch.object(m.subprocess, 'run') as run:
             with self.assertRaisesRegex(ValueError, 'different NetBird deployment'):

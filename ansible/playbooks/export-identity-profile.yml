@@ -1,0 +1,25 @@
+---
+- name: Export one public identity profile without connecting to the managed host
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
+  become: false
+  tasks:
+    - name: Require an explicit environment and a single inventory host
+      ansible.builtin.assert:
+        that:
+          - ansible_play_hosts | length == 1
+          - deploy_environment is defined
+          - deploy_environment in authentik_identity_profiles
+          - authentik_identity_profiles[deploy_environment].environment == deploy_environment
+          - identity_profile_output is defined
+          - identity_profile_output is match('^/')
+        fail_msg: Select one inventory host, an explicit environment, and an absolute controller output path.
+
+    - name: Export public profile from the selected inventory on the controller
+      ansible.builtin.copy:
+        content: "{{ authentik_identity_profiles[deploy_environment] | to_nice_json }}\n"
+        dest: "{{ identity_profile_output }}"
+        mode: '0600'
+      delegate_to: localhost
+      vars:
+        ansible_python_interpreter: "{{ ansible_playbook_python }}"

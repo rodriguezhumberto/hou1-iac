@@ -1,27 +1,20 @@
 {
-  "recorded_at": "2026-11-11T02:14:19.843753+00:00",
+  "recorded_at": "2026-11-11T02:45:32.850764+00:00",
   "issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/23",
   "scope": "Production Google source, admission, and explicit staff/VPN assignments",
   "base_ref": "552446c9eb846531397875d9f6fca89f0f04d078",
   "validation": {
     "focused_identity_tests": {
-      "tests_run": 37,
-      "result": "passed"
+      "tests_run": 43,
+      "result": "passed as part of the full suite"
     },
     "repository_tests": {
-      "command": "NGINX_BIN=<local nginx binary> python3 -m unittest discover -s tests -v",
-      "tests_run": 247,
+      "command": "NGINX_BIN=<local nginx binary> DNSMASQ_BIN=<local dnsmasq binary> python3 -m unittest discover -s tests -v",
+      "tests_run": 253,
+      "duration_seconds": 429.315,
       "result": "passed",
-      "skipped": 1,
-      "log_sha256": "10bcc867cc8a27e271597b05014b9983cbd6d538c33398311679bcbb3b2538a1",
-      "skipped_test": "test_netbird_dns.DnsTest.test_real_resolver_private_records_and_public_forwarding",
-      "skipped_test_follow_up": {
-        "command": "DNSMASQ_BIN=<local dnsmasq binary> PYTHONPATH=tests python3 -m unittest test_netbird_dns.DnsTest.test_real_resolver_private_records_and_public_forwarding -v",
-        "tests_run": 1,
-        "result": "passed",
-        "resolver_version": "2.91-1+deb13u2",
-        "log_sha256": "c6f3160fe490d8a0e3c3ea07af28043407f1599843e72cc6761b9d0d84e92e81"
-      }
+      "skipped": 0,
+      "log_sha256": "39a1194b778f9f278a6ea84c82dbc2ebdc4fa6131cead535eba6566a39e404fc"
     },
     "ansible_syntax_checks": [
       {
@@ -30,6 +23,10 @@
       },
       {
         "playbook": "authentik-bootstrap",
+        "exit_code": 0
+      },
+      {
+        "playbook": "export-identity-profile",
         "exit_code": 0
       },
       {
@@ -71,10 +68,29 @@
     "Live-policy check failures and fail-open source bindings preserve manual approval",
     "Incomplete Authentik pages and mismatched NetBird connectors/accounts cannot disable approval",
     "Staff app administration does not grant NetBird administration; unrelated groups survive",
-    "The CLI selects the production Authentik container and requires an endpoint-matched encrypted token",
-    "Real SOPS/age tests reject plaintext, wrong keys and tampered configurations"
+    "Real SOPS/age tests reject plaintext, wrong keys and tampered configurations",
+    "Shared bootstrap and admission accept custom inventory hostnames, client IDs, subnets and Compose selectors",
+    "Controller-only profile export matches the selected inventory and contains no identity allowlist or secrets",
+    "The role uses the configured Compose project and rejects a mismatched Compose file path",
+    "Compose service discovery rejects missing, invalid or multiple container IDs without an exec fallback",
+    "The CLI requires an independently exported profile and an endpoint-matched encrypted token",
+    "Production fixtures remain forbidden regardless of profile settings"
   ],
   "live_production_validation": false,
   "live_hosts_changed": false,
-  "remaining_identity_gate": "Supply the separate production Google client/secrets, validate Google egress, and prove live admission, first-login reconciliation, roles and VPN reachability."
+  "remaining_identity_gate": "Supply the separate production Google client/secrets, validate Google egress, and prove live admission, first-login reconciliation, roles and VPN reachability.",
+  "previous_head_ref": "5bb621cdebe090c40f410fd94bb9397d361c809f",
+  "profile_source": "ansible/inventory/group_vars/all/vars.yml: authentik_identity_profiles",
+  "validation_source_sha256": {
+    "ansible/inventory/group_vars/all/vars.yml": "709ebfba4f0b4d5215a06d2a8160aa5237ca8ab62f228b387ce563c04593d08e",
+    "ansible/playbooks/authentik-bootstrap.yml": "fb0d82c98b3b4c0478cad7617d5f2513751269824305d984843d50ace0d7b88d",
+    "ansible/playbooks/export-identity-profile.yml": "fd55d5fea1a0e5c529c92a8e7f6631307fac8ea599b44c33ae0ae8b82ccc1e3c",
+    "ansible/playbooks/roles/authentik/files/bootstrap.py": "b88db699e259f37772ece2ec674fb7e77927a3c00089677979b5d07074d626bd",
+    "ansible/playbooks/roles/authentik/tasks/main.yml": "76944707be0e37bfec0bb92d7cd0ef1836fe3de670f8518b84561bcc54b33efb",
+    "ansible/playbooks/roles/authentik/templates/bootstrap.json.j2": "f14bb786fa6b7e4ba742dd8e5b1c7296c4c9c9fed36346a8826c5e8d58945539",
+    "scripts/rehearsal-netbird-admission.py": "7c631cf759127ab91e4c635d3034da50d0aa361f48af51d66e81f5c87bb7a72e",
+    "tests/test_authentik_bootstrap.py": "cffac5a553023b4eaa8115f2268317684226a435a6820eccbdf8b9f7ba9ed910",
+    "tests/test_netbird_admission.py": "137e23864036f71066a87ceb1d6838a173915061e8da5a233f2b1b397fe9ec0d",
+    "tests/identity_fixtures.py": "03f36da40cd52f14e1ae9d9cf3a0946e41a81d8e796aec166868a929a588c873"
+  }
 }

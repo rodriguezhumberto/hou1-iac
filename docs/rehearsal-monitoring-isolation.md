@@ -80,9 +80,12 @@ Google source and its verified-email policy:
 
 ```bash
 python3 scripts/rehearsal-netbird-admission.py \
+  --profile <inventory-profile.json> \
   --config <private-admission.enc.json> --age-key-file <private-age-identity>
 ```
 
+First export the test profile using the [inventory export procedure](authentik-bootstrap.md#google-admission-and-staffvpn-assignments),
+selecting the same rehearsal inventory and `deploy_environment=test`.
 The entire private JSON file must be SOPS/age encrypted, including every email
 and staff-role value. The script decrypts it in memory and rejects plaintext,
 wrong-key, or integrity-check failures before contacting either service. Supply

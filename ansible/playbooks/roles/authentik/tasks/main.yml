@@ -3,7 +3,7 @@
   ansible.builtin.set_fact:
     authentik_project_root: "{{ authentik_project_root_base }}/{{ authentik_environment }}"
     authentik_data_root: "{{ authentik_data_root_base }}/{{ authentik_environment }}"
-    authentik_compose_project: "{{ authentik_compose_project_prefix }}-{{ authentik_environment }}"
+    authentik_compose_project: "{{ authentik_identity_profiles[authentik_environment].compose_project }}"
     authentik_ingress_network: "{{ authentik_test_network if authentik_environment == 'test' else authentik_prod_network }}"
     authentik_backup_root: "{{ authentik_backup_root_base }}/{{ authentik_environment }}"
     authentik_offhost_backup_root: "{{ authentik_offhost_backup_root_base }}/{{ authentik_environment }}"
@@ -12,9 +12,13 @@
   ansible.builtin.assert:
     that:
       - authentik_environment in ['test', 'prod']
+      - authentik_environment in authentik_identity_profiles
+      - authentik_identity_profiles[authentik_environment].environment == authentik_environment
       - authentik_project_root is match('^/opt/hou1-authentik/(test|prod)$')
       - authentik_data_root is match('^/var/lib/hou1-authentik/(test|prod)$')
-      - authentik_compose_project is match('^hou1-authentik-(test|prod)$')
+      - authentik_compose_project is match('^[a-z0-9][a-z0-9_-]*$')
+      - authentik_identity_profiles[authentik_environment].compose_file == authentik_project_root ~ '/compose.yaml'
+      - authentik_identity_profiles[authentik_environment].compose_service == 'authentik-server'
       - authentik_age_key_file is defined
       - authentik_age_key_file is match('^/')
       - authentik_secret_source is defined
@@ -232,7 +236,7 @@
 
 - name: Derive the environment-specific public Authentik hostname
   ansible.builtin.set_fact:
-    authentik_domain: "{{ 'auth-test.' ~ primary_domain if authentik_environment == 'test' else 'auth.' ~ primary_domain }}"
+    authentik_domain: "{{ authentik_identity_profiles[authentik_environment].issuer_host }}"
     authentik_server_alias: "authentik-server-{{ authentik_environment }}"
 
 - name: Require the existing Nginx ingress mount before publishing Authentik
@@ -335,9 +339,18 @@
     authentik_bootstrap_base_url: "{{ authentik_api_url | default('http://' ~ authentik_bootstrap_container.container.NetworkSettings.Networks[authentik_ingress_network].IPAddress ~ ':9000') }}"
   when: authentik_bootstrap_enabled | bool
 
+- name: Render the public inventory identity profile for independent validation
+  ansible.builtin.copy:
+    content: "{{ authentik_identity_profiles[authentik_environment] | to_nice_json }}\n"
+    dest: "{{ authentik_project_root }}/identity-profile.json"
+    owner: root
+    group: root
+    mode: '0600'
+  when: authentik_bootstrap_enabled | bool
+
 - name: Render the isolated environment identity manifest
   ansible.builtin.template:
-    src: "bootstrap-{{ authentik_environment }}.json.j2"
+    src: bootstrap.json.j2
     dest: "{{ authentik_project_root }}/bootstrap.json"
     owner: root
     group: root
@@ -358,6 +371,8 @@
           - "{{ authentik_bootstrap_base_url }}"
           - --environment
           - "{{ authentik_environment }}"
+          - --profile
+          - "{{ authentik_project_root }}/identity-profile.json"
           - --manifest
           - "{{ authentik_project_root }}/bootstrap.json"
       environment:

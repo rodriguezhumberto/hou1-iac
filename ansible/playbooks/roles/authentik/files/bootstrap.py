@@ -2,10 +2,12 @@
 """Idempotently apply the environment-specific Authentik identity contract."""
 import argparse
 import json
+import ipaddress
 import os
 import re
 import ssl
 import time
+from pathlib import Path
 import urllib.parse
 import urllib.request
 
@@ -51,40 +53,65 @@ class AuthentikAPI:
         return self.request('POST', f'/{resource}/', payload)['pk']
 
 
-def validate_manifest(manifest, environment):
-    if environment not in ('test', 'prod'):
+def https_origin(value):
+    parsed = urllib.parse.urlsplit(value)
+    if (parsed.scheme != 'https' or not parsed.hostname
+            or value != 'https://' + parsed.hostname
+            or not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', parsed.hostname)):
+        raise ValueError('Expected an exact HTTPS origin without credentials, port or suffix')
+    return value
+
+
+def validate_profile(profile):
+    """Validate public inventory inputs without embedding deployment conventions."""
+    if profile.get('environment') not in ('test', 'prod'):
         raise ValueError('Select an explicit test or prod environment')
-    if manifest.get('environment') != environment:
+    https_origin('https://' + profile['issuer_host'])
+    https_origin(profile['netbird_url'])
+    ipaddress.IPv4Network(profile['netbird_subnet'], strict=True)
+    for key in ('compose_project', 'compose_service'):
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', profile[key]):
+            raise ValueError('Expected an explicit Compose project and service')
+    compose_file = Path(profile['compose_file'])
+    if not compose_file.is_absolute() or '..' in compose_file.parts:
+        raise ValueError('Expected an absolute Compose file path')
+    for name in ('staff', 'netbird'):
+        client = profile[name]
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', client['client_id']) or not client['application_name']:
+            raise ValueError('Expected a named client identity')
+        for key in ('redirect_uris', 'logout_uris'):
+            uris = client[key]
+            if not isinstance(uris, list) or not uris or len(set(uris)) != len(uris):
+                raise ValueError('Expected nonempty, unique redirect and logout allowlists')
+            for uri in uris:
+                # The NetBird CLI loopback callback is a protocol requirement,
+                # independent of environment names or deployment hostnames.
+                if name == 'netbird' and key == 'redirect_uris' and uri == 'http://localhost:53000/':
+                    continue
+                parsed = urllib.parse.urlsplit(uri)
+                https_origin('https://' + parsed.netloc)
+                if parsed.scheme != 'https' or parsed.fragment:
+                    raise ValueError('Expected HTTPS redirects and logout URIs')
+    if profile['staff']['client_id'] == profile['netbird']['client_id']:
+        raise ValueError('Staff and NetBird must have separate client identities')
+    return profile
+
+
+def validate_manifest(manifest, environment, profile):
+    validate_profile(profile)
+    if manifest.get('environment') != environment or profile['environment'] != environment:
         raise ValueError('manifest environment does not match deployment environment')
-    if manifest.get('staff', {}).get('audience') != manifest['staff'].get('client_id'):
-        raise ValueError('staff audience must equal its isolated client ID')
-    if manifest.get('netbird', {}).get('audience') != manifest['netbird'].get('client_id'):
-        raise ValueError('NetBird audience must equal its isolated client ID')
-    if any(not client['issuer_host'].startswith('auth-test.' if environment == 'test' else 'auth.') for client in [manifest['staff'], manifest['netbird']]):
-        raise ValueError('test and production issuer hosts must remain isolated')
-    staff_id = 'pearland-paws-staff-test' if environment == 'test' else 'pearland-paws-staff'
-    netbird_id = 'netbird-test' if environment == 'test' else 'netbird-prod'
-    for name, expected in [('staff', staff_id), ('netbird', netbird_id)]:
-        client = manifest[name]
-        if any(client.get(key) != expected for key in ('client_id', 'provider_name', 'application_slug')):
-            raise ValueError('Client identity must match the selected environment')
-    issuer_host = manifest['staff']['issuer_host']
-    if manifest['netbird']['issuer_host'] != issuer_host:
-        raise ValueError('Clients must use the same environment issuer host')
-    suffix = issuer_host.removeprefix('auth-test.' if environment == 'test' else 'auth.')
-    if not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', suffix):
-        raise ValueError('Issuer must be an environment-specific DNS hostname')
-    staff_host = ('staff-test.' if environment == 'test' else 'staff.') + suffix
-    netbird_host = ('netbird-test.' if environment == 'test' else 'netbird.') + suffix
-    expected_uris = {
-        'staff': ([f'https://{staff_host}/api/staff/oidc/callback'], [f'https://{staff_host}/staff/login']),
-        'netbird': ([f'https://{netbird_host}/oauth2/callback', f'https://{netbird_host}/nb-auth',
-                     f'https://{netbird_host}/nb-silent-auth', 'http://localhost:53000/'],
-                    [f'https://{netbird_host}/nb-auth']),
-    }
-    for name, (redirects, logouts) in expected_uris.items():
-        client = manifest[name]
-        if sorted(client['redirect_uris']) != sorted(redirects) or client['logout_uris'] != logouts:
+    for name in ('staff', 'netbird'):
+        client, expected = manifest[name], profile[name]
+        if client.get('audience') != client.get('client_id'):
+            raise ValueError('Client audience must equal its isolated client ID')
+        if (client.get('issuer_host') != profile['issuer_host']
+                or any(client.get(key) != expected['client_id']
+                       for key in ('client_id', 'provider_name', 'application_slug'))
+                or client.get('application_name') != expected['application_name']):
+            raise ValueError('Client identity must match the selected inventory profile')
+        if (client['redirect_uris'] != expected['redirect_uris']
+                or client['logout_uris'] != expected['logout_uris']):
             raise ValueError('Redirect and logout URIs must match the environment client contract')
     google = manifest.get('google')
     if google is not None:
@@ -237,12 +264,15 @@ def main():
     parser.add_argument('--token', default=os.environ.get('AUTHENTIK_BOOTSTRAP_TOKEN'))
     parser.add_argument('--environment', required=True, choices=('test', 'prod'))
     parser.add_argument('--manifest', required=True)
+    parser.add_argument('--profile', required=True)
     args = parser.parse_args()
     if not args.token:
         raise SystemExit('AUTHENTIK_BOOTSTRAP_TOKEN is required')
     with open(args.manifest, encoding='utf-8') as stream:
         manifest = json.load(stream)
-    validate_manifest(manifest, args.environment)
+    with open(args.profile, encoding='utf-8') as stream:
+        profile = json.load(stream)
+    validate_manifest(manifest, args.environment, profile)
     secrets = {key: os.environ[key] for key in ('STAFF_OIDC_CLIENT_SECRET', 'NETBIRD_OIDC_CLIENT_SECRET')}
     if manifest.get('google'):
         secrets['GOOGLE_OAUTH_CLIENT_SECRET'] = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
