@@ -32,7 +32,7 @@ and a reviewed, validated procedure at the selected release ref:
 | Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) uses the separate production Google client, encrypted allowlist and staff/VPN assignments. Production Google token exchange, approved-account NetBird enrollment and personal SSH on both nodes are verified. Preserve the deny-by-default source and separate network/application grants. |
 | Monitoring | [Production operations evidence](evidence/production-operations-2026-11-11.json) records seven healthy targets, public/unrelated-peer denial and fresh synthetic staff-reader login/permission/logout. The owner confirmed staff and Grafana SSO login/logout. The stale-probe drill fired and resolved with two successful Discord notifications and no delivery errors; the owner confirmed receiving both messages. |
 | Controller TLS | [Scoped renewal evidence](evidence/scoped-renewal-peer-2026-11-11.json) records the production DNS-01 dry runs, served certificates, dedicated renewal peer, forced-command transport and fresh numeric status on both receivers. Keep these persistent jobs separate from the expiring administrative deployment grant. |
-| Replacement recovery | The first production unified point passed ciphertext size/SHA256/receipt checks, authenticated decryption, SQLite integrity, component completeness and saved image receipt validation. An actual production service restore remains open under [production replacement recovery](production-host-recovery.md); archive validation cannot clear it. |
+| Replacement recovery | The first production unified point passed authenticated archive validation and an offline data restore: 187 PostgreSQL tables imported, 182 non-session tables preserved through session reset, and five NetBird SQLite databases passed integrity checks. Signing keys, clients, identities and groups were preserved; stale peer status was cleared on copies. Full service/login and clean-host recovery remain open under [production replacement recovery](production-host-recovery.md). |
 | Release inputs | Production names, addresses, VPN network, clients and certificates are selected. Staff/CMS content still needs recorded manual initialization. Retire temporary administrative/scoped grants after the remaining acceptance work and owner-only handoff; website traffic cutover still requires explicit approval. |
 
 The production acceptance follow-up uses infrastructure ref
@@ -176,6 +176,18 @@ recoverability. Approval requires successful production recovery validation too.
 The normal point uses only the owner's recipient. A separate authorized test
 point may add a temporary recipient; do not change nightly recipients for a drill.
 HOU4 protects against losing HOU1, not both nodes; it is not immutable storage.
+
+The [production data-restore evidence](evidence/production-operations-2026-11-11.json)
+uses a disposable PostgreSQL container with no network or published ports and
+RAM-backed storage. It imports with `ON_ERROR_STOP` into an empty schema and
+reuses the maintained production `revoke_sessions` and `reset_peer_connections`
+functions against copies. All 182 non-session PostgreSQL tables and CMS
+non-session tables matched before/after reset; NetBird data matched except for
+connection status. The saved staff database had no active sessions, so this run
+does not prove rejection of an active staff cookie. The container and decrypted
+RAM files were removed. No restored application/IdP writer was started, and no
+cold image pull or restored login was tested. These checks narrow the remaining
+work; they do not clear the replacement-host gate or authorize a wipe.
 
 ## Deployment order and stop points
 

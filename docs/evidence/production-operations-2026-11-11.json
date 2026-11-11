@@ -205,7 +205,7 @@
       "recorded_at": "2026-11-11T17:03:57.624240+00:00"
     },
     "authenticated_decryption": "passed",
-    "actual_service_restore": "not performed; production recovery gate remains open",
+    "actual_service_restore": "PostgreSQL data imported and production reset functions checked in an isolated container; full application/identity service and replacement-host recovery remain open",
     "authentication_evidence": {
       "passed": true,
       "production_source_backup_id": "20261111T165321Z-af0f3ebf8ffe",
@@ -224,6 +224,59 @@
       "live_services_changed": false,
       "actual_postgresql_import_or_service_restore_proven": false,
       "completed_at": "2026-11-11T21:42:37.314381+00:00"
+    },
+    "data_restore": {
+      "passed": true,
+      "scope": "Offline production data restore; not a full replacement-host or login gate",
+      "environment": "production",
+      "source_backup_id": "20261111T165321Z-8c6ba35719b2",
+      "postgresql_image": "postgres@sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef",
+      "postgresql_image_selection": "Local immutable image matching the saved PostgreSQL version; no registry pull",
+      "postgres_imported_into_empty_database": true,
+      "on_error_stop": true,
+      "postgres_tables": 187,
+      "identity_counts": {
+        "authentik_core_user": 5,
+        "authentik_core_group": 8,
+        "authentik_core_application": 3,
+        "authentik_providers_oauth2_oauth2provider": 3,
+        "authentik_crypto_certificatekeypair": 2
+      },
+      "non_session_postgres_tables_unchanged": 182,
+      "signing_keys_clients_users_groups_and_policies_preserved": true,
+      "maintained_production_session_reset_reused": true,
+      "idp_session_rows_before": {
+        "django_session": 0,
+        "authentik_core_authenticatedsession": 8,
+        "authentik_providers_oauth2_authorizationcode": 0,
+        "authentik_providers_oauth2_accesstoken": 6,
+        "authentik_providers_oauth2_refreshtoken": 4
+      },
+      "idp_sessions_codes_tokens_cleared": true,
+      "staff_session_rows_before": 8,
+      "staff_active_sessions_before": 0,
+      "staff_sessions_revoked": true,
+      "cms_non_session_tables_unchanged": 12,
+      "maintained_production_peer_reset_reused": true,
+      "stale_peer_connections_cleared": 4,
+      "netbird_non_connection_data_preserved": true,
+      "netbird_sqlite_databases_integrity_checked": 5,
+      "isolated_database_network": "none",
+      "published_ports": 0,
+      "restored_writers_started": false,
+      "database_storage": "container tmpfs",
+      "database_logs": "disabled",
+      "production_services_changed": false,
+      "full_replacement_host_restore_proven": false,
+      "cold_registry_pull_proven": false,
+      "login_on_restored_services_proven": false,
+      "duration_seconds": 45.768,
+      "disposable_container_removed": true,
+      "plaintext_ram_directory_removed": true,
+      "completed_at": "2026-11-11T21:51:19.838021+00:00",
+      "evidence_limit": "No restored application/IdP writers or login checks. The saved staff database had zero unrevoked sessions; this run checks the reset operation and preservation, not rejection of a previously active staff cookie. Cold-host recovery and registry pulls remain unproven.",
+      "private_harness_sha256": "3e380b3571017b511a622ad32cd3c415d46bbc02b60f32efd347ae64eda8f809",
+      "restoration_functions_ref": "2b0abccd4379f93044fdf929559f0cd0c4a9e452"
     }
   },
   "validation": {
