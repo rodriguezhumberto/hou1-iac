@@ -71,6 +71,14 @@ Use the exact variable names and receipt checks in [image deployment](applicatio
 
 Prepare private inventory, SSH configuration and release inputs outside Git:
 
+For a single public website with a canonical alias redirect, use the
+[website routing inputs](website-routing.md): explicitly disable the secondary
+site and declare the public hostname list and redirect switch. Keep selected
+domains in encrypted release inputs, cover HTTPS aliases in the public
+certificate, and override the selected identity profile's issuer hostname when
+it differs from the shared default. A routing change requires normal runtime
+rendering rather than the image-only preserve mode.
+
 ```bash
 export INVENTORY=/private/production/inventory.yml
 export INPUTS=/private/production/release-inputs.yml

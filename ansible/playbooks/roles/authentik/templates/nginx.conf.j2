@@ -6,6 +6,7 @@ map $http_upgrade $authentik_connection_upgrade {
 server {
     listen 80;
     server_name {{ authentik_domain }};
+    set $hou1_service authentik;
     location /.well-known/acme-challenge/ { root /var/www/certbot; }
     location / { return 301 https://$host$request_uri; }
 }
@@ -13,6 +14,7 @@ server {
     listen 443 ssl;
     http2 on;
     server_name {{ authentik_domain }};
+    set $hou1_service authentik;
     ssl_certificate /etc/letsencrypt/live/{{ authentik_domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ authentik_domain }}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;

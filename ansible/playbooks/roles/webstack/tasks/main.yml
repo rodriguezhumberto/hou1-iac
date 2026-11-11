@@ -16,6 +16,9 @@
     force: yes
   no_log: true
 
+- name: Validate the selected website routing contract
+  ansible.builtin.import_tasks: website.yml
+
 - name: Configure the verified application image without source builds
   ansible.builtin.import_tasks: image-compose.yml
 
@@ -126,11 +129,13 @@
       
       # Nginx Environment Mappings
       PRIMARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', primary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
-      SECONDARY_CERT_DIR={{ ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain) }}
+      SECONDARY_CERT_DIR={{ (ssl_domains | selectattr('name', 'search', secondary_domain) | map(attribute='name') | first | default('test.' ~ primary_domain)) if webstack_secondary_site_enabled | default(true) else '' }}
       STAFF_HOSTNAME={{ staff_domain }}
       STAFF_CERT_DIR={{ staff_cert_dir }}
       PRIMARY_HOSTNAMES={{ public_site_hostnames | default([primary_domain, 'www.' ~ primary_domain, 'test.' ~ primary_domain]) | join(' ') }}
-      SECONDARY_HOSTNAMES={{ secondary_site_hostnames | default([secondary_domain, 'www.' ~ secondary_domain, 'test.' ~ secondary_domain]) | join(' ') }}
+      SECONDARY_HOSTNAMES={{ (secondary_site_hostnames | default([secondary_domain, 'www.' ~ secondary_domain, 'test.' ~ secondary_domain]) | join(' ')) if webstack_secondary_site_enabled | default(true) else '' }}
+      PUBLIC_CANONICAL_HOSTNAME={{ public_site_origin | urlsplit('hostname') }}
+      PUBLIC_CANONICAL_REDIRECT={{ (webstack_public_canonical_redirect | default(false)) | ternary('true', 'false') }}
       PUBLIC_SITE_ORIGIN={{ public_site_origin }}
 
       # for hCaptcha

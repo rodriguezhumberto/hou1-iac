@@ -1,6 +1,10 @@
 new_user_public_key: "{{ users_public_ssh }}"
 staff_vpn_subnet: "{{ netbird_subnet }}"
 
+# Preserve existing environments; production opts in through encrypted inputs.
+webstack_secondary_site_enabled: true
+webstack_public_canonical_redirect: false
+
 # Forms and CMS share the existing database mount during rollout and rollback.
 # Media has a separate persistent mount per environment.
 cms_environment: unknown
