@@ -1,0 +1,42 @@
+---
+- name: Create root-only receiver state and configuration
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop: [/etc/hou1-tls, /var/lib/hou1-tls]
+
+- name: Create shared executable directory
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Configure the fixed environment certificate allowlist
+  ansible.builtin.copy:
+    dest: /etc/hou1-tls/receiver.json
+    content: "{{ {'environment': cms_environment, 'app_directory': app_directory, 'certificate_directory': app_directory ~ '/certbot/conf', 'lineages': hou1_tls_lineages} | to_nice_json }}"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Install root-only TLS receiver
+  ansible.builtin.copy:
+    src: receive.py
+    dest: /usr/local/libexec/hou1-tls-receive
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install shared certificate validation
+  ansible.builtin.copy:
+    src: '{{ role_path }}/../../../../scripts/hou1_tls_material.py'
+    dest: /usr/local/libexec/hou1_tls_material.py
+    owner: root
+    group: root
+    mode: '0600'

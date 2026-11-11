@@ -1,0 +1,91 @@
+---
+- name: Require explicit environment-bound certificate inputs
+  ansible.builtin.assert:
+    that:
+      - hou1_controller_managed_tls is boolean and hou1_controller_managed_tls
+      - cms_environment in ['test', 'production']
+      - (cms_environment == 'production') == (inventory_hostname in groups.get('prod_env', []))
+      - not (rehearsal_controller_managed_tls | default(false) | bool) or cms_environment == 'test'
+      - hou1_tls_identity_profile in ['test', 'prod']
+      - cms_environment == ('test' if hou1_tls_identity_profile == 'test' else 'production')
+      - hou1_tls_lineages is mapping
+      - hou1_tls_lineages | length > 0
+      - hou1_tls_lineages.keys() | list | sort == ((ssl_domains | map(attribute='name') | list) + [netbird_domain, authentik_identity_profiles[hou1_tls_identity_profile].issuer_host]) | unique | sort
+      - app_directory is match('^/[A-Za-z0-9_/-]+$')
+      - hou1_tls_bundle_source is match('^/')
+      - hou1_tls_age_key_file is match('^/')
+      - not ansible_check_mode
+    fail_msg: Select the complete environment certificate allowlist and owner-encrypted controller bundle.
+  no_log: true
+
+- name: Require web certificate SANs to match the ingress domain contract
+  ansible.builtin.assert:
+    that:
+      - hou1_tls_lineages[item.name].domains | sort == (item.flags | regex_findall('(?:^|\s)-d\s+([*.a-z0-9-]+)')) | unique | sort
+      - hou1_tls_lineages[item.name].probe_hosts | length > 0
+  loop: '{{ ssl_domains }}'
+  no_log: true
+
+- name: Require dedicated identity and VPN certificate coverage
+  ansible.builtin.assert:
+    that:
+      - hou1_tls_lineages[item].domains == [item]
+      - hou1_tls_lineages[item].probe_hosts == [item]
+  loop: '{{ [netbird_domain, authentik_identity_profiles[hou1_tls_identity_profile].issuer_host] }}'
+  no_log: true
+
+- name: Decrypt certificate material only in controller memory
+  ansible.builtin.command:
+    argv: [sops, --decrypt, --output-type, json, '{{ hou1_tls_bundle_source }}']
+  environment:
+    SOPS_AGE_KEY_FILE: '{{ hou1_tls_age_key_file }}'
+  delegate_to: localhost
+  become: false
+  register: hou1_tls_decrypted
+  changed_when: false
+  no_log: true
+
+- name: Bind certificate payload to the current environment before host changes
+  ansible.builtin.assert:
+    that:
+      - (hou1_tls_decrypted.stdout | from_json).environment == cms_environment
+      - (hou1_tls_decrypted.stdout | from_json).certificates.keys() | list | sort == hou1_tls_lineages.keys() | list | sort
+    fail_msg: The encrypted certificate bundle must match this host's environment and lineages.
+  no_log: true
+
+- name: Install TLS inspection dependency through the existing package policy
+  ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
+  vars:
+    rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
+
+- name: Install the fixed TLS receiver and allowlist
+  ansible.builtin.import_tasks: receiver.yml
+
+- name: Import only validated certificates with automatic rollback on a managed host
+  ansible.builtin.command:
+    argv: [python3, /usr/local/libexec/hou1-tls-receive, --bootstrap]
+    stdin: '{{ hou1_tls_decrypted.stdout }}'
+    stdin_add_newline: false
+  register: hou1_tls_import
+  changed_when: (hou1_tls_import.stdout | from_json).changed
+  no_log: true
+
+- name: Retire legacy on-host DNS credentials after successful certificate import
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - '{{ app_directory }}/certbot/cloudflare.ini'
+    - '{{ app_directory }}/certbot/renew_ssl.sh'
+    - '{{ netbird_control_plane_directory }}/cloudflare.ini'
+  no_log: true
+
+- name: Remove the replaced host renewal cron entry
+  ansible.builtin.cron:
+    name: "Renew Let's Encrypt SSL Certificates"
+    state: absent
+
+- name: Discard decrypted material from subsequent Ansible tasks
+  ansible.builtin.set_fact:
+    hou1_tls_decrypted: {}
+  no_log: true

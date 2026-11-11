@@ -1,0 +1,5 @@
+---
+- name: Install certificate inspection support
+  ansible.builtin.apt:
+    name: openssl
+    state: present

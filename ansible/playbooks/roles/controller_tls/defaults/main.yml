@@ -1,0 +1,11 @@
+---
+hou1_tls_identity_profile: ''
+hou1_tls_lineages: {}
+hou1_tls_bundle_source: ''
+hou1_tls_age_key_file: ''
+hou1_tls_inventory_group: tls_targets
+hou1_tls_renewal_public_key: ''
+hou1_tls_controller_ip: ''
+hou1_tls_controller_config: ''
+hou1_tls_schedule_enabled: false
+hou1_tls_schedule_environment: ''

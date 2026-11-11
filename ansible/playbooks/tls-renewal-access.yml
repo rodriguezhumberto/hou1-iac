@@ -1,0 +1,13 @@
+---
+- name: Configure the VPN-only certificate renewal account
+  hosts: "{{ hou1_tls_inventory_group | default('tls_targets') }}"
+  become: true
+  pre_tasks:
+    - name: Validate existing private management
+      ansible.builtin.import_role:
+        name: netbird_common
+  tasks:
+    - name: Grant only scoped renewal transport
+      ansible.builtin.import_role:
+        name: controller_tls
+        tasks_from: access.yml

@@ -2,6 +2,7 @@
 """Read-only HOU1 aggregates for node exporter's textfile collector."""
 import grp
 import json
+import math
 import os
 import re
 from pathlib import Path
@@ -35,6 +36,8 @@ def validate_config(config):
         value = config.get(key, '')
         if not isinstance(value, str) or not re.fullmatch(r'/[a-zA-Z0-9_./-]+', value) or '..' in Path(value).parts:
             raise ValueError('Invalid aggregate path')
+    if not isinstance(config.get('controller_tls_enabled', False), bool):
+        raise ValueError('Invalid TLS metrics flag')
     if not isinstance(config.get('request_metrics_enabled'), bool):
         raise ValueError('Invalid request metrics flag')
 
@@ -132,9 +135,32 @@ def collect(config, now=None):
         except Exception:
             success = False
         emit('hou1_request_metrics_collection_success', request_success)
+    if config.get('controller_tls_enabled'):
+        metrics,tls_success=renewal_metrics(config['environment'],now)
+        samples.append(metrics.rstrip());success=success and tls_success
     emit('hou1_metrics_collection_success',int(success))
     emit('hou1_metrics_collection_timestamp_seconds',now)
     return '\n'.join(samples)+'\n',success
+
+
+def renewal_metrics(environment, now=None, path='/var/lib/hou1-tls/controller-status.json'):
+    now=time.time() if now is None else now
+    values={'last_success':0,'last_run_success':0,'observed_at':0,'certificate_not_after':0}
+    success=False
+    try:
+        data=json.loads(Path(path).read_text())
+        if data['environment']!=environment:raise ValueError('Wrong renewal environment')
+        for key in ('last_success','observed_at','certificate_not_after'):
+            if type(data[key]) not in (int,float) or not math.isfinite(data[key]) or data[key]<0:
+                raise ValueError('Invalid renewal metric')
+        if (data['last_success']>data['observed_at'] or data['observed_at']>now+30
+                or type(data['last_run_success']) is not int or data['last_run_success'] not in (0,1)):
+            raise ValueError('Invalid renewal status')
+        values=data;success=True
+    except Exception:pass
+    names={'last_success':'last_success_timestamp_seconds','last_run_success':'last_run_success',
+           'observed_at':'metrics_timestamp_seconds','certificate_not_after':'certificate_not_after_timestamp_seconds'}
+    return ''.join('hou1_tls_'+names[key]+' '+str(float(values[key]))+'\n' for key in names),success
 
 
 def write(path,text):

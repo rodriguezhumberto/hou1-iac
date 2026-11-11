@@ -1,0 +1,74 @@
+---
+- name: Require one private managed host and a dedicated renewal-only controller key
+  ansible.builtin.assert:
+    that:
+      - hou1_controller_managed_tls is boolean and hou1_controller_managed_tls
+      - groups.get(hou1_tls_inventory_group, []) == [inventory_hostname]
+      - ansible_play_hosts_all == [inventory_hostname]
+      - not (node_bootstrap | bool)
+      - ansible_host == netbird_ip
+      - cms_environment in ['test','production']
+      - (cms_environment == 'production') == (inventory_hostname in groups.get('prod_env', []))
+      - hou1_tls_controller_ip is ansible.utils.ipv4
+      - "'/' not in hou1_tls_controller_ip"
+      - (hou1_tls_controller_ip | ansible.utils.ipaddr(netbird_subnet)) is truthy
+      - hou1_tls_controller_ip != netbird_ip
+      - hou1_tls_renewal_public_key is match('^ssh-ed25519 [A-Za-z0-9+/]{68,}={0,2}( [^\r\n]+)?$')
+    fail_msg: Renewal requires the established VPN host and a dedicated source-bound public key.
+
+- name: Require the receiver to be configured by the certificate import
+  ansible.builtin.stat:
+    path: /etc/hou1-tls/receiver.json
+  register: hou1_tls_receiver_config
+
+- name: Refuse transport without a configured certificate allowlist
+  ansible.builtin.assert:
+    that: hou1_tls_receiver_config.stat.exists
+
+- name: Create the non-administrative renewal account
+  ansible.builtin.user:
+    name: hou1-renewal
+    home: /var/lib/hou1-renewal
+    shell: /bin/sh
+    password: '*'
+    create_home: true
+    system: true
+    groups: ''
+    append: false
+
+- name: Keep renewal keys under root ownership
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: [/var/lib/hou1-renewal, /var/lib/hou1-renewal/.ssh]
+
+- name: Install the two-command renewal gateway
+  ansible.builtin.copy:
+    src: gateway.py
+    dest: /usr/local/libexec/hou1-tls-gateway
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Permit only argument-free delivery and the fixed status receiver
+  ansible.builtin.copy:
+    dest: /etc/sudoers.d/hou1-renewal
+    owner: root
+    group: root
+    mode: '0440'
+    content: |
+      hou1-renewal ALL=(root) NOPASSWD: /usr/local/libexec/hou1-tls-receive ""
+      hou1-renewal ALL=(root) NOPASSWD: /usr/local/libexec/hou1-tls-receive --metrics
+    validate: /usr/sbin/visudo -csf %s
+
+- name: Restrict the renewal key to its VPN source and bounded stdin commands
+  ansible.builtin.copy:
+    dest: /var/lib/hou1-renewal/.ssh/authorized_keys
+    owner: root
+    group: root
+    mode: '0644'
+    content: |
+      restrict,from="{{ hou1_tls_controller_ip }}",command="/usr/local/libexec/hou1-tls-gateway" {{ hou1_tls_renewal_public_key }}
