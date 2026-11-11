@@ -17,8 +17,12 @@ class WorkflowTest(unittest.TestCase):
         security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
         index = next(i for i, task in enumerate(security) if task['name'] ==
                      'Wait for the restored VPN path before changing SSH listeners')
-        publish = yaml.safe_load((ROOT / 'ansible/playbooks/publish-test-recovery.yml').read_text())[0]
-        role = next(task for task in publish['tasks'] if task.get('ansible.builtin.include_role', {}).get('name') == 'security')
+        shared = 'roles/host_recovery/tasks/publish.yml'
+        for entrypoint in ['publish-test-recovery.yml', 'publish-production-recovery.yml']:
+            publish = yaml.safe_load((ROOT / 'ansible/playbooks' / entrypoint).read_text())[0]
+            self.assertEqual(publish['tasks'][0]['ansible.builtin.include_tasks'], shared)
+        publication = yaml.safe_load((ROOT / 'ansible/playbooks' / shared).read_text())
+        role = next(task for task in publication if task.get('ansible.builtin.include_role', {}).get('name') == 'security')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             firewall, listener, proof = (root / name for name in ['vpn-firewall', 'listener', 'proof'])

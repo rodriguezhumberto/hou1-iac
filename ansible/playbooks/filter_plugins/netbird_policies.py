@@ -164,10 +164,13 @@ def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environ
     return dict(groups=planned, policy=policy)
 
 
-def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id):
-    """Pin existing managed source groups before retiring a lost test server."""
-    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet, 'test-servers')
-    backups = backup_plan(groups, peers, policies, monitor_ip, server_ip, subnet, 'test')
+def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id, environment):
+    """Pin existing managed source groups before retiring the selected lost server."""
+    if environment not in ('test', 'production'):
+        raise AnsibleFilterError('Declare the recovery environment')
+    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet,
+                              'test-servers' if environment == 'test' else 'prod-servers')
+    backups = backup_plan(groups, peers, policies, monitor_ip, server_ip, subnet, environment)
     selected = []
     for plan in (metrics, backups):
         if plan['policy'] is None or plan['policy']['changed']:

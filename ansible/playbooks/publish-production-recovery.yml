@@ -1,0 +1,54 @@
+---
+- name: Publish reviewed production recovery and restore VPN management
+  hosts: production_recovery
+  become: true
+  gather_facts: false
+  module_defaults:
+    ansible.builtin.uri:
+      use_proxy: false
+      follow_redirects: none
+  pre_tasks:
+    - name: Require the explicit production restore and reviewed access changes
+      ansible.builtin.assert:
+        that:
+          - groups['production_recovery'] == [inventory_hostname]
+          - ansible_play_hosts_all == [inventory_hostname]
+          - inventory_hostname in groups.get('prod_env', [])
+          - inventory_hostname in groups.get('hou1_prod_init', [])
+          - inventory_hostname not in groups.get('test_env', [])
+          - cms_environment == 'production'
+          - authentik_environment == 'prod'
+          - node_bootstrap | bool
+          - ansible_host == prod_vps_public_ip
+          - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
+          - host_recovery_console_confirmed | default(false) | bool
+          - host_recovery_access_reviewed | default(false) | bool
+          - host_recovery_lost_peer_id is match('^[a-zA-Z0-9_-]+$')
+          - host_recovery_lost_peer_name | length > 0
+          - hou1_controller_managed_tls is boolean and hou1_controller_managed_tls
+          - not ansible_check_mode
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Reconcile authorization since the production backup and confirm both recovery consoles before publication.
+      tags: [always]
+    - name: Validate production host management configuration
+      ansible.builtin.import_role:
+        name: netbird_common
+    - name: Validate the selected production recovery contract
+      ansible.builtin.include_tasks: roles/host_recovery/tasks/request.yml
+    - name: Read the retained restore contract without printing it
+      ansible.builtin.slurp:
+        src: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/request.json'
+      register: host_recovery_saved_request
+      no_log: true
+    - name: Refuse a different recovery contract at publication
+      ansible.builtin.assert:
+        that: (host_recovery_saved_request.content | b64decode | from_json)[item.key] == item.value
+      loop: '{{ host_recovery_request | dict2items }}'
+      no_log: true
+  tasks:
+    - name: Publish and restore management through shared recovery tasks
+      ansible.builtin.include_tasks: roles/host_recovery/tasks/publish.yml
+    - name: Record outstanding operational handoff gates
+      ansible.builtin.debug:
+        msg: Restore publication completed. Reconnect HOU4, reapply TLS renewal access, monitoring and backups, verify owner login/VPN/SSH, and collect a fresh off-host recovery point before production approval.

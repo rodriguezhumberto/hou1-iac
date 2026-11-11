@@ -32,7 +32,7 @@ and a reviewed, validated procedure at the selected release ref:
 | Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) supports environment-bound Google source, encrypted allowlist and staff/VPN assignments, with offline security tests. Supply a separate production Google client/secret, validate permitted Google egress, and prove live deny-by-default admission, roles and VPN access before enabling production login. No production validation is claimed. |
 | Monitoring | [Environment-bound collectors](environment-monitoring.md) support explicit test/production profiles and Compose service discovery with VPN-only TCP/9100. Offline checks cover both environments; supply production HOU4 targets/probes and synthetic identities, then prove live private scrapes, public denial, login checks and Discord firing/recovery before clearing this gate. |
 | Controller TLS | [Controller-managed issuance and renewal](controller-tls.md) supports explicit environment lineages, SOPS-protected ACME state, bootstrap import and a VPN-only renewal account. Offline certificate/rollback/alert tests do not clear this gate: supply the production DNS-only grant, controller ownership and pinned transport, then prove ACME dry-run, served certificates and Discord failure/recovery. |
-| Replacement recovery | `restore-test-host.yml`, `publish-test-recovery.yml` and `rehearse-recovery.yml` reject production. A production restore/publication entry point and its environment-specific recovery validation are required; the tested sequence below is its acceptance checklist. |
+| Replacement recovery | [Production replacement recovery](production-host-recovery.md) provides separate restore/publication entry points with explicit inventory/backup boundaries and CI image receipts. Offline validation does not clear this gate: supply a complete production recovery point, independent consoles and scoped credentials, then prove restore, access reconciliation and operational handoff. The test entry points retain their safeguards. |
 | Release inputs | Confirm production addresses/domains, client IDs/redirects, certificates, secrets, administrative device, owner recovery access and staff/CMS initialization. Existing rehearsal inputs and temporary grants are retired. |
 
 Keep the remaining test-only guards intact. Production identity provisioning
@@ -301,8 +301,9 @@ ordinary rollback steps. A missing/corrupt snapshot requires an incident decisio
 For a lost/corrupt host, keep traffic closed and preserve HOU4. Retrieve and
 verify the complete **production** recovery set and independent controller
 handoff, including source bundle, image lock, read-only GHCR access, certificate
-state and runtime-secret recovery. Use the production recovery entry point
-required above, with this tested ordering:
+state and runtime-secret recovery. Follow [production replacement recovery](production-host-recovery.md)
+using `restore-production-host.yml` and `publish-production-recovery.yml`, with
+this tested ordering:
 
 1. Pin the new SSH identity and establish bounded console/bootstrap access.
 2. Recover the saved configuration, database/media pair, keys and exact image

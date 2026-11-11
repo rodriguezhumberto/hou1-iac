@@ -7,7 +7,9 @@ apply to retained legacy recovery points.
 Issue #27's replacement-host gate uses `restore-test-host.yml`, followed by
 `publish-test-recovery.yml`. These entry points recover the selected test point
 on fresh Debian 12 at the same HOU1 address. They are not production restore
-commands. Keep HOU4 and its retained backups intact.
+commands. See [production replacement recovery](production-host-recovery.md) for
+the separate environment-bound entry points. Keep HOU4 and its retained backups
+intact.
 
 The isolated component drill in [PR #59](https://github.com/rodriguezhumberto/hou1-iac/pull/59)
 already passed. The [second clean CI-image run](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)

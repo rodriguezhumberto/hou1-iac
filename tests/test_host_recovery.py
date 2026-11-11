@@ -31,10 +31,19 @@ restore = load('restore')
 
 def inputs():
     return dict(id='fixture-01', environment='test', staff_revision='a' * 40,
-                test_suffix='vps-test.example.invalid', netbird_subnet='100.91.0.0/16',
+                test_suffix='vps-test.example.invalid', netbird_subnet='100.91.0.0/16', server_ip='100.91.0.10',
                 bootstrap_cidr='8.8.8.8/32', runtime_age_path='/root/.config/sops/age/fixture-test.key',
                 deny_cidrs=['192.0.2.0/24'], test_addresses=['198.51.100.10'],
-                allow_local_cidrs=['100.91.0.0/16'], allow_update_cidrs=[])
+                allow_local_cidrs=['100.91.0.0/16'], allow_update_cidrs=[],
+                deployment=dict(paths=dict(app='/opt/site-test', auth='/opt/hou1-authentik/test',
+                    auth_data='/var/lib/hou1-authentik/test', netbird='/opt/hou1-netbird', cms='/var/lib/site/test/cms'),
+                    projects=dict(app='site-test', auth='hou1-authentik-test', netbird='hou1-netbird-test'),
+                    networks=dict(auth='hou1-authentik-test', netbird='hou1-netbird-ingress', subnet='172.30.80.0/29',
+                                  dynamic_range='172.30.80.4/30', proxy_ip='172.30.80.2')),
+                origins=dict(auth='https://auth-test.vps-test.example.invalid', staff='https://staff-test.vps-test.example.invalid',
+                             public='https://test.vps-test.example.invalid', netbird='https://netbird-test.vps-test.example.invalid'),
+                hostnames=['auth-test.vps-test.example.invalid', 'staff-test.vps-test.example.invalid',
+                           'test.vps-test.example.invalid', 'netbird-test.vps-test.example.invalid'])
 
 
 def lock():
@@ -164,7 +173,7 @@ class HostRecoveryPreparationTest(unittest.TestCase):
             self.assertEqual(web['services']['astro-app']['image'], 'hou1-restored-staff:' + cfg['staff_revision'])
             self.assertIn('HOST=0.0.0.0', web['services']['astro-app']['environment'])
             self.assertIn('FROM node@sha256:', (output / 'Dockerfile.recovery').read_text())
-            self.assertIn('deny all;', (output / 'authentik-test.conf').read_text())
+            self.assertIn('deny all;', (output / 'authentik.conf').read_text())
             self.assertIn('location = /api/setup', (output / 'netbird.conf').read_text())
             with tarfile.open(output / 'bundle.tar') as archive:
                 self.assertIn('staff.bundle', archive.getnames())
@@ -203,7 +212,7 @@ class HostRecoveryPreparationTest(unittest.TestCase):
                     self.assertFalse(rejected.exists())
 
     def test_publication_starts_dns_before_controller_refresh_and_private_ssh(self):
-        play = yaml.safe_load((FILES.parents[2] / 'publish-test-recovery.yml').read_text())[0]
+        play = {'tasks': yaml.safe_load((FILES.parent / 'tasks/publish.yml').read_text())}
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             resolver, refreshed, cutover = [root / name for name in ['resolver', 'refreshed', 'cutover']]
@@ -240,7 +249,7 @@ class HostRecoveryPreparationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_lost_peer_guard_refuses_live_or_different_devices(self):
-        play = yaml.safe_load((FILES.parents[2] / 'publish-test-recovery.yml').read_text())[0]
+        play = {'tasks': yaml.safe_load((FILES.parent / 'tasks/publish.yml').read_text())}
         block = next(task['block'] for task in play['tasks'] if 'block' in task)
         guard = next(task for task in block if task['name'] == 'Refuse another device or a connected peer')
         peer = dict(id='lost-hou1', name='fixture-host', ip='100.91.0.10', connected=False)
@@ -253,6 +262,9 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
 
 class HostRecoveryRuntimeTest(unittest.TestCase):
+    def setUp(self):
+        restore.configure(inputs())
+
     def test_publication_validates_both_baselines_before_changes(self):
         with tempfile.TemporaryDirectory() as temp:
             root = Path(temp)
@@ -370,7 +382,7 @@ class HostRecoveryRuntimeTest(unittest.TestCase):
             (root / 'request.json').write_text(json.dumps(inputs()))
             projects = {name: (name, base) for name in ['auth', 'netbird', 'app']}
             with patch.object(restore, 'ROOT', root), patch.object(restore, 'RECOVERY_BASE', base), \
-                 patch.object(restore, 'PROJECTS', projects), patch.object(restore, 'restore', side_effect=RuntimeError), \
+                 patch.object(restore, 'configure'), patch.object(restore, 'PROJECTS', projects), patch.object(restore, 'restore', side_effect=RuntimeError), \
                  patch.object(restore, 'dc') as dc:
                 with self.assertRaises(RuntimeError):
                     restore.main('restore')

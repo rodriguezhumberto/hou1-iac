@@ -1,0 +1,44 @@
+{
+  "schema": 1,
+  "issue": 22,
+  "scope": "Production replacement-host recovery follow-up",
+  "baseline_main": "5794e389803443bd9c98830c1ca440a2e9b915ca",
+  "validation": {
+    "mode": "offline synthetic fixtures; no live deployment",
+    "focused_command": "PYTHONPATH=tests python3 -m unittest test_production_host_recovery test_host_recovery test_recovery_peer_groups test_netbird_workflow.WorkflowTest.test_recovery_waits_after_vpn_firewall_before_listener_cutover -v",
+    "focused_tests_passed": 28,
+    "native_checks": [
+      "Real source Git bundle revision",
+      "OpenSSL SAN/key/expiry selection and certificate symlink restoration",
+      "Docker Compose parsing for all three prepared runtime projects",
+      "Ansible environment guards and real HTTP API peer-group rebinding",
+      "VPN firewall precedes SSH transport verification and listener cutover"
+    ],
+    "syntax_checked": [
+      "restore-test-host.yml",
+      "publish-test-recovery.yml",
+      "restore-production-host.yml",
+      "publish-production-recovery.yml"
+    ],
+    "full_regression": "Required Validate Ansible PR check runs the complete repository suite; consult that check for its final result"
+  },
+  "boundaries_verified": [
+    "Test backup cannot restore production",
+    "Inventory, exact VPN address, endpoints, paths and network contract must match",
+    "Production requires a saved CI application receipt and pinned runtime digests",
+    "No application source build or identity/CMS initialization during production recovery",
+    "Public ports held on loopback until explicit reviewed publication",
+    "Session revocation precedes writers; only the pinned disconnected host peer can be replaced",
+    "Only exact existing managed metrics and backup source groups are rebound",
+    "Production runtime certificate tree excludes ACME account and DNS configuration"
+  ],
+  "live_production_restore_passed": false,
+  "hosts_changed": false,
+  "remaining_live_gates": [
+    "Complete production recovery point and scoped registry/decryption access",
+    "Independent console access for both nodes and pinned SSH transport",
+    "Post-backup authorization reconciliation and reviewed publication",
+    "HOU4 reconnection, controller TLS renewal, private monitoring and fresh off-host backup",
+    "Owner Google/VPN/personal SSH access, alerts, restart and recovery evidence"
+  ]
+}

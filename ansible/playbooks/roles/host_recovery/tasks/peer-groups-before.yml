@@ -13,4 +13,4 @@
       {{ host_recovery_policy_state.results[0].json |
          netbird_recovery_source_groups(host_recovery_policy_state.results[1].json,
          host_recovery_policy_state.results[2].json, hou1_backup_receiver_ip,
-         netbird_ip, netbird_subnet, host_recovery_lost_peer_id) }}
+         netbird_ip, netbird_subnet, host_recovery_lost_peer_id, cms_environment) }}

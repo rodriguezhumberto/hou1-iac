@@ -1,9 +1,12 @@
 ---
-- name: Require the fixed new test recovery root
+- name: Require the fixed new recovery root
   ansible.builtin.assert:
     that:
       - host_recovery_root == '/var/lib/hou1-host-recovery/' + host_recovery_id
       - host_recovery_evidence_directory is match('^/')
+
+- name: Validate the environment-bound recovery request
+  ansible.builtin.import_tasks: request.yml
 
 - name: Require an unused cold Docker installation
   ansible.builtin.command:
@@ -28,7 +31,7 @@
   block:
     - name: Authenticate and safely extract the selected recovery point
       ansible.builtin.command:
-        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/verify-recovery.py', --archive, '{{ host_recovery_archive }}', --manifest, '{{ host_recovery_manifest }}', --identity, '{{ host_recovery_identity }}', --output, '{{ host_recovery_staging.path }}/payload', --environment, test]
+        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/verify-recovery.py', --archive, '{{ host_recovery_archive }}', --manifest, '{{ host_recovery_manifest }}', --identity, '{{ host_recovery_identity }}', --output, '{{ host_recovery_staging.path }}/payload', --environment, '{{ cms_environment }}']
       delegate_to: localhost
       become: false
       no_log: true
@@ -38,7 +41,7 @@
       ansible.builtin.copy:
         dest: '{{ host_recovery_staging.path }}/request.json'
         mode: '0600'
-        content: "{{ {'id': host_recovery_id, 'environment': 'test', 'staff_revision': rehearsal_staff_ref, 'test_suffix': primary_domain, 'netbird_subnet': netbird_subnet, 'bootstrap_cidr': rehearsal_bootstrap_admin_cidr, 'runtime_age_path': authentik_age_key_file, 'deny_cidrs': rehearsal_deny_cidrs, 'test_addresses': rehearsal_test_addresses, 'allow_local_cidrs': rehearsal_allow_local_cidrs, 'allow_update_cidrs': rehearsal_allow_update_cidrs} | to_nice_json }}"
+        content: "{{ host_recovery_request | to_nice_json }}"
       delegate_to: localhost
       become: false
 

@@ -1,0 +1,71 @@
+---
+- name: Preserve the isolated rehearsal input interface
+  when:
+    - host_recovery_request is not defined
+    - cms_environment == 'test'
+  ansible.builtin.set_fact:
+    host_recovery_request:
+      id: '{{ host_recovery_id }}'
+      environment: test
+      staff_revision: '{{ rehearsal_staff_ref }}'
+      test_suffix: '{{ primary_domain }}'
+      netbird_subnet: '{{ netbird_subnet }}'
+      server_ip: '{{ netbird_ip }}'
+      bootstrap_cidr: '{{ rehearsal_bootstrap_admin_cidr }}'
+      runtime_age_path: '{{ authentik_age_key_file }}'
+      deny_cidrs: '{{ rehearsal_deny_cidrs }}'
+      test_addresses: '{{ rehearsal_test_addresses }}'
+      allow_local_cidrs: '{{ rehearsal_allow_local_cidrs }}'
+      allow_update_cidrs: '{{ rehearsal_allow_update_cidrs }}'
+      origins:
+        auth: 'https://{{ authentik_identity_profiles[authentik_environment].issuer_host }}'
+        staff: 'https://{{ staff_domain }}'
+        public: '{{ public_site_origin }}'
+        netbird: '{{ netbird_management_url }}'
+      hostnames: "{{ ((ssl_domains | map(attribute='flags') | join(' ') | regex_findall('(?:^|\\s)-d\\s+([a-z0-9.-]+)')) + [staff_domain, authentik_identity_profiles[authentik_environment].issuer_host, netbird_domain]) | unique | list }}"
+      deployment:
+        paths:
+          app: '{{ app_directory }}'
+          auth: '{{ authentik_project_root_base }}/{{ authentik_environment }}'
+          auth_data: '{{ authentik_data_root_base }}/{{ authentik_environment }}'
+          netbird: '{{ netbird_control_plane_directory }}'
+          cms: '{{ cms_data_directory }}'
+        projects:
+          app: '{{ app_directory | basename }}'
+          auth: '{{ authentik_identity_profiles[authentik_environment].compose_project }}'
+          netbird: '{{ netbird_control_plane_project }}'
+        networks:
+          auth: '{{ authentik_active_network }}'
+          netbird: '{{ netbird_ingress_network }}'
+          subnet: '{{ netbird_ingress_subnet }}'
+          dynamic_range: '{{ netbird_ingress_dynamic_range }}'
+          proxy_ip: '{{ netbird_ingress_proxy_ip }}'
+  no_log: true
+
+- name: Bind recovery destinations and endpoints to the selected inventory
+  ansible.builtin.assert:
+    that:
+      - host_recovery_request.id == host_recovery_id
+      - host_recovery_request.environment == cms_environment
+      - host_recovery_request.netbird_subnet == netbird_subnet
+      - host_recovery_request.server_ip == netbird_ip
+      - host_recovery_request.runtime_age_path == authentik_age_key_file
+      - host_recovery_request.deployment.paths.app == app_directory
+      - host_recovery_request.deployment.paths.auth == authentik_project_root_base ~ '/' ~ authentik_environment
+      - host_recovery_request.deployment.paths.auth_data == authentik_data_root_base ~ '/' ~ authentik_environment
+      - host_recovery_request.deployment.paths.netbird == netbird_control_plane_directory
+      - host_recovery_request.deployment.paths.cms == cms_data_directory
+      - host_recovery_request.deployment.projects.auth == authentik_identity_profiles[authentik_environment].compose_project
+      - host_recovery_request.deployment.projects.netbird == netbird_control_plane_project
+      - host_recovery_request.deployment.networks.auth == authentik_active_network
+      - host_recovery_request.deployment.networks.netbird == netbird_ingress_network
+      - host_recovery_request.deployment.networks.subnet == netbird_ingress_subnet
+      - host_recovery_request.deployment.networks.dynamic_range == netbird_ingress_dynamic_range
+      - host_recovery_request.deployment.networks.proxy_ip == netbird_ingress_proxy_ip
+      - host_recovery_request.origins.auth == 'https://' ~ authentik_identity_profiles[authentik_environment].issuer_host
+      - host_recovery_request.origins.staff == 'https://' ~ staff_domain
+      - host_recovery_request.origins.public == public_site_origin
+      - host_recovery_request.origins.netbird == netbird_management_url
+      - cms_environment != 'production' or host_recovery_request.staff_revision == deploy_ref
+    fail_msg: Recovery contract must match the selected inventory and immutable release.
+  no_log: true
