@@ -1,0 +1,144 @@
+{
+  "recorded_at": "2026-11-11T16:19:00.341809+00:00",
+  "scope": "Infrastructure issue #70: dedicated Grafana SSO",
+  "companion_monitoring_commit": "5c8bd38d5129c03f3f0a38b4cc395070c6d5d803",
+  "validation": {
+    "full_infrastructure_suite": {
+      "tests": 314,
+      "skipped": 1,
+      "result": "passed",
+      "note": "Native DNS resolver check ran separately with the available binary and passed. Current Nginx container parser was configured for the final suite."
+    },
+    "final_identity_regressions": {
+      "tests": 10,
+      "skipped": 0,
+      "result": "passed",
+      "covers": [
+        "unrelated client and membership preservation",
+        "policy attached before provider exposure",
+        "interrupted attachment recovery",
+        "server-order mapping idempotence",
+        "minimal profile and filtered monitoring groups",
+        "token subject distinct from HTTP actor",
+        "live claim-preview rejection",
+        "owner-only SOPS encryption"
+      ]
+    },
+    "native_dns_resolver": {
+      "tests": 1,
+      "result": "passed"
+    },
+    "identity_playbook_syntax": "passed",
+    "authentik_bootstrap_playbook_syntax": "passed",
+    "git_diff_check": "passed",
+    "companion_monitoring": {
+      "full_monitoring_suite": {
+        "tests": 71,
+        "skipped": 1,
+        "result": "passed",
+        "skip": "Opt-in native Grafana test ran separately below"
+      },
+      "pinned_grafana_oauth_drill": {
+        "tests": 6,
+        "skipped": 0,
+        "result": "passed",
+        "covers": [
+          "signed ID token and S256 PKCE",
+          "Viewer, Editor and administrator enforcement",
+          "missing, malformed and unrelated group denial",
+          "wrong issuer, audience and signature denial",
+          "callback replay and PKCE failure",
+          "logout and local emergency login with the fixture IdP stopped",
+          "existing database password reconciliation through protected stdin"
+        ]
+      },
+      "grafana_sso_playbook_syntax": "passed",
+      "git_diff_check": "passed"
+    }
+  },
+  "live": {
+    "identity_contract": {
+      "passed": true,
+      "recorded_at": "2026-11-11T16:10:28.876736+00:00",
+      "checks": {
+        "confidential_client_and_existing_signing_key": true,
+        "exact_https_callback": true,
+        "environment_bound_issuer": true,
+        "dedicated_profile_and_filtered_groups": true,
+        "fail_closed_application_binding": true,
+        "live_owner_policy_allowed": true,
+        "live_nonmember_policy_denied": true,
+        "only_initial_owner_has_monitoring_membership": true,
+        "live_owner_claim_preview_maps_to_administrator": true,
+        "live_nonmember_claim_previews_grant_no_role": true
+      },
+      "allowed_policy_cases": 1,
+      "denied_policy_cases": 2
+    },
+    "grafana": {
+      "passed": true,
+      "stage": "browser",
+      "checks": {
+        "vpn_https_and_local_emergency_login": true,
+        "retained_dashboards": true,
+        "active_oidc_flags_verified": true,
+        "exact_callback_and_s256_redirect": true,
+        "strict_subject_and_role_expression_verified": true,
+        "owner_google_identity_created_by_oauth": true,
+        "owner_has_grafana_administrator_role": true,
+        "local_session_logout_invalidated": true
+      },
+      "recorded_at": "2026-11-11T16:15:53.617688+00:00",
+      "cookies_and_plaintext_credentials_removed_from_ram": true
+    },
+    "identity_reapply": {
+      "phase": "identity-preview-final-repeat",
+      "passed": true,
+      "exit_code": 0,
+      "recap": [
+        7,
+        0,
+        0,
+        0
+      ],
+      "plaintext_ram_inputs_removed": true,
+      "firewall_and_other_identity_clients_changed": false,
+      "completed_at": "2026-11-11T16:10:10.895617+00:00",
+      "no_runtime_changes": true
+    },
+    "grafana_reapply": {
+      "phase": "enable-final-repeat",
+      "passed": true,
+      "exit_code": 0,
+      "recap": [
+        24,
+        0,
+        0,
+        0
+      ],
+      "plaintext_ram_inputs_removed": true,
+      "firewall_and_other_identity_clients_changed": false,
+      "completed_at": "2026-11-11T16:13:02.515557+00:00",
+      "no_runtime_changes": true
+    },
+    "public_https_denial": {
+      "passed": true,
+      "public_https_connection_denied": true,
+      "recorded_at": "2026-11-11T15:59:44.192219+00:00"
+    },
+    "owner_reported_google_login_logout_and_relogin": "passed"
+  },
+  "secrets": {
+    "committed_identity_and_client_bundles": "encrypted to owner only",
+    "plaintext_identifiers_or_membership_committed": false,
+    "google_source_admission_changed": false,
+    "staff_roles_grant_monitoring_access": false
+  },
+  "grafana_sso_gate_passed": true,
+  "source_sha256": {
+    "ansible/playbooks/grafana-identity.yml": "ad8965c68daa37e2e98c770acc5ffd252d178132cfb963fdfade6728586e65c2",
+    "ansible/playbooks/roles/grafana_identity/tasks/main.yml": "c5b676f620bcb1bfebd3fddce4076b04d9ec9fb857840c1355b6422c0d9e868d",
+    "ansible/playbooks/roles/grafana_identity/files/provision.py": "9697acf7b6b0ff87b83f5a5aa559e530c4a6de166fa42355f04b1411c0c9d14c",
+    "tests/test_grafana_identity.py": "86584c767bd5b0d607121bf5f5e0b53970d0bee9b8f24c7eb2e757e384b80282"
+  }
+}
