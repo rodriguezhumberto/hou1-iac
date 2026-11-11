@@ -45,6 +45,8 @@ jobs:
       - run: pip install -r requirements-dev.txt
       - run: ansible-galaxy collection install -r ansible/requirements.yml
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/authentik-bootstrap.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/export-identity-profile.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-dns.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/bootstrap-control-plane.yml --syntax-check

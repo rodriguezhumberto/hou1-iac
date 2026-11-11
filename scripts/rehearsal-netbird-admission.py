@@ -1,13 +1,24 @@
 #!/usr/bin/env python3
-"""Enforce Authentik admission before disabling the isolated NetBird approval queue."""
+"""Enforce environment-bound Authentik admission before disabling NetBird approvals."""
 
 import argparse
+import importlib.util
 import json
 import os
+from pathlib import Path
+import re
 import shlex
 import subprocess
+import sys
 import urllib.parse
 import urllib.request
+
+# Use the same profile validator as managed-host bootstrap.
+_spec = importlib.util.spec_from_file_location(
+    'hou1_identity', Path(__file__).resolve().parents[1] /
+    'ansible/playbooks/roles/authentik/files/bootstrap.py')
+identity = importlib.util.module_from_spec(_spec)
+_spec.loader.exec_module(identity)
 
 AUTH_REQUEST = r'''
 import json, os, sys, urllib.request
@@ -41,16 +52,38 @@ def unique(items, key, value):
     return matches[0]
 
 
-STAFF_ROLES = {role: 'pearland-paws-staff-' + role for role in ('reader', 'editor', 'admin')}
+STAFF_ROLES = ('reader', 'editor', 'admin')
 
 
-def configure_staff_access(assignments, users, provider, auth, netbird):
+def deployment_profile(config, profile):
+    """Bind encrypted inputs to a separately selected, inventory-exported profile."""
+    identity.validate_profile(profile)
+    if config.get('environment') != profile['environment']:
+        raise ValueError('Configuration and inventory profile environments differ')
+    issuer = 'https://' + profile['issuer_host'] + '/application/o/' + profile['netbird']['client_id'] + '/'
+    if (config.get('netbird_url') != profile['netbird_url']
+            or config.get('authentik_issuer') != issuer
+            or config.get('netbird_subnet') != profile['netbird_subnet']):
+        raise ValueError('Endpoints, client and subnet must match the selected inventory profile')
+    if profile['environment'] == 'prod' and config.get('fixture_users'):
+        raise ValueError('Production admission cannot include rehearsal fixtures')
+    return profile
+
+
+def auth_results(auth, path):
+    result = auth('GET', path)
+    if result.get('next') or result.get('pagination', {}).get('next'):
+        raise ValueError('Refusing partially paginated Authentik inputs')
+    return result['results']
+
+
+def configure_staff_access(assignments, users, provider, auth, netbird, role_groups):
     """Keep network staff access separate from application privilege."""
     if not assignments:
         return {'staff_users_configured': 0, 'staff_users_awaiting_first_login': 0}
     staff = unique(netbird('GET', '/groups'), 'name', 'staff')
-    groups = auth('GET', 'core/groups/?page_size=1000')['results']
-    role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in STAFF_ROLES.items()}
+    groups = auth_results(auth, 'core/groups/?page_size=1000')
+    role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in role_groups.items()}
     peers = netbird('GET', '/peers')
     nb_users = netbird('GET', '/users')
     configured = waiting = 0
@@ -90,9 +123,8 @@ def configure_staff_access(assignments, users, provider, auth, netbird):
     return {'staff_users_configured': configured, 'staff_users_awaiting_first_login': waiting}
 
 
-def configure(config, auth, netbird):
-    if config['environment'] != 'test':
-        raise ValueError('This command is restricted to isolated test')
+def configure(config, auth, netbird, profile):
+    profile = deployment_profile(config, profile)
     emails = sorted(set(config['google_emails']))
     if not emails or any(e != e.lower() or e.count('@') != 1 or '*' in e or any(c.isspace() for c in e) for e in emails):
         raise ValueError('Supply explicit lowercase Google account addresses')
@@ -100,26 +132,29 @@ def configure(config, auth, netbird):
     if (len({u['email'] for u in assignments}) != len(assignments)
             or any(u['email'] not in emails or u['role'] not in STAFF_ROLES for u in assignments)):
         raise ValueError('Staff roles require unique, explicitly allowlisted Google accounts')
-    users = auth('GET', 'core/users/?page_size=1000')['results']
+    users = auth_results(auth, 'core/users/?page_size=1000')
+    if not users:
+        raise ValueError('An existing identity is required for live policy checks')
     fixture_ids = []
-    for name in config['fixture_users']:
+    for name in config.get('fixture_users', []):
         u = unique(users, 'username', name)
         if u['type'] != 'internal' or not u['email'].endswith('@example.invalid'):
             raise ValueError('Fixtures must be isolated internal test identities')
         fixture_ids.append(u['pk'])
-    app = auth('GET', 'core/applications/netbird-test/')
+    app_path = 'core/applications/' + profile['netbird']['client_id'] + '/'
+    app = auth('GET', app_path)
     source = auth('GET', 'sources/oauth/google/')
     if not source['enabled'] or source['provider_type'] != 'google':
-        raise ValueError('The test Google source must be enabled')
-    policies = auth('GET', 'policies/expression/?page_size=1000')['results']
+        raise ValueError('The environment Google source must be enabled')
+    policies = auth_results(auth, 'policies/expression/?page_size=1000')
     source_policy = unique(policies, 'name', 'Google approved accounts')
-    bindings = auth('GET', 'policies/bindings/?page_size=1000')['results']
-    flows = auth('GET', 'flows/instances/?page_size=1000')['results']
+    bindings = auth_results(auth, 'policies/bindings/?page_size=1000')
+    flows = auth_results(auth, 'flows/instances/?page_size=1000')
     for flow in ('authentication_flow', 'enrollment_flow'):
         instance = unique(flows, 'pk', source[flow])
         if instance['policy_engine_mode'] != 'all' or not any(
             b['target'] == source[flow] and b['policy'] == source_policy['pk']
-            and b['enabled'] and not b['negate'] for b in bindings
+            and b['enabled'] and not b['negate'] and b.get('failure_result') is False for b in bindings
         ):
             raise ValueError('Google allowlist must gate both source flows in ALL mode')
     expression = (
@@ -128,7 +163,7 @@ def configure(config, auth, netbird):
         f'return verified is True and userinfo.get("email", "").lower() in {emails!r}'
     )
     auth('PATCH', 'policies/expression/' + source_policy['pk'] + '/', {'expression': expression})
-    name = 'HOU1 test NetBird allowlist'
+    name = 'HOU1 ' + profile['environment'] + ' NetBird allowlist'
     matches = [p for p in policies if p['name'] == name]
     if len(matches) > 1:
         raise ValueError('Duplicate managed admission policy')
@@ -143,7 +178,7 @@ def configure(config, auth, netbird):
         auth('PATCH', 'policies/bindings/' + existing[0]['pk'] + '/', payload)
     else:
         auth('POST', 'policies/bindings/', payload)
-    auth('PATCH', 'core/applications/netbird-test/', {'policy_engine_mode': 'all'})
+    auth('PATCH', app_path, {'policy_engine_mode': 'all'})
     # Test the running policy engine before changing NetBird's admission switch.
     for user in users:
         expected = user['is_active'] and (
@@ -173,7 +208,7 @@ def configure(config, auth, netbird):
         raise ValueError('Expected isolated Authentik connector')
     accounts = netbird('GET', '/accounts')
     if len(accounts) != 1 or accounts[0]['settings']['network_range'] != config['netbird_subnet']:
-        raise ValueError('Expected the isolated test account and subnet')
+        raise ValueError('Expected the selected environment account and subnet')
     account = accounts[0]
     settings = account['settings']
     if assignments and not settings['groups_propagation_enabled']:
@@ -194,8 +229,8 @@ def configure(config, auth, netbird):
             if updated.get('pending_approval') or updated.get('is_blocked') or updated.get('role') != 'user':
                 raise ValueError('Allowlisted pending user did not become a regular active user')
             approved += 1
-    staff_report = configure_staff_access(assignments, users, provider, auth, netbird)
-    return {**staff_report, 'environment': 'test', 'application_policy_checks': len(users),
+    staff_report = configure_staff_access(assignments, users, provider, auth, netbird, profile['role_groups'])
+    return {**staff_report, 'environment': profile['environment'], 'application_policy_checks': len(users),
             'google_policy_checks': source_checks, 'manual_approval_required': False,
             'existing_allowlisted_pending_users_reconciled': approved}
 
@@ -222,32 +257,37 @@ def load_encrypted_config(path, age_key_file=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', required=True)
+    p.add_argument('--identity-secrets', required=True, help='SOPS Authentik bundle containing IDENTITY_NAMES')
+    p.add_argument('--profile', required=True, help='Public JSON exported from the selected Ansible inventory')
     p.add_argument('--age-key-file', help='Age identity for config decryption (or SOPS_AGE_KEY_FILE)')
     args = p.parse_args()
     c = load_encrypted_config(args.config, args.age_key_file)
-    if c['environment'] != 'test':
-        raise ValueError('Refusing production')
-    nb = urllib.parse.urlsplit(c['netbird_url'])
-    issuer = urllib.parse.urlsplit(c['authentik_issuer'])
-    if (nb.scheme != 'https' or not nb.hostname.startswith('netbird-test.') or nb.path
-            or issuer.scheme != 'https' or issuer.hostname != nb.hostname.replace('netbird-test.', 'auth-test.', 1)
-            or issuer.path != '/application/o/netbird-test/' or c['netbird_subnet'] == '100.90.0.0/16'):
-        raise ValueError('Expected isolated test origins, issuer and subnet')
-    token = json.loads(subprocess.run(
-        ['sops', '--decrypt', '--output-type', 'json', c['netbird_token_file']],
-        env={**os.environ, 'SOPS_AGE_KEY_FILE': c['age_key_file']},
-        capture_output=True, text=True, check=True).stdout)
+    with open(args.profile, encoding='utf-8') as stream:
+        public_profile = json.load(stream)
+    names = load_encrypted_config(args.identity_secrets, args.age_key_file)['IDENTITY_NAMES']
+    profile = deployment_profile(c, identity.resolve_profile(public_profile, names))
+    token = load_encrypted_config(c['netbird_token_file'], c['age_key_file'])
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')
 
+    container = None
+
     def auth(method, path, body=None):
+        nonlocal container
+        if container is None:
+            command = shlex.join(['sudo', '-n', 'docker', 'compose', '-p', profile['compose_project'],
+                                  '-f', profile['compose_file'], 'ps', '-q', profile['compose_service']])
+            result = subprocess.run(c['ssh'] + [command], capture_output=True, text=True, check=True, timeout=35)
+            container = result.stdout.strip()
+            if not re.fullmatch(r'[0-9a-f]{12,64}', container):
+                raise ValueError('Expected exactly one running Compose service container')
         command = shlex.join(['sudo', '-n', 'docker', 'exec', '-i',
-            'hou1-authentik-test-authentik-server-1', 'python', '-c', AUTH_REQUEST])
+            container, 'python', '-c', AUTH_REQUEST])
         r = subprocess.run(c['ssh'] + [command], input=json.dumps({
             'method': method, 'path': path, 'body': body}), capture_output=True,
             text=True, check=True, timeout=35)
         result = json.loads(r.stdout)
-        if isinstance(result, dict) and result.get('next'):
+        if isinstance(result, dict) and (result.get('next') or result.get('pagination', {}).get('next')):
             raise ValueError('Refusing partially paginated Authentik inputs')
         return result
 
@@ -259,8 +299,12 @@ def main():
             data = r.read()
             return json.loads(data) if data else {}
 
-    print(json.dumps(configure(c, auth, netbird)))
+    print(json.dumps(configure(c, auth, netbird, profile)))
 
 
 if __name__ == '__main__':
-    main()
+    try:
+        main()
+    except Exception:
+        # API errors and subprocess tracebacks may carry credentials or emails.
+        sys.exit('Admission reconciliation failed; private diagnostics withheld. Check encrypted inputs and service policy gates.')

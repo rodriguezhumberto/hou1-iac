@@ -1,10 +1,14 @@
 #!/usr/bin/env python3
 """Idempotently apply the environment-specific Authentik identity contract."""
 import argparse
+import copy
 import json
+import ipaddress
 import os
+import re
 import ssl
 import time
+from pathlib import Path
 import urllib.parse
 import urllib.request
 
@@ -50,22 +54,95 @@ class AuthentikAPI:
         return self.request('POST', f'/{resource}/', payload)['pk']
 
 
-def validate_manifest(manifest, environment):
-    if manifest.get('environment') != environment:
+def https_origin(value):
+    parsed = urllib.parse.urlsplit(value)
+    if (parsed.scheme != 'https' or not parsed.hostname
+            or value != 'https://' + parsed.hostname
+            or not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', parsed.hostname)):
+        raise ValueError('Expected an exact HTTPS origin without credentials, port or suffix')
+    return value
+
+
+def validate_profile(profile):
+    """Validate public inventory inputs without embedding deployment conventions."""
+    if profile.get('environment') not in ('test', 'prod'):
+        raise ValueError('Select an explicit test or prod environment')
+    https_origin('https://' + profile['issuer_host'])
+    https_origin(profile['netbird_url'])
+    ipaddress.IPv4Network(profile['netbird_subnet'], strict=True)
+    for key in ('compose_project', 'compose_service'):
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', profile[key]):
+            raise ValueError('Expected an explicit Compose project and service')
+    compose_file = Path(profile['compose_file'])
+    if not compose_file.is_absolute() or '..' in compose_file.parts:
+        raise ValueError('Expected an absolute Compose file path')
+    for name in ('staff', 'netbird'):
+        client = profile[name]
+        if not re.fullmatch(r'[A-Za-z0-9_-]+', client['client_id']) or not client['application_name']:
+            raise ValueError('Expected a named client identity')
+        for key in ('redirect_uris', 'logout_uris'):
+            uris = client[key]
+            if not isinstance(uris, list) or not uris or len(set(uris)) != len(uris):
+                raise ValueError('Expected nonempty, unique redirect and logout allowlists')
+            for uri in uris:
+                # The NetBird CLI loopback callback is a protocol requirement,
+                # independent of environment names or deployment hostnames.
+                if name == 'netbird' and key == 'redirect_uris' and uri == 'http://localhost:53000/':
+                    continue
+                parsed = urllib.parse.urlsplit(uri)
+                https_origin('https://' + parsed.netloc)
+                if parsed.scheme != 'https' or parsed.fragment:
+                    raise ValueError('Expected HTTPS redirects and logout URIs')
+    if profile['staff']['client_id'] == profile['netbird']['client_id']:
+        raise ValueError('Staff and NetBird must have separate client identities')
+    return profile
+
+
+def resolve_profile(public_profile, names):
+    """Merge organization identifiers from the environment's SOPS bundle only."""
+    if names.get('environment') != public_profile.get('environment'):
+        raise ValueError('Identity names belong to a different environment')
+    if any(key in public_profile['staff'] for key in ('client_id', 'application_name')):
+        raise ValueError('Staff identity names must come from SOPS, not the public profile')
+    if (set(names['staff']) != {'client_id', 'application_name'}
+            or set(names['role_groups']) != {'reader', 'editor', 'admin'}
+            or set(names['scope_mapping_names']) != {'profile', 'groups', 'audience'}):
+        raise ValueError('Supply the complete private identity naming contract')
+    for key in ('role_groups', 'scope_mapping_names'):
+        values = list(names[key].values())
+        if (any(not isinstance(value, str) or not value.strip() for value in values)
+                or len(set(values)) != len(values)):
+            raise ValueError('Private identity names must be nonempty and unique')
+    profile = copy.deepcopy(public_profile)
+    profile['staff'].update(names['staff'])
+    profile['role_groups'] = dict(names['role_groups'])
+    profile['scope_mapping_names'] = dict(names['scope_mapping_names'])
+    return validate_profile(profile)
+
+
+def validate_manifest(manifest, environment, profile):
+    validate_profile(profile)
+    if manifest.get('environment') != environment or profile['environment'] != environment:
         raise ValueError('manifest environment does not match deployment environment')
-    if manifest.get('staff', {}).get('audience') != manifest['staff'].get('client_id'):
-        raise ValueError('staff audience must equal its isolated client ID')
-    if manifest.get('netbird', {}).get('audience') != manifest['netbird'].get('client_id'):
-        raise ValueError('NetBird audience must equal its isolated client ID')
-    if any(not client['issuer_host'].startswith('auth-test.' if environment == 'test' else 'auth.') for client in [manifest['staff'], manifest['netbird']]):
-        raise ValueError('test and production issuer hosts must remain isolated')
-    for client in [manifest['staff'], manifest['netbird']]:
-        if any(not uri.startswith(('https://', 'http://localhost:')) for uri in client['redirect_uris'] + client['logout_uris']):
-            raise ValueError('redirect and logout URIs must be HTTPS or the documented CLI localhost URI')
+    for name in ('staff', 'netbird'):
+        client, expected = manifest[name], profile[name]
+        if client.get('audience') != client.get('client_id'):
+            raise ValueError('Client audience must equal its isolated client ID')
+        if (client.get('issuer_host') != profile['issuer_host']
+                or any(client.get(key) != expected['client_id']
+                       for key in ('client_id', 'provider_name', 'application_slug'))
+                or client.get('application_name') != expected['application_name']):
+            raise ValueError('Client identity must match the selected inventory profile')
+        if (client['redirect_uris'] != expected['redirect_uris']
+                or client['logout_uris'] != expected['logout_uris']):
+            raise ValueError('Redirect and logout URIs must match the environment client contract')
+    if sorted(group['name'] for group in manifest['groups']) != sorted(profile['role_groups'].values()):
+        raise ValueError('Role groups must match the private identity naming contract')
+    mapping_names = {mapping['scope_name']: mapping['name'] for mapping in manifest['scope_mappings']}
+    if mapping_names != profile['scope_mapping_names']:
+        raise ValueError('Scope mapping names must match the private identity naming contract')
     google = manifest.get('google')
     if google is not None:
-        if environment != 'test':
-            raise ValueError('Google source bootstrap is restricted to the isolated rehearsal')
         emails = google.get('allowed_emails', [])
         if (not isinstance(emails, list) or not emails
                 or any(not isinstance(email, str) or email != email.lower()
@@ -215,12 +292,16 @@ def main():
     parser.add_argument('--token', default=os.environ.get('AUTHENTIK_BOOTSTRAP_TOKEN'))
     parser.add_argument('--environment', required=True, choices=('test', 'prod'))
     parser.add_argument('--manifest', required=True)
+    parser.add_argument('--profile', required=True)
     args = parser.parse_args()
     if not args.token:
         raise SystemExit('AUTHENTIK_BOOTSTRAP_TOKEN is required')
     with open(args.manifest, encoding='utf-8') as stream:
         manifest = json.load(stream)
-    validate_manifest(manifest, args.environment)
+    with open(args.profile, encoding='utf-8') as stream:
+        profile = json.load(stream)
+    profile = resolve_profile(profile, json.loads(os.environ['AUTHENTIK_IDENTITY_NAMES']))
+    validate_manifest(manifest, args.environment, profile)
     secrets = {key: os.environ[key] for key in ('STAFF_OIDC_CLIENT_SECRET', 'NETBIRD_OIDC_CLIENT_SECRET')}
     if manifest.get('google'):
         secrets['GOOGLE_OAUTH_CLIENT_SECRET'] = os.environ.get('GOOGLE_OAUTH_CLIENT_SECRET')
