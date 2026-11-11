@@ -80,8 +80,12 @@ def validate(request, metadata, lock, app, netbird):
     if not production:
         for value in saved.values():
             drill.isolated_origin(value, suffix)
-    if len(set(origins.values())) != 4 or netbird['server'].get('disableGeoliteUpdate') is not True:
-        raise ValueError('Require separate environment origins and offline geolocation startup')
+    if len(set(origins.values())) != 4:
+        raise ValueError('Require separate environment origins')
+    # The isolated rehearsal cannot depend on public geolocation downloads.
+    # Production retains its saved updater setting and normal outbound policy.
+    if not production and netbird['server'].get('disableGeoliteUpdate') is not True:
+        raise ValueError('Require offline geolocation startup for test recovery')
     if not production and (not request['deny_cidrs'] or not request['test_addresses']):
         raise ValueError('Require the existing production isolation inputs')
     for key in ['deny_cidrs', 'allow_local_cidrs', 'allow_update_cidrs']:

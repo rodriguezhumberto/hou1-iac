@@ -120,6 +120,16 @@ class HostRecoveryPreparationTest(unittest.TestCase):
         with self.assertRaises(ValueError):
             prepare.validate(cfg, metadata, images, {**app, 'STAFF_OIDC_ISSUER': 'https://auth.example.invalid'}, vpn)
 
+    def test_rehearsal_recovery_still_requires_offline_geolocation_startup(self):
+        cfg, metadata, images, app, vpn = self.values()
+        for setting in [None, False, 'true']:
+            candidate = {'server': {'exposedAddress': vpn['server']['exposedAddress']}}
+            if setting is not None:
+                candidate['server']['disableGeoliteUpdate'] = setting
+            with self.subTest(setting=setting), self.assertRaisesRegex(ValueError, 'offline geolocation'):
+                prepare.validate(cfg, metadata, images, app, candidate)
+        self.assertEqual(prepare.validate(cfg, metadata, images, app, vpn)['netbird'], cfg['origins']['netbird'])
+
     def fixture(self, root):
         payload = drill_tests.RecoveryPreparationTest().fixture(root / 'payload')
         cfg, metadata, images, app, vpn = self.values()

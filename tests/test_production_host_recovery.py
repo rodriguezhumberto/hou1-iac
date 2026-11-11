@@ -4,6 +4,7 @@ import json
 from pathlib import Path
 import shutil
 import subprocess
+import tarfile
 import tempfile
 import unittest
 from unittest.mock import patch
@@ -112,6 +113,24 @@ class ProductionRecoveryTest(unittest.TestCase):
                         command[4:4] = ['-f', str(payload / 'app-config/docker-compose.override.yml')]
                     result = subprocess.run(command, capture_output=True, text=True)
                     self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_production_recovery_preserves_saved_geolocation_update_policy(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg, payload, bundle, lock = fixture(root)
+            path = payload / 'netbird-files/config.yaml'
+            for index, setting in enumerate([None, False, True]):
+                config = {'server': {'exposedAddress': cfg['origins']['netbird']}}
+                if setting is not None:
+                    config['server']['disableGeoliteUpdate'] = setting
+                original = yaml.safe_dump(config).encode()
+                path.write_bytes(original)
+                output = root / ('prepared-' + str(index))
+                with self.subTest(setting=setting):
+                    self.assertTrue(host.prepare.prepare(cfg, payload, bundle, lock, output)['prepared'])
+                    with tarfile.open(output / 'bundle.tar') as archive:
+                        self.assertEqual(archive.extractfile('payload/netbird-files/config.yaml').read(), original)
+                    self.assertEqual(path.read_bytes(), original)
 
     def test_wrong_environment_endpoints_key_or_revision_fail_before_staging(self):
         with tempfile.TemporaryDirectory() as directory:
