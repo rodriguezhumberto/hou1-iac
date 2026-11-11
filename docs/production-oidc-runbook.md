@@ -30,7 +30,7 @@ and a reviewed, validated procedure at the selected release ref:
 | Gate | Current implementation and required work |
 | --- | --- |
 | Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) uses the separate production Google client, encrypted allowlist and staff/VPN assignments. Production Google token exchange, approved-account NetBird enrollment and personal SSH on both nodes are verified. Preserve the deny-by-default source and separate network/application grants. |
-| Monitoring | [Production operations evidence](evidence/production-operations-2026-11-11.json) records seven healthy targets, public/unrelated-peer denial and fresh synthetic staff-reader login/permission/logout. The owner confirmed staff and Grafana SSO login/logout. The stale-probe drill fired and resolved with two successful Discord notifications and no delivery errors; owner channel confirmation remains pending. |
+| Monitoring | [Production operations evidence](evidence/production-operations-2026-11-11.json) records seven healthy targets, public/unrelated-peer denial and fresh synthetic staff-reader login/permission/logout. The owner confirmed staff and Grafana SSO login/logout. The stale-probe drill fired and resolved with two successful Discord notifications and no delivery errors; the owner confirmed receiving both messages. |
 | Controller TLS | [Scoped renewal evidence](evidence/scoped-renewal-peer-2026-11-11.json) records the production DNS-01 dry runs, served certificates, dedicated renewal peer, forced-command transport and fresh numeric status on both receivers. Keep these persistent jobs separate from the expiring administrative deployment grant. |
 | Replacement recovery | The first production unified point has been collected and its ciphertext size/SHA256/receipt verified. Authenticated decryption and an actual production recovery remain separate gates under [production replacement recovery](production-host-recovery.md). A successful test restore or transfer receipt cannot clear them. |
 | Release inputs | Production names, addresses, VPN network, clients and certificates are selected. Staff/CMS content still needs recorded manual initialization. Retire temporary administrative/scoped grants after the remaining acceptance work and owner-only handoff; website traffic cutover still requires explicit approval. |
@@ -279,9 +279,10 @@ monitoring groups. Verify Google login, the monitoring role, logout and the
 retained local emergency administrator before completing its SSO rollout.
 Use the optional [environment-bound synthetic reader probe](staff-login-probe.md)
 with a separate SOPS credential bundle. Its code and companion HOU4 rules are
-checked offline; provisioning the selected identity, enabling private TCP/443,
-and proving fresh login plus Discord firing/resolution remain live gates. The
-probe covers local Authentik login, reader enforcement and logout; independently
+checked offline. Production provisioning, private TCP/443, fresh reader login
+and Discord firing/resolution are recorded in the production operations evidence,
+including owner confirmation of both notifications. The probe covers local
+Authentik login, reader enforcement and logout; independently
 verify a human Google login and VPN connection. Deployment requires a fresh probe
 success after container reconciliation. Never use real Google passwords in it.
 

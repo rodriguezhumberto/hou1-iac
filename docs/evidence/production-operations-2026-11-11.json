@@ -145,13 +145,15 @@
     "real_alerts_kept_enabled": true,
     "automatic_recovery_timer_already_completed_and_unloaded": true,
     "cleanup_recheck_passed": true,
-    "channel_visibility_owner_confirmation_required": true,
+    "channel_visibility_owner_confirmation_required": false,
     "evidence_limit": "Notification counters correlate with the drill; they do not identify individual Discord messages.",
     "corrected_attempt": "Final cleanup tried to stop an already collected transient recovery timer. Probe restoration and alert acceptance had passed; cleanup now accepts the completed timer and final health was rechecked.",
     "duration_seconds": 698,
     "completed_at": "2026-11-11T17:03:31.849778+00:00",
     "human_services_stopped_by_alert_drill": false,
-    "separate_backup_capture_briefly_stopped_writers": true
+    "separate_backup_capture_briefly_stopped_writers": true,
+    "owner_confirmed_firing_and_resolved_messages": true,
+    "owner_confirmation_recorded_at": "2026-11-11T21:40:51.257754+00:00"
   },
   "backup": {
     "production_manifest": {
@@ -230,7 +232,6 @@
     }
   },
   "remaining": [
-    "Owner confirmation of matching Discord firing and resolved messages",
     "Authenticate production recovery decryption and complete actual recovery validation",
     "Record manual staff/CMS content initialization",
     "Finish release record, outstanding publication-entrypoint review and temporary-grant retirement",
