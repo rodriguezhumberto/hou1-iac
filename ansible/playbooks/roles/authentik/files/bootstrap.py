@@ -3,6 +3,7 @@
 import argparse
 import json
 import os
+import re
 import ssl
 import time
 import urllib.parse
@@ -51,6 +52,8 @@ class AuthentikAPI:
 
 
 def validate_manifest(manifest, environment):
+    if environment not in ('test', 'prod'):
+        raise ValueError('Select an explicit test or prod environment')
     if manifest.get('environment') != environment:
         raise ValueError('manifest environment does not match deployment environment')
     if manifest.get('staff', {}).get('audience') != manifest['staff'].get('client_id'):
@@ -59,13 +62,32 @@ def validate_manifest(manifest, environment):
         raise ValueError('NetBird audience must equal its isolated client ID')
     if any(not client['issuer_host'].startswith('auth-test.' if environment == 'test' else 'auth.') for client in [manifest['staff'], manifest['netbird']]):
         raise ValueError('test and production issuer hosts must remain isolated')
-    for client in [manifest['staff'], manifest['netbird']]:
-        if any(not uri.startswith(('https://', 'http://localhost:')) for uri in client['redirect_uris'] + client['logout_uris']):
-            raise ValueError('redirect and logout URIs must be HTTPS or the documented CLI localhost URI')
+    staff_id = 'pearland-paws-staff-test' if environment == 'test' else 'pearland-paws-staff'
+    netbird_id = 'netbird-test' if environment == 'test' else 'netbird-prod'
+    for name, expected in [('staff', staff_id), ('netbird', netbird_id)]:
+        client = manifest[name]
+        if any(client.get(key) != expected for key in ('client_id', 'provider_name', 'application_slug')):
+            raise ValueError('Client identity must match the selected environment')
+    issuer_host = manifest['staff']['issuer_host']
+    if manifest['netbird']['issuer_host'] != issuer_host:
+        raise ValueError('Clients must use the same environment issuer host')
+    suffix = issuer_host.removeprefix('auth-test.' if environment == 'test' else 'auth.')
+    if not re.fullmatch(r'[a-z0-9]+(?:[.-][a-z0-9]+)+', suffix):
+        raise ValueError('Issuer must be an environment-specific DNS hostname')
+    staff_host = ('staff-test.' if environment == 'test' else 'staff.') + suffix
+    netbird_host = ('netbird-test.' if environment == 'test' else 'netbird.') + suffix
+    expected_uris = {
+        'staff': ([f'https://{staff_host}/api/staff/oidc/callback'], [f'https://{staff_host}/staff/login']),
+        'netbird': ([f'https://{netbird_host}/oauth2/callback', f'https://{netbird_host}/nb-auth',
+                     f'https://{netbird_host}/nb-silent-auth', 'http://localhost:53000/'],
+                    [f'https://{netbird_host}/nb-auth']),
+    }
+    for name, (redirects, logouts) in expected_uris.items():
+        client = manifest[name]
+        if sorted(client['redirect_uris']) != sorted(redirects) or client['logout_uris'] != logouts:
+            raise ValueError('Redirect and logout URIs must match the environment client contract')
     google = manifest.get('google')
     if google is not None:
-        if environment != 'test':
-            raise ValueError('Google source bootstrap is restricted to the isolated rehearsal')
         emails = google.get('allowed_emails', [])
         if (not isinstance(emails, list) or not emails
                 or any(not isinstance(email, str) or email != email.lower()

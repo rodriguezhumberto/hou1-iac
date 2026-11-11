@@ -18,7 +18,7 @@
       - authentik_age_key_file is defined
       - authentik_age_key_file is match('^/')
       - authentik_secret_source is defined
-      - not (authentik_google_enabled | default(false) | bool) or (authentik_environment == 'test' and authentik_bootstrap_enabled | bool)
+      - not (authentik_google_enabled | default(false) | bool) or authentik_bootstrap_enabled | bool
     fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
   no_log: true
 

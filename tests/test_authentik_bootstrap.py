@@ -88,10 +88,10 @@ class AuthentikBootstrapTest(unittest.TestCase):
             {'pk': 'write', 'name': 'default-source-enrollment-write', 'user_type': 'external'}]
         return api
 
-    def google_manifest(self):
+    def google_manifest(self, environment='test'):
         env = Environment()
         env.filters['to_json'] = json.dumps
-        return json.loads(env.from_string((ROLE / 'templates/bootstrap-test.json.j2').read_text()).render(
+        return json.loads(env.from_string((ROLE / f'templates/bootstrap-{environment}.json.j2').read_text()).render(
             primary_domain='example.invalid', authentik_staff_users=[], authentik_google_enabled=True,
             authentik_decrypted={'GOOGLE_OAUTH_CLIENT_ID': 'fixture.apps.googleusercontent.com',
                                  'GOOGLE_ALLOWED_EMAILS': ['allowed@example.invalid']}))
@@ -250,19 +250,60 @@ class AuthentikBootstrapTest(unittest.TestCase):
             bootstrap.apply_google(self.google_manifest()['google'], api, '')
         self.assertEqual(api.writes, [])
 
-    def test_google_manifest_refuses_production_or_broad_allowlists(self):
-        for value in ([], ['*@example.invalid'], ['UPPER@example.invalid'], ['bad email@example.invalid']):
-            manifest = self.google_manifest()
-            manifest['google']['allowed_emails'] = value
-            with self.assertRaises(ValueError):
-                bootstrap.validate_manifest(manifest, 'test')
-        env = Environment()
-        env.filters['to_json'] = json.dumps
-        manifest = json.loads(env.from_string((ROLE / 'templates/bootstrap-prod.json.j2').read_text()).render(
-            primary_domain='example.invalid', authentik_staff_users=[]))
-        manifest['google'] = self.google_manifest()['google']
-        with self.assertRaisesRegex(ValueError, 'restricted to the isolated rehearsal'):
-            bootstrap.validate_manifest(manifest, 'prod')
+    def test_google_manifest_refuses_broad_allowlists_in_both_environments(self):
+        for environment in ('test', 'prod'):
+            for value in ([], ['*@example.invalid'], ['UPPER@example.invalid'], ['bad email@example.invalid']):
+                manifest = self.google_manifest(environment)
+                manifest['google']['allowed_emails'] = value
+                with self.subTest(environment=environment, value=value), self.assertRaises(ValueError):
+                    bootstrap.validate_manifest(manifest, environment)
+
+    def test_production_google_bootstrap_is_idempotent_and_preserves_emergency_admin(self):
+        manifest = self.google_manifest('prod')
+        bootstrap.validate_manifest(manifest, 'prod')
+        api = self.google_api()
+        emergency = {'pk': 1, 'username': 'akadmin', 'is_superuser': True, 'groups': ['emergency']}
+        api.objects['core/users'] = [emergency.copy()]
+        secrets = {'STAFF_OIDC_CLIENT_SECRET': 'prod-staff-fixture',
+                   'NETBIRD_OIDC_CLIENT_SECRET': 'prod-netbird-fixture',
+                   'GOOGLE_OAUTH_CLIENT_SECRET': 'prod-google-fixture'}
+        bootstrap.apply(manifest, api, secrets)
+        count = len(api.writes)
+        bootstrap.apply(manifest, api, secrets)
+        self.assertEqual(len(api.writes), count)
+        self.assertEqual(api.objects['core/users'], [emergency])
+        self.assertEqual({p['client_id'] for p in api.objects['providers/oauth2']},
+                         {'netbird-prod', 'pearland-paws-staff'})
+        source = api.objects['sources/oauth'][0]
+        self.assertTrue(source['enabled'])
+        self.assertEqual(source['consumer_secret'], secrets['GOOGLE_OAUTH_CLIENT_SECRET'])
+        expression = api.objects['policies/expression'][0]['expression']
+        for email, verified, expected in [('allowed@example.invalid', True, True),
+                                           ('unknown@example.invalid', True, False),
+                                           ('allowed@example.invalid', 'true', False),
+                                           ('allowed@example.invalid', False, False)]:
+            ns = {'context': {'oauth_userinfo': {'email': email, 'email_verified': verified}}}
+            exec('def evaluate():\n' + '\n'.join('    ' + line for line in expression.splitlines()), ns)
+            self.assertEqual(ns['evaluate'](), expected)
+
+    def test_production_manifest_rejects_test_client_substitution(self):
+        for client_name in ('staff', 'netbird'):
+            for key in ('client_id', 'provider_name', 'application_slug', 'issuer_host', 'redirect_uris', 'logout_uris'):
+                manifest = self.google_manifest('prod')
+                manifest[client_name][key] = self.google_manifest()[client_name][key]
+                with self.subTest(client=client_name, key=key), self.assertRaises(ValueError):
+                    bootstrap.validate_manifest(manifest, 'prod')
+
+    def test_production_google_opt_in_requires_bootstrap(self):
+        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+                    if t['name'] == 'Validate Authentik environment and isolated roots')
+        variables = dict(authentik_environment='prod', authentik_project_root='/opt/hou1-authentik/prod',
+                         authentik_data_root='/var/lib/hou1-authentik/prod',
+                         authentik_compose_project='hou1-authentik-prod', authentik_age_key_file='/private/key',
+                         authentik_secret_source='/private/prod.enc.yaml', authentik_google_enabled=True)
+        for enabled in (True, False):
+            result = run_play({**variables, 'authentik_bootstrap_enabled': enabled}, [task])
+            self.assertEqual(result.returncode == 0, enabled, result.stdout + result.stderr)
 
     def test_pinned_schema_reconciles_twice_without_duplicate_objects(self):
         env = Environment()

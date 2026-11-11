@@ -1,0 +1,80 @@
+{
+  "recorded_at": "2026-11-11T02:14:19.843753+00:00",
+  "issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/23",
+  "scope": "Production Google source, admission, and explicit staff/VPN assignments",
+  "base_ref": "552446c9eb846531397875d9f6fca89f0f04d078",
+  "validation": {
+    "focused_identity_tests": {
+      "tests_run": 37,
+      "result": "passed"
+    },
+    "repository_tests": {
+      "command": "NGINX_BIN=<local nginx binary> python3 -m unittest discover -s tests -v",
+      "tests_run": 247,
+      "result": "passed",
+      "skipped": 1,
+      "log_sha256": "10bcc867cc8a27e271597b05014b9983cbd6d538c33398311679bcbb3b2538a1",
+      "skipped_test": "test_netbird_dns.DnsTest.test_real_resolver_private_records_and_public_forwarding",
+      "skipped_test_follow_up": {
+        "command": "DNSMASQ_BIN=<local dnsmasq binary> PYTHONPATH=tests python3 -m unittest test_netbird_dns.DnsTest.test_real_resolver_private_records_and_public_forwarding -v",
+        "tests_run": 1,
+        "result": "passed",
+        "resolver_version": "2.91-1+deb13u2",
+        "log_sha256": "c6f3160fe490d8a0e3c3ea07af28043407f1599843e72cc6761b9d0d84e92e81"
+      }
+    },
+    "ansible_syntax_checks": [
+      {
+        "playbook": "hou1",
+        "exit_code": 0
+      },
+      {
+        "playbook": "authentik-bootstrap",
+        "exit_code": 0
+      },
+      {
+        "playbook": "netbird-control-plane",
+        "exit_code": 0
+      },
+      {
+        "playbook": "netbird-dns",
+        "exit_code": 0
+      },
+      {
+        "playbook": "bootstrap-control-plane",
+        "exit_code": 0
+      },
+      {
+        "playbook": "backups",
+        "exit_code": 0
+      },
+      {
+        "playbook": "rehearse-recovery",
+        "exit_code": 0
+      },
+      {
+        "playbook": "restore-test-host",
+        "exit_code": 0
+      },
+      {
+        "playbook": "publish-test-recovery",
+        "exit_code": 0
+      }
+    ],
+    "git_diff_check": "passed"
+  },
+  "fixture_api_checks": [
+    "Production Google bootstrap is idempotent and preserves the local emergency administrator",
+    "Only explicitly allowlisted, verified Google accounts pass source admission",
+    "Client, issuer, redirect and logout substitution across environments is rejected",
+    "Production fixtures and mismatched origin, issuer or subnet fail before API access",
+    "Live-policy check failures and fail-open source bindings preserve manual approval",
+    "Incomplete Authentik pages and mismatched NetBird connectors/accounts cannot disable approval",
+    "Staff app administration does not grant NetBird administration; unrelated groups survive",
+    "The CLI selects the production Authentik container and requires an endpoint-matched encrypted token",
+    "Real SOPS/age tests reject plaintext, wrong keys and tampered configurations"
+  ],
+  "live_production_validation": false,
+  "live_hosts_changed": false,
+  "remaining_identity_gate": "Supply the separate production Google client/secrets, validate Google egress, and prove live admission, first-login reconciliation, roles and VPN reachability."
+}

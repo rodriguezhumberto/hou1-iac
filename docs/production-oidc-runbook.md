@@ -29,14 +29,15 @@ and a reviewed, validated procedure at the selected release ref:
 
 | Gate | Current implementation and required work |
 | --- | --- |
-| Google admission | `authentik_google_enabled` and `scripts/rehearsal-netbird-admission.py` enforce test-only provisioning. Implement and validate production Google source, encrypted allowlist, role/VPN assignment and deny-by-default admission before enabling the production login flow. |
+| Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) supports environment-bound Google source, encrypted allowlist and staff/VPN assignments, with offline security tests. Supply a separate production Google client/secret, validate permitted Google egress, and prove live deny-by-default admission, roles and VPN access before enabling production login. No production validation is claimed. |
 | Monitoring | `ansible/playbooks/monitoring.yml` and `monitoring_exporter` enforce the isolated test inventory, paths and subnet. Provide production collectors, targets, synthetic login identities and matching HOU4 rules before relying on the rehearsal's green board. |
 | Controller TLS | `scripts/rehearsal-controller-tls.py` accepts only test certificates/paths. Production roles retain a host-side DNS credential/cron path. Resolve the production controller-managed issuance/renewal path and prove its delivery/expiry alerts under the agreed secret scope before deployment. |
 | Replacement recovery | `restore-test-host.yml`, `publish-test-recovery.yml` and `rehearse-recovery.yml` reject production. A production restore/publication entry point and its environment-specific recovery validation are required; the tested sequence below is its acceptance checklist. |
 | Release inputs | Confirm production addresses/domains, client IDs/redirects, certificates, secrets, administrative device, owner recovery access and staff/CMS initialization. Existing rehearsal inputs and temporary grants are retired. |
 
-Keep these guards intact. This documentation change does not implement those
-production paths. Independent HOU4 outage monitoring remains deliberately deferred.
+Keep the remaining test-only guards intact. Production identity provisioning
+does not enable the other production paths. Independent HOU4 outage monitoring
+remains deliberately deferred.
 
 ## Release record and access
 
