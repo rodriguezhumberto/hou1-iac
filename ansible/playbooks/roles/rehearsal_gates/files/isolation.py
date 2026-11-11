@@ -28,13 +28,22 @@ PACKAGE_APT_FILE = Path('/etc/apt/apt.conf.d/99hou1-test-package-access')
 PACKAGE_APT_CONFIG = 'Acquire::EnableSrvRecords "false";\n'
 PACKAGE_BEGIN = '# BEGIN HOU1 TEST PACKAGE ACCESS'
 PACKAGE_END = '# END HOU1 TEST PACKAGE ACCESS'
+REGISTRY_HOSTS = ('ghcr.io', 'pkg-containers.githubusercontent.com')
+REGISTRY_TTL_SECONDS = 1800
+REGISTRY_RECEIPT = Path('/var/lib/hou1-test-registry-access.json')
+REGISTRY_BEGIN = '# BEGIN HOU1 TEST REGISTRY ACCESS'
+REGISTRY_END = '# END HOU1 TEST REGISTRY ACCESS'
 
 
 def package_targets(config):
+    return endpoint_targets(config, PACKAGE_HOSTS)
+
+
+def endpoint_targets(config, endpoints):
     rules(config)  # Includes test-only, explicit-deny and bounded-egress guards.
     denied = [ipaddress.ip_network(v, strict=True) for v in config['deny_cidrs']]
     hosts = {}
-    for host in PACKAGE_HOSTS:
+    for host in endpoints:
         addresses = {ipaddress.ip_address(info[4][0]) for info in
                      socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
         assert addresses, f'No addresses for package endpoint {host}'
@@ -45,24 +54,24 @@ def package_targets(config):
     return hosts
 
 
-def package_hosts(hosts):
+def package_hosts(hosts, begin=PACKAGE_BEGIN, end=PACKAGE_END):
     """Replace only our block, preserving the inode and all unmanaged bytes."""
     original = PACKAGE_HOSTS_FILE.read_text()
     lines, managed = [], False
     for line in original.splitlines(keepends=True):
-        if line.rstrip('\r\n') == PACKAGE_BEGIN:
+        if line.rstrip('\r\n') == begin:
             assert not managed, 'Duplicate package hosts block'
             managed = True
-        elif line.rstrip('\r\n') == PACKAGE_END:
+        elif line.rstrip('\r\n') == end:
             assert managed, 'Unexpected package hosts block end'
             managed = False
         elif not managed:
             lines.append(line)
     assert not managed, 'Unterminated package hosts block'
     prefix = '' if not hosts else '\n'.join([
-        PACKAGE_BEGIN,
+        begin,
         *(f'{address} {host}' for host, addresses in sorted(hosts.items()) for address in addresses),
-        PACKAGE_END, '',
+        end, '',
     ])
     updated = prefix + ''.join(lines)
     if updated != original:
@@ -70,29 +79,37 @@ def package_hosts(hosts):
 
 
 def package_batch(hosts, existing_sets):
+    return endpoint_batch(hosts, existing_sets, 'packages', PACKAGE_TTL_SECONDS, '{ 80, 443 }')
+
+
+def endpoint_batch(hosts, existing_sets, prefix, ttl, ports):
     lines = []
     for version, kind in [(4, 'ipv4_addr'), (6, 'ipv6_addr')]:
-        name = f'packages{version}'
+        name = f'{prefix}{version}'
         if name not in existing_sets:
-            lines.append(f'add set inet {TABLE} {name} {{ type {kind}; flags timeout; timeout {PACKAGE_TTL_SECONDS}s; }}')
+            lines.append(f'add set inet {TABLE} {name} {{ type {kind}; flags timeout; timeout {ttl}s; }}')
             # Works with a restored older isolation table too. Denies still win
             # even though these rules are inserted at the start of each chain.
             for chain in ['host_output', 'egress_guard']:
                 family = 'ip' if version == 4 else 'ip6'
-                lines.append(f'insert rule inet {TABLE} {chain} {family} daddr != @denied{version} {family} daddr @{name} tcp dport {{ 80, 443 }} accept')
+                lines.append(f'insert rule inet {TABLE} {chain} {family} daddr != @denied{version} {family} daddr @{name} tcp dport {ports} accept')
         lines.append(f'flush set inet {TABLE} {name}')
         addresses = sorted({address for values in hosts.values() for address in values
                             if ipaddress.ip_address(address).version == version})
         if addresses:
-            entries = ', '.join(f'{address} timeout {PACKAGE_TTL_SECONDS}s' for address in addresses)
+            entries = ', '.join(f'{address} timeout {ttl}s' for address in addresses)
             lines.append(f'add element inet {TABLE} {name} {{ {entries} }}')
     return '\n'.join(lines) + '\n'
 
 
 def package_sets():
+    return {item['set']['name'] for item in table_items() if 'set' in item}
+
+
+def table_items():
     result = subprocess.run(['nft', '-j', 'list', 'table', 'inet', TABLE],
                             check=True, capture_output=True, text=True, timeout=15)
-    return {item['set']['name'] for item in json.loads(result.stdout)['nftables'] if 'set' in item}
+    return json.loads(result.stdout)['nftables']
 
 
 def close_packages(token):
@@ -125,6 +142,44 @@ def open_packages(config):
         package_hosts(hosts)
     except BaseException:
         close_packages(receipt['token'])
+        raise
+    print(json.dumps(receipt))
+
+
+def registry_cleanup_batch(items):
+    lines = []
+    names = {'registry4', 'registry6'}
+    for item in items:
+        rule = item.get('rule', {})
+        if any('"@' + name + '"' in json.dumps(rule.get('expr', [])) for name in names):
+            assert rule['family'] == 'inet' and rule['table'] == TABLE
+            assert rule['chain'] in {'host_output', 'egress_guard'}
+            lines.append(f"delete rule inet {TABLE} {rule['chain']} handle {int(rule['handle'])}")
+    for name in sorted({item['set']['name'] for item in items if 'set' in item} & names):
+        lines.append(f'delete set inet {TABLE} {name}')
+    return '\n'.join(lines) + '\n'
+
+
+def close_registry(token):
+    receipt = json.loads(REGISTRY_RECEIPT.read_text())
+    assert secrets.compare_digest(receipt['token'], token), 'Registry lease token mismatch'
+    package_hosts({}, REGISTRY_BEGIN, REGISTRY_END)
+    load_batch(registry_cleanup_batch(table_items()))
+    REGISTRY_RECEIPT.unlink()
+
+
+def open_registry(config):
+    hosts = endpoint_targets(config, REGISTRY_HOSTS)
+    assert REGISTRY_BEGIN not in PACKAGE_HOSTS_FILE.read_text(), 'Stale registry hosts block needs cleanup'
+    sets = package_sets()
+    receipt = {'token': secrets.token_hex(16)}
+    with os.fdopen(os.open(REGISTRY_RECEIPT, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as output:
+        json.dump(receipt, output)
+    try:
+        load_batch(endpoint_batch(hosts, sets, 'registry', REGISTRY_TTL_SECONDS, '443'))
+        package_hosts(hosts, REGISTRY_BEGIN, REGISTRY_END)
+    except BaseException:
+        close_registry(receipt['token'])
         raise
     print(json.dumps(receipt))
 
@@ -360,9 +415,16 @@ if __name__ == "__main__":
     mode.add_argument("--refresh-google", action="store_true")
     mode.add_argument("--open-packages", action="store_true")
     mode.add_argument("--close-packages", metavar="TOKEN")
+    mode.add_argument("--open-registry", action="store_true")
+    mode.add_argument("--close-registry", metavar="TOKEN")
     a = p.parse_args()
     config = json.loads(Path(a.config).read_text())
-    if a.open_packages:
+    if a.open_registry:
+        open_registry(config)
+    elif a.close_registry:
+        assert config['environment'] == 'test'
+        close_registry(a.close_registry)
+    elif a.open_packages:
         open_packages(config)
     elif a.close_packages:
         assert config['environment'] == 'test'

@@ -1,5 +1,9 @@
 # Reproducible isolated recovery drill
 
+CI-backed recovery points use their saved image digest and temporary registry
+access; see [Application images](application-images.md). Cached build dependencies
+and application builds described below apply only to legacy source-built points.
+
 Issue #27's component recovery rehearsal now has a repository entry point:
 `ansible/playbooks/rehearse-recovery.yml`. The `recovery_drill` role contains the
 preparation, build, restore, identity, application and cleanup programs. No code

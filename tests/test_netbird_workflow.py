@@ -127,7 +127,7 @@ class WorkflowTest(unittest.TestCase):
         roles = bootstrap['roles']
         web = next(role for role in roles if role['role'] == 'webstack')
         tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
-        deploy = next(task for task in tasks if task['name'] == 'Rebuild and deploy updated Docker containers')
+        deploy = next(task for task in tasks if task['name'] == 'Deploy the verified application without building on the host')
         # Render the production command with a Compose fixture that records args.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

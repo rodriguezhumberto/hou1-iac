@@ -13,6 +13,13 @@
     owner: root
     group: root
     mode: '0700'
+- name: Install the shared application artifact verifier for backup capture
+  ansible.builtin.copy:
+    src: '{{ role_path }}/../application_image/files/artifact.py'
+    dest: /usr/local/libexec/hou1-application-artifact.py
+    owner: root
+    group: root
+    mode: '0755'
 - name: Install local preparation separately from the SSH ciphertext reader
   ansible.builtin.template:
     src: '{{ item }}.j2'

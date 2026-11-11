@@ -76,11 +76,12 @@
         extra_opts: [--no-same-owner]
       no_log: true
 
-    - name: Restore the empty host and stop at the private publication checkpoint
-      ansible.builtin.command:
-        argv: [python3, '{{ host_recovery_root }}/restore.py']
-      no_log: true
-      changed_when: true
+    - name: Restore the empty host with temporary registry access and stop before publication
+      ansible.builtin.include_role:
+        name: application_image
+        tasks_from: registry-command
+      vars:
+        application_image_command_argv: [python3, '{{ host_recovery_root }}/restore.py']
   always:
     - name: Preserve remote diagnostics and remove controller plaintext
       block:

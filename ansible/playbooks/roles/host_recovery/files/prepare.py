@@ -19,6 +19,9 @@ ROLES = HERE.parents[1]
 spec = importlib.util.spec_from_file_location('drill_prepare', ROLES / 'recovery_drill/files/prepare.py')
 drill = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(drill)
+spec = importlib.util.spec_from_file_location('application_artifact', ROLES / 'application_image/files/artifact.py')
+artifact = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(artifact)
 REPOSITORIES = {'postgresql': 'postgres', 'authentik-server': 'ghcr.io/goauthentik/server',
                 'authentik-worker': 'ghcr.io/goauthentik/server',
                 'netbird-server': 'netbirdio/netbird-server', 'dashboard': 'netbirdio/dashboard',
@@ -43,9 +46,17 @@ def validate(request, metadata, lock, app, netbird):
             or app.get('staff_vpn_subnet') != str(subnet)
             or ipaddress.ip_address(app['HOU1_VPN_IP']) not in subnet):
         raise ValueError('Require the saved test VPN boundary and one public bootstrap source')
-    if set(lock) != set(REPOSITORIES):
-        raise ValueError('Require all runtime and build image digests')
-    for service, repo in REPOSITORIES.items():
+    repositories = dict(REPOSITORIES)
+    receipt = metadata.get('application_image')
+    if receipt is not None:
+        artifact.validate_receipt(receipt, request['staff_revision'])
+        repositories.pop('node')
+        repositories['astro-app'] = artifact.REPOSITORY
+        if lock.get('astro-app') != receipt['image']:
+            raise ValueError('Image lock must preserve the saved application artifact')
+    if set(lock) != set(repositories):
+        raise ValueError('Require all runtime image digests (and the build base only for legacy recovery)')
+    for service, repo in repositories.items():
         if not re.fullmatch(re.escape(repo) + r'@sha256:[0-9a-f]{64}', lock[service]):
             raise ValueError('Unexpected image repository or mutable image reference')
     if lock['authentik-server'] != lock['authentik-worker']:
@@ -72,12 +83,14 @@ def prepare(request, payload, source_bundle, image_lock, output):
     app = drill.environment(payload / 'app-config/.env')
     netbird = yaml.safe_load((payload / 'netbird-files/config.yaml').read_text())
     origins = validate(request, metadata, lock, app, netbird)
+    receipt = artifact.saved(payload, request['staff_revision'])
     auth = yaml.safe_load((payload / 'authentik/compose.yaml').read_text())
     vpn = yaml.safe_load((payload / 'netbird-files/compose.yaml').read_text())
     web = yaml.safe_load((payload / 'app-config/docker-compose.yml').read_text())
     if (set(auth['services']) != {'postgresql', 'authentik-server', 'authentik-worker'}
             or set(vpn['services']) != {'netbird-server', 'dashboard'}
-            or vpn['services']['netbird-server']['image'] != 'netbirdio/netbird-server:0.82.0'
+            or vpn['services']['netbird-server']['image'] not in (
+                'netbirdio/netbird-server:0.82.0', lock['netbird-server'])
             or set(web['services']) != {'astro-app', 'nginx', 'uptime-kuma'}):
         raise ValueError('Unexpected saved services or NetBird release')
     for config in [auth, vpn, web]:
@@ -124,16 +137,17 @@ def prepare(request, payload, source_bundle, image_lock, output):
         if git('rev-parse', 'refs/heads/recovery').decode().strip() != request['staff_revision']:
             raise ValueError('Source bundle does not match the saved revision')
         dockerfile = git('show', request['staff_revision'] + ':astro-app/Dockerfile').decode()
-        if re.findall(r'^FROM (\S+)', dockerfile, re.M) != ['node:24.22.2', 'node:24.22.2']:
+        if receipt is None and re.findall(r'^FROM (\S+)', dockerfile, re.M) != ['node:24.22.2', 'node:24.22.2']:
             raise ValueError('Review a changed build base before replacement recovery')
-        (output / 'Dockerfile.recovery').write_text(dockerfile.replace('FROM node:24.22.2 ', 'FROM ' + lock['node'] + ' '))
+        if receipt is None:
+            (output / 'Dockerfile.recovery').write_text(dockerfile.replace('FROM node:24.22.2 ', 'FROM ' + lock['node'] + ' '))
         shutil.rmtree(repository)
         for config in [auth, vpn, web]:
             for name, service in config['services'].items():
                 if name in lock:
                     service['image'] = lock[name]
         web['services']['astro-app'].pop('build', None)
-        web['services']['astro-app']['image'] = 'hou1-restored-staff:' + request['staff_revision']
+        web['services']['astro-app']['image'] = receipt['image'] if receipt else 'hou1-restored-staff:' + request['staff_revision']
         for name, value in [('auth.compose.json', auth), ('netbird.compose.json', vpn), ('app.compose.json', web)]:
             (output / name).write_text(json.dumps(value, indent=2) + '\n')
         values = dict(netbird_domain=origins['netbird'].removeprefix('https://'),
@@ -157,10 +171,13 @@ def prepare(request, payload, source_bundle, image_lock, output):
                 if mapping[host] != app[cert_key]:
                     raise ValueError('Saved Nginx environment and certificate lineage differ')
         cfg = {**request, 'origins': origins, 'image_lock': lock}
+        if receipt is not None:
+            cfg['application_image'] = receipt
         (output / 'request.json').write_text(json.dumps(cfg, indent=2) + '\n')
         (output / 'certificate-report.json').write_text(json.dumps(mapping, indent=2) + '\n')
         shutil.copyfile(source_bundle, output / 'staff.bundle')
         shutil.copyfile(HERE / 'restore.py', output / 'restore.py')
+        shutil.copyfile(ROLES / 'application_image/files/artifact.py', output / 'artifact.py')
         shutil.copyfile(ROLES / 'rehearsal_gates/files/isolation.py', output / 'isolation.py')
         with tarfile.open(output / 'bundle.tar', 'w') as archive:
             archive.add(payload, arcname='payload')

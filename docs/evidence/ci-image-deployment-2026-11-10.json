@@ -1,0 +1,237 @@
+{
+  "scope": "Existing isolated test HOU1 CI-digest deployment, migration rollback, redeployment and component recovery",
+  "recorded_at": "2026-11-10T22:24:34.888417+00:00",
+  "tested_code_revision": "351cea509c5368ca81dacdb5da83643f22c61e2a",
+  "base_recovery_revision": "31e35b4118737b62865c67eafbbbcc145b1e6fc6",
+  "infrastructure_issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/60",
+  "application_issue": "https://github.com/rodriguezhumberto/pearland-paws/issues/57",
+  "application_pr": "https://github.com/rodriguezhumberto/pearland-paws/pull/58",
+  "release_run": "https://github.com/rodriguezhumberto/pearland-paws/actions/runs/42904438853",
+  "release": {
+    "schema": 1,
+    "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+    "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+    "platform": "linux/amd64",
+    "image_id": "sha256:9cf6cd2860066ebe071de179908d83ec79f094a1afd7766d08b54a6522b875af"
+  },
+  "deployed_artifact": {
+    "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+    "image_id": "sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+    "platform": "linux/amd64",
+    "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+    "schema": 1
+  },
+  "registry": {
+    "visibility": "private",
+    "anonymous_token_request_status": 401,
+    "credential_scope": "read:packages",
+    "credential_delivery": "SOPS/age; temporary root-only Docker config removed after each operation",
+    "operator_only_encrypted_credential_prepared": true,
+    "temporary_deployment_age_identity_removed": true
+  },
+  "publication": "Manual workflow_dispatch from main; deployment remains explicit",
+  "checks": {
+    "repository_suite": {
+      "total": 227,
+      "passed": 226,
+      "skipped": 1,
+      "failed": 0,
+      "started_revision": "1479fac4a098b3ac6b55a15634fc62f909d3fcaa",
+      "skip": "Native dnsmasq integration unavailable on controller"
+    },
+    "final_image_and_recovery_suite": {
+      "passed": 47,
+      "failed": 0,
+      "revision": "351cea509c5368ca81dacdb5da83643f22c61e2a"
+    },
+    "ansible_syntax": {
+      "passed": 8
+    },
+    "diff_check": "passed"
+  },
+  "live_phases": {
+    "digest": {
+      "primary_health_checks": 23,
+      "staff_login_and_role_checks": 7,
+      "monitoring_targets_up": 8,
+      "active_alerts": 0,
+      "runtime_bytes_unchanged": true,
+      "public_staff_and_admin_denied": true,
+      "public_ssh_and_metrics_closed": true,
+      "registry_credentials_dns_pins_and_lease_removed": true
+    },
+    "rollback": {
+      "primary_health_checks": 23,
+      "staff_login_and_role_checks": 7,
+      "monitoring_targets_up": 8,
+      "active_alerts": 0,
+      "runtime_bytes_unchanged": true,
+      "public_staff_and_admin_denied": true,
+      "public_ssh_and_metrics_closed": true,
+      "registry_credentials_dns_pins_and_lease_removed": true
+    },
+    "redeployed": {
+      "primary_health_checks": 23,
+      "staff_login_and_role_checks": 7,
+      "monitoring_targets_up": 8,
+      "active_alerts": 0,
+      "runtime_bytes_unchanged": true,
+      "public_staff_and_admin_denied": true,
+      "public_ssh_and_metrics_closed": true,
+      "registry_credentials_dns_pins_and_lease_removed": true
+    },
+    "final": {
+      "primary_health_checks": 23,
+      "staff_login_and_role_checks": 7,
+      "monitoring_targets_up": 8,
+      "active_alerts": 0,
+      "runtime_bytes_unchanged": true,
+      "public_staff_and_admin_denied": true,
+      "public_ssh_and_metrics_closed": true,
+      "registry_credentials_dns_pins_and_lease_removed": true
+    }
+  },
+  "storage": {
+    "sqlite_integrity": "ok",
+    "database_inode_and_schema_unchanged_after_code_rollback_and_redeploy": true,
+    "media_contents_unchanged": true,
+    "database_restore_not_used_for_primary_code_rollback": true
+  },
+  "backup": {
+    "manifest": {
+      "schema": 1,
+      "environment": "test",
+      "created": 1794348707,
+      "id": "20261110T221147Z-675b78ae240f",
+      "size": 29561466,
+      "sha256": "10632c12fa621f244802ffa09415c46f635a6657e4a741edbc093a11d2aec317"
+    },
+    "ciphertext_hash_verified_on_hou4_and_controller": true,
+    "authorized_test_recipient_stanzas": 2,
+    "nightly_recipient_unchanged": true,
+    "one_time_encryption_wrapper_removed": true,
+    "backup_timer_active": true
+  },
+  "component_restore": {
+    "passed": true,
+    "host_build": false,
+    "application_image": {
+      "schema": 1,
+      "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+      "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+      "platform": "linux/amd64",
+      "image_id": "sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42"
+    },
+    "postgres_tables": 187,
+    "empty_postgresql_import": true,
+    "published_ports": 0,
+    "internal_network": true,
+    "identity_assertions": {
+      "fixture_passwords_match_recovery_point": true,
+      "google_source_secret_recovered": true,
+      "signing_private_keys_parse": true,
+      "local_emergency_admin_password_recovered": true,
+      "both_oidc_client_secrets_recovered": true,
+      "existing_internal_test_identities_recovered": true,
+      "no_identity_rebootstrap": true
+    },
+    "application_checks": {
+      "session_reset_setup": {
+        "active_staff_and_idp_login_before_session_reset": true
+      },
+      "after_session_reset": {
+        "pre_reset_staff_session_denied": true,
+        "fresh_oidc_login_after_session_reset": true,
+        "fresh_logout_revokes_session": true
+      },
+      "initial": {
+        "external_egress_denied": true,
+        "restored_discovery": true,
+        "restored_signing_key_matches_reference": true,
+        "netbird_api_discovery_and_jwks": true,
+        "netbird_dashboard": true,
+        "unauthenticated_staff_denied": true,
+        "restored_reader_login_and_read": true,
+        "reader_write_denied": true,
+        "reader_logout_revoked_session": true,
+        "restored_admin_login_and_read": true,
+        "empty_snapshot_content_preserved": true,
+        "admin_private_media_preview": true,
+        "reader_private_media_preview": true,
+        "reader_media_write_denied": true,
+        "admin_media_upload": true,
+        "admin_content_write": true
+      },
+      "after_restart": {
+        "identity_aware_session_survives_app_restart": true,
+        "content_survives_app_restart": true,
+        "media_survives_app_restart": true,
+        "private_preview_survives_app_restart": true
+      },
+      "after_rollback": {
+        "post_snapshot_session_absent_after_database_rollback": true,
+        "snapshot_content_restored_after_rollback": true,
+        "snapshot_media_restored_after_rollback": true,
+        "login_after_rollback": true,
+        "logout_revoked_session_after_rollback": true
+      }
+    },
+    "application_checks_passed": 29,
+    "cleanup": {
+      "drill_containers_removed": true,
+      "drill_network_removed": true,
+      "primary_ids_starttimes_unchanged": true
+    },
+    "remote_and_controller_plaintext_staging_removed": true
+  },
+  "stopped_attempts_and_corrections": [
+    {
+      "phase": "initial harness guard",
+      "error": "Repository vars_files overrode the test inventory",
+      "correction": "Use inventory defaults at their normal precedence; verify test guards in check mode",
+      "app_replaced": false
+    },
+    {
+      "phase": "GHCR login",
+      "error": "Docker resolved a GHCR IP outside the static test allowlist",
+      "correction": "Fixed-endpoint HTTPS lease with pinned target DNS, expiry and always cleanup",
+      "app_replaced": false
+    },
+    {
+      "phase": "source checkout",
+      "error": "Recovered checkout still fetched only the old recovery branch",
+      "correction": "Fetch the exact selected release SHA through an explicit refspec",
+      "app_replaced": false
+    },
+    {
+      "phase": "postdeployment isolation check",
+      "error": "Empty registry lease rules preceded the first deny rules",
+      "correction": "Remove registry rules and sets during lease cleanup; rerun health checks"
+    },
+    {
+      "phase": "receipt comparison",
+      "error": "CI classic Docker and target containerd store reported different local IDs for the same manifest",
+      "correction": "Verify portable manifest identity and record the destination engine local ID; retain strict local container checks"
+    },
+    {
+      "phase": "capture update harness validation",
+      "error": "Static role syntax selected the full role rather than recovery tasks",
+      "correction": "Use include_role with tasks_from recovery; syntax-check before running",
+      "host_changed": false
+    }
+  ],
+  "limits": [
+    "First migration rollback restored the retained pre-CI local image; rollback between two published CI digests was not exercised.",
+    "Component restore used isolated containers on existing HOU1; this is not clean-OS replacement recovery or a production cutover.",
+    "Live external Google login was not repeated; internal fixture OIDC login and existing VPN/service health passed.",
+    "Merge prerequisite PR #59, then rebase PR #61 and rerun checks before merging."
+  ],
+  "vps_changes": true,
+  "host_wiped": false,
+  "production_promoted": false,
+  "live_registry_publication": true,
+  "live_authenticated_pull": true,
+  "live_digest_deployment": true,
+  "live_digest_component_restore": true,
+  "live_digest_clean_host_restore": false
+}

@@ -1,0 +1,70 @@
+---
+- name: Require SOPS inputs together for private registry access
+  ansible.builtin.assert:
+    that:
+      - (application_image_registry_secret_source | length > 0) == (application_image_registry_age_key_file | length > 0)
+    fail_msg: Supply both controller SOPS registry inputs; only legacy source-built recovery may omit both.
+
+- name: Create a temporary private Docker credential directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: hou1-ghcr-
+  register: application_image_docker_config
+
+- name: Use registry access only for this operation
+  block:
+    - name: Lease fixed registry destinations only on isolated test hosts
+      ansible.builtin.include_tasks: registry-access.yml
+
+    - name: Read the scoped pull credential on the controller
+      ansible.builtin.command:
+        argv: [sops, --decrypt, --output-type, json, '{{ application_image_registry_secret_source }}']
+      environment:
+        SOPS_AGE_KEY_FILE: '{{ application_image_registry_age_key_file }}'
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      no_log: true
+      register: application_image_registry_secrets
+      when: application_image_registry_secret_source | length > 0
+
+    - name: Authenticate only to GHCR with the read-only pull credential
+      ansible.builtin.command:
+        argv: [docker, login, ghcr.io, --username, '{{ (application_image_registry_secrets.stdout | from_json).GHCR_USERNAME }}', --password-stdin]
+        stdin: '{{ (application_image_registry_secrets.stdout | from_json).GHCR_TOKEN }}'
+        stdin_add_newline: false
+      environment:
+        DOCKER_CONFIG: '{{ application_image_docker_config.path }}'
+      changed_when: false
+      no_log: true
+      when: application_image_registry_secret_source | length > 0
+
+    - name: Run the fixed artifact operation with temporary registry access
+      ansible.builtin.command:
+        argv: '{{ application_image_command_argv }}'
+      environment:
+        DOCKER_CONFIG: '{{ application_image_docker_config.path }}'
+      register: application_image_command_result
+      changed_when: true
+      no_log: true
+  always:
+    - name: Remove both credential and network leases even if either cleanup fails
+      block:
+        - name: Remove the registry credential directory even after a failed pull
+          ansible.builtin.file:
+            path: '{{ application_image_docker_config.path }}'
+            state: absent
+          no_log: true
+        - name: Discard the decrypted pull credential from subsequent task variables
+          ansible.builtin.set_fact:
+            application_image_registry_secrets: {}
+          no_log: true
+      always:
+        - name: Close temporary registry destinations and DNS pins after success or failure
+          ansible.builtin.command:
+            argv: [python3, /usr/local/libexec/hou1-test-registry-access, '{{ application_image_isolation_config }}', --close-registry, '{{ (application_image_registry_lease.stdout | from_json).token }}']
+          when:
+            - application_image_isolation_config | default('') | length > 0
+            - application_image_registry_lease.rc | default(-1) == 0
+          changed_when: true
+          no_log: true

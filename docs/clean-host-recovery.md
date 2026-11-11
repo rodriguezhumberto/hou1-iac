@@ -1,13 +1,19 @@
 # Clean test-host recovery
 
+For CI-built recovery points, follow the digest and registry requirements in
+[Application images](application-images.md). Source-build instructions below
+apply to retained legacy recovery points.
+
 Issue #27's replacement-host gate uses `restore-test-host.yml`, followed by
 `publish-test-recovery.yml`. These entry points recover the selected test point
 on fresh Debian 12 at the same HOU1 address. They are not production restore
 commands. Keep HOU4 and its retained backups intact.
 
 The isolated component drill in [PR #59](https://github.com/rodriguezhumberto/hou1-iac/pull/59)
-already passed. This clean-host workflow still needs its own live evidence.
-Local preparation, syntax checks and fixture tests do not complete that gate.
+already passed. The [second clean CI-image run](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
+completed restore, access review, publication, monitoring, off-host collection,
+component recovery and reboot. Local preparation and fixture tests alone do not
+complete this gate.
 The [continued-host troubleshooting evidence](evidence/hou1-recovery-iteration-2026-11-10-01.json)
 records the repaired host's monitoring, backup, alert, component recovery and
 reboot checks separately from an uninterrupted clean-host run.
@@ -20,7 +26,9 @@ The [CI-image clean attempt](evidence/hou1-ci-clean-host-recovery-2026-11-10-01.
 restored 187 PostgreSQL tables and matched 13 authorization tables. HOU4
 reconnected with its retained peer. Publication stopped because controller DNS
 verification preceded private resolver installation; that ordering is corrected.
-The failed attempt remains stopped, and a new clean run is required.
+The failed attempt remains stopped. The second attempt passed with the corrected
+ordering. It also found and corrected a health-probe false positive after package
+leases; the firewall policy was unchanged.
 
 ## Before wiping HOU1
 
@@ -101,8 +109,9 @@ ansible-playbook -i /private/point/inventory.yml \
 The playbook reuses the existing cloud-init wait, package, capacity, user and
 Docker preparation. It authenticates the recovery point on the controller,
 validates source, endpoints, mounts, certificates and images, and restores saved
-configuration. It pulls images from registries and builds the app without cache
-before placing runtime credentials in the checkout. PostgreSQL imports only
+configuration. It pulls images from registries. CI-backed points pull and verify
+the saved application digest without building; retained legacy points build the
+app without cache before placing runtime credentials in the checkout. PostgreSQL imports only
 into an empty schema, with TCP query readiness and `ON_ERROR_STOP`.
 
 Backed-up IdP sessions/codes/tokens and staff sessions are cleared while restored

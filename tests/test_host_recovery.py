@@ -176,6 +176,32 @@ class HostRecoveryPreparationTest(unittest.TestCase):
                 prepare.prepare(cfg, payload, bundle, images, root / 'escaped')
             self.assertFalse((root / 'escaped').exists())
 
+    def test_recovery_of_a_restored_netbird_requires_the_exact_locked_digest(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp)
+            cfg, payload, bundle, images = self.fixture(root)
+            saved = payload / 'netbird-files/compose.yaml'
+            vpn = yaml.safe_load(saved.read_text())
+            pinned = json.loads(images.read_text())['netbird-server']
+            vpn['services']['netbird-server']['image'] = pinned
+            saved.write_text(yaml.safe_dump(vpn))
+            output = root / 'pinned'
+            self.assertTrue(prepare.prepare(cfg, payload, bundle, images, output)['prepared'])
+            self.assertEqual(json.loads((output / 'netbird.compose.json').read_text())[
+                'services']['netbird-server']['image'], pinned)
+            for index, image in enumerate([
+                'netbirdio/netbird-server@sha256:' + 'c' * 64,
+                'foreign.invalid/netbird-server@sha256:' + 'b' * 64,
+                'netbirdio/netbird-server:0.83.0',
+            ]):
+                with self.subTest(image=image):
+                    vpn['services']['netbird-server']['image'] = image
+                    saved.write_text(yaml.safe_dump(vpn))
+                    rejected = root / ('rejected-' + str(index))
+                    with self.assertRaises(ValueError):
+                        prepare.prepare(cfg, payload, bundle, images, rejected)
+                    self.assertFalse(rejected.exists())
+
     def test_publication_starts_dns_before_controller_refresh_and_private_ssh(self):
         play = yaml.safe_load((FILES.parents[2] / 'publish-test-recovery.yml').read_text())[0]
         with tempfile.TemporaryDirectory() as directory:

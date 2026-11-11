@@ -17,6 +17,9 @@ HERE = Path(__file__).resolve().parent
 spec = importlib.util.spec_from_file_location('recovery_certificates', HERE / 'certificates.py')
 certificates = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(certificates)
+spec = importlib.util.spec_from_file_location('application_artifact', HERE.parents[1] / 'application_image/files/artifact.py')
+artifact = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(artifact)
 
 
 def environment(path):
@@ -68,6 +71,7 @@ def prepare(request, payload, output):
     payload, output = Path(payload).resolve(), Path(output)
     metadata = json.loads((payload / 'recovery.json').read_text())
     validate(request, metadata)
+    receipt = artifact.saved(payload, request['staff_revision'])
     if output.exists():
         raise ValueError('Staging output must not exist')
     app = environment(payload / 'app-config/.env')
@@ -110,7 +114,7 @@ def prepare(request, payload, output):
             service.pop('volumes', None)
         services[name] = service
     saved_app = yaml.safe_load((payload / 'app-config/docker-compose.yml').read_text())['services']['astro-app']
-    services['astro-app'] = dict(image='hou1-recovery-app:' + request['staff_revision'], restart='no',
+    services['astro-app'] = dict(image=receipt['image'] if receipt else 'hou1-recovery-app:' + request['staff_revision'], restart='no',
                                 env_file=['./payload/app-config/.env'], environment=saved_app['environment'],
                                 healthcheck=saved_app['healthcheck'], networks=['recovery'], mem_limit='768m', pids_limit=256,
                                 volumes=[root + '/payload/cms/database:/var/data', root + '/payload/cms/media:/var/data/media'])
@@ -141,12 +145,15 @@ def prepare(request, payload, output):
     proxy, mapping = certificates.rewrite_proxy('events {}\nhttp { access_log off; error_log /dev/stderr crit; ' + '\n'.join(servers) + '\n}\n', payload / 'app-config/certbot/conf')
     output.mkdir(mode=0o700, parents=True)
     cfg = {**request, **origins, 'issuer': app['STAFF_OIDC_ISSUER']}
+    if receipt is not None:
+        cfg['application_image'] = receipt
     (output / 'drill-input.json').write_text(json.dumps(cfg, indent=2) + '\n')
     (output / 'compose.json').write_text(json.dumps(compose, indent=2) + '\n')
     (output / 'proxy.conf').write_text(proxy)
     (output / 'certificate-mapping.json').write_text(json.dumps(mapping, indent=2) + '\n')
     for name in ('runtime.py', 'build.py', 'check.py', 'http_probe.py', 'identity_smoke.py', 'driver.py'):
         shutil.copyfile(HERE / name, output / name)
+    shutil.copyfile(HERE.parents[1] / 'application_image/files/artifact.py', output / 'artifact.py')
     shutil.copyfile(HERE.parents[4] / 'scripts/verify-recovery.py', output / 'safe_archive.py')
     with tarfile.open(output / 'bundle.tar', 'w') as archive:
         archive.add(payload, arcname='payload')
