@@ -204,8 +204,27 @@
       "pinned_export_key_authenticated_and_denied_non_export_commands": true,
       "recorded_at": "2026-11-11T17:03:57.624240+00:00"
     },
-    "authenticated_decryption": "pending owner grant",
-    "actual_service_restore": "not performed; production recovery gate remains open"
+    "authenticated_decryption": "passed",
+    "actual_service_restore": "not performed; production recovery gate remains open",
+    "authentication_evidence": {
+      "passed": true,
+      "production_source_backup_id": "20261111T165321Z-af0f3ebf8ffe",
+      "source_sha256": "79d488bd381a231d8a2abac968bedeef59b16bad66037cd31a40bdf5c0b4a602",
+      "scoped_drill_id": "20261111T165321Z-8c6ba35719b2",
+      "scoped_drill_sha256": "b3917d422eed222ab50f07f369a25c328de25e61b53fb19bc09b321e893f6800",
+      "authenticated_owner_decryption": true,
+      "scoped_reencryption_verified": true,
+      "sqlite_integrity": "passed",
+      "postgresql_dump_nonempty": true,
+      "complete_component_archives": true,
+      "ci_image_receipt_matches_saved_revision": true,
+      "owner_private_key_files_removed": true,
+      "plaintext_ram_directory_removed": true,
+      "nightly_backup_recipient_changed": false,
+      "live_services_changed": false,
+      "actual_postgresql_import_or_service_restore_proven": false,
+      "completed_at": "2026-11-11T21:42:37.314381+00:00"
+    }
   },
   "validation": {
     "monitoring_suite": {
@@ -232,7 +251,7 @@
     }
   },
   "remaining": [
-    "Authenticate production recovery decryption and complete actual recovery validation",
+    "Complete actual production recovery validation",
     "Record manual staff/CMS content initialization",
     "Finish release record, outstanding publication-entrypoint review and temporary-grant retirement",
     "Explicit website traffic cutover approval"
