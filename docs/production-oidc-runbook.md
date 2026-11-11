@@ -8,7 +8,7 @@ record, command argument, PR or evidence report.
 
 ## Evidence and current production gates
 
-The merged infrastructure baseline is
+The rehearsal infrastructure baseline is
 `f3edfcf08ea3e444f967adf078bf2899aa36f1d0`. The rehearsal used application revision
 `a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51` and image
 `ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42`.
@@ -29,11 +29,17 @@ and a reviewed, validated procedure at the selected release ref:
 
 | Gate | Current implementation and required work |
 | --- | --- |
-| Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) supports environment-bound Google source, encrypted allowlist and staff/VPN assignments, with offline security tests. Supply a separate production Google client/secret, validate permitted Google egress, and prove live deny-by-default admission, roles and VPN access before enabling production login. No production validation is claimed. |
-| Monitoring | [Environment-bound collectors](environment-monitoring.md) support explicit test/production profiles and Compose service discovery with VPN-only TCP/9100. Offline checks cover both environments; supply production HOU4 targets/probes and synthetic identities, then prove live private scrapes, public denial, login checks and Discord firing/recovery before clearing this gate. |
-| Controller TLS | [Controller-managed issuance and renewal](controller-tls.md) supports explicit environment lineages, SOPS-protected ACME state, bootstrap import and a VPN-only renewal account. Offline certificate/rollback/alert tests do not clear this gate: supply the production DNS-only grant, controller ownership and pinned transport, then prove ACME dry-run, served certificates and Discord failure/recovery. |
-| Replacement recovery | [Production replacement recovery](production-host-recovery.md) provides separate restore/publication entry points with explicit inventory/backup boundaries and CI image receipts. Offline validation does not clear this gate: supply a complete production recovery point, independent consoles and scoped credentials, then prove restore, access reconciliation and operational handoff. The test entry points retain their safeguards. |
-| Release inputs | Confirm production addresses/domains, client IDs/redirects, certificates, secrets, administrative device, owner recovery access and staff/CMS initialization. Existing rehearsal inputs and temporary grants are retired. |
+| Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) uses the separate production Google client, encrypted allowlist and staff/VPN assignments. Production Google token exchange, approved-account NetBird enrollment and personal SSH on both nodes are verified. Preserve the deny-by-default source and separate network/application grants. |
+| Monitoring | [Production operations evidence](evidence/production-operations-2026-11-11.json) records seven healthy targets, public/unrelated-peer denial and fresh synthetic staff-reader login/permission/logout. The owner confirmed staff and Grafana SSO login/logout. The stale-probe drill fired and resolved with two successful Discord notifications and no delivery errors; owner channel confirmation remains pending. |
+| Controller TLS | [Scoped renewal evidence](evidence/scoped-renewal-peer-2026-11-11.json) records the production DNS-01 dry runs, served certificates, dedicated renewal peer, forced-command transport and fresh numeric status on both receivers. Keep these persistent jobs separate from the expiring administrative deployment grant. |
+| Replacement recovery | The first production unified point has been collected and its ciphertext size/SHA256/receipt verified. Authenticated decryption and an actual production recovery remain separate gates under [production replacement recovery](production-host-recovery.md). A successful test restore or transfer receipt cannot clear them. |
+| Release inputs | Production names, addresses, VPN network, clients and certificates are selected. Staff/CMS content still needs recorded manual initialization. Retire temporary administrative/scoped grants after the remaining acceptance work and owner-only handoff; website traffic cutover still requires explicit approval. |
+
+The production acceptance follow-up uses infrastructure ref
+`56ec4c7ca7a7e087cfda887d131100e9e13dc60d`. The owner has confirmed production
+Google/NetBird access, personal SSH on both nodes, Grafana SSO login/logout and
+staff-app SSO login/logout. Record alert delivery and backup acceptance in the
+release record; the remaining recovery and traffic cutover gates stay explicit.
 
 Keep the remaining test-only guards intact. Production identity provisioning
 does not enable the other production paths. Independent HOU4 outage monitoring
@@ -130,7 +136,10 @@ weekly points. A failed capture extends the approximate one-day data-loss window
 
 Pair the established production VPN peers through
 [the backup protocol](hou4-backup-protocol.md), using only the HOU4 transport
-**public** key and the verified HOU1 server public key. Then run:
+**public** key and the verified HOU1 server public key. Set
+`hou1_backup_app_project` to the actual application's Compose project from the
+selected deployment; do not inherit an old project name. Keep the nightly age
+recipient owner-only. Then run:
 
 ```bash
 ansible-playbook -i "$INVENTORY" ansible/playbooks/backups.yml \
