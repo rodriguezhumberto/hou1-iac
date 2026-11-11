@@ -83,22 +83,26 @@ def policy_plan(groups, policies, dns_port=1053, server_group='prod-servers'):
     return dict(managed=plan, default=default)
 
 
-def monitoring_plan(groups, peers, policies, monitor_ip, server_ip):
-    """Restrict one monitoring peer to one isolated target on TCP 9100."""
+def monitoring_plan(groups, peers, policies, monitor_ip, server_ip,
+                    subnet, server_group):
+    """Restrict one enrolled monitoring peer to one environment target on TCP 9100."""
     from ipaddress import IPv4Address, IPv4Network
-    network = IPv4Network('100.91.0.0/16')
-    if (monitor_ip == server_ip or IPv4Address(monitor_ip) not in network
-            or IPv4Address(server_ip) not in network):
-        raise AnsibleFilterError('Monitoring requires distinct isolated VPN peers')
-    environment = [g for g in groups if g['name'] == 'test-servers']
+    network = IPv4Network(subnet)
+    if (server_group not in ('test-servers', 'prod-servers') or not network.subnet_of(IPv4Network('100.64.0.0/10'))
+            or monitor_ip == server_ip or any(IPv4Address(ip) not in network
+            or IPv4Address(ip) in (network.network_address, network.broadcast_address)
+            for ip in (monitor_ip, server_ip))):
+        raise AnsibleFilterError('Monitoring requires distinct environment VPN peers')
+    suffix = 'test' if server_group == 'test-servers' else 'production'
+    environment = [g for g in groups if g['name'] == server_group]
     if len(environment) != 1:
-        raise AnsibleFilterError('Monitoring requires the isolated test-servers group')
+        raise AnsibleFilterError('Monitoring requires exactly one declared environment server group')
     members = {p['id'] if isinstance(p, dict) else p for p in environment[0].get('peers', [])}
     planned = []
-    for name, address in [('hou1-monitoring-test', monitor_ip), ('hou1-metrics-test', server_ip)]:
+    for name, address in [('hou1-monitoring-' + suffix, monitor_ip), ('hou1-metrics-' + suffix, server_ip)]:
         matches = [p for p in peers if p['ip'] == address]
         if len(matches) != 1 or matches[0]['id'] not in members:
-            raise AnsibleFilterError('Metrics peers must be unique enrolled test servers')
+            raise AnsibleFilterError('Metrics peers must be unique enrolled environment servers')
         peer = matches[0]['id']
         found = [g for g in groups if g['name'] == name]
         if len(found) > 1:
@@ -109,7 +113,7 @@ def monitoring_plan(groups, peers, policies, monitor_ip, server_ip):
         planned.append(dict(id=current['id'] if current else None, body=dict(name=name, peers=[peer])))
     policy = None
     if all(g['id'] for g in planned):
-        name = 'hou1-monitoring-test-metrics'
+        name = 'hou1-monitoring-' + suffix + '-metrics'
         marker = 'Managed by hou1-iac monitoring.'
         body = dict(name=name, description=marker, enabled=True, source_posture_checks=[], rules=[dict(
             name=name, description=marker, enabled=True, action='accept', protocol='tcp',
@@ -162,7 +166,7 @@ def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environ
 
 def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id):
     """Pin existing managed source groups before retiring a lost test server."""
-    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip)
+    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet, 'test-servers')
     backups = backup_plan(groups, peers, policies, monitor_ip, server_ip, subnet, 'test')
     selected = []
     for plan in (metrics, backups):

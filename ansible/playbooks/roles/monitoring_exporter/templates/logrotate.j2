@@ -9,6 +9,6 @@
     create 0640 root root
     sharedscripts
     postrotate
-        /usr/bin/docker exec {{ hou1_monitoring_containers.nginx.name }} nginx -s reopen >/dev/null 2>&1
+        /usr/local/libexec/hou1-monitoring-collect --reopen-nginx >/dev/null 2>&1
     endscript
 }

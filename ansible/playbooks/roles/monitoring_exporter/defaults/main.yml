@@ -1,15 +1,26 @@
 ---
 hou1_monitoring_enabled: false
+hou1_monitoring_inventory_group: monitoring_targets
+# Select an existing public identity profile explicitly; never infer the host's environment.
+hou1_monitoring_identity_profile: ''
 hou1_monitoring_peer_ip: ''
 hou1_monitoring_exporter_port: 9100
+# The application root comes from encrypted deployment inputs. Discover by Compose
+# labels rather than generated container names (which depend on project naming).
 hou1_monitoring_containers:
-  postgresql: {name: hou1-authentik-test-postgresql-1, project: hou1-authentik-test}
-  authentik-server: {name: hou1-authentik-test-authentik-server-1, project: hou1-authentik-test}
-  authentik-worker: {name: hou1-authentik-test-authentik-worker-1, project: hou1-authentik-test}
-  staff-app: {name: pearlandpaws-test-astro-app-1, project: pearlandpaws-test}
-  nginx: {name: pearlandpaws-test-nginx-1, project: pearlandpaws-test}
-  netbird: {name: hou1-netbird-test-netbird-server-1, project: hou1-netbird-test}
-  netbird-dashboard: {name: hou1-netbird-test-dashboard-1, project: hou1-netbird-test}
-hou1_monitoring_backup_directory: /var/backups/hou1-authentik/test
+  postgresql:
+    directory: '{{ authentik_project_root_base }}/{{ hou1_monitoring_identity_profile }}'
+    service: postgresql
+  authentik-server:
+    directory: '{{ authentik_project_root_base }}/{{ hou1_monitoring_identity_profile }}'
+    service: authentik-server
+  authentik-worker:
+    directory: '{{ authentik_project_root_base }}/{{ hou1_monitoring_identity_profile }}'
+    service: authentik-worker
+  staff-app: {directory: '{{ app_directory }}', service: astro-app}
+  nginx: {directory: '{{ app_directory }}', service: nginx}
+  netbird: {directory: '{{ netbird_control_plane_directory }}', service: netbird-server}
+  netbird-dashboard: {directory: '{{ netbird_control_plane_directory }}', service: dashboard}
+hou1_monitoring_backup_directory: '{{ authentik_backup_root_base }}/{{ hou1_monitoring_identity_profile }}'
 hou1_request_metrics_enabled: false
-hou1_request_metrics_log: /opt/pearlandpaws-test/nginx-logs/metrics.jsonl
+hou1_request_metrics_log: '{{ app_directory }}/nginx-logs/metrics.jsonl'

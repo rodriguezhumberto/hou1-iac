@@ -1,0 +1,74 @@
+{
+  "recorded_at": "2026-11-11T04:00:15.657665+00:00",
+  "scope": "Environment-bound VPN-only collectors; follow-up to infrastructure issue #19",
+  "base_commit": "3310f2930febfdc7cbecdb2e462d1effedf2d2cd",
+  "companion_monitoring_commit": "234784077b7d86ca1db8bd8b7b1006256a895f66",
+  "validation": {
+    "full_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou4-nginx-tools/root/usr/sbin/nginx DNSMASQ_BIN=/var/tmp/issue-23-dnsmasq/root/usr/sbin/dnsmasq python3 -m unittest discover -s tests -v",
+      "tests": 259,
+      "skipped": 0,
+      "result": "passed",
+      "note": "Started before two final focused test additions and the equivalent Nginx-reopen helper extraction; final monitoring code was checked separately below."
+    },
+    "final_monitoring_checks": {
+      "command": "python3 -m unittest discover -s tests -p test_monitoring_exporter.py -v",
+      "tests": 9,
+      "skipped": 0,
+      "result": "passed",
+      "covers": [
+        "test and production guard acceptance",
+        "mismatched profile/subnet/group and public/bootstrap target denial",
+        "ambiguous inventory rejection",
+        "single-source single-target one-way TCP 9100 policy and idempotent readback",
+        "unexpected membership and policy ownership rejection",
+        "missing/duplicate/mismatched Compose sources",
+        "aggregate-only PostgreSQL output and failure gauges",
+        "Nginx reopen uses only a discovered running container"
+      ]
+    },
+    "monitoring_playbook_syntax": {
+      "result": "passed",
+      "command": "ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/monitoring.yml --syntax-check"
+    },
+    "companion_monitoring": {
+      "full_suite": 54,
+      "skipped": 0,
+      "result": "passed",
+      "final_integration_checks": 5,
+      "final_request_alert_checks": 1,
+      "environments": [
+        "test",
+        "production"
+      ],
+      "native_tools": [
+        "promtool 2.53.3",
+        "amtool 0.28.1",
+        "alertmanager",
+        "blackbox_exporter",
+        "nginx"
+      ],
+      "covers": [
+        "distinct VPN target on TCP 9100",
+        "production sample labels",
+        "alert hold/firing/absence/recovery",
+        "existing callback latency traffic minimum and quiet-period suppression"
+      ]
+    }
+  },
+  "source_sha256": {
+    "ansible/playbooks/filter_plugins/netbird_policies.py": "addc88ae2f1436cdf17f8144e4bdf499743a1be5d86dad0a8d50b85fdf8fb59b",
+    "ansible/playbooks/monitoring.yml": "0729bbb4666f3bda3420a42bfd2c21d17ab93d869786ea37d9d7ec2885e9d5e3",
+    "ansible/playbooks/roles/monitoring_exporter/defaults/main.yml": "096be96be01c88c83a92237528625bc006c3d7be018ab4ffd1802783789fef99",
+    "ansible/playbooks/roles/monitoring_exporter/tasks/main.yml": "4a7ac0c17bf5e4ba9fb943b99570bc5a3d20f2daae9a03c8f194b7884794f574",
+    "ansible/playbooks/roles/monitoring_exporter/files/collect.py": "24b994fe776f3fed730383e32ad73816440023bedbd568d904194a80904924ef"
+  },
+  "live_deployment_performed": false,
+  "production_gate_cleared": false,
+  "remaining": [
+    "live production scrape and firewall verification",
+    "production synthetic identities and environment-bound login probe",
+    "live Discord failure/recovery evidence",
+    "separate controller TLS and production replacement-recovery gates"
+  ]
+}

@@ -14,7 +14,7 @@
 
     - name: Plan the two exact metrics groups
       ansible.builtin.set_fact:
-        hou1_metrics_plan: '{{ hou1_monitoring_api.results[0].json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_monitoring_api.results[2].json, hou1_monitoring_peer_ip, netbird_ip) }}'
+        hou1_metrics_plan: '{{ hou1_monitoring_api.results[0].json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_monitoring_api.results[2].json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group) }}'
 
     - name: Create only missing metrics peer groups
       ansible.builtin.uri:
@@ -37,7 +37,7 @@
 
     - name: Plan the single direction and single port policy
       ansible.builtin.set_fact:
-        hou1_metrics_plan: '{{ hou1_metrics_groups.json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_monitoring_api.results[2].json, hou1_monitoring_peer_ip, netbird_ip) }}'
+        hou1_metrics_plan: '{{ hou1_metrics_groups.json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_monitoring_api.results[2].json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group) }}'
 
     - name: Apply only the marked metrics policy
       ansible.builtin.uri:
@@ -59,4 +59,4 @@
 
     - name: Require exact policy contents and membership after reconciliation
       ansible.builtin.assert:
-        that: not (hou1_metrics_groups.json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_metrics_policies.json, hou1_monitoring_peer_ip, netbird_ip)).policy.changed
+        that: not (hou1_metrics_groups.json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_metrics_policies.json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group)).policy.changed

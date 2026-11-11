@@ -1,6 +1,6 @@
 ---
-- name: Export isolated HOU1 metrics privately to HOU4
-  hosts: isolated_test_vps
+- name: Export declared HOU1 metrics privately to HOU4
+  hosts: "{{ hou1_monitoring_inventory_group | default('monitoring_targets') }}"
   become: true
   gather_facts: true
   module_defaults:
