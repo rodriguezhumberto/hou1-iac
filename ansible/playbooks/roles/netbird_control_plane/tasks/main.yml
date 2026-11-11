@@ -149,7 +149,7 @@
     mode: '0600'
   no_log: true
 
-  when: not (rehearsal_controller_managed_tls | default(false) | bool)
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Check for the NetBird certificate
   ansible.builtin.stat:
@@ -159,8 +159,8 @@
 - name: Require the controller-issued netbird certificate before private DNS deployment
   ansible.builtin.assert:
     that: netbird_certificate.stat.exists
-    fail_msg: Import the isolated test certificate from the trusted controller first.
-  when: rehearsal_controller_managed_tls | default(false) | bool
+    fail_msg: Import the environment-bound certificate from the trusted controller first.
+  when: (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Obtain the dedicated NetBird certificate through DNS-01
   ansible.builtin.command:
@@ -189,13 +189,14 @@
       - "{{ netbird_domain }}"
   when:
     - not netbird_certificate.stat.exists
-    - not (rehearsal_controller_managed_tls | default(false) | bool)
+    - not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Preserve NetBird certificate renewal credentials for the app renewal job
   ansible.builtin.lineinfile:
     path: "{{ app_directory }}/certbot/conf/renewal/{{ netbird_domain }}.conf"
     regexp: '^dns_cloudflare_credentials\s*='
     line: 'dns_cloudflare_credentials = /cloudflare.ini'
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Render the public control-plane ingress
   ansible.builtin.template:

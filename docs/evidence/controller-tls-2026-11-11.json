@@ -1,0 +1,73 @@
+{
+  "recorded_at": "2026-11-11T04:43:12.296235+00:00",
+  "scope": "Controller TLS issuance, scoped delivery, renewal and alerts; infrastructure issue #20",
+  "base_commit": "9a3d107b7a143e4ce73dc0d06837db84c3b9d680",
+  "companion_monitoring_commit": "5c1a76b00980b49adcd3f48f88a986cc86203999",
+  "validation": {
+    "full_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou4-nginx-tools/root/usr/sbin/nginx DNSMASQ_BIN=/var/tmp/issue-23-dnsmasq/root/usr/sbin/dnsmasq python3 -m unittest discover -s tests -v",
+      "tests": 271,
+      "skipped": 0,
+      "result": "passed",
+      "note": "Full run started before final focused preflight/host-DNS tests and CA/known-host/scheduler hardening. Final TLS code was checked separately below."
+    },
+    "final_tls_checks": {
+      "command": "python3 -m unittest discover -s tests -p test_controller_tls.py -v",
+      "tests": 12,
+      "skipped": 0,
+      "result": "passed",
+      "covers": [
+        "native SAN, expiry, key and CA-chain validation",
+        "bootstrap, no-op and certificate rotation",
+        "failed reload or served verification restores original files/symlinks",
+        "native verified TLS handshake",
+        "real SOPS encrypted state and bundle roundtrip",
+        "dry-run does not publish or modify encrypted state",
+        "failed or timed-out issuance cleans scratch/container and preserves success",
+        "delivery fingerprint readback",
+        "scheduler requires matching recent verified deployment",
+        "private pinned SSH renewal account",
+        "gateway rejects shells, arguments and bootstrap",
+        "stale/future/non-numeric or cross-environment status rejection",
+        "real Ansible decryption preflight does not log plaintext",
+        "production mode skips legacy DNS and renewal tasks",
+        "native systemd verification for both environments"
+      ]
+    },
+    "sudoers_parser": {
+      "command": "visudo -cf <rendered temporary sudoers>",
+      "result": "passed"
+    },
+    "new_playbook_syntax": {
+      "playbooks": [
+        "tls-renewal-access.yml",
+        "tls-renewal-schedule.yml"
+      ],
+      "result": "passed"
+    },
+    "companion_monitoring": {
+      "full_suite_tests": 56,
+      "skipped": 0,
+      "result": "passed",
+      "native_tls_alert_checks": "passed in test and production",
+      "request_thresholds_changed": false
+    }
+  },
+  "source_sha256": {
+    "scripts/controller-tls.py": "cde4b0a2185f852b1ee1c35d0e1f8377c77d429a3198ebebf7a3a5d8e25f125d",
+    "scripts/hou1_tls_material.py": "5ee840828949354b49db3a691ce221c36bb12aa4be60fe6d46545dfb7369b133",
+    "ansible/playbooks/roles/controller_tls/files/receive.py": "c1ca715e11a98dda90250f809d331072cae53b50c12400d35c568403db849cc4",
+    "ansible/playbooks/roles/controller_tls/files/gateway.py": "967d6d2a70a11392b22053f850b5099d00282e18da9bca433551b7e2d5a0c60a",
+    "ansible/playbooks/roles/controller_tls/tasks/main.yml": "ce0dec63e6a4637dd8fe48d2f1284050c24cb183a049589304cfe769e7b8c2a4",
+    "ansible/playbooks/roles/controller_tls/tasks/access.yml": "c90b8f71aa4eec280df4b324a751f5db7f54ed64e4c69e4edf92be719902cc0b",
+    "ansible/playbooks/roles/controller_tls/tasks/schedule.yml": "381e3952395d2823648101228101079033f58a00b4af4c61c9b3a6fc6fd2f459"
+  },
+  "live_deployment_performed": false,
+  "production_gate_cleared": false,
+  "remaining": [
+    "owner-approved production lineages, DNS-only grant and controller ownership",
+    "pinned VPN renewal transport and first verified production delivery",
+    "live ACME dry-run and Discord failure/resolution evidence",
+    "production replacement-host recovery is a separate gate"
+  ]
+}

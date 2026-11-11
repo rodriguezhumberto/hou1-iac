@@ -1,0 +1,8 @@
+[Unit]
+Description=Controller-only HOU1 certificate issuance and verified renewal
+[Service]
+Type=oneshot
+ExecStart={{ ansible_playbook_python }} {{ hou1_tls_schedule_directory }}/controller-tls.py --config {{ hou1_tls_controller_config }} --deploy
+TimeoutStartSec=7800
+UMask=0077
+NoNewPrivileges=yes

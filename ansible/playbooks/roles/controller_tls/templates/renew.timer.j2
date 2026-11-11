@@ -1,0 +1,9 @@
+[Unit]
+Description=Renew HOU1 certificates twice daily
+[Timer]
+OnCalendar=*-*-* 03,15:15:00 UTC
+RandomizedDelaySec=300
+Persistent=true
+Unit=hou1-tls-{{ hou1_tls_schedule_environment }}.service
+[Install]
+WantedBy=timers.target

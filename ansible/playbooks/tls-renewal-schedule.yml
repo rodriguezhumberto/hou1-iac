@@ -1,0 +1,11 @@
+---
+- name: Manage HOU1 TLS scheduling on the trusted controller
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: false
+  tasks:
+    - name: Schedule only the selected environment
+      ansible.builtin.import_role:
+        name: controller_tls
+        tasks_from: schedule.yml

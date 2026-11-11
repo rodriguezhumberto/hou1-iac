@@ -24,3 +24,4 @@ hou1_monitoring_containers:
 hou1_monitoring_backup_directory: '{{ authentik_backup_root_base }}/{{ hou1_monitoring_identity_profile }}'
 hou1_request_metrics_enabled: false
 hou1_request_metrics_log: '{{ app_directory }}/nginx-logs/metrics.jsonl'
+hou1_tls_metrics_enabled: false

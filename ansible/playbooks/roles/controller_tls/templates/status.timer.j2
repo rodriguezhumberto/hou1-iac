@@ -1,0 +1,8 @@
+[Unit]
+Description=Publish HOU1 controller renewal status each minute
+[Timer]
+OnCalendar=minutely
+Persistent=true
+Unit=hou1-tls-{{ hou1_tls_schedule_environment }}-status.service
+[Install]
+WantedBy=timers.target

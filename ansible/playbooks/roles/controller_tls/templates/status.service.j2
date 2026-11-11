@@ -1,0 +1,8 @@
+[Unit]
+Description=Publish bounded HOU1 controller renewal status over the VPN
+[Service]
+Type=oneshot
+ExecStart={{ ansible_playbook_python }} {{ hou1_tls_schedule_directory }}/controller-tls.py --config {{ hou1_tls_controller_config }} --publish-status
+TimeoutStartSec=90
+UMask=0077
+NoNewPrivileges=yes

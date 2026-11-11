@@ -61,7 +61,7 @@ class MonitoringExporterTest(unittest.TestCase):
                   netbird_server_group='test-servers',netbird_subnet='100.91.0.0/16',
                   netbird_ip='100.91.0.10',ansible_host='100.91.0.10',node_bootstrap=False,
                   hou1_monitoring_peer_ip='100.91.0.22',hou1_monitoring_exporter_port=9100,
-                  hou1_request_metrics_enabled=False)
+                  hou1_request_metrics_enabled=False,hou1_tls_metrics_enabled=False)
         scenarios=[({}, {'metrics-target':{'hosts':{'localhost':{},'other':{}}}}),
                    ({}, {'metrics-target':{'hosts':{'localhost':{}}},'prod_env':{'hosts':{'localhost':{}}}}),
                    ({'cms_environment':'production','netbird_server_group':'prod-servers',

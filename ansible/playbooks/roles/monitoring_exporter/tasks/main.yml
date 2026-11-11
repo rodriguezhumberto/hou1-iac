@@ -23,6 +23,8 @@
       - hou1_monitoring_peer_ip != (netbird_subnet | ansible.utils.ipaddr('broadcast'))
       - hou1_monitoring_exporter_port == 9100
       - hou1_request_metrics_enabled is boolean
+      - hou1_tls_metrics_enabled is boolean
+      - not hou1_tls_metrics_enabled or hou1_controller_managed_tls | bool
       - not ansible_check_mode
     fail_msg: Select one matching environment inventory group, identity profile and HOU4 VPN peer.
 
@@ -85,7 +87,7 @@
     owner: root
     group: root
     mode: '0600'
-    content: "{{ {'environment': cms_environment, 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory, 'request_metrics_enabled': hou1_request_metrics_enabled, 'request_metrics_log': hou1_request_metrics_log} | to_nice_json }}"
+    content: "{{ {'environment': cms_environment, 'containers': hou1_monitoring_containers, 'authentik_backup_directory': hou1_monitoring_backup_directory, 'request_metrics_enabled': hou1_request_metrics_enabled, 'request_metrics_log': hou1_request_metrics_log, 'controller_tls_enabled': hou1_tls_metrics_enabled} | to_nice_json }}"
   no_log: true
 
 - name: Install the read-only aggregate collector

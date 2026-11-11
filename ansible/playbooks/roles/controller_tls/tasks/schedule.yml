@@ -1,0 +1,85 @@
+---
+- name: Require an explicit scheduling environment and boolean enable switch
+  ansible.builtin.assert:
+    that:
+      - hou1_tls_schedule_enabled is boolean
+      - hou1_tls_schedule_environment in ['test', 'production']
+
+- name: Configure controller scheduling
+  when: hou1_tls_schedule_enabled
+  block:
+    - name: Require a protected absolute controller configuration path
+      ansible.builtin.assert:
+        that:
+          - hou1_tls_controller_config is match('^/[A-Za-z0-9_./-]+$')
+          - "'..' not in hou1_tls_controller_config.split('/')"
+          - not ansible_check_mode
+    - name: Bind the scheduler to the selected controller environment
+      ansible.builtin.set_fact:
+        hou1_tls_schedule_config: '{{ lookup("ansible.builtin.file", hou1_tls_controller_config) | from_json }}'
+        hou1_tls_schedule_directory: '{{ hou1_tls_controller_config | dirname }}'
+      no_log: true
+    - name: Refuse a controller configuration from another environment
+      ansible.builtin.assert:
+        that: hou1_tls_schedule_config.environment == hou1_tls_schedule_environment
+      no_log: true
+    - name: Verify private configuration and scoped SSH before changing timers
+      ansible.builtin.command:
+        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/controller-tls.py', --config, '{{ hou1_tls_controller_config }}', --check-config]
+      changed_when: false
+    - name: Require the persistent controller user manager
+      ansible.builtin.command:
+        argv: [systemctl, --user, is-active, default.target]
+      changed_when: false
+    - name: Require scheduling to survive controller logout
+      ansible.builtin.command:
+        argv: [loginctl, show-user, '{{ lookup("env", "USER") }}', -p, Linger, --value]
+      register: hou1_tls_linger
+      changed_when: false
+      failed_when: hou1_tls_linger.stdout | trim != 'yes'
+    - name: Install controller TLS programs from this checkout
+      ansible.builtin.copy:
+        src: '{{ role_path }}/../../../../scripts/{{ item }}'
+        dest: '{{ hou1_tls_schedule_directory }}/{{ item }}'
+        mode: '0700'
+      loop: [controller-tls.py, hou1_tls_material.py]
+    - name: Create the controller user unit directory
+      ansible.builtin.file:
+        path: '{{ lookup("env", "HOME") }}/.config/systemd/user'
+        state: directory
+        mode: '0700'
+    - name: Install persistent renewal and status-publication units
+      ansible.builtin.template:
+        src: '{{ item }}.j2'
+        dest: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-tls-{{ hou1_tls_schedule_environment }}{{ "-status" if item.startswith("status") else "" }}.{{ "timer" if item.endswith("timer") else "service" }}'
+        mode: '0600'
+      loop: [renew.service, renew.timer, status.service, status.timer]
+    - name: Load controller units
+      ansible.builtin.systemd_service:
+        scope: user
+        daemon_reload: true
+    - name: Enable renewal and minutely publication
+      ansible.builtin.systemd_service:
+        scope: user
+        name: 'hou1-tls-{{ hou1_tls_schedule_environment }}{{ item }}.timer'
+        enabled: true
+        state: started
+      loop: ['', '-status']
+
+- name: Find existing scheduled timers before disabling
+  ansible.builtin.stat:
+    path: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-tls-{{ hou1_tls_schedule_environment }}{{ item }}.timer'
+  loop: ['', '-status']
+  register: hou1_tls_existing_timers
+  when: not hou1_tls_schedule_enabled
+
+- name: Disable only this environment's existing timers
+  ansible.builtin.systemd_service:
+    scope: user
+    name: 'hou1-tls-{{ hou1_tls_schedule_environment }}{{ item.item }}.timer'
+    enabled: false
+    state: stopped
+  loop: '{{ hou1_tls_existing_timers.results | default([]) }}'
+  when:
+    - not hou1_tls_schedule_enabled
+    - item.stat.exists
