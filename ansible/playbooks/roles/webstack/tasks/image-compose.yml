@@ -9,8 +9,12 @@
     application_image_compose: '{{ application_image_source_compose.content | b64decode | from_yaml }}'
     application_image_service: "{{ (application_image_source_compose.content | b64decode | from_yaml).services['astro-app'] | dict2items | rejectattr('key', 'equalto', 'build') | items2dict | combine({'image': application_image_reference}) }}"
 
+- name: Omit only disabled secondary-site template and static-content mounts
+  ansible.builtin.set_fact:
+    application_image_nginx: '{{ application_image_compose.services.nginx | webstack_nginx_service(webstack_secondary_site_enabled | default(true)) }}'
+
 - name: Write the image-only deployment Compose configuration
   ansible.builtin.copy:
     dest: '{{ app_directory }}/docker-compose.yml'
     mode: '0644'
-    content: "{{ application_image_compose | combine({'services': application_image_compose.services | combine({'astro-app': application_image_service})}) | to_nice_yaml }}"
+    content: "{{ application_image_compose | combine({'services': application_image_compose.services | combine({'astro-app': application_image_service, 'nginx': application_image_nginx})}) | to_nice_yaml }}"

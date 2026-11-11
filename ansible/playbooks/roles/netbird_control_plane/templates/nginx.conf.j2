@@ -9,12 +9,14 @@
 server {
     listen 80;
     server_name {{ netbird_domain }};
+    set $hou1_service netbird;
     return 301 https://$host$request_uri;
 }
 server {
     listen 443 ssl;
     http2 on;
     server_name {{ netbird_domain }};
+    set $hou1_service netbird;
     ssl_certificate /etc/letsencrypt/live/{{ netbird_domain }}/fullchain.pem;
     ssl_certificate_key /etc/letsencrypt/live/{{ netbird_domain }}/privkey.pem;
     ssl_protocols TLSv1.2 TLSv1.3;

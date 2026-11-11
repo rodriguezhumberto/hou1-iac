@@ -1,0 +1,71 @@
+{
+  "recorded_at": "2026-11-11T06:29:47.232504+00:00",
+  "scope": "Explicit website routing and hostname-independent ingress metrics; infrastructure #27 deployment follow-up",
+  "base_commit": "1b5912aa0179c29cf6a75308c9c1c9bfff49c399",
+  "companion_application_commit": "4434c5c1b4b124054e7f1232478a8c4ae0b95608",
+  "companion_application_ci": "https://github.com/rodriguezhumberto/pearland-paws/actions/runs/42972244112",
+  "validation": {
+    "full_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou4-nginx-tools/root/usr/sbin/nginx DNSMASQ_BIN=/var/tmp/issue-23-dnsmasq/root/usr/sbin/dnsmasq python3 -m unittest discover -s tests -v",
+      "tests": 293,
+      "skipped": 0,
+      "result": "passed",
+      "note": "Full suite started before final ingress metric labels and expanded private-host overlap guards; final changed components were checked separately."
+    },
+    "final_netbird_ingress": {
+      "command": "NGINX_BIN=/var/tmp/hou4-nginx-tools/root/usr/sbin/nginx python3 -m unittest discover -s tests -p test_netbird_control_plane.py -v",
+      "tests": 8,
+      "result": "passed"
+    },
+    "final_authentik_ingress": {
+      "command": "python3 -m unittest discover -s tests -p test_authentik_compose.py -v",
+      "tests": 3,
+      "result": "passed"
+    },
+    "hou1_syntax": {
+      "command": "ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check",
+      "result": "passed"
+    },
+    "website_checks": {
+      "tests": 4,
+      "result": "passed",
+      "covers": [
+        "No secondary domain/certificate required when disabled.",
+        "Only secondary template/static mounts removed in actual Compose output.",
+        "Image digest, storage, ingress and other services preserved.",
+        "Boolean, canonical-origin, distinct-host and compatible-source guards.",
+        "Runtime render binds explicit canonical settings without logging private values."
+      ]
+    },
+    "companion_application": {
+      "unit_tests": 94,
+      "integration_tests": 9,
+      "build": "passed",
+      "native_nginx_scenarios": 2,
+      "ci_image_build_and_smoke": "passed"
+    },
+    "final_website_checks": {
+      "command": "python3 -m unittest discover -s tests -p test_website_routing.py -v",
+      "tests": 4,
+      "result": "passed",
+      "includes": "Staff, NetBird and declared identity profile hosts cannot overlap public/static hosts."
+    }
+  },
+  "source_sha256": {
+    "ansible/playbooks/filter_plugins/webstack_sites.py": "bcc81b29a8bc45a37d4d3ac31dfd7a4c63c98cb12f35a6c4cc844ece4ed1bda7",
+    "ansible/playbooks/roles/webstack/tasks/website.yml": "95423a893197c19811c735e0eb4f0883e835349b4cc5597e07f8abb63ced7981",
+    "ansible/playbooks/roles/webstack/tasks/image-compose.yml": "f19559c05459f1e48727885b6de784a285946bdb1edb40dca3da2f4876469528",
+    "ansible/playbooks/roles/webstack/tasks/main.yml": "36028067f9e68699d1d026951e37c55a0a103a4fc3ace72b8268cf411b7c4174",
+    "ansible/playbooks/roles/authentik/templates/nginx.conf.j2": "51f85295d4ac401471d74cc37b7282b365d7aaefce4c2f71243dd628aaef0bc4",
+    "ansible/playbooks/roles/netbird_control_plane/templates/nginx.conf.j2": "934835cf1f600b11949022e5ddcdae4524905495e905cfb079c43a86393b32c1"
+  },
+  "live_deployment_performed": false,
+  "image_published": false,
+  "production_gate_cleared": false,
+  "remaining": [
+    "Select and publish a compatible main application digest before deployment.",
+    "Provide actual domains and addresses through encrypted release inputs.",
+    "Verify DNS, certificate alias SANs, direct live redirects and omitted-host denial.",
+    "Complete production identity, monitoring, TLS renewal and recovery gates."
+  ]
+}

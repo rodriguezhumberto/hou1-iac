@@ -1,0 +1,18 @@
+---
+- name: Validate explicit public website and optional secondary-site inputs
+  ansible.builtin.assert:
+    that: (vars | webstack_site_errors) | length == 0
+    fail_msg: Invalid website switches, canonical origin or overlapping hostnames.
+  no_log: true
+
+- name: Check selected application support for optional website routing
+  ansible.builtin.stat:
+    path: '{{ app_directory }}/nginx/secondary.conf.template'
+  register: webstack_secondary_template
+  when: not (webstack_secondary_site_enabled | default(true)) or webstack_public_canonical_redirect | default(false)
+
+- name: Require a compatible immutable application revision for website routing
+  ansible.builtin.assert:
+    that: webstack_secondary_template.stat.isreg | default(false)
+    fail_msg: Select an application revision containing optional secondary-site and canonical redirect support.
+  when: not (webstack_secondary_site_enabled | default(true)) or webstack_public_canonical_redirect | default(false)
