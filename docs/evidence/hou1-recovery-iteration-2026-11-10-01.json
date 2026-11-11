@@ -1,0 +1,330 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T08:40:34.338690+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "mode": "operator-authorized troubleshooting on existing nodes; no wipe",
+  "original_failed_attempt_preserved": true,
+  "clean_host_gate_complete": false,
+  "production_approved": false,
+  "tested_refs": {
+    "initial_restore": "7312d380021269ff292f08d1b1e3a5a275080bbd",
+    "publication": "d055e1eaae99c2efcad5b906c168703782e561e0",
+    "group_repair_and_management": "59645608f3d8c0ef045910b2cdfe7aeed0c76674",
+    "corrected_component": "82e136d5343efc21b205db03314a2a0cc8749ab0",
+    "staff": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+    "hou4": "96f80c0b1fa1fcd0b856038ce9ab700fd0d12af5"
+  },
+  "source_group_repair": {
+    "operation": "checked source-group repair",
+    "succeeded": true,
+    "groups_reassigned": 2,
+    "existing_policy_grants_and_ids_unchanged": true,
+    "other_groups_unchanged": true,
+    "production_after_tasks_exercised": true,
+    "not_a_clean_recovery_replay": true,
+    "verification_note": "Policy responses embed live destination peer counts; compare normalized grants rather than those counts. No policy writes performed.",
+    "infra_ref": "59645608f3d8c0ef045910b2cdfe7aeed0c76674"
+  },
+  "playbooks": {
+    "monitoring": {
+      "ok": 35,
+      "changed": 14,
+      "unreachable": 0,
+      "failed": 0,
+      "skipped": 3,
+      "rescued": 0,
+      "ignored": 0
+    },
+    "backups": {
+      "ok": 34,
+      "changed": 12,
+      "unreachable": 0,
+      "failed": 0,
+      "skipped": 5,
+      "rescued": 0,
+      "ignored": 0
+    },
+    "hou4-backup": {
+      "ok": 17,
+      "changed": 1,
+      "unreachable": 0,
+      "failed": 0,
+      "skipped": 4,
+      "rescued": 0,
+      "ignored": 0
+    },
+    "component-02": {
+      "ok": 26,
+      "changed": 17,
+      "unreachable": 0,
+      "failed": 0,
+      "skipped": 0,
+      "rescued": 0,
+      "ignored": 0
+    }
+  },
+  "capture": {
+    "capture_succeeded": true,
+    "fresh_marker_verified": true,
+    "vpn_reachable_after_capture": true,
+    "duration_seconds": 91.07,
+    "recorded_at": "2026-11-10T08:10:05.325768+00:00"
+  },
+  "collection": {
+    "manifest": {
+      "schema": 1,
+      "environment": "test",
+      "created": 1794298194,
+      "id": "20261110T080954Z-7e806970dc8a",
+      "size": 29327624,
+      "sha256": "9ae15b39521135a715ef002f3b3633875318a1dad6e8a89a17e0b4bca91f64e9"
+    },
+    "receipt": {
+      "schema": 1,
+      "received": 1794298222,
+      "sha256": "9ae15b39521135a715ef002f3b3633875318a1dad6e8a89a17e0b4bca91f64e9",
+      "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+    },
+    "retained_points": 2,
+    "receiver_timer_enabled": true,
+    "fresh_point_decryption_tested": false
+  },
+  "discord": {
+    "fault": "stop only HOU1 prometheus-node-exporter",
+    "expected_alerts": [
+      "Hou1CollectorUnavailable",
+      "Hou1PostgresqlUnavailable",
+      "Hou1RequestMetricsUnavailable",
+      "Hou4MetricsTargetDown"
+    ],
+    "firing_delivery_accepted": true,
+    "resolved_delivery_accepted": true,
+    "notifications_before": 29.0,
+    "notifications_firing": 33.0,
+    "notifications_after_recovery": 37.0,
+    "notification_failures_delta": 0.0,
+    "exporter_restored": true,
+    "recovery_watchdog_removed": true,
+    "netbird_not_stopped": true,
+    "proof": "Alertmanager Discord notification counters; not an operator screenshot of receipt"
+  },
+  "backup_transport": {
+    "backup_shell_denied": true,
+    "backup_sudo_denied": true,
+    "backup_extra_arguments_denied": true,
+    "backup_forwarding_denied": true,
+    "pinned_source_host_verification_used": true
+  },
+  "public_access": {
+    "staff_public_denied": {
+      "status": 403,
+      "passed": true
+    },
+    "authentik_admin_public_denied": {
+      "status": 403,
+      "passed": true
+    },
+    "netbird_api_public_ready": {
+      "status": 200,
+      "passed": true
+    },
+    "public_tcp_22_closed": {
+      "passed": true
+    },
+    "public_tcp_9100_closed": {
+      "passed": true
+    }
+  },
+  "public_access_after_reboot": {
+    "staff_public_denied": {
+      "status": 403,
+      "passed": true
+    },
+    "authentik_admin_public_denied": {
+      "status": 403,
+      "passed": true
+    },
+    "netbird_api_public_ready": {
+      "status": 200,
+      "passed": true
+    },
+    "public_tcp_22_closed": {
+      "passed": true
+    },
+    "public_tcp_9100_closed": {
+      "passed": true
+    }
+  },
+  "dashboard": {
+    "authenticated_dashboard_readback": true,
+    "title": "HOU1 Operations",
+    "provisioned": true,
+    "panels": 24
+  },
+  "tls_renewal": {
+    "environment": "test",
+    "recorded_at": "2026-11-10T08:11:24.999765+00:00",
+    "certificate_lineages": 4,
+    "dns_credentials_shipped": false,
+    "mode": "renew; no forced issuance",
+    "scheduled_hou1_controller_timer": "left disabled as requested before wipe"
+  },
+  "primary_staff_probe": {
+    "routine_login_probe": "passed",
+    "identities_checked": 2,
+    "checks_passed": 7
+  },
+  "operator_confirmations": {
+    "google_login": true,
+    "vpn_client": true,
+    "personal_hou1_ssh_key": true
+  },
+  "component_first_iteration": {
+    "passed": false,
+    "cause": "Current controller health-check passwords belonged to a different deployment; both failed read-only comparison with recovered fixture hashes.",
+    "cleanup": {
+      "drill_containers_removed": true,
+      "drill_network_removed": true,
+      "primary_ids_starttimes_unchanged": true
+    },
+    "identity_assertions_passed": {
+      "google_source_secret_recovered": true,
+      "signing_private_keys_parse": true,
+      "local_emergency_admin_password_recovered": true,
+      "both_oidc_client_secrets_recovered": true,
+      "existing_internal_test_identities_recovered": true,
+      "no_identity_rebootstrap": true
+    }
+  },
+  "component_corrected_iteration": {
+    "passed": true,
+    "recovery_point": "20261109T095132Z-dd7fe78119c3",
+    "fixture_credentials_from_recovered_sops_bundle": true,
+    "no_password_resets_or_identity_rebootstrap": true,
+    "identity_assertions": {
+      "fixture_passwords_match_recovery_point": true,
+      "google_source_secret_recovered": true,
+      "signing_private_keys_parse": true,
+      "local_emergency_admin_password_recovered": true,
+      "both_oidc_client_secrets_recovered": true,
+      "existing_internal_test_identities_recovered": true,
+      "no_identity_rebootstrap": true
+    },
+    "application": {
+      "restored_staff_sessions_invalidated_before_login_and_after_rollback": true,
+      "schema": 1,
+      "passed": true,
+      "environment": "test",
+      "recorded_at": 1794299620,
+      "checks": {
+        "session_reset_setup": {
+          "active_staff_and_idp_login_before_session_reset": true
+        },
+        "after_session_reset": {
+          "pre_reset_staff_session_denied": true,
+          "fresh_oidc_login_after_session_reset": true,
+          "fresh_logout_revokes_session": true
+        },
+        "initial": {
+          "external_egress_denied": true,
+          "restored_discovery": true,
+          "restored_signing_key_matches_reference": true,
+          "netbird_api_discovery_and_jwks": true,
+          "netbird_dashboard": true,
+          "unauthenticated_staff_denied": true,
+          "restored_reader_login_and_read": true,
+          "reader_write_denied": true,
+          "reader_logout_revoked_session": true,
+          "restored_admin_login_and_read": true,
+          "empty_snapshot_content_preserved": true,
+          "admin_private_media_preview": true,
+          "reader_private_media_preview": true,
+          "reader_media_write_denied": true,
+          "admin_media_upload": true,
+          "admin_content_write": true
+        },
+        "after_restart": {
+          "identity_aware_session_survives_app_restart": true,
+          "content_survives_app_restart": true,
+          "media_survives_app_restart": true,
+          "private_preview_survives_app_restart": true
+        },
+        "after_rollback": {
+          "post_snapshot_session_absent_after_database_rollback": true,
+          "snapshot_content_restored_after_rollback": true,
+          "snapshot_media_restored_after_rollback": true,
+          "login_after_rollback": true,
+          "logout_revoked_session_after_rollback": true
+        }
+      },
+      "check_count": 29,
+      "runtime_identity_and_application_checks_seconds": 229.491,
+      "staff_database_media_rollback_seconds": 56.026,
+      "rollback_scope": "Restored-copy staff SQLite/media to the actual recovery point; not a live HOU1 traffic cutover",
+      "harness_sha256": {
+        "build.py": "6009fe0b35f2c75ac8dd57c23ac4bac6a12044e60ac5cd6e72a5e14aca773c3c",
+        "identity_smoke.py": "91def46e8ed8ff1a4047b888687423030333eb88e28739308c5b57eb773288b2",
+        "runtime.py": "8103ac45ac265eeb6df4169ff152a0b0bfa9d8e174d61933159a8923dd79093d",
+        "safe_archive.py": "125ae73d12e38d39230abd1cb65652b7c96fdca820f1309f02fdb82cca1c5ea2",
+        "http_probe.py": "9334037a7715d566e9c2e7ab37204021a9a323ca45268108e7ca48bb42d976b5",
+        "check.py": "816762582c164fc617b8a5a749d2932a18800bf9f88d2d0d7447b6a8136b4fb3",
+        "driver.py": "c2a09761ce9a635cee4a32dff385dcc3e3966266bd896a85d83a879cdbb96e3c"
+      },
+      "scope": "Isolated component restore; no production, host replacement, external Google or VPN peer cutover"
+    },
+    "cleanup": {
+      "drill_containers_removed": true,
+      "drill_network_removed": true,
+      "primary_ids_starttimes_unchanged": true
+    }
+  },
+  "reboot": {
+    "reboot_passed": true,
+    "boot_id_changed": true,
+    "fresh_private_ssh_verified": true,
+    "host_key_verification_retained": true,
+    "health_checks_passed": 23,
+    "persistent_services": {
+      "expected_services_active": true,
+      "interrupted_writer_recovery_enabled": true
+    },
+    "elapsed_seconds": 132.91,
+    "recorded_at": "2026-11-10T08:37:01.253623+00:00"
+  },
+  "final_health": {
+    "primary_checks_passed": 23,
+    "monitoring": {
+      "targets_up": 8,
+      "active_alerts": 0,
+      "vpn_active": true,
+      "backup_timer_enabled": true
+    },
+    "recorded_at": "2026-11-10T08:40:03.905633+00:00"
+  },
+  "monitoring_convergence": {
+    "first_post_reboot_readback_window_seconds": 90,
+    "first_readback_timed_out": true,
+    "subsequent_read_only_sample_targets_up": 8,
+    "subsequent_read_only_sample_alerts": 0,
+    "configuration_or_service_mutations_between_samples": false,
+    "recorded_at": "2026-11-10T08:39:57.069418+00:00"
+  },
+  "local_checks": {
+    "recovery_regression_tests": 14,
+    "source_group_regression_tests": 3,
+    "component_playbook_syntax": true,
+    "diff_check": true
+  },
+  "remaining_clean_boundary": [
+    "Run corrected restore/publication/monitoring/backup sequence from empty Debian at one immutable reviewed revision.",
+    "Prove pre-retirement source-group pinning and post-enrollment reassignment in that uninterrupted run."
+  ],
+  "limitations": [
+    "Fresh capture proves encrypted transfer and retention; the decrypt/restore drill used the retained authorized earlier recovery point.",
+    "The last driver-only correction latches missing fixture-input failures; it is covered locally, while the successful live component run used the preceding fixture-preflight commit.",
+    "No provider-level power loss or simultaneous loss of both nodes tested.",
+    "No merge or production promotion authorized."
+  ]
+}

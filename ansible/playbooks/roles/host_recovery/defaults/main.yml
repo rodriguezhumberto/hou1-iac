@@ -1,0 +1,3 @@
+---
+host_recovery_root: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}'
+host_recovery_console_confirmed: false

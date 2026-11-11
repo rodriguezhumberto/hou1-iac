@@ -4,7 +4,9 @@
 import argparse
 import ipaddress
 import json
+import os
 from pathlib import Path
+import secrets
 import socket
 import subprocess
 import tempfile
@@ -16,6 +18,115 @@ TABLE = "hou1_test_isolation"
 # names are deliberately fixed; this is not a general workload egress input.
 GOOGLE_HOSTS = ("accounts.google.com", "oauth2.googleapis.com", "www.googleapis.com")
 GOOGLE_TTL_SECONDS = 300
+
+# Fixed host package repositories only; never arbitrary workload destinations.
+PACKAGE_HOSTS = ("deb.debian.org", "security.debian.org", "download.docker.com", "pkgs.netbird.io")
+PACKAGE_TTL_SECONDS = 1800
+PACKAGE_RECEIPT = Path('/var/lib/hou1-test-package-access.json')
+PACKAGE_HOSTS_FILE = Path('/etc/hosts')
+PACKAGE_APT_FILE = Path('/etc/apt/apt.conf.d/99hou1-test-package-access')
+PACKAGE_APT_CONFIG = 'Acquire::EnableSrvRecords "false";\n'
+PACKAGE_BEGIN = '# BEGIN HOU1 TEST PACKAGE ACCESS'
+PACKAGE_END = '# END HOU1 TEST PACKAGE ACCESS'
+
+
+def package_targets(config):
+    rules(config)  # Includes test-only, explicit-deny and bounded-egress guards.
+    denied = [ipaddress.ip_network(v, strict=True) for v in config['deny_cidrs']]
+    hosts = {}
+    for host in PACKAGE_HOSTS:
+        addresses = {ipaddress.ip_address(info[4][0]) for info in
+                     socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)}
+        assert addresses, f'No addresses for package endpoint {host}'
+        assert all(a.is_global and not any(a in n for n in denied
+                                          if a.version == n.version)
+                   for a in addresses), f'Unsafe package endpoint {host}'
+        hosts[host] = sorted(map(str, addresses))
+    return hosts
+
+
+def package_hosts(hosts):
+    """Replace only our block, preserving the inode and all unmanaged bytes."""
+    original = PACKAGE_HOSTS_FILE.read_text()
+    lines, managed = [], False
+    for line in original.splitlines(keepends=True):
+        if line.rstrip('\r\n') == PACKAGE_BEGIN:
+            assert not managed, 'Duplicate package hosts block'
+            managed = True
+        elif line.rstrip('\r\n') == PACKAGE_END:
+            assert managed, 'Unexpected package hosts block end'
+            managed = False
+        elif not managed:
+            lines.append(line)
+    assert not managed, 'Unterminated package hosts block'
+    prefix = '' if not hosts else '\n'.join([
+        PACKAGE_BEGIN,
+        *(f'{address} {host}' for host, addresses in sorted(hosts.items()) for address in addresses),
+        PACKAGE_END, '',
+    ])
+    updated = prefix + ''.join(lines)
+    if updated != original:
+        PACKAGE_HOSTS_FILE.write_text(updated)
+
+
+def package_batch(hosts, existing_sets):
+    lines = []
+    for version, kind in [(4, 'ipv4_addr'), (6, 'ipv6_addr')]:
+        name = f'packages{version}'
+        if name not in existing_sets:
+            lines.append(f'add set inet {TABLE} {name} {{ type {kind}; flags timeout; timeout {PACKAGE_TTL_SECONDS}s; }}')
+            # Works with a restored older isolation table too. Denies still win
+            # even though these rules are inserted at the start of each chain.
+            for chain in ['host_output', 'egress_guard']:
+                family = 'ip' if version == 4 else 'ip6'
+                lines.append(f'insert rule inet {TABLE} {chain} {family} daddr != @denied{version} {family} daddr @{name} tcp dport {{ 80, 443 }} accept')
+        lines.append(f'flush set inet {TABLE} {name}')
+        addresses = sorted({address for values in hosts.values() for address in values
+                            if ipaddress.ip_address(address).version == version})
+        if addresses:
+            entries = ', '.join(f'{address} timeout {PACKAGE_TTL_SECONDS}s' for address in addresses)
+            lines.append(f'add element inet {TABLE} {name} {{ {entries} }}')
+    return '\n'.join(lines) + '\n'
+
+
+def package_sets():
+    result = subprocess.run(['nft', '-j', 'list', 'table', 'inet', TABLE],
+                            check=True, capture_output=True, text=True, timeout=15)
+    return {item['set']['name'] for item in json.loads(result.stdout)['nftables'] if 'set' in item}
+
+
+def close_packages(token):
+    receipt = json.loads(PACKAGE_RECEIPT.read_text())
+    assert secrets.compare_digest(receipt['token'], token), 'Package lease token mismatch'
+    # Keep the receipt if cleanup fails, so an operator can finish it safely.
+    package_hosts({})
+    if PACKAGE_APT_FILE.exists():
+        assert PACKAGE_APT_FILE.read_text() == PACKAGE_APT_CONFIG, 'Package APT configuration changed'
+        PACKAGE_APT_FILE.unlink()
+    load_batch(package_batch({}, package_sets()))
+    PACKAGE_RECEIPT.unlink()
+
+
+def open_packages(config):
+    hosts = package_targets(config)  # Resolve on this host before changing anything.
+    assert PACKAGE_BEGIN not in PACKAGE_HOSTS_FILE.read_text(), 'Stale package hosts block needs cleanup'
+    assert not PACKAGE_APT_FILE.exists(), 'Stale package APT configuration needs cleanup'
+    sets = package_sets()  # Refuse a missing isolation table.
+    receipt = {'token': secrets.token_hex(16)}
+    # Exclusive claim prevents concurrent runs from replacing another lease.
+    with os.fdopen(os.open(PACKAGE_RECEIPT, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600), 'w') as output:
+        json.dump(receipt, output)
+    try:
+        load_batch(package_batch(hosts, sets))
+        # APT must use the pinned origin, rather than selecting another CDN via
+        # DNS SRV records. This setting exists only for this package operation.
+        with PACKAGE_APT_FILE.open('x') as output:
+            output.write(PACKAGE_APT_CONFIG)
+        package_hosts(hosts)
+    except BaseException:
+        close_packages(receipt['token'])
+        raise
+    print(json.dumps(receipt))
 
 
 def google_targets(config):
@@ -247,9 +358,16 @@ if __name__ == "__main__":
     mode = p.add_mutually_exclusive_group()
     mode.add_argument("--render", action="store_true")
     mode.add_argument("--refresh-google", action="store_true")
+    mode.add_argument("--open-packages", action="store_true")
+    mode.add_argument("--close-packages", metavar="TOKEN")
     a = p.parse_args()
     config = json.loads(Path(a.config).read_text())
-    if a.refresh_google:
+    if a.open_packages:
+        open_packages(config)
+    elif a.close_packages:
+        assert config['environment'] == 'test'
+        close_packages(a.close_packages)
+    elif a.refresh_google:
         refresh_google(config)
     elif a.render:
         print(rules(config), end="")

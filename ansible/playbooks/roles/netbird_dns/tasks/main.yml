@@ -21,11 +21,10 @@
 - name: Discover private records through the API
   ansible.builtin.import_tasks: discover.yml
 
-- name: Install the resolver binary and DNS verification tool
-  ansible.builtin.apt:
-    name: [dnsmasq-base, dnsutils]
-    state: present
-    update_cache: true
+- name: Install resolver packages through bounded test repository access
+  ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
+  vars:
+    rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
 
 - name: Create the unprivileged resolver account
   ansible.builtin.user:

@@ -104,7 +104,7 @@ def monitoring_plan(groups, peers, policies, monitor_ip, server_ip):
         if len(found) > 1:
             raise AnsibleFilterError('Duplicate metrics group')
         current = found[0] if found else None
-        if current and {p['id'] if isinstance(p, dict) else p for p in current.get('peers', [])} != {peer}:
+        if current and {p['id'] if isinstance(p, dict) else p for p in (current.get('peers') or [])} != {peer}:
             raise AnsibleFilterError('Existing metrics group has unexpected members; review manually')
         planned.append(dict(id=current['id'] if current else None, body=dict(name=name, peers=[peer])))
     policy = None
@@ -141,7 +141,7 @@ def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environ
         name = 'hou1-backup-' + environment + '-' + suffix
         matches = [g for g in groups if g['name'] == name]
         peer_id = found_peers[0]['id']
-        if len(matches) > 1 or (matches and {p['id'] if isinstance(p, dict) else p for p in matches[0].get('peers', [])} != {peer_id}):
+        if len(matches) > 1 or (matches and {p['id'] if isinstance(p, dict) else p for p in (matches[0].get('peers') or [])} != {peer_id}):
             raise AnsibleFilterError('Existing backup group has unexpected membership')
         planned.append(dict(id=matches[0]['id'] if matches else None, body=dict(name=name, peers=[peer_id])))
     policy = None
@@ -160,6 +160,24 @@ def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environ
     return dict(groups=planned, policy=policy)
 
 
+def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id):
+    """Pin existing managed source groups before retiring a lost test server."""
+    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip)
+    backups = backup_plan(groups, peers, policies, monitor_ip, server_ip, subnet, 'test')
+    selected = []
+    for plan in (metrics, backups):
+        if plan['policy'] is None or plan['policy']['changed']:
+            raise AnsibleFilterError('Recovery requires the existing exact managed monitoring and backup policies')
+        source = plan['groups'][1]
+        if source['id'] is None or source['body']['peers'] != [lost_peer_id]:
+            raise AnsibleFilterError('Recovery group does not belong only to the pinned lost peer')
+        current = next(group for group in groups if group['id'] == source['id'])
+        if current.get('resources'):
+            raise AnsibleFilterError('Recovery cannot reassign a group with resource grants')
+        selected.append(dict(id=source['id'], name=source['body']['name'], policy=plan['policy']))
+    return selected
+
+
 class FilterModule:
     def filters(self):
-        return {'netbird_backup_plan': backup_plan, 'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan}
+        return {'netbird_backup_plan': backup_plan, 'netbird_policy_body': policy_body, 'netbird_policy_plan': policy_plan, 'netbird_monitoring_plan': monitoring_plan, 'netbird_recovery_source_groups': recovery_source_groups}

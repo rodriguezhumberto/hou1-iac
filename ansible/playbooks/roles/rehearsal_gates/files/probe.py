@@ -16,6 +16,39 @@ def command(argv, timeout=20):
     return subprocess.run(argv, capture_output=True, text=True, timeout=timeout)
 
 
+def isolation_guard_ready(guard):
+    """Allow lease exclusions before denies, but never a production bypass."""
+    denied = {"ip": "@denied4", "ip6": "@denied6"}
+    remaining = dict(denied)
+
+    def destination(protocol, op, name):
+        return {"match": {"op": op, "left": {"payload": {
+            "protocol": protocol, "field": "daddr"}}, "right": name}}
+
+    for rule in guard:
+        expressions = rule["expr"]
+        if not expressions or not all("match" in e or "counter" in e
+                                      for e in expressions[:-1]):
+            return False
+        matches = [e for e in expressions if "match" in e]
+        if expressions[-1] == {"drop": None}:
+            found = [protocol for protocol, name in remaining.items()
+                     if matches == [destination(protocol, "==", name)]]
+            if not found:
+                return False
+            del remaining[found[0]]
+            if not remaining:
+                return True
+        elif expressions[-1] == {"accept": None}:
+            # The direct IP payload also limits the rule to that address family.
+            if not any(destination(protocol, "!=", name) in matches
+                       for protocol, name in denied.items()):
+                return False
+        else:
+            return False
+    return False
+
+
 def collect(c):
     result = {}
 
@@ -166,9 +199,7 @@ def collect(c):
         return (
             expected <= chains
             and all(policies.get(k) == "drop" for k in expected)
-            and len(guard) >= 2
-            and "denied4" in json.dumps(guard[0])
-            and "denied6" in json.dumps(guard[1])
+            and isolation_guard_ready(guard)
         )
 
     def secret_boundary():

@@ -1,0 +1,8 @@
+---
+- name: Rehearse the encrypted HOU1 backup in isolated containers
+  hosts: "{{ target_hosts | default('isolated_test_vps') }}"
+  become: true
+  gather_facts: false
+  serial: 1
+  roles:
+    - role: recovery_drill

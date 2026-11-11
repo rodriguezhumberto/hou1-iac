@@ -33,14 +33,10 @@
 - name: Reconcile only the two metrics peer groups and their single-port policy
   ansible.builtin.import_tasks: policy.yml
 
-- name: Install the native private exporter and collector dependencies
-  ansible.builtin.apt:
-    name: [prometheus-node-exporter, python3, logrotate]
-    state: present
-    policy_rc_d: 101
-    install_recommends: false
-    update_cache: true
-    cache_valid_time: 3600
+- name: Install dependencies through bounded test repository access
+  ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
+  vars:
+    rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
 
 - name: Create protected metrics directories
   ansible.builtin.file:

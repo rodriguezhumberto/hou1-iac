@@ -1,0 +1,50 @@
+---
+- name: Default to ordinary package management outside active test isolation
+  ansible.builtin.set_fact:
+    rehearsal_package_config: ''
+
+- name: Locate only the explicit isolated test policy
+  when:
+    - cms_environment == 'test'
+    - inventory_hostname in groups.get('isolated_test_vps', [])
+    - inventory_hostname not in groups.get('prod_env', [])
+  block:
+    - name: Check persistent and replacement-host isolation inputs
+      ansible.builtin.stat:
+        path: '{{ item }}'
+      loop:
+        - /etc/hou1-test-gates/isolation.json
+        - '/var/lib/hou1-host-recovery/{{ host_recovery_id | default("not-selected") }}/isolation.json'
+      register: rehearsal_package_configs
+    - name: Select the installed policy without inventing network grants
+      ansible.builtin.set_fact:
+        rehearsal_package_config: '{{ (rehearsal_package_configs.results | selectattr("stat.exists") | map(attribute="item") | list | first) | default("") }}'
+
+- name: Manage packages with a bounded test-only repository lease
+  block:
+    - name: Install the bounded repository access helper
+      ansible.builtin.copy:
+        src: '{{ role_path }}/../rehearsal_gates/files/isolation.py'
+        dest: /usr/local/sbin/hou1-test-package-access
+        owner: root
+        group: root
+        mode: '0700'
+      when: rehearsal_package_config | length > 0
+    - name: Resolve and pin approved repositories on the isolated target
+      ansible.builtin.command:
+        argv: [python3, /usr/local/sbin/hou1-test-package-access, '{{ rehearsal_package_config }}', --open-packages]
+      when: rehearsal_package_config | length > 0
+      register: rehearsal_package_lease
+      changed_when: true
+      no_log: true
+    - name: Run the existing package tasks
+      ansible.builtin.include_tasks: '{{ rehearsal_package_tasks }}'
+  always:
+    - name: Remove repository pins and temporary firewall destinations after success or failure
+      ansible.builtin.command:
+        argv: [python3, /usr/local/sbin/hou1-test-package-access, '{{ rehearsal_package_config }}', --close-packages, '{{ (rehearsal_package_lease.stdout | from_json).token }}']
+      when:
+        - rehearsal_package_config | length > 0
+        - rehearsal_package_lease.rc | default(-1) == 0
+      changed_when: true
+      no_log: true

@@ -1,0 +1,25 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T07:17:33.302437+00:00",
+  "issue": 27,
+  "environment": "isolated-test",
+  "attempt": "replacement-20261110-03",
+  "scope": "Local publication ordering correction found before publication, while restore prerequisites run",
+  "restore_started_ref": "7312d380021269ff292f08d1b1e3a5a275080bbd",
+  "unexpected_live_failure_observed": false,
+  "publication_started": false,
+  "finding": "The restored VPN readiness probe was placed before the security role installed its VPN SSH firewall rule.",
+  "correction": "Opt in through the recovery security role; run its readiness probe after the private SSH rule and before listener changes.",
+  "local_workflow_tests_passed": 9,
+  "publication_syntax_passed": true,
+  "production_promotion_approved": false,
+  "source_sha256": {
+    "ansible/playbooks/publish-test-recovery.yml": "8ee32b2fc41f5e0535e6c542dca4dbf024b299622041bb034dbc0d636c2d73cd",
+    "ansible/playbooks/roles/security/tasks/main.yml": "6594681e05ddc90b283998419237d03efa6cbdf4a8548552c632305beebbfbfb",
+    "tests/test_netbird_workflow.py": "4181efab572b77945cfdc84a5592a6b0a657b1b9ef4ae40a6871c333e0b0b379"
+  },
+  "validation_log_sha256": {
+    "ordering-tests.log": "1bca4b97d1fcae6a610d8509bc5d65eb2832ac5c582ad4e46bc2f4ec1aee2b37",
+    "ordering-syntax.log": "970649d0e98f6a5a319e5c2b03d7febdfa0f0b4c4eecb6285a2769c2d65ebc3b"
+  }
+}

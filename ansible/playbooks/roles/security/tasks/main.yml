@@ -19,6 +19,12 @@
     proto: tcp
     src: "{{ netbird_subnet }}"
 
+- name: Wait for the restored VPN path before changing SSH listeners
+  ansible.builtin.include_tasks: verify-access.yml
+  vars:
+    security_netbird_wait_for_transport: true
+  when: security_netbird_wait_before_cutover | default(false) | bool
+
 - name: Record the public bootstrap address before changing the SSH path
   ansible.builtin.set_fact:
     ssh_bootstrap_public_ip: "{{ ansible_host }}"
@@ -281,6 +287,13 @@
       ansible.builtin.systemd:
         name: ssh
         state: reloaded
+
+    - name: Disarm the bootstrap fallback after restoring SSH on failure
+      ansible.builtin.systemd:
+        name: ansible-ssh-bootstrap-fallback.timer
+        enabled: false
+        state: stopped
+      when: node_bootstrap | bool
 
     - name: Stop after restoring the previous listener
       ansible.builtin.fail:

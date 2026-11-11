@@ -1,0 +1,135 @@
+{
+  "scope": "Clean HOU1 replacement recovery with the CI-built application artifact; stopped on publication failure",
+  "recorded_at": "2026-11-10T23:54:24.786092+00:00",
+  "tested_infra_revision": "cc91412cdca6105902ceb67e22d13f62352b5d49",
+  "base_recovery_pr": "https://github.com/rodriguezhumberto/hou1-iac/pull/59",
+  "artifact_pr": "https://github.com/rodriguezhumberto/hou1-iac/pull/61",
+  "recovery_point": {
+    "schema": 1,
+    "environment": "test",
+    "created": 1794351628,
+    "id": "20261110T230028Z-184f657a1db7",
+    "size": 29572621,
+    "sha256": "b59e7c0c9e0959bc2b089933bec02dd5dd213320f46c31c8571e28970c59eed3"
+  },
+  "host_preflight": {
+    "fresh_debian_12": true,
+    "vcpus": 4,
+    "memory_mib": 16005,
+    "free_disk_gib": 74,
+    "free_inodes": 5207035,
+    "bootstrap_key_installed": true,
+    "password_delivery_deleted": true,
+    "deployment_started": false,
+    "hou4_preserved": true
+  },
+  "restore": {
+    "passed": true,
+    "environment": "test",
+    "staff_revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+    "postgres_tables": 187,
+    "sessions_revoked_before_writers": true,
+    "identity_bootstrap_run": false,
+    "cms_seed_run": false,
+    "netbird_connection_flags_reset_before_server": true,
+    "netbird_stale_connections_cleared": 4,
+    "cold_registry_pulls": true,
+    "cold_application_build": false,
+    "application_image": {
+      "schema": 1,
+      "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+      "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+      "platform": "linux/amd64",
+      "image_id": "sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42"
+    },
+    "ports_bound_to_loopback": true,
+    "restore_seconds": 487.057,
+    "next": "Reconcile access changes, explicitly publish, replace only the lost HOU1 peer, then finalize VPN/security/monitoring/backups"
+  },
+  "authorization_review": {
+    "selected_tables_compared": 13,
+    "all_selected_tables_matched": true
+  },
+  "publication": {
+    "exit_code": 2,
+    "failed_task": "Refresh the dedicated controller transport after replacing the remote peer key",
+    "lost_hou1_peer_replacement_and_source_group_guards_completed": true,
+    "private_ssh_cutover_completed": false,
+    "monitoring_and_backup_reconciliation_started": false,
+    "cause": "Private DNS verification ran before the netbird_dns role installed HOU1 resolver at 100.91.0.10:1053.",
+    "first_dns_observation": "Controller management connected; private DNS queries returned SERVFAIL and the upstream reported connection refused.",
+    "read_only_diagnostics": {
+      "recorded_at": "2026-11-10T23:53:37.135862+00:00",
+      "host": {
+        "resolver_unit_absent": true,
+        "resolver_binary_absent": true,
+        "resolver_configuration_absent": true
+      },
+      "controller": {
+        "management_connected": true,
+        "controller_ip_matches": true,
+        "dns_upstream_is_restored_host": true,
+        "upstream_connection_refused_reported": false,
+        "private_dns_query_failed": true,
+        "public_bootstrap_dns_retained": true
+      },
+      "live_changes_made": false
+    },
+    "fix": "Install and verify the existing private resolver before refreshing controller VPN/DNS; keep controller refresh before SSH cutover.",
+    "live_attempt_not_resumed": true,
+    "original_failure_markers_and_private_diagnostics_retained": true,
+    "controller_plaintext_staging_removed": true,
+    "public_bootstrap_ssh_not_retired": true
+  },
+  "hou4": {
+    "private_ssh_verified": true,
+    "retained_hou4_peer_reconnected_without_reenrollment": true,
+    "fingerprint_verification_retained": true,
+    "elapsed_seconds": 66.225,
+    "recorded_at": "2026-11-10T23:47:15.243760+00:00"
+  },
+  "outage_alerts": {
+    "fault": "operator-authorized HOU1 wipe and clean recovery",
+    "observed_at": "2026-11-10T23:47:47.475272+00:00",
+    "sample": {
+      "pre_wipe_sent": 51.0,
+      "pre_wipe_failed": 0.0,
+      "firing": [
+        "Hou1CollectorUnavailable",
+        "Hou1PostgresqlUnavailable",
+        "Hou1RequestMetricsUnavailable",
+        "Hou4MetricsTargetDown",
+        "Hou4RenewalMetricsStale"
+      ],
+      "alertmanager_active": [
+        "Hou1CollectorUnavailable",
+        "Hou1PostgresqlUnavailable",
+        "Hou1RequestMetricsUnavailable",
+        "Hou4MetricsTargetDown",
+        "Hou4RenewalMetricsStale"
+      ],
+      "sent": 57.0,
+      "failed": 0.0
+    },
+    "required_alerts_observed": [
+      "Hou1CollectorUnavailable",
+      "Hou1PostgresqlUnavailable",
+      "Hou1RequestMetricsUnavailable",
+      "Hou4MetricsTargetDown"
+    ],
+    "alerts_remained_enabled": true
+  },
+  "validation_of_fix": {
+    "host_recovery_checks_passed": 14,
+    "controller_dns_checks_passed": 3,
+    "publication_syntax_passed": true,
+    "new_clean_host_replay_pending": true
+  },
+  "acceptance": {
+    "uninterrupted_clean_host_gate_passed": false,
+    "new_user_confirmed_hou1_wipe_required": true,
+    "hou4_must_remain_intact": true,
+    "production_promotion_authorized": false,
+    "temporary_scoped_recovery_keys_retained_for_authorized_gate": true
+  }
+}

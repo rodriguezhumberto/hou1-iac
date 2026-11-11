@@ -64,10 +64,10 @@
     fail_msg: Re-encrypt the host-only application secrets under its separate age identity before accepting isolation.
   no_log: true
 
-- name: Install the existing host inspection utilities
-  ansible.builtin.apt:
-    name: [nftables, curl, sysstat]
-    state: present
+- name: Install dependencies through bounded test repository access
+  ansible.builtin.include_tasks: ../../rehearsal_gates/tasks/package-access.yml
+  vars:
+    rehearsal_package_tasks: '{{ role_path }}/tasks/packages.yml'
 
 - name: Create the test gate configuration directory
   ansible.builtin.file:

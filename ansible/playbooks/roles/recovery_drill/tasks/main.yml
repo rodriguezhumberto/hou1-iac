@@ -1,0 +1,218 @@
+---
+- name: Require an explicit isolated test recovery and immutable app revision
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test'
+      - inventory_hostname in groups.get('isolated_test_vps', [])
+      - inventory_hostname not in groups.get('prod_env', [])
+      - recovery_drill_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
+      - recovery_drill_root == '/var/tmp/hou1-recovery-drill-' + recovery_drill_id
+      - recovery_drill_project == 'hou1-recovery-drill-' + recovery_drill_id
+      - recovery_drill_staff_ref is match('^[a-f0-9]{40}$')
+      - recovery_drill_evidence_directory is match('^/')
+      - recovery_drill_archive is match('^/')
+      - recovery_drill_manifest is match('^/')
+      - recovery_drill_age_identity is match('^/')
+      - recovery_drill_reference_jwks is match('^/')
+      - recovery_drill_app_source is match('^/')
+      - not ansible_check_mode
+    fail_msg: Use a new explicit test drill ID, immutable staff revision, private controller files and established test inventory.
+
+- name: Require headroom for the additional isolated stack
+  ansible.builtin.command:
+    argv:
+      - python3
+      - -c
+      - |
+        from pathlib import Path
+        import os
+        fs = os.statvfs('/var/tmp')
+        available = int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:'))) * 1024
+        assert fs.f_bavail * fs.f_frsize >= 10 * 1024**3, 'Need at least 10 GiB free disk; also budget for archive/build growth'
+        assert available >= 4 * 1024**3, 'Need at least 4 GiB available RAM for the additional stack'
+  changed_when: false
+
+- name: Check the recovery destination before copying anything
+  ansible.builtin.stat:
+    path: "{{ recovery_drill_root }}"
+  register: recovery_drill_destination
+
+- name: Refuse to overwrite an existing attempt
+  ansible.builtin.assert:
+    that: not recovery_drill_destination.stat.exists
+    fail_msg: Choose a new drill ID; never resume a failed restore or overwrite its data.
+
+- name: Check whether this controller evidence ID was already used
+  ansible.builtin.stat:
+    path: "{{ recovery_drill_evidence_directory }}/{{ recovery_drill_id }}"
+  delegate_to: localhost
+  become: false
+  register: recovery_drill_previous_evidence
+
+- name: Preserve earlier recovery evidence
+  ansible.builtin.assert:
+    that: not recovery_drill_previous_evidence.stat.exists
+    fail_msg: Choose a new drill ID; existing evidence must not be overwritten.
+
+- name: Create private controller staging
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: hou1-recovery-controller-
+  delegate_to: localhost
+  become: false
+  register: recovery_drill_staging
+
+- name: Rehearse recovery and always clean its isolated resources
+  block:
+    - name: Authenticate and safely extract the encrypted backup on the controller
+      ansible.builtin.command:
+        argv:
+          - "{{ ansible_playbook_python }}"
+          - "{{ role_path }}/../../../../scripts/verify-recovery.py"
+          - --archive
+          - "{{ recovery_drill_archive }}"
+          - --manifest
+          - "{{ recovery_drill_manifest }}"
+          - --identity
+          - "{{ recovery_drill_age_identity }}"
+          - --output
+          - "{{ recovery_drill_staging.path }}/payload"
+          - --environment
+          - test
+      delegate_to: localhost
+      become: false
+      no_log: true
+      changed_when: true
+
+    - name: Write the nonsecret recovery request
+      ansible.builtin.copy:
+        dest: "{{ recovery_drill_staging.path }}/request.json"
+        mode: '0600'
+        content: "{{ {'environment': 'test', 'project': recovery_drill_project, 'root': recovery_drill_root, 'staff_revision': recovery_drill_staff_ref, 'test_suffix': recovery_drill_test_suffix, 'app_source': recovery_drill_app_source, 'primary_containers': recovery_drill_primary_containers, 'admin_username': recovery_drill_admin_username, 'reader_username': recovery_drill_reader_username} | to_nice_json }}"
+      delegate_to: localhost
+      become: false
+
+    - name: Prepare the saved runtime and isolated proxy from the verified backup
+      ansible.builtin.command:
+        argv: ["{{ ansible_playbook_python }}", "{{ role_path }}/files/prepare.py", --request, "{{ recovery_drill_staging.path }}/request.json", --payload, "{{ recovery_drill_staging.path }}/payload", --output, "{{ recovery_drill_staging.path }}/bundle"]
+      delegate_to: localhost
+      become: false
+      no_log: true
+      changed_when: true
+
+    - name: Claim the new private remote drill directory atomically
+      ansible.builtin.command:
+        argv: [mkdir, -m, '0700', "{{ recovery_drill_root }}"]
+      changed_when: true
+      register: recovery_drill_claim
+
+    - name: Copy the private recovery bundle
+      ansible.builtin.copy:
+        src: "{{ recovery_drill_staging.path }}/bundle/bundle.tar"
+        dest: "{{ recovery_drill_root }}/bundle.tar"
+        mode: '0600'
+      no_log: true
+
+    - name: Extract only into the claimed private directory
+      ansible.builtin.unarchive:
+        src: "{{ recovery_drill_root }}/bundle.tar"
+        dest: "{{ recovery_drill_root }}"
+        remote_src: true
+        extra_opts: [--no-same-owner]
+      no_log: true
+
+    - name: Supply only the internal test login credentials
+      ansible.builtin.copy:
+        dest: "{{ recovery_drill_root }}/health-input.json"
+        mode: '0600'
+        content: "{{ {'TEST_ADMIN_PASSWORD': recovery_drill_probe_secrets.TEST_ADMIN_PASSWORD, 'TEST_READER_PASSWORD': recovery_drill_probe_secrets.TEST_READER_PASSWORD} | to_nice_json }}"
+      no_log: true
+
+    - name: Copy the public reference signing keys
+      ansible.builtin.copy:
+        src: "{{ recovery_drill_reference_jwks }}"
+        dest: "{{ recovery_drill_root }}/reference-jwks.json"
+        mode: '0600'
+
+    # Separate tasks are deliberate: Ansible loops continue after a failed item.
+    - name: Build the exact saved staff revision
+      ansible.builtin.command:
+        argv: [python3, "{{ recovery_drill_root }}/driver.py", build]
+      changed_when: true
+      no_log: true
+
+    - name: Import into empty PostgreSQL and start the isolated restored stack
+      ansible.builtin.command:
+        argv: [python3, "{{ recovery_drill_root }}/driver.py", start]
+      changed_when: true
+      no_log: true
+
+    - name: Verify recovered identity material without rebootstrap
+      ansible.builtin.command:
+        argv: [python3, "{{ recovery_drill_root }}/driver.py", identity]
+      changed_when: false
+      no_log: true
+
+    - name: Verify OIDC roles session reset media restart and rollback
+      ansible.builtin.command:
+        argv: [python3, "{{ recovery_drill_root }}/driver.py", http]
+      changed_when: true
+      no_log: true
+  always:
+    - name: Clean remote resources and preserve evidence
+      block:
+        - name: Check whether the isolated driver was extracted
+          ansible.builtin.stat:
+            path: "{{ recovery_drill_root }}/driver.py"
+          when: recovery_drill_claim is defined and recovery_drill_claim is changed
+          register: recovery_drill_driver
+
+        - name: Stop only this drill project and verify the primary baseline
+          ansible.builtin.command:
+            argv: [python3, "{{ recovery_drill_root }}/driver.py", cleanup]
+          when:
+            - recovery_drill_claim is defined and recovery_drill_claim is changed
+            - recovery_drill_driver.stat.exists | default(false)
+          register: recovery_drill_cleanup
+          changed_when: true
+          no_log: true
+
+        - name: Create the private controller evidence directory
+          ansible.builtin.file:
+            path: "{{ recovery_drill_evidence_directory }}/{{ recovery_drill_id }}"
+            state: directory
+            mode: '0700'
+          delegate_to: localhost
+          become: false
+
+        - name: Find public reports and protected failure diagnostics
+          ansible.builtin.find:
+            paths: "{{ recovery_drill_root }}"
+            patterns: ['*-report.json', '*-result.json', 'first-error.json', 'session-reset-*.json', '*-private.log', 'private-*.log', certificate-mapping.json]
+            recurse: false
+          when: recovery_drill_claim is defined and recovery_drill_claim is changed
+          register: recovery_drill_reports
+          no_log: true
+
+        - name: Preserve evidence before deleting plaintext recovery files
+          ansible.builtin.fetch:
+            src: "{{ item.path }}"
+            dest: "{{ recovery_drill_evidence_directory }}/{{ recovery_drill_id }}/{{ item.path | basename }}"
+            flat: true
+          loop: "{{ recovery_drill_reports.files | default([]) }}"
+          no_log: true
+
+        - name: Remove remote plaintext only after successful teardown and evidence collection
+          ansible.builtin.file:
+            path: "{{ recovery_drill_root }}"
+            state: absent
+          when:
+            - recovery_drill_claim is defined and recovery_drill_claim is changed
+            - not (recovery_drill_driver.stat.exists | default(false)) or recovery_drill_cleanup.rc | default(1) == 0
+      always:
+        - name: Remove controller plaintext staging
+          ansible.builtin.file:
+            path: "{{ recovery_drill_staging.path }}"
+            state: absent
+          delegate_to: localhost
+          become: false

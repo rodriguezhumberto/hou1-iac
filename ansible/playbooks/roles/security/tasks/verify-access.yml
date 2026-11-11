@@ -11,3 +11,14 @@
   delegate_to: localhost
   become: false
   changed_when: false
+  register: security_netbird_ssh_probe
+  # The restored control plane can report a connected peer before its tunnel
+  # carries traffic. Only the pre-cutover readiness call opts into polling.
+  # Authentication, host-key and other unexpected errors fail immediately.
+  until: >-
+    security_netbird_ssh_probe.rc == 0 or
+    not (security_netbird_wait_for_transport | default(false) | bool) or
+    security_netbird_ssh_probe.stderr is search('(?i)(permission denied|host key verification failed|remote host identification has changed|bad permissions|invalid format)') or
+    not (security_netbird_ssh_probe.stderr is search('(?i)(connection closed by UNKNOWN port 65535|connection timed out|connection refused|no route to host|connection reset by peer|operation timed out)'))
+  retries: '{{ 12 if security_netbird_wait_for_transport | default(false) | bool else 0 }}'
+  delay: 5

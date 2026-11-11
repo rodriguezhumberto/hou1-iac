@@ -1,0 +1,66 @@
+---
+# Replacement-host recovery only. Never run the fresh identity bootstrap here.
+- name: Refuse replacement recovery on an existing installation
+  hosts: isolated_test_vps
+  become: true
+  pre_tasks:
+    - name: Require the selected fresh Debian test host and independent HOU4 console
+      ansible.builtin.assert:
+        that:
+          - groups['isolated_test_vps'] | length == 1
+          - inventory_hostname not in groups.get('prod_env', [])
+          - cms_environment == 'test'
+          - node_bootstrap | bool
+          - ansible_host == test_vps_public_ip
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.distribution_major_version == '12'
+          - ansible_facts.architecture == 'x86_64'
+          - host_recovery_console_confirmed | default(false) | bool
+          - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
+          - app_directory == '/opt/pearlandpaws-test'
+          - authentik_environment == 'test'
+          - netbird_version == '0.82.0'
+          - not ansible_check_mode
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Use the explicit fresh Debian 12 test inventory and independently verified recovery console.
+
+    - name: Preserve earlier controller evidence IDs
+      ansible.builtin.stat:
+        path: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}'
+      delegate_to: localhost
+      become: false
+      register: host_recovery_existing_evidence
+    - name: Require an unused evidence ID
+      ansible.builtin.assert:
+        that: not host_recovery_existing_evidence.stat.exists
+
+    - name: Refuse to overwrite any existing application or recovery attempt
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - |
+            from pathlib import Path
+            import sys
+            for value in sys.argv[1:]:
+                path = Path(value)
+                assert not path.exists() and not path.is_symlink(), 'Existing recovery destination'
+                assert not any(parent.is_symlink() for parent in path.parents), 'Symlink destination'
+          - /opt/pearlandpaws-test
+          - /opt/hou1-authentik/test
+          - /opt/hou1-netbird
+          - /var/lib/hou1-authentik/test
+          - /var/lib/pearlandpaws/test
+          - '/var/lib/hou1-host-recovery/{{ host_recovery_id }}'
+      changed_when: false
+
+- name: Install the existing fresh-host prerequisites
+  ansible.builtin.import_playbook: rehearsal-prepare.yml
+
+- name: Restore saved test services without identity bootstrap
+  hosts: isolated_test_vps
+  become: true
+  gather_facts: false
+  roles:
+    - host_recovery

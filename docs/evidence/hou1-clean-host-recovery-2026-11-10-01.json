@@ -1,0 +1,87 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T05:52:18.287894+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "attempt": "replacement-20261110-01",
+  "live_infrastructure_ref": "6040d26f9a9a04621ee055eaf684027010e1796d",
+  "staff_revision": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "selected_original_recovery_point": "20261109T095132Z-dd7fe78119c3",
+  "fresh_os": "Debian 12",
+  "restore": {
+    "passed": true,
+    "ansible_ok": 50,
+    "ansible_changed": 24,
+    "ansible_failed": 0,
+    "ansible_unreachable": 0,
+    "ansible_rescued": 0,
+    "ansible_ignored": 0,
+    "postgres_tables": 187,
+    "containers_running": 7,
+    "restore_seconds": 746.927,
+    "cold_registry_pulls": true,
+    "cold_application_build": true,
+    "sessions_revoked_before_writers": true,
+    "identity_bootstrap_run": false,
+    "cms_seed_run": false,
+    "actual_ports_verified_loopback": true,
+    "remote_payload_removed": true,
+    "controller_staging_removed": true
+  },
+  "authorization_review": {
+    "selected_tables_compared": 13,
+    "all_match": true
+  },
+  "publication": {
+    "helper_published_ports": true,
+    "passed": false,
+    "ansible_ok": 11,
+    "ansible_changed": 1,
+    "ansible_failed": 1,
+    "failed_task": "Refuse another device or a connected peer",
+    "peer_id_name_ip_match": true,
+    "returned_connected": true,
+    "stored_last_seen": "2026-11-09 08:57:53",
+    "replacement_host_netbird_client_installed": false,
+    "peer_delete_attempted": false,
+    "replacement_peer_enrollment_attempted": false,
+    "private_ssh_handoff_completed": false,
+    "public_ssh_remains_source_restricted_bootstrap": true
+  },
+  "finding": "Restored NetBird 0.82.0 peer connection flags described transport sessions at backup time; offline restore did not clear them before server startup. The connected-peer guard correctly refused deletion.",
+  "local_fix": {
+    "clear_connection_flags_only_while_server_stopped": true,
+    "connected_peer_deletion_guard_preserved": true,
+    "focused_tests_passed": 12,
+    "syntax_checks_passed": [
+      "restore-test-host.yml",
+      "publish-test-recovery.yml"
+    ],
+    "authenticated_snapshot_regression": {
+      "authenticated_snapshot_used": true,
+      "stale_connection_flags_cleared": 4,
+      "all_other_saved_database_values_preserved": true,
+      "tables_checked": 39,
+      "live_node_modified": false
+    },
+    "live_retry_performed": false
+  },
+  "hou4_modified": false,
+  "temporary_recovery_grant_retained": true,
+  "operator_private_identity_retained": false,
+  "live_clean_host_recovery_gate_passed": false,
+  "next_attempt_requires_operator_confirmed_wipe": true,
+  "next_wipe_checkpoint_released": false,
+  "production_promotion_approved": false,
+  "source_sha256": {
+    "ansible/playbooks/roles/host_recovery/files/restore.py": "4645f91b2b8cd7d3991d292410a258e9d99ab11441049d50e46b2056faec1503",
+    "tests/test_host_recovery.py": "73ea9adf24704ca72d81117499a2344981ea72613a4d2d23098c93a9c397a6be"
+  },
+  "validation_log_sha256": {
+    "restore-private.log": "b8196fee4869b611545ee0e203a786954e86c0e25aa69df018a029736d87c163",
+    "publish-private.log": "61cb9477919e65123576f67fed8ba01bc40051b33e6c5cd4d4d186274233e84c",
+    "fix-focused-tests.log": "f2a6cd008bb21ab893467af8dd33b74c4ef8fabe81757ae2b5d1724131800899",
+    "offline-status-fix-validation.json": "8da75790c00ae657a86cf3e7e03c9ad3572c2f5b8d1d62e0ea297408a00268a3"
+  }
+}

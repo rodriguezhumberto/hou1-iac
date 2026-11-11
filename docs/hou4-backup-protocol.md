@@ -4,6 +4,11 @@ This implements the off-host collection needed for the recovery rehearsal in
 #27. It does not establish production readiness until a fresh-node restore has
 passed. Existing production data is never used as a test seed.
 
+The [versioned recovery playbook rehearsal](evidence/hou1-recovery-ansible-2026-11-10-02.json)
+passed all 29 application checks and six identity assertions on the existing
+test host. This proves isolated component recovery; clean-host recovery remains
+a separate gate.
+
 The [live HOU4 rehearsal](evidence/hou4-backup-live-2026-11-08.json) collected a
 32.4 MB encrypted point, verified transfer integrity, and passed Discord recovery
 and HOU4 reboot checks. The [interruption rehearsal](evidence/hou1-backup-interruption-2026-11-08.json)
@@ -162,6 +167,15 @@ Keep provider-console access to both nodes; recovering the NetBird control plane
 must not depend on that same control plane being available.
 
 ## Offline validation and clean-host restore
+
+The guarded [clean test-host workflow](clean-host-recovery.md) implements the
+fresh-OS rehearsal with saved configuration and an explicit publication/access
+checkpoint. Its live replacement-host validation remains pending.
+
+For the repeatable **isolated component drill** on the running test host, use
+[the recovery playbook](reproducible-recovery-drill.md). It implements the tested
+component sequence with private staging and evidence collection. Its local
+regressions do not replace a fresh live run or the clean-host steps below.
 
 From HOU4's provider console or an independent operator access path, copy one
 complete directory (`recovery.age`, `manifest.json`, `receipt.json`) to an operator

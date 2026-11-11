@@ -1,0 +1,13 @@
+---
+recovery_drill_root: "/var/tmp/hou1-recovery-drill-{{ recovery_drill_id }}"
+recovery_drill_project: "hou1-recovery-drill-{{ recovery_drill_id }}"
+recovery_drill_admin_username: vps-staff-admin
+recovery_drill_reader_username: vps-staff-reader
+recovery_drill_primary_containers:
+  - hou1-authentik-test-authentik-server-1
+  - hou1-authentik-test-authentik-worker-1
+  - hou1-authentik-test-postgresql-1
+  - hou1-netbird-test-netbird-server-1
+  - hou1-netbird-test-dashboard-1
+  - pearlandpaws-test-astro-app-1
+  - pearlandpaws-test-nginx-1

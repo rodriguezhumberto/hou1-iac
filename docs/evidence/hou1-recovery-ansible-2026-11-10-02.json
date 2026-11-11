@@ -1,0 +1,144 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T00:58:17.801833+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "attempt": "ansible-20261110-02",
+  "tested_infrastructure_revision": "95ca59eeb78d365001c407aa8736ffe4512b9c27",
+  "staff_revision": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "live_result": "passed",
+  "ansible_exit_code": 0,
+  "identity_assertions": {
+    "google_source_secret_recovered": true,
+    "signing_private_keys_parse": true,
+    "local_emergency_admin_password_recovered": true,
+    "both_oidc_client_secrets_recovered": true,
+    "existing_internal_test_identities_recovered": true,
+    "no_identity_rebootstrap": true
+  },
+  "cleanup": {
+    "drill_containers_removed": true,
+    "drill_network_removed": true,
+    "primary_ids_starttimes_unchanged": true
+  },
+  "scope": "Isolated component restore; no production, host replacement, external Google or VPN peer cutover",
+  "build": {
+    "staff_revision": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+    "image_id": "sha256:38a2fdd170ef69396c722e6bf54c55456ddb361e37934acab6f036f892333027",
+    "build_seconds": 13.712,
+    "source": "git archive of exact recovery revision",
+    "runtime_configuration": "saved recovery environment; public build arguments only",
+    "artifact_requirement": "Exact saved source and cached base images/dependencies; no retained image registry assumed"
+  },
+  "startup": {
+    "restore_startup_seconds": 156.987,
+    "postgres_imported_into_empty_database": true,
+    "postgres_tables": 187,
+    "all_seven_running": true,
+    "internal_network": true,
+    "published_ports": 0,
+    "all_mounts_private": true,
+    "only_drill_containers_attached": true,
+    "live_services_untouched": true
+  },
+  "application": {
+    "passed": true,
+    "checks": {
+      "session_reset_setup": {
+        "active_staff_and_idp_login_before_session_reset": true
+      },
+      "after_session_reset": {
+        "pre_reset_staff_session_denied": true,
+        "fresh_oidc_login_after_session_reset": true,
+        "fresh_logout_revokes_session": true
+      },
+      "initial": {
+        "external_egress_denied": true,
+        "restored_discovery": true,
+        "restored_signing_key_matches_reference": true,
+        "netbird_api_discovery_and_jwks": true,
+        "netbird_dashboard": true,
+        "unauthenticated_staff_denied": true,
+        "restored_reader_login_and_read": true,
+        "reader_write_denied": true,
+        "reader_logout_revoked_session": true,
+        "restored_admin_login_and_read": true,
+        "empty_snapshot_content_preserved": true,
+        "admin_private_media_preview": true,
+        "reader_private_media_preview": true,
+        "reader_media_write_denied": true,
+        "admin_media_upload": true,
+        "admin_content_write": true
+      },
+      "after_restart": {
+        "identity_aware_session_survives_app_restart": true,
+        "content_survives_app_restart": true,
+        "media_survives_app_restart": true,
+        "private_preview_survives_app_restart": true
+      },
+      "after_rollback": {
+        "post_snapshot_session_absent_after_database_rollback": true,
+        "snapshot_content_restored_after_rollback": true,
+        "snapshot_media_restored_after_rollback": true,
+        "login_after_rollback": true,
+        "logout_revoked_session_after_rollback": true
+      }
+    },
+    "check_count": 29,
+    "runtime_identity_and_application_checks_seconds": 228.759,
+    "staff_database_media_rollback_seconds": 58.136,
+    "restored_staff_sessions_invalidated_before_login_and_after_rollback": true,
+    "rollback_scope": "Restored-copy staff SQLite/media to the actual recovery point; not a live HOU1 traffic cutover",
+    "harness_sha256": {
+      "build.py": "6009fe0b35f2c75ac8dd57c23ac4bac6a12044e60ac5cd6e72a5e14aca773c3c",
+      "identity_smoke.py": "afb548bd990f4ac97876d31ae398a24489e5b3272a31ef15b1b927593b623f55",
+      "runtime.py": "8103ac45ac265eeb6df4169ff152a0b0bfa9d8e174d61933159a8923dd79093d",
+      "safe_archive.py": "125ae73d12e38d39230abd1cb65652b7c96fdca820f1309f02fdb82cca1c5ea2",
+      "http_probe.py": "9334037a7715d566e9c2e7ab37204021a9a323ca45268108e7ca48bb42d976b5",
+      "check.py": "816762582c164fc617b8a5a749d2932a18800bf9f88d2d0d7447b6a8136b4fb3",
+      "driver.py": "e05edd615badb1c8501493390dbc59771a83d866f8054c6e2b74dd56539b02d9"
+    }
+  },
+  "post_restore_health": {
+    "primary_checks_passed": 23,
+    "monitoring_targets_up": 8,
+    "active_alerts": 0
+  },
+  "phase_receipts": {
+    "build": {
+      "phase": "build",
+      "recorded_at": "2026-11-10T00:50:16.845529+00:00",
+      "passed": true
+    },
+    "start": {
+      "phase": "start",
+      "recorded_at": "2026-11-10T00:50:32.399809+00:00",
+      "passed": true
+    },
+    "identity": {
+      "phase": "identity",
+      "recorded_at": "2026-11-10T00:53:11.393537+00:00",
+      "passed": true
+    },
+    "http": {
+      "phase": "http",
+      "recorded_at": "2026-11-10T00:53:21.185295+00:00",
+      "passed": true
+    }
+  },
+  "protected_report_sha256": {
+    "recovery-report.json": "4f9deb55abceabe4b01ac87c8c14c7c4c96aa74b82c111a4e90ea9c90d00dca8",
+    "identity-report.json": "6765da493a587e53aca672371a2a5ff8313df7894c3b1e9b0d8fc102e2e7d11c",
+    "startup-report.json": "e48cbe3596f685e01cb3795036fa7ef58615797c19e86158372ec8392eee8957",
+    "cleanup-report.json": "08d27973a0e2d5a1a8740e2bf75cc0168bcb91cfa44e474ee03716236cc5c729"
+  },
+  "replacement_host_recovery_pending": true,
+  "production_promotion_approved": false,
+  "recovery_grant_retirement": {
+    "temporary_recovery_identity_removed": true,
+    "retired_at": "2026-11-10T00:59:01.877999+00:00",
+    "operator_encrypted_archive_preserved": true,
+    "encrypted_scoped_grant_preserved": true
+  }
+}

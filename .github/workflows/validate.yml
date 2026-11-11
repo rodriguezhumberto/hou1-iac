@@ -49,4 +49,7 @@ jobs:
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-dns.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/bootstrap-control-plane.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/backups.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/rehearse-recovery.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/restore-test-host.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/publish-test-recovery.yml --syntax-check
       - run: python -m unittest discover -s tests -v

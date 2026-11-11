@@ -1,0 +1,445 @@
+{
+  "schema": 1,
+  "recorded_at": "2026-11-10T09:34:13.248293+00:00",
+  "issue": 27,
+  "staff_issue": 39,
+  "environment": "isolated-test",
+  "recovery_id": "replacement-20261110-04",
+  "infra_ref": "7cf3f0ea2216ed0e5189c477dbaa38da3e609c2d",
+  "staff_ref": "c3b51ec297e318f3d12d07e341c95bb976dc492f",
+  "clean_host_gate_complete": false,
+  "production_approved": false,
+  "restore": {
+    "succeeded": true,
+    "ok": 50,
+    "changed": 24,
+    "failed": 0,
+    "rescued": 0,
+    "ignored": 0,
+    "driver_seconds": 724.691,
+    "postgresql_tables": 187,
+    "cold_image_pull_and_uncached_build": true,
+    "sessions_reset_before_writers": true,
+    "identity_bootstrap_and_cms_seeding_run": false,
+    "authorization_comparisons_matched": 13
+  },
+  "publication": {
+    "succeeded": false,
+    "ok": 28,
+    "changed": 2,
+    "failed": 1,
+    "task": "netbird_client : Install NetBird repository prerequisites",
+    "cause": "VPS Docker CDN DNS answers absent from the controller-resolved package update allowlist; global APT cache refresh blocked.",
+    "ingress_already_published": true,
+    "lost_peer_already_deleted": true,
+    "replacement_peer_enrolled": false,
+    "two_exact_managed_source_groups_pinned_before_deletion": true,
+    "failed_phase_not_replayed": true
+  },
+  "controller_preflight": {
+    "helper_error_preserved": true,
+    "production_private_address_was_incorrectly_required_global": true,
+    "all_resolved_production_destinations_verified_denied_before_restore": true,
+    "actual_restore_inventory_preserved": true
+  },
+  "fix_validation": {
+    "target_resolved_fixed_repositories": 4,
+    "target_nft_check_exit": 0,
+    "focused_tests_passed": 6,
+    "repository_tests": 202,
+    "repository_tests_failed": 0,
+    "repository_tests_skipped": 1,
+    "playbook_syntax_checks_passed": 10,
+    "dns_regressions": {
+      "passed": 3,
+      "skipped": 1
+    },
+    "host_recovery_tests_passed": 13
+  },
+  "remaining": "Uninterrupted fresh-Debian restore/publication/monitoring/backup replay at one immutable reviewed revision, including the declared dedicated-controller reconnect helper.",
+  "continuation_preflight": {
+    "saved_source_group_plan_recovered": true,
+    "source_groups": 2,
+    "current_stored_policies_match_selected_snapshot": true,
+    "all_group_membership_changes_only_lost_peer_removal": true,
+    "lost_peer_absent_and_address_available": true,
+    "live_changes_made": false,
+    "original_failure_preserved": true
+  },
+  "continuation_01": {
+    "infra_ref": "799d4d69f0433848f562ae7cda7d9e2c7043f581",
+    "mode": "separate checked troubleshooting run",
+    "exit_code": 99,
+    "stopped_by_controller_at": "netbird_dns : Install the resolver binary and DNS verification tool",
+    "reason": "DNS role also refreshed global APT cache outside temporary repository lease; stopped rather than waiting through the same blocked CDN retries.",
+    "netbird_0_82_0_installed_and_connected": true,
+    "source_group_and_policy_verification": {
+      "same_managed_source_group_ids": true,
+      "exact_managed_policy_grants_preserved": true,
+      "source_membership_only_replacement": true,
+      "lost_peer_retired": true,
+      "new_hou1_peer_connected": true,
+      "checked_plan_recovered_from_selected_snapshot": true,
+      "uninterrupted_clean_gate": false,
+      "infrastructure_revision": "799d4d69f0433848f562ae7cda7d9e2c7043f581"
+    },
+    "netbird_package_lease_cleanup_verified": true,
+    "original_failure_preserved": true
+  },
+  "continuation_02": {
+    "infra_ref": "44b078f9dd6546db1fafaaaf44197b15bb20adaa",
+    "dns_package_access_and_verification_passed": true,
+    "exit_code": 2,
+    "task": "security : Connect as the administrative user over NetBird from the controller",
+    "ssh_listeners_not_changed": true,
+    "cause": "Retained dedicated controller client cached the old HOU1 peer key at the replacement VPN address. Management connected did not imply an up-to-date peer map.",
+    "cached_peer_key_mismatch_verified": true,
+    "dedicated_controller_restart_refreshed_key": true,
+    "fresh_private_ssh_succeeded_after_reconnect": true,
+    "original_failure_preserved": true
+  },
+  "continued_private_handoff": {
+    "infra_ref": "af53719b1c636bdb4bcc245b269acd247a400282",
+    "exit_code": 0,
+    "ok": 81,
+    "changed": 33,
+    "failed": 0,
+    "public_checks": {
+      "staff_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "authentik_admin_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "netbird_api_public_ready": {
+        "status": 200,
+        "passed": true
+      },
+      "public_tcp_22_closed": {
+        "passed": true
+      },
+      "public_tcp_9100_closed": {
+        "passed": true
+      }
+    },
+    "operator_confirmations": {
+      "google_sign_in_succeeded": true,
+      "vpn_reconnect_succeeded": true,
+      "personal_hou1_ssh_key_succeeded": true,
+      "reported_at": "2026-11-10T10:02:57.238350+00:00"
+    },
+    "google_endpoint_connectivity": {
+      "authentik_container_verified_google_https": true,
+      "endpoints": {
+        "discovery": 200,
+        "token_endpoint": 404,
+        "signing_keys": 200
+      },
+      "token_request_without_credentials": true,
+      "recorded_at": "2026-11-10T09:57:17.186523+00:00"
+    }
+  },
+  "continued_operations": {
+    "monitoring_exit": 0,
+    "backup_source_exit": 0,
+    "hou4_backup_exit": 0,
+    "capture": {
+      "capture_succeeded": true,
+      "fresh_marker_verified": true,
+      "vpn_reachable_after_capture": true,
+      "duration_seconds": 106.12,
+      "recorded_at": "2026-11-10T10:03:35.104962+00:00"
+    },
+    "collection": {
+      "receipt": {
+        "schema": 1,
+        "received": 1794305072,
+        "sha256": "452a88283da7bc8dbfda4dc80dcddf91a6cb1462dd33f91f3119d190fd87060f",
+        "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+      },
+      "manifest": {
+        "schema": 1,
+        "environment": "test",
+        "created": 1794305005,
+        "id": "20261110T100325Z-2c2c91acd367",
+        "size": 29335107,
+        "sha256": "452a88283da7bc8dbfda4dc80dcddf91a6cb1462dd33f91f3119d190fd87060f"
+      },
+      "retained_points": 2,
+      "receiver_timer_enabled": true
+    },
+    "dashboard": {
+      "authenticated_dashboard_readback": true,
+      "title": "HOU1 Operations",
+      "provisioned": true,
+      "panels": 24
+    },
+    "real_discord_delivery": {
+      "fault": "operator-authorized HOU1 wipe and clean recovery",
+      "firing_delivery_accepted": true,
+      "resolved_delivery_accepted": true,
+      "before": {
+        "fault": "operator-authorized HOU1 wipe and clean recovery",
+        "observed_at": "2026-11-10T09:39:55.525563+00:00",
+        "sample": {
+          "pre_wipe_sent": 37.0,
+          "pre_wipe_failed": 0.0,
+          "firing": [
+            "Hou1CollectorUnavailable",
+            "Hou1PostgresqlUnavailable",
+            "Hou1RequestMetricsUnavailable",
+            "Hou4MetricsTargetDown"
+          ],
+          "alertmanager_active": [
+            "Hou1CollectorUnavailable",
+            "Hou1PostgresqlUnavailable",
+            "Hou1RequestMetricsUnavailable",
+            "Hou4MetricsTargetDown"
+          ],
+          "sent": 45.0,
+          "failed": 0.0
+        },
+        "required_alerts_observed": [
+          "Hou1CollectorUnavailable",
+          "Hou1PostgresqlUnavailable",
+          "Hou1RequestMetricsUnavailable",
+          "Hou4MetricsTargetDown"
+        ],
+        "alerts_remained_enabled": true
+      },
+      "resolved": {
+        "pre_wipe_sent": 37.0,
+        "pre_wipe_failed": 0.0,
+        "firing": [],
+        "alertmanager_active": [],
+        "sent": 49.0,
+        "failed": 0.0
+      },
+      "notification_failures_delta": 0,
+      "proof": "Real outage and recovery plus Alertmanager Discord acceptance counters; no operator screenshot of receipt",
+      "recorded_at": "2026-11-10T10:07:54.249873+00:00"
+    },
+    "playbook_recaps": {
+      "private-handoff": {
+        "ok": 81,
+        "changed": 33,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 4,
+        "rescued": 0,
+        "ignored": 0
+      },
+      "monitoring": {
+        "ok": 43,
+        "changed": 16,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 3,
+        "rescued": 0,
+        "ignored": 0
+      },
+      "backup-source": {
+        "ok": 42,
+        "changed": 14,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 5,
+        "rescued": 0,
+        "ignored": 0
+      },
+      "hou4-backup": {
+        "ok": 17,
+        "changed": 1,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 4,
+        "rescued": 0,
+        "ignored": 0
+      },
+      "component": {
+        "ok": 26,
+        "changed": 17,
+        "unreachable": 0,
+        "failed": 0,
+        "skipped": 0,
+        "rescued": 0,
+        "ignored": 0
+      }
+    },
+    "staff_probe": {
+      "routine_login_probe": "passed",
+      "identities_checked": 2,
+      "checks_passed": 7
+    },
+    "backup_transport": {
+      "backup_shell_denied": true,
+      "backup_sudo_denied": true,
+      "backup_extra_arguments_denied": true,
+      "backup_forwarding_denied": true,
+      "pinned_source_host_verification_used": true
+    },
+    "component": {
+      "infra_ref": "97fab89b1e42ef45c1f1e25e9d3b3c98af7a1b55",
+      "identity": {
+        "fixture_passwords_match_recovery_point": true,
+        "google_source_secret_recovered": true,
+        "signing_private_keys_parse": true,
+        "local_emergency_admin_password_recovered": true,
+        "both_oidc_client_secrets_recovered": true,
+        "existing_internal_test_identities_recovered": true,
+        "no_identity_rebootstrap": true
+      },
+      "application": {
+        "restored_staff_sessions_invalidated_before_login_and_after_rollback": true,
+        "schema": 1,
+        "passed": true,
+        "environment": "test",
+        "recorded_at": 1794306072,
+        "checks": {
+          "session_reset_setup": {
+            "active_staff_and_idp_login_before_session_reset": true
+          },
+          "after_session_reset": {
+            "pre_reset_staff_session_denied": true,
+            "fresh_oidc_login_after_session_reset": true,
+            "fresh_logout_revokes_session": true
+          },
+          "initial": {
+            "external_egress_denied": true,
+            "restored_discovery": true,
+            "restored_signing_key_matches_reference": true,
+            "netbird_api_discovery_and_jwks": true,
+            "netbird_dashboard": true,
+            "unauthenticated_staff_denied": true,
+            "restored_reader_login_and_read": true,
+            "reader_write_denied": true,
+            "reader_logout_revoked_session": true,
+            "restored_admin_login_and_read": true,
+            "empty_snapshot_content_preserved": true,
+            "admin_private_media_preview": true,
+            "reader_private_media_preview": true,
+            "reader_media_write_denied": true,
+            "admin_media_upload": true,
+            "admin_content_write": true
+          },
+          "after_restart": {
+            "identity_aware_session_survives_app_restart": true,
+            "content_survives_app_restart": true,
+            "media_survives_app_restart": true,
+            "private_preview_survives_app_restart": true
+          },
+          "after_rollback": {
+            "post_snapshot_session_absent_after_database_rollback": true,
+            "snapshot_content_restored_after_rollback": true,
+            "snapshot_media_restored_after_rollback": true,
+            "login_after_rollback": true,
+            "logout_revoked_session_after_rollback": true
+          }
+        },
+        "check_count": 29,
+        "runtime_identity_and_application_checks_seconds": 239.661,
+        "staff_database_media_rollback_seconds": 68.26,
+        "rollback_scope": "Restored-copy staff SQLite/media to the actual recovery point; not a live HOU1 traffic cutover",
+        "harness_sha256": {
+          "build.py": "6009fe0b35f2c75ac8dd57c23ac4bac6a12044e60ac5cd6e72a5e14aca773c3c",
+          "identity_smoke.py": "91def46e8ed8ff1a4047b888687423030333eb88e28739308c5b57eb773288b2",
+          "runtime.py": "8103ac45ac265eeb6df4169ff152a0b0bfa9d8e174d61933159a8923dd79093d",
+          "safe_archive.py": "125ae73d12e38d39230abd1cb65652b7c96fdca820f1309f02fdb82cca1c5ea2",
+          "http_probe.py": "9334037a7715d566e9c2e7ab37204021a9a323ca45268108e7ca48bb42d976b5",
+          "check.py": "816762582c164fc617b8a5a749d2932a18800bf9f88d2d0d7447b6a8136b4fb3",
+          "driver.py": "f9a7fb274a26855576fe14a214f8af680011a1592a9849acf5ff73dffc4cd9c8"
+        },
+        "scope": "Isolated component restore; no production, host replacement, external Google or VPN peer cutover"
+      },
+      "cleanup": {
+        "drill_containers_removed": true,
+        "drill_network_removed": true,
+        "primary_ids_starttimes_unchanged": true
+      },
+      "no_identity_bootstrap_or_fixture_password_reset": true,
+      "selected_point": "20261109T095132Z-dd7fe78119c3",
+      "newly_collected_point_decrypted": false
+    },
+    "reboot": {
+      "reboot_passed": true,
+      "boot_id_changed": true,
+      "fresh_private_ssh_verified": true,
+      "host_key_verification_retained": true,
+      "health_checks_passed": 23,
+      "persistent_services": {
+        "expected_services_active": true,
+        "interrupted_writer_recovery_enabled": true
+      },
+      "elapsed_seconds": 146.57,
+      "recorded_at": "2026-11-10T10:24:51.098016+00:00"
+    },
+    "final_health": {
+      "primary_checks_passed": 23,
+      "monitoring": {
+        "targets_up": 8,
+        "active_alerts": 0,
+        "vpn_active": true,
+        "backup_timer_enabled": true
+      },
+      "recorded_at": "2026-11-10T10:26:56.383854+00:00"
+    },
+    "public_after_reboot": {
+      "staff_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "authentik_admin_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "netbird_api_public_ready": {
+        "status": 200,
+        "passed": true
+      },
+      "public_tcp_22_closed": {
+        "passed": true
+      },
+      "public_tcp_9100_closed": {
+        "passed": true
+      }
+    }
+  },
+  "controller_probe_finding": {
+    "routine_staff_probe_failed": true,
+    "cause": "Bare musl container did not apply OS split DNS. Public fallback resolvers raced private answers; using only the local split resolver then prevented public Authentik resolution.",
+    "scoped_fix": "Dedicated reconnect helper verifies private records through NetBird DNS and manages only those hosts pins while retaining public DNS.",
+    "private_mapping_and_public_dns_regressions_passed": 3,
+    "live_recheck_pending": false,
+    "reconnect_helper": {
+      "ready": true,
+      "dedicated_client_reconnected": true,
+      "private_dns_answers_verified": true,
+      "public_dns_retained": true,
+      "infra_ref": "97fab89b1e42ef45c1f1e25e9d3b3c98af7a1b55",
+      "recorded_at": "2026-11-10T10:12:41.499379+00:00"
+    },
+    "final_routine_probe": {
+      "routine_login_probe": "passed",
+      "identities_checked": 2,
+      "checks_passed": 7
+    }
+  },
+  "updated_at": "2026-11-10T10:28:01.138586+00:00",
+  "final_validation": {
+    "source_ref": "97fab89b1e42ef45c1f1e25e9d3b3c98af7a1b55",
+    "repository_tests": 207,
+    "skipped": 1,
+    "skip": "Controller lacks native dnsmasq binary; declared records were verified live over UDP and TCP.",
+    "all_tests_passed": true,
+    "production_and_issue_closure_authorized": false
+  },
+  "limitations": [
+    "The initial clean attempt and stopped continuations remain failures; troubleshooting success does not complete the clean-host gate.",
+    "Fresh ciphertext capture and collection were checked by size and SHA-256 over pinned SSH; decryption/restoration used the retained scoped grant for the earlier selected recovery point.",
+    "No simultaneous loss of both nodes or provider-level power-loss drill.",
+    "Controller-managed certificate renewal schedule remains disabled as requested; the prior renewal evidence is unchanged.",
+    "No merge, issue closure or production promotion authorized."
+  ]
+}
