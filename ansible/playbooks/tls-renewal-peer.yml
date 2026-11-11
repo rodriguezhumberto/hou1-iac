@@ -1,0 +1,11 @@
+---
+- name: Configure a dedicated controller renewal peer and fixed namespace jobs
+  hosts: localhost
+  connection: local
+  become: false
+  gather_facts: true
+  tasks:
+    - name: Configure only the controller renewal transport
+      ansible.builtin.import_role:
+        name: controller_tls
+        tasks_from: peer.yml

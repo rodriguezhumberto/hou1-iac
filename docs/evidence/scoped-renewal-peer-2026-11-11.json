@@ -1,0 +1,72 @@
+{
+  "issue": 20,
+  "recorded_at": "2026-11-11T11:54:02.939826+00:00",
+  "scope": "Persistent scoped controller transport for certificate delivery and numeric renewal status",
+  "netbird_version": "0.82.0",
+  "local_validation": {
+    "hou1_full_suite_tests": 304,
+    "hou1_full_suite_skipped": 0,
+    "hou1_full_suite_seconds": 492.737,
+    "hou1_final_peer_focused_tests": 11,
+    "hou1_peer_and_schedule_syntax_checks_passed": true,
+    "hou4_companion_revision": "4febe04",
+    "hou4_full_suite_tests": 65,
+    "hou4_native_subtests_rechecked_with_pinned_tools": true,
+    "hou4_both_playbook_syntax_checks_passed": true
+  },
+  "source_sha256": {
+    "scripts/controller-renewal-peer.py": "059187509faee1332207bac314b087c27d88a3a671cff3d1f5acf7b33072e23b",
+    "ansible/playbooks/tls-renewal-peer.yml": "aa9da126ca286c3a8f602522163d674cd552468932b8af701b8dfdbe3975d53e",
+    "ansible/playbooks/roles/controller_tls/files/namespace-exec.py": "2d5b9857c9f3d6942cfc4a1e5063842b53e22a5e2cc3bc61c7483d3b4abbfb43",
+    "ansible/playbooks/roles/controller_tls/tasks/peer.yml": "7f865fdbc39e6490ee97ea35f7d8f4b234042a53927bb7fc4c5ae4211dc21e3f",
+    "ansible/playbooks/roles/controller_tls/tasks/schedule.yml": "1cd338824cc5be70689fd8e3ea5a5488549c70a870b2c437d54c36a4f8a9f22e",
+    "ansible/playbooks/roles/controller_tls/templates/renew.service.j2": "dc0fbfd5f13f56a29a7dc2e54d29fddb49c5bcb6420fc1b6177f87088f09051c",
+    "ansible/playbooks/roles/controller_tls/templates/status.service.j2": "ca50f9a5bf91af7b5fd6e32944039920f360cd7e2171a584ddd6050c96a67d66"
+  },
+  "live_acceptance": {
+    "owner_authorized_separate_persistent_peer": true,
+    "exact_source_group_without_administrative_membership": true,
+    "explicit_receiver_server_group_from_encrypted_inventory": true,
+    "ephemeral_login_and_inactivity_expiration_disabled": true,
+    "source_policy_only_outbound_tcp_22_to_two_receivers": true,
+    "dedicated_network_namespace_without_host_route_or_address_changes": true,
+    "container_restart_retained_peer_address_and_policy": true,
+    "setup_key_and_temporary_file_removed": true,
+    "management_token_and_age_identity_not_in_peer_container": true,
+    "namespace_jobs_run_nonroot_without_capabilities_and_with_no_new_privileges": true,
+    "unknown_executor_job_denied": true,
+    "authenticated_arbitrary_commands_denied_on_both_receivers": true,
+    "renewal_key_rejected_from_other_source_peer": true,
+    "https_metrics_backend_and_unrelated_peer_ssh_denied": true,
+    "both_acme_dry_runs_passed": true,
+    "both_certificate_deliveries_verified_served_certificates": true,
+    "both_renewal_and_status_timers_enabled_with_fixed_executor": true,
+    "both_actual_systemd_renewal_services_succeeded": true,
+    "both_receivers_have_fresh_successful_numeric_renewal_status": true,
+    "grafana_private_dns_deployed": true,
+    "owner_confirmed_grafana_login_page_without_certificate_warning": true,
+    "owner_only_encrypted_controller_recovery_escrow_created": true,
+    "public_dns_or_website_traffic_cutover_changed": false
+  },
+  "corrected_attempts": [
+    {
+      "operation": "Initial peer provisioning",
+      "failure": "Private dotted runtime path rejected before enrollment",
+      "correction": "Permit safe dotted path segments while rejecting parent traversal; regression covered"
+    },
+    {
+      "operation": "Initial HOU4 ingress verification",
+      "failure": "Controller used a production hostname before private DNS was configured",
+      "correction": "Verify over the administrator VPN namespace with the production TLS hostname; then deploy split DNS"
+    }
+  ],
+  "remaining_boundaries": [
+    "Full HOU4 production monitoring and firing/resolved alert acceptance",
+    "Production backup pairing and restore acceptance",
+    "Manual staff/CMS content seeding and staff SSO acceptance",
+    "Temporary administrative grant retirement after remaining authorized rollout work",
+    "Explicit website traffic cutover approval"
+  ],
+  "untested_controller_recovery": "Encrypted escrow is retained, but replacement-controller recovery has not been exercised",
+  "production_promotion_complete": false
+}

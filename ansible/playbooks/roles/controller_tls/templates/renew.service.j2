@@ -2,7 +2,11 @@
 Description=Controller-only HOU1 certificate issuance and verified renewal
 [Service]
 Type=oneshot
+{% if hou1_tls_executor_job_prefix | default('') %}
+ExecStart=/usr/bin/sudo -n /usr/local/libexec/controller-renewal-exec {{ hou1_tls_executor_job_prefix }}-deploy
+{% else %}
 ExecStart={{ ansible_playbook_python }} {{ hou1_tls_schedule_directory }}/controller-tls.py --config {{ hou1_tls_controller_config }} --deploy
+{% endif %}
 TimeoutStartSec=7800
 UMask=0077
-NoNewPrivileges=yes
+NoNewPrivileges={{ 'no' if hou1_tls_executor_job_prefix | default('') else 'yes' }}
