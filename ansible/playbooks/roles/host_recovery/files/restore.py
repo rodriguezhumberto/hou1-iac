@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Restore a fresh test host once; leave published ports on loopback for review."""
+"""Restore a fresh host once; leave published ports on loopback for review."""
 import argparse
 import importlib.util
 import datetime
@@ -13,13 +13,23 @@ import time
 
 ROOT = Path(__file__).resolve().parent
 RECOVERY_BASE = Path('/var/lib/hou1-host-recovery')
-APP = Path('/opt/pearlandpaws-test')
-AUTH = Path('/opt/hou1-authentik/test')
-AUTH_DATA = Path('/var/lib/hou1-authentik/test')
-VPN = Path('/opt/hou1-netbird')
-MEDIA = Path('/var/lib/pearlandpaws/test/cms/media')
-PROJECTS = {'auth': ('hou1-authentik-test', AUTH), 'netbird': ('hou1-netbird-test', VPN),
-            'app': ('pearlandpaws-test', APP)}
+APP = AUTH = AUTH_DATA = VPN = MEDIA = None
+PROJECTS = {}
+
+
+def configure(cfg):
+    global APP, AUTH, AUTH_DATA, VPN, MEDIA, PROJECTS
+    spec = importlib.util.spec_from_file_location('host_recovery_contract', Path(__file__).resolve().with_name('contract.py'))
+    contract = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(contract)
+    deployment = contract.layout(cfg)
+    paths = deployment['paths']
+    APP, AUTH, AUTH_DATA, VPN = [Path(paths[key]) for key in ('app', 'auth', 'auth_data', 'netbird')]
+    MEDIA = Path(paths['cms']) / 'media'
+    PROJECTS = {key: (deployment['projects'][key], path)
+                for key, path in [('app', APP), ('auth', AUTH), ('netbird', VPN)]}
+
+
 SESSION_TABLES = ['django_session', 'authentik_core_authenticatedsession',
                   'authentik_providers_oauth2_authorizationcode',
                   'authentik_providers_oauth2_accesstoken', 'authentik_providers_oauth2_refreshtoken']
@@ -55,6 +65,18 @@ def copy_tree(source, destination, uid=0, gid=0, public=False):
         if not path.is_symlink():
             os.chown(path, uid, gid)
             path.chmod((0o755 if public else 0o750) if path.is_dir() else (0o644 if public else 0o640))
+
+
+def copy_certificates(environment, source, destination):
+    if environment == 'test':
+        copy_tree(source, destination)
+    else:
+        # Keep certificate symlink lineages, without reinstalling old ACME
+        # accounts, DNS grants, renewal configuration or hooks.
+        destination.mkdir(mode=0o750)
+        for name in ('live', 'archive'):
+            if (source / name).is_dir():
+                copy_tree(source / name, destination / name)
 
 
 def write(name, data):
@@ -122,7 +144,7 @@ def hold_public_ports(configs):
 
 
 def install(cfg):
-    paths_absent([APP, AUTH, AUTH_DATA, VPN, MEDIA.parents[1], Path(cfg['runtime_age_path'])])
+    paths_absent([APP, AUTH, AUTH_DATA, VPN, MEDIA.parent, Path(cfg['runtime_age_path'])])
     if run('docker', 'ps', '-aq').strip() or run('docker', 'image', 'ls', '-aq').strip():
         raise ValueError('Cold-host recovery requires empty container and image stores')
     payload = ROOT / 'payload'
@@ -143,6 +165,7 @@ def install(cfg):
         artifact = importlib.util.module_from_spec(spec); spec.loader.exec_module(artifact)
         receipt = artifact.verify_saved(receipt, cfg['staff_revision'])
         cfg['application_image'] = receipt
+        write('request.json', cfg)
     else:
         env = saved_environment(payload / 'app-config/.env')
         keys = ['PUBLIC_HCAPTCHA_SITE_KEY', 'PUBLIC_VAPID_PUBLIC_KEY', 'PUBLIC_SITE_ORIGIN',
@@ -165,7 +188,7 @@ def install(cfg):
     certs.parent.mkdir(mode=0o700, exist_ok=True)
     if certs.exists():
         shutil.rmtree(certs)  # Only source checkout files; host destinations were absent.
-    copy_tree(payload / 'app-config/certbot/conf', certs)
+    copy_certificates(cfg['environment'], payload / 'app-config/certbot/conf', certs)
     (APP / 'certbot/www').mkdir(mode=0o755, exist_ok=True)
     (APP / 'nginx-logs').mkdir(mode=0o755, exist_ok=True)
     if (APP / 'database').exists():
@@ -201,19 +224,21 @@ def install(cfg):
         (directory / filename).write_text(json.dumps(config, indent=2) + '\n')
         (directory / filename).chmod(0o600)
     (VPN / 'ingress').mkdir(mode=0o755)
-    for name in ['netbird.conf', 'authentik-test.conf']:
+    for name in ['netbird.conf', 'authentik.conf']:
         shutil.copyfile(ROOT / name, VPN / 'ingress' / name)
     (VPN / 'nginx-include.conf').write_text('include /etc/nginx/netbird/*.conf;\n')
-    run('docker', 'network', 'create', 'hou1-authentik-test')
-    run('docker', 'network', 'create', '--subnet', '172.30.80.0/29', '--ip-range', '172.30.80.4/30', 'hou1-netbird-ingress')
+    networks = cfg['deployment']['networks']
+    run('docker', 'network', 'create', networks['auth'])
+    run('docker', 'network', 'create', '--subnet', networks['subnet'], '--ip-range', networks['dynamic_range'], networks['netbird'])
     run('ufw', '--force', 'reset')
     run('ufw', 'default', 'deny', 'incoming')
     run('ufw', 'default', 'allow', 'outgoing')
     run('ufw', 'allow', 'from', cfg['bootstrap_cidr'], 'to', 'any', 'port', '22', 'proto', 'tcp')
     run('ufw', '--force', 'enable')
-    isolation = {key: cfg[key] for key in ['environment', 'deny_cidrs', 'test_addresses', 'allow_local_cidrs', 'allow_update_cidrs']}
-    (ROOT / 'isolation.json').write_text(json.dumps(isolation) + '\n')
-    run('python3', str(ROOT / 'isolation.py'), str(ROOT / 'isolation.json'))
+    if cfg['environment'] == 'test':
+        isolation = {key: cfg[key] for key in ['environment', 'deny_cidrs', 'test_addresses', 'allow_local_cidrs', 'allow_update_cidrs']}
+        (ROOT / 'isolation.json').write_text(json.dumps(isolation) + '\n')
+        run('python3', str(ROOT / 'isolation.py'), str(ROOT / 'isolation.json'))
     return configs
 
 
@@ -238,7 +263,7 @@ def restore(cfg):
     dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server', 'dashboard')
     dc('app', 'up', '-d', '--pull', 'never', '--wait', '--wait-timeout', '180', 'astro-app', 'nginx')
     dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
-    report = dict(passed=True, environment='test', staff_revision=cfg['staff_revision'], postgres_tables=tables,
+    report = dict(passed=True, environment=cfg['environment'], staff_revision=cfg['staff_revision'], postgres_tables=tables,
                   sessions_revoked_before_writers=True, identity_bootstrap_run=False, cms_seed_run=False,
                   netbird_connection_flags_reset_before_server=True,
                   netbird_stale_connections_cleared=stale_connections,
@@ -257,7 +282,12 @@ def restore(cfg):
 
 
 def publish(cfg):
-    if not json.loads((ROOT / 'restore-report.json').read_text())['passed']:
+    report = json.loads((ROOT / 'restore-report.json').read_text())
+    if (not report['passed'] or (cfg['environment'] == 'production' and
+            (report.get('environment') != 'production' or report.get('staff_revision') != cfg['staff_revision']
+             or report.get('application_image') != cfg.get('application_image')
+             or report.get('ports_bound_to_loopback') is not True
+             or report.get('sessions_revoked_before_writers') is not True))):
         raise ValueError('Restore checkpoint has not passed')
     changes = []
     for project, service, before, after in [
@@ -278,7 +308,7 @@ def publish(cfg):
     dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server')
     dc('app', 'up', '-d', '--pull', 'never', '--no-deps', 'nginx')
     dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
-    report = {'passed': True, 'environment': 'test', 'ports_published': True,
+    report = {'passed': True, 'environment': cfg['environment'], 'ports_published': True,
               'access_reconciliation_operator_asserted': True, 'host_enrollment_pending': True}
     write('publish-report.json', report)
     return report
@@ -287,10 +317,13 @@ def publish(cfg):
 def main(action):
     os.umask(0o077)
     cfg = json.loads((ROOT / 'request.json').read_text())
-    if cfg['environment'] != 'test' or ROOT != RECOVERY_BASE / cfg['id']:
+    if cfg['environment'] not in ('test', 'production') or ROOT != RECOVERY_BASE / cfg['id']:
         raise ValueError('Wrong recovery root or environment')
     if (ROOT / 'first-error.json').exists() or (ROOT / (action + '-report.json')).exists():
         raise ValueError('Do not resume an earlier or completed attempt')
+    configure(cfg)
+    if cfg['environment'] == 'production' and not cfg.get('application_image'):
+        raise ValueError('Production recovery requires a CI artifact')
     try:
         return {'restore': restore, 'publish': publish}[action](cfg)
     except Exception as error:

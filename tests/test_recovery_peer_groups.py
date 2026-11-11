@@ -27,7 +27,7 @@ def fixture():
 
 def plan(state, lost='lost'):
     return POLICY['recovery_source_groups'](state['groups'], state['peers'], state['policies'],
-                                             '100.91.0.22', '100.91.0.10', '100.91.0.0/16', lost)
+                                             '100.91.0.22', '100.91.0.10', '100.91.0.0/16', lost, 'test')
 
 
 class RecoveryPeerGroupsTest(unittest.TestCase):
@@ -51,6 +51,26 @@ class RecoveryPeerGroupsTest(unittest.TestCase):
                 if change == 'operator-policy': state['policies'][0]['description'] = 'Operator owned'
                 if change == 'broadened-policy': state['policies'][0]['rules'][0]['ports'].append('22')
                 with self.assertRaises(Exception): plan(state)
+
+    def test_production_source_groups_require_the_exact_environment_policies(self):
+        state = fixture()
+        for peer in state['peers']:
+            peer['ip'] = peer['ip'].replace('100.91.', '100.90.')
+        for group in state['groups']:
+            group['name'] = group['name'].replace('test-servers', 'prod-servers').replace('-test', '-production')
+        metrics = POLICY['monitoring_plan'](state['groups'], state['peers'], [],
+                    '100.90.0.22', '100.90.0.10', '100.90.0.0/16', 'prod-servers')['policy']['body']
+        backup = POLICY['backup_plan'](state['groups'], state['peers'], [],
+                    '100.90.0.22', '100.90.0.10', '100.90.0.0/16', 'production')['policy']['body']
+        state['policies'] = [dict(id='metrics-policy', **metrics), dict(id='backup-policy', **backup)]
+        selected = POLICY['recovery_source_groups'](state['groups'], state['peers'], state['policies'],
+                    '100.90.0.22', '100.90.0.10', '100.90.0.0/16', 'lost', 'production')
+        self.assertEqual([group['name'] for group in selected],
+                         ['hou1-metrics-production', 'hou1-backup-production-source'])
+        for environment in ['test', 'unknown']:
+            with self.assertRaises(Exception):
+                POLICY['recovery_source_groups'](state['groups'], state['peers'], state['policies'],
+                    '100.90.0.22', '100.90.0.10', '100.90.0.0/16', 'lost', environment)
 
     def test_ordinary_planners_still_refuse_empty_source_groups(self):
         state = fixture()
@@ -107,7 +127,7 @@ class RecoveryPeerGroupsTest(unittest.TestCase):
                 try:
                     variables = dict(netbird_api_url=url, netbird_api_headers={},
                                      hou1_backup_receiver_ip='100.91.0.22', netbird_ip='100.91.0.10',
-                                     netbird_subnet='100.91.0.0/16', host_recovery_lost_peer_id='lost',
+                                     netbird_subnet='100.91.0.0/16', cms_environment='test', host_recovery_lost_peer_id='lost',
                                      netbird_server_peer={'id': 'new', 'ip': '100.91.0.10'})
                     result = run_play(variables, [
                         {'ansible.builtin.include_tasks': str(ROLES / 'host_recovery/tasks/peer-groups-before.yml')},

@@ -1,0 +1,77 @@
+---
+# Replacement recovery only; never initialize a new identity database here.
+- name: Restore one explicitly selected fresh production replacement
+  hosts: production_recovery
+  become: true
+  pre_tasks:
+    - name: Require the fresh production host and independent recovery access
+      ansible.builtin.assert:
+        that:
+          - groups['production_recovery'] == [inventory_hostname]
+          - ansible_play_hosts_all == [inventory_hostname]
+          - inventory_hostname in groups.get('prod_env', [])
+          - inventory_hostname in groups.get('hou1_prod_init', [])
+          - inventory_hostname not in groups.get('test_env', [])
+          - cms_environment == 'production'
+          - authentik_environment == 'prod'
+          - netbird_server_group == 'prod-servers'
+          - netbird_subnet == authentik_identity_profiles.prod.netbird_subnet
+          - node_bootstrap | bool
+          - ansible_host == prod_vps_public_ip
+          - ansible_facts.distribution == 'Debian'
+          - ansible_facts.distribution_major_version == '12'
+          - ansible_facts.architecture == 'x86_64'
+          - host_recovery_console_confirmed | default(false) | bool
+          - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
+          - host_recovery_request is mapping
+          - hou1_controller_managed_tls is boolean and hou1_controller_managed_tls
+          - application_image_registry_secret_source | length > 0
+          - application_image_registry_age_key_file | length > 0
+          - netbird_version == '0.82.0'
+          - not ansible_check_mode
+          - ansible_run_tags | list == ['all']
+          - ansible_skip_tags | length == 0
+        fail_msg: Select one fresh Debian 12 production init host, pinned registry access and independent consoles for both nodes.
+      tags: [always]
+
+    - name: Bind the explicit recovery contract to production inventory
+      ansible.builtin.include_tasks: roles/host_recovery/tasks/request.yml
+
+    - name: Preserve earlier controller evidence
+      ansible.builtin.stat:
+        path: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}'
+      delegate_to: localhost
+      become: false
+      register: host_recovery_existing_evidence
+    - name: Require an unused evidence ID
+      ansible.builtin.assert:
+        that: not host_recovery_existing_evidence.stat.exists
+
+    - name: Refuse existing application state or a previous attempt
+      ansible.builtin.command:
+        argv: "{{ ['python3', '-c', 'from pathlib import Path; import sys; paths = [Path(value) for value in sys.argv[1:]]; assert all(not p.exists() and not p.is_symlink() and not any(a.is_symlink() for a in p.parents) for p in paths), \"Existing recovery destination\"'] + (host_recovery_request.deployment.paths.values() | list) + [host_recovery_request.runtime_age_path, '/var/lib/hou1-host-recovery/' ~ host_recovery_id] }}"
+      changed_when: false
+
+    - name: Detect provider initialization before acquiring package locks
+      ansible.builtin.stat:
+        path: /usr/bin/cloud-init
+      register: host_recovery_cloud_init
+    - name: Wait only when cloud-init is installed
+      ansible.builtin.command:
+        argv: [/usr/bin/timeout, '900', /usr/bin/cloud-init, status, --wait]
+      when: host_recovery_cloud_init.stat.exists
+      changed_when: false
+    - name: Install replacement-host prerequisites
+      ansible.builtin.apt:
+        name: [systemd-resolved, ufw, age, python3-yaml, jq, sysstat, dnsutils]
+        update_cache: true
+        state: present
+        lock_timeout: 300
+    - name: Require Authentik capacity before restoring workloads
+      ansible.builtin.include_role:
+        name: authentik_policy
+        tasks_from: capacity
+  roles:
+    - common
+    - docker
+    - host_recovery
