@@ -17,8 +17,18 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sudo apt-get update
-          sudo apt-get install --no-install-recommends -y age
+          for attempt in 1 2 3; do
+            if gh release download v1.2.1 --repo FiloSottile/age \
+              --pattern age-v1.2.1-linux-amd64.tar.gz --output "$RUNNER_TEMP/age.tar.gz" --clobber; then
+              break
+            fi
+            if [ "$attempt" -eq 3 ]; then exit 1; fi
+            sleep 2
+          done
+          echo '7df45a6cc87d4da11cc03a539a7470c15b1041ab2b396af088fe9990f7c79d50  '$RUNNER_TEMP'/age.tar.gz' \
+            | sha256sum --check --strict
+          tar -xzf "$RUNNER_TEMP/age.tar.gz" -C "$RUNNER_TEMP" age/age age/age-keygen
+          sudo install -m 0755 "$RUNNER_TEMP/age/age" "$RUNNER_TEMP/age/age-keygen" /usr/local/bin/
           for attempt in 1 2 3; do
             if gh release download v3.11.0 --repo getsops/sops \
               --pattern sops-v3.11.0.linux.amd64 --output "$RUNNER_TEMP/sops" --clobber; then
