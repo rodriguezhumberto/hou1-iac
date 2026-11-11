@@ -1,0 +1,441 @@
+{
+  "scope": "Clean Debian 12 HOU1 replacement recovery using the saved CI application digest; retained HOU4 monitoring and backup receiver",
+  "recorded_at": "2026-11-11T01:11:26.751527+00:00",
+  "clean_deployment_revision": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+  "health_probe_correction_revision": "c7f1599",
+  "recovery_pr": "https://github.com/rodriguezhumberto/hou1-iac/pull/59",
+  "artifact_pr": "https://github.com/rodriguezhumberto/hou1-iac/pull/61",
+  "recovery_point": {
+    "schema": 1,
+    "environment": "test",
+    "created": 1794351628,
+    "id": "20261110T230028Z-184f657a1db7",
+    "size": 29572621,
+    "sha256": "b59e7c0c9e0959bc2b089933bec02dd5dd213320f46c31c8571e28970c59eed3"
+  },
+  "host_preflight": {
+    "fresh_debian_12": true,
+    "vcpus": 4,
+    "memory_mib": 16005,
+    "free_disk_gib": 74,
+    "free_inodes": 5207121,
+    "bootstrap_key_installed": true,
+    "password_delivery_deleted": true,
+    "hou4_preserved": true
+  },
+  "ssh_host_identity": {
+    "fingerprint": "SHA256:Bb+JsHkmHHzeWQ0W1fbl5CzSSgNzwB7lrRX2Q+SB9Qk",
+    "trust_source": "First observed key under operator authorization to trust the rebuilt test host; no provider-console comparison claimed"
+  },
+  "restore": {
+    "passed": true,
+    "environment": "test",
+    "staff_revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+    "postgres_tables": 187,
+    "sessions_revoked_before_writers": true,
+    "identity_bootstrap_run": false,
+    "cms_seed_run": false,
+    "netbird_connection_flags_reset_before_server": true,
+    "netbird_stale_connections_cleared": 4,
+    "cold_registry_pulls": true,
+    "cold_application_build": false,
+    "application_image": {
+      "schema": 1,
+      "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+      "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+      "platform": "linux/amd64",
+      "image_id": "sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42"
+    },
+    "ports_bound_to_loopback": true,
+    "restore_seconds": 529.602,
+    "next": "Reconcile access changes, explicitly publish, replace only the lost HOU1 peer, then finalize VPN/security/monitoring/backups"
+  },
+  "authorization_review": {
+    "selected_tables_compared": 13,
+    "all_selected_tables_matched": true
+  },
+  "deployment_phases": {
+    "restore": {
+      "phase": "restore",
+      "infra_ref": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+      "exit_code": 0,
+      "recorded_at": "2026-11-11T00:32:57.973729+00:00"
+    },
+    "publish": {
+      "phase": "publish",
+      "infra_ref": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+      "exit_code": 0,
+      "recorded_at": "2026-11-11T00:38:25.244330+00:00"
+    },
+    "monitoring": {
+      "phase": "monitoring",
+      "infra_ref": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+      "exit_code": 0,
+      "recorded_at": "2026-11-11T00:40:21.978823+00:00"
+    },
+    "backups": {
+      "phase": "backups",
+      "infra_ref": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+      "exit_code": 0,
+      "recorded_at": "2026-11-11T00:43:56.945975+00:00"
+    },
+    "hou4-backup": {
+      "phase": "hou4-backup-pin-and-receiver",
+      "exit_code": 0,
+      "recorded_at": "2026-11-11T00:45:05.922089+00:00",
+      "hou4_ref": "96f80c0b1fa1fcd0b856038ce9ab700fd0d12af5"
+    },
+    "component": {
+      "phase": "digest-backed isolated component restore",
+      "started_at": "2026-11-11T00:47:25.499633+00:00",
+      "recovery_point": "20261110T230028Z-184f657a1db7",
+      "infra_revision": "58cd318c7c2a7f4630ef2565a170800d16fa9284",
+      "application": {
+        "schema": 1,
+        "image": "ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42",
+        "revision": "a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51",
+        "platform": "linux/amd64",
+        "image_id": "sha256:9cf6cd2860066ebe071de179908d83ec79f094a1afd7766d08b54a6522b875af"
+      },
+      "exit_code": 0
+    }
+  },
+  "hou4_reconnection": {
+    "private_ssh_verified": true,
+    "retained_hou4_peer_reconnected_without_reenrollment": true,
+    "fingerprint_verification_retained": true,
+    "elapsed_seconds": 114.764,
+    "recorded_at": "2026-11-11T00:35:24.355262+00:00"
+  },
+  "fresh_backup": {
+    "capture": {
+      "capture_succeeded": true,
+      "normal_backup_owner_only_recipient_verified": true,
+      "fresh_marker_verified": true,
+      "vpn_reachable_after_capture": true,
+      "duration_seconds": 83.935,
+      "recorded_at": "2026-11-11T00:46:35.552781+00:00"
+    },
+    "collection": {
+      "receipt": {
+        "schema": 1,
+        "received": 1794358019,
+        "sha256": "fcc560dedb5b2c03cc31f4459188149de5a4007423150be8588d7699baa8e6e3",
+        "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+      },
+      "manifest": {
+        "schema": 1,
+        "environment": "test",
+        "created": 1794357991,
+        "id": "20261111T004631Z-3838440aa90e",
+        "size": 29605811,
+        "sha256": "fcc560dedb5b2c03cc31f4459188149de5a4007423150be8588d7699baa8e6e3"
+      },
+      "retained_points": 3,
+      "archive_size_and_sha256_verified": true,
+      "new_owner_only_point_decrypted_by_controller": false,
+      "receiver_timer_enabled": true
+    },
+    "transport_boundaries": {
+      "backup_shell_denied": true,
+      "backup_sudo_denied": true,
+      "backup_extra_arguments_denied": true,
+      "backup_forwarding_denied": true,
+      "pinned_source_host_verification_used": true
+    },
+    "new_point_encrypted_owner_only": true,
+    "new_point_decrypted_by_controller": false,
+    "component_restore_used_selected_decryptable_test_point": true
+  },
+  "component_recovery": {
+    "passed": true,
+    "checks_passed": 29,
+    "checks": {
+      "session_reset_setup": {
+        "active_staff_and_idp_login_before_session_reset": true
+      },
+      "after_session_reset": {
+        "pre_reset_staff_session_denied": true,
+        "fresh_oidc_login_after_session_reset": true,
+        "fresh_logout_revokes_session": true
+      },
+      "initial": {
+        "external_egress_denied": true,
+        "restored_discovery": true,
+        "restored_signing_key_matches_reference": true,
+        "netbird_api_discovery_and_jwks": true,
+        "netbird_dashboard": true,
+        "unauthenticated_staff_denied": true,
+        "restored_reader_login_and_read": true,
+        "reader_write_denied": true,
+        "reader_logout_revoked_session": true,
+        "restored_admin_login_and_read": true,
+        "empty_snapshot_content_preserved": true,
+        "admin_private_media_preview": true,
+        "reader_private_media_preview": true,
+        "reader_media_write_denied": true,
+        "admin_media_upload": true,
+        "admin_content_write": true
+      },
+      "after_restart": {
+        "identity_aware_session_survives_app_restart": true,
+        "content_survives_app_restart": true,
+        "media_survives_app_restart": true,
+        "private_preview_survives_app_restart": true
+      },
+      "after_rollback": {
+        "post_snapshot_session_absent_after_database_rollback": true,
+        "snapshot_content_restored_after_rollback": true,
+        "snapshot_media_restored_after_rollback": true,
+        "login_after_rollback": true,
+        "logout_revoked_session_after_rollback": true
+      }
+    },
+    "identity_material": {
+      "fixture_passwords_match_recovery_point": true,
+      "google_source_secret_recovered": true,
+      "signing_private_keys_parse": true,
+      "local_emergency_admin_password_recovered": true,
+      "both_oidc_client_secrets_recovered": true,
+      "existing_internal_test_identities_recovered": true,
+      "no_identity_rebootstrap": true
+    },
+    "postgres_tables": 187,
+    "empty_database_import": true,
+    "internal_network": true,
+    "published_ports": 0,
+    "cleanup": {
+      "drill_containers_removed": true,
+      "drill_network_removed": true,
+      "primary_ids_starttimes_unchanged": true
+    }
+  },
+  "final_health": {
+    "host_checks_passed": 23,
+    "saved_runtime_and_nginx_source_verified": true,
+    "saved_application_digest_and_revision_verified": true,
+    "staff": {
+      "routine_login_probe": "passed",
+      "identities_checked": 2,
+      "checks_passed": 7
+    },
+    "public_boundaries": {
+      "staff_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "authentik_admin_public_denied": {
+        "status": 403,
+        "passed": true
+      },
+      "netbird_api_public_ready": {
+        "status": 200,
+        "passed": true
+      },
+      "public_tcp_22_closed": {
+        "passed": true
+      },
+      "public_tcp_9100_closed": {
+        "passed": true
+      }
+    },
+    "monitoring": {
+      "targets_total": 8,
+      "targets_up": 8,
+      "active_alerts": 0,
+      "backup_timer_enabled": true,
+      "recorded_at": "2026-11-11T01:02:45.168380+00:00"
+    },
+    "operator_access": {
+      "google_sign_in": true,
+      "vpn_reconnected": true,
+      "personal_ssh": true,
+      "reported_by": "operator",
+      "recorded_at": "2026-11-11T00:42:33.431539+00:00",
+      "host_fingerprint": "SHA256:Bb+JsHkmHHzeWQ0W1fbl5CzSSgNzwB7lrRX2Q+SB9Qk"
+    }
+  },
+  "discord": {
+    "fault": "operator-authorized HOU1 wipe and clean recovery",
+    "firing_delivery_accepted": true,
+    "resolved_delivery_accepted": true,
+    "before": {
+      "fault": "operator-authorized HOU1 wipe and clean recovery",
+      "observed_at": "2026-11-11T00:35:31.399311+00:00",
+      "sample": {
+        "pre_wipe_sent": 51.0,
+        "pre_wipe_failed": 0.0,
+        "firing": [
+          "Hou1CollectorUnavailable",
+          "Hou1PostgresqlUnavailable",
+          "Hou1RequestMetricsUnavailable",
+          "Hou4MetricsTargetDown",
+          "Hou4RenewalMetricsStale"
+        ],
+        "alertmanager_active": [
+          "Hou1CollectorUnavailable",
+          "Hou1PostgresqlUnavailable",
+          "Hou1RequestMetricsUnavailable",
+          "Hou4MetricsTargetDown",
+          "Hou4RenewalMetricsStale"
+        ],
+        "sent": 62.0,
+        "failed": 0.0
+      },
+      "required_alerts_observed": [
+        "Hou1CollectorUnavailable",
+        "Hou1PostgresqlUnavailable",
+        "Hou1RequestMetricsUnavailable",
+        "Hou4MetricsTargetDown"
+      ],
+      "alerts_remained_enabled": true,
+      "continuous_outage_across_attempts": true,
+      "original_outage_checkpoint": "2026-11-10T23:23:52.966370+00:00",
+      "earlier_firing_evidence": "/var/tmp/hou1-ci-clean-recovery-2026-11-10-01/discord-outage-before.json"
+    },
+    "resolved": {
+      "pre_wipe_sent": 51.0,
+      "pre_wipe_failed": 0.0,
+      "firing": [],
+      "alertmanager_active": [],
+      "sent": 67.0,
+      "failed": 0.0
+    },
+    "notification_failures_delta": 0,
+    "proof": "Real outage and recovery plus Alertmanager Discord acceptance counters; no operator screenshot of receipt",
+    "recorded_at": "2026-11-11T00:47:43.470656+00:00"
+  },
+  "reboot": {
+    "reboot_passed": true,
+    "boot_id_changed": true,
+    "fresh_private_ssh_verified": true,
+    "host_key_verification_retained": true,
+    "health_checks_passed": 23,
+    "persistent_services": {
+      "expected_services_active": true,
+      "interrupted_writer_recovery_enabled": true
+    },
+    "elapsed_seconds": 134.342,
+    "recorded_at": "2026-11-11T00:58:49.005364+00:00"
+  },
+  "validation_corrections": {
+    "harness": {
+      "recorded_at": "2026-11-11T00:39:54.909824+00:00",
+      "check": "check-restored-host.py",
+      "failure": "Local assertion expected Nginx source in app-config archive; archive deliberately restores immutable source from the Git bundle.",
+      "deployment_failure": false,
+      "host_modified_by_check": false,
+      "correction_applied": "Compare .env to saved archive and Nginx source to the verified saved source revision.",
+      "verification_passed": true
+    },
+    "intermediate_health": {
+      "check_stage": "Before backup role/capture and reboot",
+      "checks_passed": 21,
+      "checks_total": 23,
+      "findings": {
+        "authentik_backup_fresh": "Expected before backup source setup/capture. Verify after fresh capture.",
+        "isolation_loaded": "Probe assumes IPv4/IPv6 deny rules occupy indexes 0/1. Bounded package helper inserts explicit-deny-excluding lease rules ahead of those; close empties sets. Verify empty sets and deny rules; fix probe without changing firewall policy."
+      },
+      "deployment_phases_failed": false,
+      "isolation_readback": {
+        "package_sets_empty": true,
+        "package_and_registry_receipts_absent": true,
+        "both_explicit_production_deny_rules_present": true,
+        "chain_policies_drop": true
+      }
+    },
+    "probe_correction": {
+      "exit_code": 0,
+      "sha256": "022df9031a87b179046b28b077b97b8d7e01281ce7c2749668f81d8e80f5afc2",
+      "health_probe_only": true,
+      "firewall_modified": false,
+      "clean_restore_and_publication_not_replayed": true,
+      "recorded_at": "2026-11-11T01:00:40.532761+00:00"
+    },
+    "live_candidate_verification": {
+      "checked_at": "2026-11-11T00:48:45.810545+00:00",
+      "checks_passed": 23,
+      "probe_only_correction": true,
+      "host_files_changed": false,
+      "firewall_changed": false
+    },
+    "regression_checks": {
+      "tests_passed": 6,
+      "security_bypass_negative_cases": true
+    },
+    "post_reboot_pending_alert": "Nginx error-rate alert briefly pending during the restart request window; final pending and firing alert count is zero. No threshold changed."
+  },
+  "repository_checks": {
+    "suite_revision": "c1d215747d6025f4c5035b8e8331eb9959a126ed",
+    "tests_run": 236,
+    "elapsed_seconds": 410.306,
+    "skipped": 1,
+    "failures_after_targeted_rerun": 0,
+    "initial_suite_exit_code": 1,
+    "initial_failure": "Controller NGINX_BIN was not selected; validator prerequisite assertion failed before Nginx parsing.",
+    "targeted_rerun": {
+      "exit_code": 0,
+      "test": "test_rendered_stack_and_ingress",
+      "resolution": "Select the same Nginx 1.28 container validator used by CI; no repository code changed",
+      "recorded_at": "2026-11-11T01:10:19.632735+00:00"
+    },
+    "syntax_playbooks_passed": 8,
+    "diff_check": "passed"
+  },
+  "timing": {
+    "provision_and_restore_seconds": 849.862,
+    "restore_worker_seconds": 529.602,
+    "restore_start_to_published_seconds": 1177.133,
+    "operator_wipe_and_preparation_excluded": true,
+    "continuous_alert_outage_includes_previous_failed_attempt_and_operator_wait": true,
+    "component_checks_seconds": 224.202,
+    "component_rollback_seconds": 56.798
+  },
+  "retirement": {
+    "operator_only_controller_bundles": 9,
+    "temporary_age_cannot_decrypt_active_sources": true,
+    "temporary_ssh_removed": {
+      "hou1": {
+        "users": {
+          "root": {
+            "removed": 1,
+            "other_authorizations_preserved": true
+          },
+          "dev": {
+            "removed": 1,
+            "other_authorizations_preserved": true
+          }
+        },
+        "operator_key_preserved": true,
+        "fresh_temporary_authentication_denied": true
+      },
+      "hou4": {
+        "users": {
+          "root": {
+            "removed": 1,
+            "other_authorizations_preserved": true
+          },
+          "monitor-admin": {
+            "removed": 1,
+            "other_authorizations_preserved": true
+          }
+        },
+        "operator_key_preserved": true,
+        "fresh_temporary_authentication_denied": true
+      }
+    },
+    "private_key_files_removed": 7,
+    "host_runtime_key_and_routine_job_identities_preserved": true,
+    "owner_private_identity_never_used": true,
+    "operator_kit_sha256": "8156d86a653219e99159b6feb85c637868597c99bba3d9d2b417b4e923720259"
+  },
+  "acceptance": {
+    "clean_restore_and_publication_passed": true,
+    "all_deployment_playbooks_passed_without_resume": true,
+    "read_only_probe_false_positive_fixed_after_recovery": true,
+    "earlier_failed_attempt_preserved_and_not_resumed": true,
+    "hou4_preserved": true,
+    "production_promotion_authorized": false,
+    "remaining_production_documentation": "Update final production runbook to the tested unified-backup/digest workflow under the existing documentation issue."
+  }
+}

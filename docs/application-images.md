@@ -106,10 +106,16 @@ were preserved. The temporary deployment age identity was removed. See the
 [recorded evidence](evidence/ci-image-deployment-2026-11-10.json).
 
 This first migration did not test rollback between two published CI digests.
-The clean-OS replay remains separate, and PR #61 stays dependent on PR #59.
+PR #61 stays dependent on PR #59; merge the prerequisite first and rerun checks
+after rebasing.
 
 The next [clean-host preflight](evidence/ci-image-clean-recovery-preflight-2026-11-10.json)
 verified a fresh encrypted point, remote image manifests, saved access policy and
 controller inputs. It also fixed preparation of backups taken after a prior
 restore: NetBird's saved image may use the exact recovery-lock digest. The
-clean-host restore itself remains pending.
+subsequent [clean-host run](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
+passed: 187 PostgreSQL tables restored, 13 selected authorization tables matched,
+29 isolated recovery checks passed, and reboot restored private management and
+all 23 host checks. HOU4 reconnected without re-enrollment and collected a fresh
+owner-encrypted point. This completes the test recovery gate, not production
+promotion.
