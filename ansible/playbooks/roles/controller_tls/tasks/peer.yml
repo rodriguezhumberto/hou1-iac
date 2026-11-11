@@ -1,0 +1,98 @@
+---
+- name: Require explicit controller-only renewal inputs
+  ansible.builtin.assert:
+    that:
+      - ansible_user_uid | int > 0
+      - ansible_user_id is match('^[a-z_][a-z0-9_-]{0,31}$')
+      - hou1_tls_peer_config.environment in ['test', 'production']
+      - hou1_tls_peer_jobs is mapping and hou1_tls_peer_jobs | length > 0
+      - not ansible_check_mode
+      - netbird_management_url == hou1_tls_peer_config.management_url
+      - netbird_server_group == hou1_tls_peer_config.server_group
+
+- name: Validate fixed operation identifiers before writing sudo configuration
+  ansible.builtin.assert:
+    that: item is match('^[a-z][a-z0-9-]{1,80}$')
+  loop: '{{ hou1_tls_peer_jobs.keys() | list }}'
+
+- name: Create the separate private peer runtime
+  ansible.builtin.file:
+    path: '{{ hou1_tls_peer_config.runtime }}'
+    state: directory
+    mode: '0700'
+
+- name: Read the control-plane token only during provisioning
+  netbird_token_vault:
+    path: '{{ netbird_token_vault_file }}'
+    management_url: '{{ netbird_management_url }}'
+    age_key_file: '{{ netbird_token_age_key_file }}'
+  register: renewal_peer_token
+  no_log: true
+
+- name: Provision the persistent peer and exact receiver policy
+  block:
+    - name: Require a protected provisioning token
+      ansible.builtin.assert:
+        that: renewal_peer_token.exists
+      no_log: true
+    - name: Reconcile the isolated peer with no token in process arguments or runtime files
+      ansible.builtin.command:
+        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/controller-renewal-peer.py']
+        stdin: '{{ {"config": hou1_tls_peer_config, "token": renewal_peer_token.token} | to_json }}'
+      register: renewal_peer_result
+      no_log: true
+    - name: Retain only non-secret enrollment evidence
+      ansible.builtin.copy:
+        dest: '{{ hou1_tls_peer_config.runtime }}/enrollment.json'
+        content: '{{ renewal_peer_result.stdout | from_json | to_nice_json }}'
+        mode: '0600'
+  always:
+    - name: Discard the temporary API context after provisioning
+      ansible.builtin.set_fact:
+        renewal_peer_token: {}
+        renewal_peer_result: {}
+      no_log: true
+
+- name: Install the fixed root-owned namespace launcher
+  become: true
+  block:
+    - name: Create the root-owned launcher directory
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Create protected executor configuration directory
+      ansible.builtin.file:
+        path: /etc/controller-renewal
+        state: directory
+        owner: root
+        group: root
+        mode: '0700'
+    - name: Install the isolated Python entry point
+      ansible.builtin.copy:
+        src: namespace-exec.py
+        dest: /usr/local/libexec/controller-renewal-exec
+        owner: root
+        group: root
+        mode: '0755'
+    - name: Allow only configured non-root TLS jobs in the selected namespace
+      ansible.builtin.copy:
+        dest: /etc/controller-renewal/exec.json
+        content: '{{ {"container": hou1_tls_peer_config.container, "uid": ansible_user_uid | int, "gid": ansible_user_gid | int, "jobs": hou1_tls_peer_jobs} | to_nice_json }}'
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+    - name: Limit namespace entry to exact renewal job identifiers
+      ansible.builtin.copy:
+        dest: /etc/sudoers.d/controller-renewal
+        owner: root
+        group: root
+        mode: '0440'
+        content: |
+          {% for job in hou1_tls_peer_jobs.keys() | sort %}
+          {{ ansible_user_id }} ALL=(root) NOPASSWD: /usr/local/libexec/controller-renewal-exec {{ job }}
+          {% endfor %}
+        validate: /usr/sbin/visudo -cf %s

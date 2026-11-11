@@ -4,6 +4,7 @@
     that:
       - hou1_tls_schedule_enabled is boolean
       - hou1_tls_schedule_environment in ['test', 'production']
+      - hou1_tls_executor_job_prefix == '' or hou1_tls_executor_job_prefix is match('^[a-z][a-z0-9-]{1,60}$')
 
 - name: Configure controller scheduling
   when: hou1_tls_schedule_enabled
@@ -25,7 +26,10 @@
       no_log: true
     - name: Verify private configuration and scoped SSH before changing timers
       ansible.builtin.command:
-        argv: ['{{ ansible_playbook_python }}', '{{ role_path }}/../../../../scripts/controller-tls.py', --config, '{{ hou1_tls_controller_config }}', --check-config]
+        argv: >-
+          {{ ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec', hou1_tls_executor_job_prefix ~ '-check-config']
+             if hou1_tls_executor_job_prefix else
+             [ansible_playbook_python, role_path ~ '/../../../../scripts/controller-tls.py', '--config', hou1_tls_controller_config, '--check-config'] }}
       changed_when: false
     - name: Require the persistent controller user manager
       ansible.builtin.command:

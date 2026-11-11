@@ -5,6 +5,10 @@ production certificates. DNS credentials and ACME account state stay on the
 trusted controller. HOU1 receives only certificate chains and private keys.
 The existing rehearsal helpers retain their test-only guards.
 
+If deployment access is temporary, provision a
+[separate renewal VPN peer](controller-renewal-peer.md) before retiring it.
+Its fixed namespace jobs retain the direct pinned SSH contract below.
+
 No live production issuance, delivery or alert validation is claimed by offline
 tests. Keep the production TLS gate open until the checks below pass.
 
