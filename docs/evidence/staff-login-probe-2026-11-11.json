@@ -1,0 +1,53 @@
+{
+  "recorded_at": "2026-11-11T05:58:24.133424+00:00",
+  "scope": "Environment-bound synthetic staff login and exact VPN HTTPS policy; follow-up to infrastructure #28",
+  "base_commit": "bca8624bf319f53d070f91cb2fff7f829ffc8412",
+  "companion_monitoring_commit": "468583df5d9e0400607fcee9515ff3b9a77b3b88",
+  "validation": {
+    "full_suite": {
+      "command": "NGINX_BIN=/var/tmp/hou4-nginx-tools/root/usr/sbin/nginx DNSMASQ_BIN=/var/tmp/issue-23-dnsmasq/root/usr/sbin/dnsmasq python3 -m unittest discover -s tests -v",
+      "tests": 289,
+      "skipped": 0,
+      "result": "passed",
+      "log": "/var/tmp/hou1-staff-probe-full.log"
+    },
+    "monitoring_syntax": {
+      "command": "ANSIBLE_CONFIG=ansible/ansible.cfg ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/monitoring.yml --syntax-check",
+      "result": "passed"
+    },
+    "coverage": [
+      "Real local HTTPS/cookie/redirect authorization fixture with CA and VPN-IP pinning.",
+      "Wrong issuer, insecure PKCE, external redirect, excess role and failed logout/revocation refusal.",
+      "Same-origin no-ID PATCH verifies reader denial without content writes.",
+      "Credential environment/kind and private destination guards.",
+      "Numeric failure/freshness/recovery state, including corrupt-state reset.",
+      "Real Ansible/HTTP optional HTTPS reconciliation, idempotence and no admin group changes."
+    ],
+    "companion_monitoring": {
+      "full_suite_tests": 60,
+      "skipped": 0,
+      "result": "passed",
+      "final_probe_tests": 4,
+      "native_readiness": "Old success refused; fresh success accepted.",
+      "native_alerts": "Failure, stale/missing/wrong-environment metrics, holds and recovery pass in both environments.",
+      "syntax": "passed",
+      "compose_config": "passed",
+      "pinned_interpreter_config_and_ca": "passed",
+      "callback_latency_thresholds": "unchanged"
+    }
+  },
+  "source_sha256": {
+    "scripts/staff-login-probe.py": "ba312e199953708fff0548540650b4f267bbb45dce9b6916043463e9c88336d3",
+    "ansible/playbooks/filter_plugins/netbird_policies.py": "b8e1190c8a1ab8d07f29855a24c430f1ba8606fd9db0ac02983101f681235cfe",
+    "ansible/playbooks/roles/monitoring_exporter/tasks/policy.yml": "6c88d79e9eb4d0f7cbdae47bb271abed150c97fb47fdfe81e2154fb72e649876"
+  },
+  "live_deployment_performed": false,
+  "production_gate_cleared": false,
+  "remaining": [
+    "Provision environment-specific synthetic reader and separate SOPS credentials.",
+    "Enable exact HTTPS policy and HOU4 probe using scoped controller access.",
+    "Record live fresh login, protected read/reader denial/logout, private scrape and public/unrelated-peer denial.",
+    "Prove Discord firing and resolved delivery.",
+    "Verify human Google login separately; local synthetic login does not prove Google exchange."
+  ]
+}

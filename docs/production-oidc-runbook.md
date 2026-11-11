@@ -257,7 +257,13 @@ The dashboard is **HOU1 Operations**; metrics travel over the VPN, with HOU4 the
 only metrics source allowed by policy. Discord is the current receiver. Record
 actual target/rule IDs and verify firing **and resolved** delivery; HTTP
 acknowledgment proves Discord acceptance, not that a person read the message.
-Use synthetic accounts, not real Google passwords, for automated login probes.
+Use the optional [environment-bound synthetic reader probe](staff-login-probe.md)
+with a separate SOPS credential bundle. Its code and companion HOU4 rules are
+checked offline; provisioning the selected identity, enabling private TCP/443,
+and proving fresh login plus Discord firing/resolution remain live gates. The
+probe covers local Authentik login, reader enforcement and logout; independently
+verify a human Google login and VPN connection. Deployment requires a fresh probe
+success after container reconciliation. Never use real Google passwords in it.
 
 | Signal | Current rule / stop threshold to validate in production |
 | --- | --- |

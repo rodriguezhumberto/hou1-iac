@@ -60,3 +60,31 @@
     - name: Require exact policy contents and membership after reconciliation
       ansible.builtin.assert:
         that: not (hou1_metrics_groups.json | netbird_monitoring_plan(hou1_monitoring_api.results[1].json, hou1_metrics_policies.json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group)).policy.changed
+
+    - name: Plan optional HTTPS access using only the two exact metrics peers
+      ansible.builtin.set_fact:
+        hou1_probe_policy: '{{ hou1_metrics_groups.json | netbird_staff_probe_plan(hou1_monitoring_api.results[1].json, hou1_metrics_policies.json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group, hou1_staff_probe_enabled | default(false)) }}'
+
+    - name: Reconcile only the marked single-port staff probe policy
+      ansible.builtin.uri:
+        url: '{{ netbird_api_url }}/api/policies{{ "/" ~ hou1_probe_policy.id if hou1_probe_policy.id else "" }}'
+        headers: '{{ netbird_api_headers }}'
+        method: '{{ "PUT" if hou1_probe_policy.id else "POST" }}'
+        body_format: json
+        body: '{{ hou1_probe_policy.body }}'
+        status_code: 200
+      when: hou1_probe_policy is not none and hou1_probe_policy.changed
+      changed_when: true
+
+    - name: Read back the optional staff probe policy
+      ansible.builtin.uri:
+        url: '{{ netbird_api_url }}/api/policies'
+        headers: '{{ netbird_api_headers }}'
+        status_code: 200
+      register: hou1_probe_policies
+      when: hou1_probe_policy is not none
+
+    - name: Require exact optional HTTPS policy readback
+      ansible.builtin.assert:
+        that: not (hou1_metrics_groups.json | netbird_staff_probe_plan(hou1_monitoring_api.results[1].json, hou1_probe_policies.json, hou1_monitoring_peer_ip, netbird_ip, netbird_subnet, netbird_server_group, hou1_staff_probe_enabled | default(false))).changed
+      when: hou1_probe_policy is not none
