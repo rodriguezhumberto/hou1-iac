@@ -15,17 +15,18 @@ The bootstrap utility uses the Authentik API and only reconciles the named
 groups, users, property mappings, providers, and applications in the selected
 manifest. It never deletes or rewrites unrelated identities. Re-running it is
 idempotent. `authentik_identity_profiles` in inventory defines the public issuer,
-management endpoint, subnet, client IDs, callback/logout lists, and Compose
-selectors. One shared manifest template consumes the selected profile; bootstrap
+management endpoint, subnet, callback/logout lists, and Compose selectors.
+Organization-specific client, application, group and scope-mapping names come
+from the matching SOPS-encrypted `identity-names-<environment>.enc.json` bundle. One shared manifest template consumes the selected profile; bootstrap
 and admission share its validator. The default profiles are:
 
 | environment | staff client/audience | NetBird client/audience |
 | --- | --- | --- |
-| test | `pearland-paws-staff-test` | `netbird-test` |
-| prod | `pearland-paws-staff` | `netbird-prod` |
+| test | From the encrypted naming bundle | `netbird-test` |
+| prod | From the encrypted naming bundle | `netbird-prod` |
 
-Override deployment values in the inventory profile, rather than editing Python
-or maintaining a second manifest template. Keep test/production clients, domains,
+Override public deployment values in the inventory profile. Edit identity names
+only through SOPS; do not add them to inventory, examples or source code. Keep test/production clients, domains,
 certificates and SOPS secrets separate. The role checks that its Compose selector
 matches its deployment path. Client/provider/application identifiers use the
 configured client ID; other naming conventions are not enforced in Python.
@@ -75,7 +76,8 @@ ansible-playbook -i ansible/inventory/inventory.yml \
   -e identity_profile_output=/private/identity-prod.json --ask-vault-pass
 ```
 
-The exported profile contains no account allowlist, roles, OAuth secret or token.
+The exported profile contains no organization-specific client or application name,
+role-group names, scope-mapping names, account allowlist, OAuth secret or token.
 Treat it as trusted deployment configuration and protect it from modification;
 the command does not accept a profile embedded in the encrypted admission file
 as its expected destination. Refresh the export after inventory changes.
@@ -83,8 +85,26 @@ as its expected destination. Refresh the export after inventory changes.
 ```bash
 python3 scripts/rehearsal-netbird-admission.py \
   --profile /private/identity-prod.json \
+  --identity-secrets ansible/secrets/identity-names-prod.enc.json \
   --config /private/admission-prod.enc.json --age-key-file /private/scoped-age-key
 ```
+
+The role decrypts the naming bundle on the managed host into memory, suppresses
+its output, and retains only ciphertext alongside the deployment for recovery.
+The controller command decrypts the same bundle in memory with its scoped age
+identity. Its `IDENTITY_NAMES` object contains:
+
+- `environment`, matching the selected profile.
+- `staff.client_id` and `staff.application_name`.
+- `role_groups.reader`, `role_groups.editor`, and `role_groups.admin`.
+- `scope_mapping_names.profile`, `.groups`, and `.audience`.
+
+The committed bundles preserve the existing identity names and are encrypted
+only to the owner's age recipient. A temporary deployment recipient must be
+granted access to copies of these bundles alongside the other deployment secrets.
+Missing or mismatched naming inputs fail closed; there is no plaintext default.
+Keep existing values during this cleanup: changing a client or group name is
+a separate identity migration requiring coordinated application configuration.
 
 The SOPS-encrypted admission configuration retains its environment and destination
 bindings. They must exactly match the independently exported profile; mismatches

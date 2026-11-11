@@ -101,9 +101,10 @@ authentik_backup_age_recipient: ''
 authentik_bootstrap_enabled: false
 authentik_staff_users: []
 authentik_google_enabled: false
+authentik_identity_secret_source: "{{ playbook_dir }}/../secrets/identity-names-{{ authentik_environment }}.enc.json"
 
 # Public deployment identity. Shared bootstrap/admission code consumes a selected
-# profile; account allowlists, assignments and OAuth secrets remain in SOPS.
+# profile; organization identity names, allowlists and OAuth secrets stay in SOPS.
 authentik_identity_profiles:
   test:
     environment: test
@@ -114,8 +115,6 @@ authentik_identity_profiles:
     compose_file: "{{ authentik_project_root_base }}/test/compose.yaml"
     compose_service: authentik-server
     staff:
-      client_id: pearland-paws-staff-test
-      application_name: Pearland Paws Staff Test
       redirect_uris: ["https://staff-test.{{ primary_domain }}/api/staff/oidc/callback"]
       logout_uris: ["https://staff-test.{{ primary_domain }}/staff/login"]
     netbird:
@@ -136,8 +135,6 @@ authentik_identity_profiles:
     compose_file: "{{ authentik_project_root_base }}/prod/compose.yaml"
     compose_service: authentik-server
     staff:
-      client_id: pearland-paws-staff
-      application_name: Pearland Paws Staff
       redirect_uris: ["https://staff.{{ primary_domain }}/api/staff/oidc/callback"]
       logout_uris: ["https://staff.{{ primary_domain }}/staff/login"]
     netbird:

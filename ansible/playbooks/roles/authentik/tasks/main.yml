@@ -118,6 +118,34 @@
         authentik_decrypted: "{{ authentik_decrypted_file.content | b64decode | from_yaml }}"
       no_log: true
 
+    - name: Load the encrypted organization naming contract for identity bootstrap
+      when: authentik_bootstrap_enabled | bool
+      no_log: true
+      block:
+        - name: Copy the owner-encrypted naming bundle for deployment and recovery
+          ansible.builtin.copy:
+            src: "{{ authentik_identity_secret_source }}"
+            dest: "{{ authentik_project_root }}/identity-names.enc.json"
+            owner: root
+            group: root
+            mode: '0600'
+
+        - name: Decrypt identity names into memory only
+          ansible.builtin.command:
+            argv: [sops, --decrypt, --output-type, json, "{{ authentik_project_root }}/identity-names.enc.json"]
+          environment:
+            SOPS_AGE_KEY_FILE: "{{ authentik_age_key_file }}"
+          register: authentik_private_identity_names
+          changed_when: false
+
+        - name: Merge the private naming contract into bootstrap inputs
+          ansible.builtin.set_fact:
+            authentik_decrypted: "{{ authentik_decrypted | combine(authentik_private_identity_names.stdout | from_json) }}"
+
+        - name: Require the naming bundle to match the selected environment
+          ansible.builtin.assert:
+            that: authentik_decrypted.IDENTITY_NAMES.environment == authentik_environment
+
     - name: Map environment secrets to deployment inputs
       ansible.builtin.set_fact:
         authentik_secret_key: "{{ authentik_decrypted.AUTHENTIK_SECRET_KEY }}"
@@ -134,6 +162,8 @@
           - authentik_postgres_password | length >= 32
           - staff_oidc_client_secret | length >= 32
           - netbird_oidc_client_secret | length >= 32
+          - not (authentik_bootstrap_enabled | bool) or authentik_decrypted.IDENTITY_NAMES is defined
+          - not (authentik_bootstrap_enabled | bool) or authentik_decrypted.IDENTITY_NAMES.environment == authentik_environment
         fail_msg: The decrypted secret set is incomplete or contains short values.
       no_log: true
 
@@ -380,6 +410,7 @@
         STAFF_OIDC_CLIENT_SECRET: "{{ staff_oidc_client_secret }}"
         NETBIRD_OIDC_CLIENT_SECRET: "{{ netbird_oidc_client_secret }}"
         GOOGLE_OAUTH_CLIENT_SECRET: "{{ authentik_decrypted.GOOGLE_OAUTH_CLIENT_SECRET | default('') }}"
+        AUTHENTIK_IDENTITY_NAMES: "{{ authentik_decrypted.IDENTITY_NAMES | to_json }}"
       register: authentik_bootstrap_result
       changed_when: true
   always:

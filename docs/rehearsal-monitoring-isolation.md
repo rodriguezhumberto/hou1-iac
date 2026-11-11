@@ -81,6 +81,7 @@ Google source and its verified-email policy:
 ```bash
 python3 scripts/rehearsal-netbird-admission.py \
   --profile <inventory-profile.json> \
+  --identity-secrets ansible/secrets/identity-names-test.enc.json \
   --config <private-admission.enc.json> --age-key-file <private-age-identity>
 ```
 

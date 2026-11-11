@@ -52,7 +52,7 @@ def unique(items, key, value):
     return matches[0]
 
 
-STAFF_ROLES = {role: 'pearland-paws-staff-' + role for role in ('reader', 'editor', 'admin')}
+STAFF_ROLES = ('reader', 'editor', 'admin')
 
 
 def deployment_profile(config, profile):
@@ -77,13 +77,13 @@ def auth_results(auth, path):
     return result['results']
 
 
-def configure_staff_access(assignments, users, provider, auth, netbird):
+def configure_staff_access(assignments, users, provider, auth, netbird, role_groups):
     """Keep network staff access separate from application privilege."""
     if not assignments:
         return {'staff_users_configured': 0, 'staff_users_awaiting_first_login': 0}
     staff = unique(netbird('GET', '/groups'), 'name', 'staff')
     groups = auth_results(auth, 'core/groups/?page_size=1000')
-    role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in STAFF_ROLES.items()}
+    role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in role_groups.items()}
     peers = netbird('GET', '/peers')
     nb_users = netbird('GET', '/users')
     configured = waiting = 0
@@ -229,7 +229,7 @@ def configure(config, auth, netbird, profile):
             if updated.get('pending_approval') or updated.get('is_blocked') or updated.get('role') != 'user':
                 raise ValueError('Allowlisted pending user did not become a regular active user')
             approved += 1
-    staff_report = configure_staff_access(assignments, users, provider, auth, netbird)
+    staff_report = configure_staff_access(assignments, users, provider, auth, netbird, profile['role_groups'])
     return {**staff_report, 'environment': profile['environment'], 'application_policy_checks': len(users),
             'google_policy_checks': source_checks, 'manual_approval_required': False,
             'existing_allowlisted_pending_users_reconciled': approved}
@@ -257,12 +257,15 @@ def load_encrypted_config(path, age_key_file=None):
 def main():
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument('--config', required=True)
+    p.add_argument('--identity-secrets', required=True, help='SOPS Authentik bundle containing IDENTITY_NAMES')
     p.add_argument('--profile', required=True, help='Public JSON exported from the selected Ansible inventory')
     p.add_argument('--age-key-file', help='Age identity for config decryption (or SOPS_AGE_KEY_FILE)')
     args = p.parse_args()
     c = load_encrypted_config(args.config, args.age_key_file)
     with open(args.profile, encoding='utf-8') as stream:
-        profile = deployment_profile(c, json.load(stream))
+        public_profile = json.load(stream)
+    names = load_encrypted_config(args.identity_secrets, args.age_key_file)['IDENTITY_NAMES']
+    profile = deployment_profile(c, identity.resolve_profile(public_profile, names))
     token = load_encrypted_config(c['netbird_token_file'], c['age_key_file'])
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')

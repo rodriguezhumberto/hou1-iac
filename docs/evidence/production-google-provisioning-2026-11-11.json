@@ -1,20 +1,25 @@
 {
-  "recorded_at": "2026-11-11T02:45:32.850764+00:00",
+  "recorded_at": "2026-11-11T03:12:27.731424+00:00",
   "issue": "https://github.com/rodriguezhumberto/hou1-iac/issues/23",
   "scope": "Production Google source, admission, and explicit staff/VPN assignments",
   "base_ref": "552446c9eb846531397875d9f6fca89f0f04d078",
   "validation": {
     "focused_identity_tests": {
-      "tests_run": 43,
-      "result": "passed as part of the full suite"
+      "tests_run": 46,
+      "result": "passed after correcting fixture ownership",
+      "bootstrap_log_sha256": "a493a04820d911811adece747c41bdaecf0fd52db1aa070bd59d50aa19b9b339",
+      "admission_log_sha256": "a519d367798c29303f357465879e145560909afd69079f82001c21db17f7a892"
     },
     "repository_tests": {
       "command": "NGINX_BIN=<local nginx binary> DNSMASQ_BIN=<local dnsmasq binary> python3 -m unittest discover -s tests -v",
-      "tests_run": 253,
-      "duration_seconds": 429.315,
-      "result": "passed",
+      "tests_run": 256,
+      "passed": 255,
+      "failed": 1,
       "skipped": 0,
-      "log_sha256": "39a1194b778f9f278a6ea84c82dbc2ebdc4fa6131cead535eba6566a39e404fc"
+      "result": "One local fixture ownership failure, corrected and verified by the full 46-test identity rerun; final CI rerun pending",
+      "failure": "test_role_loads_private_names_without_plaintext_files_or_logged_values (test_authentik_bootstrap.AuthentikBootstrapTest.test_role_loads_private_names_without_plaintext_files_or_logged_values)",
+      "correction": "Use current UID/GID only in the local fixture; production root ownership is unchanged",
+      "log_sha256": "3c7bb15473a2e09edc4cea704cb36e243d2587e2750439a8fe9248edad9482e8"
     },
     "ansible_syntax_checks": [
       {
@@ -58,7 +63,10 @@
         "exit_code": 0
       }
     ],
-    "git_diff_check": "passed"
+    "git_diff_check": "passed",
+    "plaintext_organization_names_in_pr_additions": 0,
+    "naming_bundle_recipients": "Owner only; no controller recipient added",
+    "existing_runtime_names": "Preserved from the baseline manifests before encryption; no live identity renames performed"
   },
   "fixture_api_checks": [
     "Production Google bootstrap is idempotent and preserves the local emergency administrator",
@@ -74,23 +82,31 @@
     "The role uses the configured Compose project and rejects a mismatched Compose file path",
     "Compose service discovery rejects missing, invalid or multiple container IDs without an exec fallback",
     "The CLI requires an independently exported profile and an endpoint-matched encrypted token",
-    "Production fixtures remain forbidden regardless of profile settings"
+    "Production fixtures remain forbidden regardless of profile settings",
+    "Organization identity names are absent from public profile exports and new plaintext source",
+    "Naming bundles encrypt every identifier to the owner age recipient",
+    "The role loads names into memory without plaintext files or logged values and rejects a different environment",
+    "Bootstrap verifies client, group and scope-mapping identities against the private naming contract"
   ],
   "live_production_validation": false,
   "live_hosts_changed": false,
   "remaining_identity_gate": "Supply the separate production Google client/secrets, validate Google egress, and prove live admission, first-login reconciliation, roles and VPN reachability.",
-  "previous_head_ref": "5bb621cdebe090c40f410fd94bb9397d361c809f",
+  "previous_head_ref": "c67a708c20c7737851b1b0127f2585e3b237b8af",
   "profile_source": "ansible/inventory/group_vars/all/vars.yml: authentik_identity_profiles",
   "validation_source_sha256": {
-    "ansible/inventory/group_vars/all/vars.yml": "709ebfba4f0b4d5215a06d2a8160aa5237ca8ab62f228b387ce563c04593d08e",
+    "ansible/inventory/group_vars/all/vars.yml": "53e80450eea7cffa4edbdaaeed5e284eb4fcad6ad568f5c02d112a3945a61a35",
     "ansible/playbooks/authentik-bootstrap.yml": "fb0d82c98b3b4c0478cad7617d5f2513751269824305d984843d50ace0d7b88d",
     "ansible/playbooks/export-identity-profile.yml": "fd55d5fea1a0e5c529c92a8e7f6631307fac8ea599b44c33ae0ae8b82ccc1e3c",
-    "ansible/playbooks/roles/authentik/files/bootstrap.py": "b88db699e259f37772ece2ec674fb7e77927a3c00089677979b5d07074d626bd",
-    "ansible/playbooks/roles/authentik/tasks/main.yml": "76944707be0e37bfec0bb92d7cd0ef1836fe3de670f8518b84561bcc54b33efb",
-    "ansible/playbooks/roles/authentik/templates/bootstrap.json.j2": "f14bb786fa6b7e4ba742dd8e5b1c7296c4c9c9fed36346a8826c5e8d58945539",
-    "scripts/rehearsal-netbird-admission.py": "7c631cf759127ab91e4c635d3034da50d0aa361f48af51d66e81f5c87bb7a72e",
-    "tests/test_authentik_bootstrap.py": "cffac5a553023b4eaa8115f2268317684226a435a6820eccbdf8b9f7ba9ed910",
-    "tests/test_netbird_admission.py": "137e23864036f71066a87ceb1d6838a173915061e8da5a233f2b1b397fe9ec0d",
-    "tests/identity_fixtures.py": "03f36da40cd52f14e1ae9d9cf3a0946e41a81d8e796aec166868a929a588c873"
-  }
+    "ansible/playbooks/roles/authentik/files/bootstrap.py": "3f16cc46c50b26bd06105413a9e44f6fd7b0d56feaf92e72db54769b81782ef0",
+    "ansible/playbooks/roles/authentik/tasks/main.yml": "c947dbdc097524795dd2ef3aa51a27ae58ddf623e8a488948b7d577cd8fb4bc1",
+    "ansible/playbooks/roles/authentik/templates/bootstrap.json.j2": "606771bfb6f15dfd0f341c083b41b173e13c45ad69300662af5c2e8cf2951067",
+    "scripts/rehearsal-netbird-admission.py": "ff745112c4078542554dc7e7db84f3dde0b579e056c53adcaceda42c856b2ed7",
+    "tests/test_authentik_bootstrap.py": "3259a067442d4496977b073bd992576814cc1e0aa992908400c9b9fb88c18802",
+    "tests/test_netbird_admission.py": "e7efcfa9804e3a278af6ec2e83c00b947b03fee5e221e1a5823823470d34ebf4",
+    "tests/identity_fixtures.py": "1b1bc48faf3ace0924e64bd2aa77ff77ae7a619ce5bfad8fd7f0f893984fd6e0",
+    ".sops.yaml": "bf134fb1971e6e0448f19977ef26c5b63643d13ad11570669ce42b9ea5a7beac",
+    "ansible/secrets/identity-names-test.enc.json": "2f7ac1f257a8de66d6d1ba738a240482d6b0d21f2a18c9861421635c570d3c0b",
+    "ansible/secrets/identity-names-prod.enc.json": "c03150a5797e8855d66c23b7516a2c077a6c9e9d222b4e69357070231a598748"
+  },
+  "identity_name_source": "Owner-encrypted SOPS bundles, merged in memory with public inventory profiles"
 }

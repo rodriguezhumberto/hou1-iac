@@ -14,7 +14,7 @@ import textwrap
 import unittest
 from unittest.mock import patch
 from contextlib import redirect_stdout
-from identity_fixtures import identity_profile
+from identity_fixtures import identity_profile, identity_names
 
 SPEC = importlib.util.spec_from_file_location('admission', Path(__file__).resolve().parents[1] / 'scripts/rehearsal-netbird-admission.py')
 m = importlib.util.module_from_spec(SPEC)
@@ -32,7 +32,8 @@ class EncryptedConfigTest(unittest.TestCase):
         recipient = subprocess.run(['age-keygen', '-y', str(self.key)],
                                    check=True, capture_output=True, text=True).stdout.strip()
         self.config = {'environment': 'test', 'google_emails': ['private@example.invalid'],
-                       'staff_users': [{'email': 'private@example.invalid', 'role': 'admin'}]}
+                       'staff_users': [{'email': 'private@example.invalid', 'role': 'admin'}],
+                       'IDENTITY_NAMES': identity_names('test')}
         self.encrypted = self.root / 'admission.enc.json'
         result = subprocess.run(['sops', '--encrypt', '--config', '/dev/null', '--age', recipient,
                                  '--input-type', 'json', '--output-type', 'json', '/dev/stdin'],
@@ -42,7 +43,10 @@ class EncryptedConfigTest(unittest.TestCase):
     def test_real_sops_round_trip_hides_emails_and_roles_and_supports_environment_key(self):
         ciphertext = self.encrypted.read_text()
         self.assertNotIn('private@example.invalid', ciphertext)
-        self.assertNotIn('"admin"', ciphertext)
+        self.assertTrue(json.loads(ciphertext)['staff_users'][0]['role'].startswith('ENC[AES256_GCM,'))
+        for section in ('staff', 'role_groups', 'scope_mapping_names'):
+            for name in self.config['IDENTITY_NAMES'][section].values():
+                self.assertNotIn(name, ciphertext)
         self.assertEqual(m.load_encrypted_config(self.encrypted, self.key), self.config)
         with patch.dict(os.environ, {'SOPS_AGE_KEY_FILE': str(self.key)}):
             self.assertEqual(m.load_encrypted_config(self.encrypted), self.config)
@@ -275,13 +279,14 @@ class ProductionAdmissionTest(AdmissionTest):
         temp = tempfile.TemporaryDirectory()
         self.addCleanup(temp.cleanup)
         profile_file = Path(temp.name) / 'profile.json'
-        profile_file.write_text(json.dumps(self.profile))
-        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--age-key-file', '/private/scoped.key']), \
-                patch.object(m, 'load_encrypted_config', side_effect=[config, token]) as decrypt, \
+        profile_file.write_text(json.dumps(identity_profile('prod', private=False)))
+        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml', '--age-key-file', '/private/scoped.key']), \
+                patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]) as decrypt, \
                 patch.object(m, 'configure', side_effect=configure), \
                 patch.object(m.subprocess, 'run', side_effect=[SimpleNamespace(stdout='a' * 64), SimpleNamespace(stdout='{}')]) as run, redirect_stdout(output):
             m.main()
-        self.assertEqual(decrypt.call_args_list[1].args, ('token.enc.json', '/private/scoped.key'))
+        self.assertEqual(decrypt.call_args_list[1].args, ('auth.enc.yaml', '/private/scoped.key'))
+        self.assertEqual(decrypt.call_args_list[2].args, ('token.enc.json', '/private/scoped.key'))
         discovery = run.call_args_list[0].args[0][-1]
         self.assertIn('docker compose -p ' + self.profile['compose_project'], discovery)
         self.assertIn('-f ' + self.profile['compose_file'], discovery)
@@ -292,15 +297,15 @@ class ProductionAdmissionTest(AdmissionTest):
         self.assertNotIn(token['netbird_api_token'], str(command) + output.getvalue())
         for container in ('', 'not-a-container-id', 'a' * 64 + '\n' + 'b' * 64):
             with self.subTest(container=container), \
-                    patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file)]), \
-                    patch.object(m, 'load_encrypted_config', side_effect=[config, token]), \
+                    patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml']), \
+                    patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]), \
                     patch.object(m.subprocess, 'run', return_value=SimpleNamespace(stdout=container)) as run:
                 with self.assertRaisesRegex(ValueError, 'exactly one running'):
                     m.main()
                 self.assertEqual(run.call_count, 1)
         token['netbird_management_url'] = 'https://netbird-test.example.invalid'
-        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file)]), \
-                patch.object(m, 'load_encrypted_config', side_effect=[config, token]), \
+        with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml']), \
+                patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]), \
                 patch.object(m, 'configure') as configure, patch.object(m.subprocess, 'run') as run:
             with self.assertRaisesRegex(ValueError, 'different NetBird deployment'):
                 m.main()
@@ -320,7 +325,7 @@ class StaffAccessTest(unittest.TestCase):
 
         def auth(method, path, body=None):
             if path.startswith('core/groups/?'):
-                return {'results': [{'pk': role, 'name': name} for role, name in m.STAFF_ROLES.items()]}
+                return {'results': [{'pk': role, 'name': name} for role, name in identity_names()['role_groups'].items()]}
             if path == 'core/users/7/':
                 if method == 'PATCH': user.update(body);updates.append(('auth', copy.deepcopy(body)))
                 return copy.deepcopy(user)
@@ -337,7 +342,7 @@ class StaffAccessTest(unittest.TestCase):
                 return nb_user
             raise AssertionError((method, path))
 
-        args = ([{'email': user['email'], 'role': 'admin'}], [user], {'id': 'connector'}, auth, netbird)
+        args = ([{'email': user['email'], 'role': 'admin'}], [user], {'id': 'connector'}, auth, netbird, identity_names()['role_groups'])
         report = m.configure_staff_access(*args)
         self.assertEqual(report, {'staff_users_configured': 1, 'staff_users_awaiting_first_login': 0})
         self.assertEqual(user['groups'], ['admin', 'unrelated'])
@@ -351,10 +356,10 @@ class StaffAccessTest(unittest.TestCase):
     def test_unknown_identity_waits_without_granting_any_role_or_network_access(self):
         def auth(method, path, body=None):
             self.assertEqual(method, 'GET')
-            return {'results': [{'pk': r, 'name': n} for r, n in m.STAFF_ROLES.items()]}
+            return {'results': [{'pk': r, 'name': n} for r, n in identity_names()['role_groups'].items()]}
         def netbird(method, path, body=None):
             self.assertEqual(method, 'GET')
             return [{'id': 'staff', 'name': 'staff'}] if path == '/groups' else []
-        result = m.configure_staff_access([{'email': 'new@gmail.com', 'role': 'reader'}], [], {'id': 'connector'}, auth, netbird)
+        result = m.configure_staff_access([{'email': 'new@gmail.com', 'role': 'reader'}], [], {'id': 'connector'}, auth, netbird, identity_names()['role_groups'])
         self.assertEqual(result['staff_users_awaiting_first_login'], 1)
         self.assertEqual(result['staff_users_configured'], 0)

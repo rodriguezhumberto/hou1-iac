@@ -1,7 +1,10 @@
 from pathlib import Path
 import json
 import importlib.util
+import os
 import py_compile
+import shutil
+import subprocess
 import unittest
 from unittest.mock import patch
 from functools import partial
@@ -13,7 +16,7 @@ import yaml
 
 from jinja2 import Environment
 from helpers import run_play
-from identity_fixtures import identity_profile, identity_manifest
+from identity_fixtures import identity_profile, identity_manifest, identity_names
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLE = ROOT / 'ansible/playbooks/roles/authentik'
@@ -227,7 +230,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
                 'authentik_bootstrap_enabled': True, 'authentik_project_root': directory,
                 'authentik_bootstrap_base_url': 'http://127.0.0.1:1', 'authentik_environment': 'test',
                 'authentik_bootstrap_token': secret, 'staff_oidc_client_secret': secret,
-                'netbird_oidc_client_secret': secret, 'authentik_decrypted': {},
+                'netbird_oidc_client_secret': secret, 'authentik_decrypted': {'IDENTITY_NAMES': identity_names()},
             }, [{'block': [task], 'rescue': [{'ansible.builtin.set_fact': {'bootstrap_failed': True}}]},
                 {'ansible.builtin.assert': {'that': 'bootstrap_failed | default(false)'}}])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -269,7 +272,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
         self.assertEqual(len(api.writes), count)
         self.assertEqual(api.objects['core/users'], [emergency])
         self.assertEqual({p['client_id'] for p in api.objects['providers/oauth2']},
-                         {'netbird-prod', 'pearland-paws-staff'})
+                         {'netbird-prod', 'fixture-staff-prod'})
         source = api.objects['sources/oauth'][0]
         self.assertTrue(source['enabled'])
         self.assertEqual(source['consumer_secret'], secrets['GOOGLE_OAUTH_CLIENT_SECRET'])
@@ -341,15 +344,84 @@ class AuthentikBootstrapTest(unittest.TestCase):
                 result = run_play({'primary_domain': 'example.invalid', 'deploy_environment': environment,
                                    'identity_profile_output': str(output)}, playbook['tasks'])
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                self.assertEqual(json.loads(output.read_text()), identity_profile(environment))
+                self.assertEqual(json.loads(output.read_text()), identity_profile(environment, private=False))
                 self.assertEqual(output.stat().st_mode & 0o777, 0o600)
                 self.assertNotIn('google_emails', output.read_text())
                 self.assertNotIn('staff_users', output.read_text())
+                for value in identity_names(environment)['staff'].values():
+                    self.assertNotIn(value, output.read_text())
+                self.assertNotIn('scope_mapping_names', output.read_text())
+                self.assertNotIn('role_groups', output.read_text())
             output.unlink()
             result = run_play({'primary_domain': 'example.invalid', 'deploy_environment': 'unknown',
                                'identity_profile_output': str(output)}, playbook['tasks'])
             self.assertNotEqual(result.returncode, 0)
             self.assertFalse(output.exists())
+
+    def test_names_resolve_only_from_the_matching_private_contract(self):
+        public = identity_profile('prod', private=False)
+        resolved = bootstrap.resolve_profile(public, identity_names('prod'))
+        self.assertEqual(resolved, identity_profile('prod'))
+        self.assertNotIn('client_id', public['staff'])
+        self.assertNotIn('role_groups', public)
+        with self.assertRaises(ValueError):
+            bootstrap.resolve_profile(public, identity_names('test'))
+        with self.assertRaises(ValueError):
+            bootstrap.resolve_profile(resolved, identity_names('prod'))
+        for key in ('role_groups', 'scope_mapping_names'):
+            names = identity_names('prod')
+            names[key] = {}
+            with self.subTest(key=key), self.assertRaises(ValueError):
+                bootstrap.resolve_profile(public, names)
+        for target in ('group', 'scope'):
+            manifest = identity_manifest('prod')
+            if target == 'group':
+                manifest['groups'][0]['name'] = 'an-unexpected-group'
+            else:
+                manifest['scope_mappings'][0]['name'] = 'an-unexpected-mapping'
+            with self.subTest(target=target), self.assertRaises(ValueError):
+                bootstrap.validate_manifest(manifest, 'prod', resolved)
+
+    def test_committed_naming_bundles_encrypt_every_identity_value_to_the_owner(self):
+        rules = yaml.safe_load((ROOT / '.sops.yaml').read_text())['creation_rules']
+        owner = next(rule['age'] for rule in rules if 'identity-names-' in rule['path_regex'])
+        for environment in ('test', 'prod'):
+            bundle = json.loads((ROOT / f'ansible/secrets/identity-names-{environment}.enc.json').read_text())
+            self.assertEqual([entry['recipient'] for entry in bundle['sops']['age']], [owner])
+            names = bundle['IDENTITY_NAMES']
+            self.assertTrue(names['environment'].startswith('ENC[AES256_GCM,'))
+            for section in ('staff', 'role_groups', 'scope_mapping_names'):
+                self.assertTrue(all(value.startswith('ENC[AES256_GCM,') for value in names[section].values()))
+
+    @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age binaries required')
+    def test_role_loads_private_names_without_plaintext_files_or_logged_values(self):
+        deployment = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text()) if 'block' in t)
+        task = next(t for t in deployment['block'] if t['name'] == 'Load the encrypted organization naming contract for identity bootstrap')
+        # The production role runs as root; these disposable fixtures use the
+        # current test user while exercising the real copy/decrypt/merge tasks.
+        task['block'][0]['ansible.builtin.copy'].update(owner=str(os.getuid()), group=str(os.getgid()))
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            key, encrypted, project = root / 'key', root / 'names.enc.json', root / 'deployment'
+            project.mkdir()
+            subprocess.run(['age-keygen', '-o', str(key)], check=True, capture_output=True)
+            recipient = subprocess.check_output(['age-keygen', '-y', str(key)], text=True).strip()
+            for environment in ('test', 'prod'):
+                names = identity_names(environment)
+                result = subprocess.run(['sops', '--encrypt', '--config', '/dev/null', '--age', recipient,
+                                         '--input-type', 'json', '--output-type', 'json', '/dev/stdin'],
+                                        input=json.dumps({'IDENTITY_NAMES': names}), text=True, capture_output=True, check=True)
+                encrypted.write_text(result.stdout)
+                result = run_play({'authentik_environment': 'test', 'authentik_bootstrap_enabled': True,
+                                   'authentik_identity_secret_source': str(encrypted),
+                                   'authentik_project_root': str(project), 'authentik_age_key_file': str(key),
+                                   'authentik_decrypted': {}}, [task])
+                self.assertEqual(result.returncode == 0, environment == 'test', result.stdout + result.stderr)
+                self.assertNotIn(names['staff']['client_id'], result.stdout + result.stderr)
+                self.assertNotIn(names['staff']['application_name'], result.stdout + result.stderr)
+                self.assertEqual([p.name for p in project.iterdir()], ['identity-names.enc.json'])
+                self.assertEqual(json.loads((project / 'identity-names.enc.json').read_text())['IDENTITY_NAMES'],
+                                 json.loads(encrypted.read_text())['IDENTITY_NAMES'])
 
     def test_role_uses_configured_project_and_rejects_a_different_compose_path(self):
         tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())[:2]
@@ -415,13 +487,13 @@ class AuthentikBootstrapTest(unittest.TestCase):
         for environment in ['test', 'prod']:
             manifest = identity_manifest(environment)
             user = SimpleNamespace(name='Reader', username='reader', ak_groups=SimpleNamespace(all=lambda: [
-                SimpleNamespace(name='pearland-paws-staff-reader'), SimpleNamespace(name='unrelated-admin')]))
+                SimpleNamespace(name='fixture-staff-reader'), SimpleNamespace(name='unrelated-admin')]))
             claims = []
             for mapping in manifest['scope_mappings']:
                 namespace = {'user': user, 'provider': SimpleNamespace(client_id=manifest['staff']['client_id'])}
                 exec('def evaluate():\n    ' + mapping['expression'], namespace)
                 claims.append(namespace['evaluate']())
-            self.assertEqual([claim['groups'] for claim in claims if 'groups' in claim], [['pearland-paws-staff-reader']])
+            self.assertEqual([claim['groups'] for claim in claims if 'groups' in claim], [['fixture-staff-reader']])
             self.assertEqual([claim['aud'] for claim in claims if 'aud' in claim], [manifest['staff']['client_id']])
 
     def test_bootstrap_script_is_valid_and_api_reconciliation_is_idempotent(self):

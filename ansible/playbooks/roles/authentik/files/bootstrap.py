@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Idempotently apply the environment-specific Authentik identity contract."""
 import argparse
+import copy
 import json
 import ipaddress
 import os
@@ -97,6 +98,28 @@ def validate_profile(profile):
     return profile
 
 
+def resolve_profile(public_profile, names):
+    """Merge organization identifiers from the environment's SOPS bundle only."""
+    if names.get('environment') != public_profile.get('environment'):
+        raise ValueError('Identity names belong to a different environment')
+    if any(key in public_profile['staff'] for key in ('client_id', 'application_name')):
+        raise ValueError('Staff identity names must come from SOPS, not the public profile')
+    if (set(names['staff']) != {'client_id', 'application_name'}
+            or set(names['role_groups']) != {'reader', 'editor', 'admin'}
+            or set(names['scope_mapping_names']) != {'profile', 'groups', 'audience'}):
+        raise ValueError('Supply the complete private identity naming contract')
+    for key in ('role_groups', 'scope_mapping_names'):
+        values = list(names[key].values())
+        if (any(not isinstance(value, str) or not value.strip() for value in values)
+                or len(set(values)) != len(values)):
+            raise ValueError('Private identity names must be nonempty and unique')
+    profile = copy.deepcopy(public_profile)
+    profile['staff'].update(names['staff'])
+    profile['role_groups'] = dict(names['role_groups'])
+    profile['scope_mapping_names'] = dict(names['scope_mapping_names'])
+    return validate_profile(profile)
+
+
 def validate_manifest(manifest, environment, profile):
     validate_profile(profile)
     if manifest.get('environment') != environment or profile['environment'] != environment:
@@ -113,6 +136,11 @@ def validate_manifest(manifest, environment, profile):
         if (client['redirect_uris'] != expected['redirect_uris']
                 or client['logout_uris'] != expected['logout_uris']):
             raise ValueError('Redirect and logout URIs must match the environment client contract')
+    if sorted(group['name'] for group in manifest['groups']) != sorted(profile['role_groups'].values()):
+        raise ValueError('Role groups must match the private identity naming contract')
+    mapping_names = {mapping['scope_name']: mapping['name'] for mapping in manifest['scope_mappings']}
+    if mapping_names != profile['scope_mapping_names']:
+        raise ValueError('Scope mapping names must match the private identity naming contract')
     google = manifest.get('google')
     if google is not None:
         emails = google.get('allowed_emails', [])
@@ -272,6 +300,7 @@ def main():
         manifest = json.load(stream)
     with open(args.profile, encoding='utf-8') as stream:
         profile = json.load(stream)
+    profile = resolve_profile(profile, json.loads(os.environ['AUTHENTIK_IDENTITY_NAMES']))
     validate_manifest(manifest, args.environment, profile)
     secrets = {key: os.environ[key] for key in ('STAFF_OIDC_CLIENT_SECRET', 'NETBIRD_OIDC_CLIENT_SECRET')}
     if manifest.get('google'):

@@ -1,10 +1,6 @@
 {
   "environment": {{ authentik_environment | to_json }},
-  "groups": [
-    {"name": "pearland-paws-staff-admin"},
-    {"name": "pearland-paws-staff-editor"},
-    {"name": "pearland-paws-staff-reader"}
-  ],
+  "groups": [{% for group in authentik_decrypted.IDENTITY_NAMES.role_groups.values() %}{"name": {{ group | to_json }}}{{ ',' if not loop.last else '' }}{% endfor %}],
   "users": {{ authentik_staff_users | to_json }},
 {% if authentik_google_enabled | default(false) %}
   "google": {
@@ -13,12 +9,13 @@
   },
 {% endif %}
   "scope_mappings": [
-    {"name": "Pearland Paws profile {{ authentik_environment }}", "scope_name": "profile", "expression": "return {'name': user.name, 'preferred_username': user.username}"},
-    {"name": "Pearland Paws groups {{ authentik_environment }}", "scope_name": "groups", "expression": "return {'groups': [group.name for group in user.ak_groups.all() if group.name in ['pearland-paws-staff-admin', 'pearland-paws-staff-editor', 'pearland-paws-staff-reader']]}"},
-    {"name": "Pearland Paws audience {{ authentik_environment }}", "scope_name": "audience", "expression": "return {'aud': provider.client_id}"}
+    {"name": {{ authentik_decrypted.IDENTITY_NAMES.scope_mapping_names.profile | to_json }}, "scope_name": "profile", "expression": "return {'name': user.name, 'preferred_username': user.username}"},
+    {"name": {{ authentik_decrypted.IDENTITY_NAMES.scope_mapping_names.groups | to_json }}, "scope_name": "groups", "expression": {{ ("return {'groups': [group.name for group in user.ak_groups.all() if group.name in " ~ (authentik_decrypted.IDENTITY_NAMES.role_groups.values() | list | to_json) ~ "]}") | to_json }}},
+    {"name": {{ authentik_decrypted.IDENTITY_NAMES.scope_mapping_names.audience | to_json }}, "scope_name": "audience", "expression": "return {'aud': provider.client_id}"}
   ],
 {% for name in ['staff', 'netbird'] %}
-{% set client = authentik_identity_profiles[authentik_environment][name] %}
+{% set public_client = authentik_identity_profiles[authentik_environment][name] %}
+{% set client = authentik_decrypted.IDENTITY_NAMES.staff if name == 'staff' else public_client %}
   "{{ name }}": {
     "issuer_host": {{ authentik_identity_profiles[authentik_environment].issuer_host | to_json }},
     "provider_name": {{ client.client_id | to_json }},
@@ -28,8 +25,8 @@
     "audience": {{ client.client_id | to_json }},
     "secret_env": "{{ name | upper }}_OIDC_CLIENT_SECRET",
     "scopes": ["profile", "groups", "audience"],
-    "redirect_uris": {{ client.redirect_uris | to_json }},
-    "logout_uris": {{ client.logout_uris | to_json }}
+    "redirect_uris": {{ public_client.redirect_uris | to_json }},
+    "logout_uris": {{ public_client.logout_uris | to_json }}
   }{{ ',' if not loop.last else '' }}
 {% endfor %}
 }

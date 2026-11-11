@@ -77,7 +77,8 @@ verified; the password delivery file was deleted afterward.
    `test-servers`. If console recovery is pending, wait before starting either
    playbook. Their existing peer-policy guards must remain enforced.
    A first Google web login creates the fresh identity; it does not prove device
-   enrollment. Run `scripts/rehearsal-netbird-admission.py` with `--profile`
+   enrollment. Run `scripts/rehearsal-netbird-admission.py` with
+   `--identity-secrets` selecting the matching owner-encrypted naming bundle, and `--profile`
    pointing to the [inventory-exported identity profile](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) and the encrypted
    admission inputs and verify its positive/negative policy checks, disabled
    approval requirement, exact pending-user reconciliation, and explicit staff
