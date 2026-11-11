@@ -265,6 +265,9 @@ The dashboard is **HOU1 Operations**; metrics travel over the VPN, with HOU4 the
 only metrics source allowed by policy. Discord is the current receiver. Record
 actual target/rule IDs and verify firing **and resolved** delivery; HTTP
 acknowledgment proves Discord acceptance, not that a person read the message.
+Grafana's optional [dedicated Authentik client](grafana-sso.md) uses separate
+monitoring groups. Verify Google login, the monitoring role, logout and the
+retained local emergency administrator before completing its SSO rollout.
 Use the optional [environment-bound synthetic reader probe](staff-login-probe.md)
 with a separate SOPS credential bundle. Its code and companion HOU4 rules are
 checked offline; provisioning the selected identity, enabling private TCP/443,

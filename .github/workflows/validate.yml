@@ -58,6 +58,7 @@ jobs:
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-access.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-schedule.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-peer.yml --syntax-check
+      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/grafana-identity.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/restore-production-host.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/publish-production-recovery.yml --syntax-check
       - run: python -m unittest discover -s tests -v

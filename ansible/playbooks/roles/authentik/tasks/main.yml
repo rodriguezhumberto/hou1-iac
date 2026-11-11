@@ -418,3 +418,10 @@
       ansible.builtin.file:
         path: "{{ authentik_project_root }}/bootstrap.json"
         state: absent
+
+- name: Configure optional Grafana identity after the shared platform is ready
+  ansible.builtin.include_role:
+    name: grafana_identity
+  when:
+    - grafana_identity_enabled | default(false) | bool
+    - not (node_bootstrap | default(true) | bool)

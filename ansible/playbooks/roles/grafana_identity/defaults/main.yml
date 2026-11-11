@@ -1,0 +1,4 @@
+---
+grafana_identity_enabled: false
+grafana_identity_secret_source: ''
+grafana_identity_age_key_file: ''

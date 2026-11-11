@@ -1,0 +1,55 @@
+---
+- name: Reconcile an explicitly enabled Grafana identity contract
+  when: grafana_identity_enabled | bool
+  block:
+    - name: Decrypt the Grafana-only identity input on the controller
+      ansible.builtin.command:
+        argv: [sops, --decrypt, --output-type, json, '{{ grafana_identity_secret_source }}']
+      environment:
+        SOPS_AGE_KEY_FILE: '{{ grafana_identity_age_key_file }}'
+        SOPS_AGE_KEY: ''
+      delegate_to: localhost
+      become: false
+      changed_when: false
+      register: grafana_identity_decrypted
+      no_log: true
+    - name: Bind the private contract to the independently selected deployment
+      ansible.builtin.assert:
+        that:
+          - grafana_identity_enabled is boolean
+          - cms_environment in ['test', 'production']
+          - not node_bootstrap | bool
+          - ansible_host == netbird_ip
+          - (grafana_identity_decrypted.stdout | from_json).environment == cms_environment
+          - (grafana_identity_decrypted.stdout | from_json).issuer_origin == 'https://' ~ authentik_identity_profiles[authentik_environment].issuer_host
+      no_log: true
+    - name: Discover the declared Authentik service rather than a container name
+      ansible.builtin.command:
+        argv: [docker, compose, -p, '{{ authentik_identity_profiles[authentik_environment].compose_project }}',
+               -f, '{{ authentik_identity_profiles[authentik_environment].compose_file }}', ps, -q,
+               '{{ authentik_identity_profiles[authentik_environment].compose_service }}']
+      changed_when: false
+      register: grafana_identity_container
+    - name: Require exactly one running Authentik service
+      ansible.builtin.assert:
+        that: grafana_identity_container.stdout is match('^[a-f0-9]{12,64}$')
+    - name: Reconcile the provider through the container-local authenticated API
+      ansible.builtin.command:
+        argv: [docker, exec, '-i', '{{ grafana_identity_container.stdout }}', python, '-c',
+               '{{ lookup("ansible.builtin.file", role_path ~ "/files/provision.py") }}']
+        stdin: '{{ grafana_identity_decrypted.stdout }}'
+      register: grafana_identity_result
+      no_log: true
+      changed_when:
+        - grafana_identity_result.rc == 0
+        - (grafana_identity_result.stdout | from_json).changed
+    - name: Require completed fail-closed client reconciliation
+      ansible.builtin.assert:
+        that: (grafana_identity_result.stdout | from_json).passed
+      no_log: true
+  always:
+    - name: Discard Grafana client plaintext from subsequent tasks
+      ansible.builtin.set_fact:
+        grafana_identity_decrypted: {}
+        grafana_identity_result: {}
+      no_log: true

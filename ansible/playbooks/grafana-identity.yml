@@ -1,0 +1,7 @@
+---
+- name: Configure the dedicated Grafana OIDC client after Authentik bootstrap
+  hosts: '{{ target_hosts | default("hou1_prod") }}'
+  become: true
+  gather_facts: false
+  roles:
+    - grafana_identity
