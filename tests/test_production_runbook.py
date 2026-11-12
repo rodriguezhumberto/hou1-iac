@@ -13,7 +13,7 @@ class ProductionRunbookTest(unittest.TestCase):
             "BACKUP_ID=", "BACKUP_SHA256=", "APP_IMAGE=", "TEST_REHEARSAL=", "OIDC_TESTS=",
             "authentik-preflight.yml", "authentik-bootstrap.yml", "netbird-authentik-cutover.yml",
             "verify-recovery.py", "recovery.age", "receipt.json", "break-glass.sh", "authentik-rollback.sh",
-            "Production approval remains blocked", "test-only", "ON_ERROR_STOP",
+            "Current production evidence and remaining handoff limits:", "test-only", "ON_ERROR_STOP",
             "PostgreSQL", "Nginx", "Staff login", "1%", "5 minutes", "15 minutes",
         )
         for marker in required:

@@ -65,7 +65,7 @@
     },
     "owner_only_encryption": true,
     "controller_copy_size_checksum_verified": true,
-    "owner_decryption_test_performed": false,
+    "owner_decryption_test_performed": true,
     "hou4_collection_pending": false,
     "owner_reported_hou4_collection_command_run": true,
     "hou4_receipt_from_owner": {
@@ -76,7 +76,13 @@
     },
     "hou4_receipt_sha256_matches_source": true,
     "hou4_received_utc": "2026-11-12T08:25:01+00:00",
-    "hou4_receipt_identification": "Owner returned receipt from the exact post-import recovery-point path supplied."
+    "hou4_receipt_identification": "Owner returned receipt from the exact post-import recovery-point path supplied.",
+    "owner_decryption_followup": {
+      "sha256": "e053e97b0495a820231c03ace55f6127d32513cfa979529296bb3f496f10cb0b",
+      "bytes": 34666268,
+      "authenticated_decryption": true
+    },
+    "owner_decryption_verified_at": "2026-11-12T10:34:26.120420+00:00"
   },
   "source_unchanged_at_latest_comparison": true,
   "source_accepting_writes": false,
@@ -437,5 +443,12 @@
   },
   "private_artifact_notes": {
     "public-verification.result.json": "The historical digest identifies the initial pre-cutover run. The legacy operator helper reused this output path; the post-cutover checks are classified and retained separately."
+  },
+  "closeout_followups": {
+    "owner_requested_separate_issues": true,
+    "controller_recovery": 77,
+    "uninterrupted_production_recovery": 78,
+    "secret_consolidation": 45,
+    "additional_live_wipe_authorized": false
   }
 }

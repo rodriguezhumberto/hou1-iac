@@ -26,15 +26,21 @@ and [signing-key overlap evidence](jwks-overlap-evidence-2026-11-07.md).
 
 Current production evidence and remaining handoff limits:
 
+Keep the test-only recovery entry points and their environment guards intact.
+Use the dedicated production procedure for production recovery.
+
 | Gate | Current implementation and required work |
 | --- | --- |
 | Google admission | The production client and encrypted admission policy passed live policy checks. The owner confirmed Google login, VPN reconnection, personal SSH and staff/Grafana sign-in and sign-out. Preserve [deny-by-default provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) for future changes. |
 | Monitoring | [Earlier production monitoring and alert evidence](evidence/production-operations-2026-11-11.json) retains its original snapshot and limitations. Seven production targets, seven application containers, the staff-login probe and backup metrics passed after reboot. Public management access was denied. The owner confirmed Discord firing/resolution before replacement; that delivery drill was not repeated after this replacement. See [environment-bound collectors](environment-monitoring.md). |
-| Controller TLS | Production delivery/status recovered, and both status jobs passed after temporary administrative peer removal. Retain the separate scoped renewal peer and [controller-managed renewal](controller-tls.md). Updated owner-encrypted recovery material exists; owner decryption and replacement-controller recovery remain untested. |
-| Replacement recovery | [The clean-OS restore and operational handoff](production-host-recovery.md#latest-live-result) passed using a production recovery point and pinned CI image. Controller contract/host-key corrections, renewal target rebinding and an independent HOU4 NetBird restart were required. Uninterrupted end-to-end automation remains unproven. A fresh owner-only off-host point passed size/checksum verification, without a second decryption test. |
+| Controller TLS | Production delivery/status recovered, and both status jobs passed after temporary administrative peer removal. Retain the separate scoped renewal peer and [controller-managed renewal](controller-tls.md). The owner [authenticated decryption of the updated recovery bundle](evidence/owner-recovery-access-2026-11-12.json) locally without uploading the key or writing plaintext. Replacement-controller execution remains untested and is tracked in [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
+| Replacement recovery | [The clean-OS restore and operational handoff](production-host-recovery.md#latest-live-result) passed using a production recovery point and pinned CI image. Controller contract/host-key corrections, renewal target rebinding and an independent HOU4 NetBird restart were required. Uninterrupted end-to-end automation remains unproven and is tracked in [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). The later post-import owner-only point passed off-host size/checksum verification and owner-local authenticated decryption. This did not repeat its full database/service restore. |
 | Release inputs | [The website migration and approved cutover](evidence/website-data-migration-2026-11-12.json) preserved destination authentication state and passed owner content review and HOU4 recovery-point collection. Frozen source and destination business data matched, so final sync required no rewrite. Public records select the replacement with proxy settings retained; all 217 checks over 30 minutes passed. The owner confirmed website content, canonical redirect, staff/Grafana SSO, the operations homepage with data, and the Authentik applications overview. The overview now uses the VPN after the requested network-specific Private Relay pause; user and applications API requests returned 200. The legacy application remains stopped. Legacy SSH and the separate repair grant are retired; owner keys and the scoped renewal peer were preserved. |
 
-Independent HOU4 outage monitoring remains deliberately deferred.
+Independent HOU4 outage monitoring remains deliberately deferred. The owner
+requested separate follow-up issues for controller failover and uninterrupted
+production recovery; those unproven execution tests do not reopen the completed
+isolated rollout. Secret consolidation remains separate under #45.
 
 The approved traffic cutover sends the public website to the replacement. Keep
 the old application stopped to prevent split writes, and retain the old node

@@ -29,14 +29,16 @@ Publication needed controller bootstrap/host-key corrections and a security-role
 resume. The existing renewal destination group needed its replacement HOU1
 member, and HOU4 NetBird needed an independent-access restart to discard the old
 HOU1 WireGuard key. Preserve these as operator handoff steps when repeating the
-procedure; a fully uninterrupted run remains unproven.
+procedure; a fully uninterrupted run remains unproven and is tracked in
+[infrastructure #78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
 
 Temporary dashboard, public recovery SSH and administrative SSH/VPN grants were
 removed. Owner access and the separate scoped renewal peer remain. Both TLS
 status jobs succeeded after administrative peer removal. Updated controller
 recovery material was encrypted to the owner; replacement-controller recovery
-and owner decryption of this updated copy were not tested. Deleting temporary
-keys does not rotate service credentials already read during deployment.
+was not tested. The owner subsequently [verified authenticated decryption](evidence/owner-recovery-access-2026-11-12.json) of this updated copy locally; that check did not execute a replacement
+controller. The owner requested [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77)
+for that separate execution test. Deleting temporary keys does not rotate service credentials already read during deployment.
 
 ## Before the replacement
 
