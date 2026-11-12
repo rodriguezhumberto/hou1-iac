@@ -1,0 +1,47 @@
+{
+  "recorded_at": "2026-11-12T09:59:10.835651+00:00",
+  "issue": 23,
+  "regression": "The pinned upstream source flow requires an unauthenticated browser even though Google may return an existing connection while a session is active.",
+  "change": "Allow either session state only after both verified-email admission bindings are reconciled.",
+  "validation": {
+    "bootstrap_suite": {
+      "tests": 29,
+      "result": "passed"
+    },
+    "repository_suite": {
+      "tests": 318,
+      "passed": 316,
+      "skipped": 1,
+      "initial_failures": 1,
+      "initial_failure": "Nginx parser was not selected in the local test environment.",
+      "followup": "All eight NetBird control-plane tests passed with NGINX_BIN set to the existing container validator.",
+      "unresolved_failures": 0,
+      "skip": "Optional dnsmasq runtime integration requires DNSMASQ_BIN."
+    },
+    "authentik_bootstrap_syntax": "passed",
+    "git_diff_check": "passed"
+  },
+  "live": {
+    "recorded_at": "2026-11-12T09:48:48.169641+00:00",
+    "changed": true,
+    "before_authentication": "require_unauthenticated",
+    "after_authentication": "none",
+    "existing_verified_email_admission_preserved": true,
+    "unknown_and_unverified_accounts_denied": true,
+    "source_pkce_and_both_flow_bindings_unchanged": true,
+    "unrelated_flow_configuration_unchanged": true,
+    "services_restarted": false,
+    "owner_browser_retest_pending": true
+  },
+  "browser_followup": {
+    "owner_google_callback_successful": true,
+    "overview_confirmation_pending": true,
+    "remaining_login_redirect": "The browser reaches the public origin; private API calls receive 403. Owner system DNS returns the public origin while NetBird DNS returns the correct private address.",
+    "private_api_restriction_preserved": true
+  },
+  "post_repair_public_checks": {
+    "passed": true,
+    "checks": 7,
+    "staff_and_identity_admin_public_denials": 403
+  }
+}

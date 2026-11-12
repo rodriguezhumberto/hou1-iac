@@ -53,6 +53,14 @@ contract before API writes. Production uses its own Google OAuth client and
 secret; register `https://<profile-issuer-host>/source/oauth/callback/google/`
 as its Google authorized redirect URI. Do not reuse the rehearsal OAuth client.
 
+The source authentication flow uses `authentication: none` so a Google callback
+also works when the browser already has an Authentik session, including when
+returning to the applications overview after logout from another application.
+Bootstrap applies this setting only after both verified-email policy bindings
+are enabled, non-negated and fail closed in ALL mode. This flow setting does not
+grant application roles or bypass the account allowlist. Check the overview
+after a fresh login and again with an existing session when validating changes.
+
 For production, select the production inventory and `deploy_environment=prod`,
 the production SOPS bundle and its scoped age identity. Confirm production
 DNS/TLS and permitted Google discovery/token/userinfo egress first; this identity
