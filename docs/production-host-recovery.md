@@ -2,14 +2,43 @@
 
 Follow-up to infrastructure issue #22. The production entry points share the
 restore engine with the rehearsal, but require an explicit production contract.
+[Live production evidence](evidence/production-host-recovery-2026-11-12.json)
+records a completed clean-OS restore and operational handoff with operator
+corrections. It does **not** establish uninterrupted end-to-end automation or
+authorize another wipe or website traffic cutover.
 [Offline fixture evidence](evidence/production-host-recovery-2026-11-11.json)
-records the implementation checks; a live production restore is still a release
-gate. Neither this procedure nor a successful test restore authorizes a wipe or
-production promotion. [Production snapshot preparation](evidence/production-recovery-preflight-2026-11-11.json)
+records the implementation checks. [Production snapshot preparation](evidence/production-recovery-preflight-2026-11-11.json)
 records the saved source/image/certificate checks and the environment-specific
 geolocation correction; it does not prove a clean-host restore.
 Keep `restore-test-host.yml`, `publish-test-recovery.yml`
 and the component drill's test-only guards intact.
+
+## Latest live result
+
+The November 12 replacement restored production point
+`20261111T165321Z-8c6ba35719b2` in 542.335 seconds: 187 PostgreSQL tables,
+cold pulls of the pinned application image, and session revocation before
+writers. No application build, identity bootstrap or CMS seed ran. The owner
+confirmed Google, VPN, personal SSH, and staff/Grafana sign-in and sign-out.
+HOU1 recovered after reboot; seven monitoring targets, seven application
+containers, the synthetic staff login, backups and both TLS status jobs passed.
+The fresh owner-encrypted off-host point's size and checksum were verified;
+that new point was not decrypted by the controller.
+
+Publication needed controller bootstrap/host-key corrections and a security-role
+resume. The existing renewal destination group needed its replacement HOU1
+member, and HOU4 NetBird needed an independent-access restart to discard the old
+HOU1 WireGuard key. Preserve these as operator handoff steps when repeating the
+procedure; a fully uninterrupted run remains unproven and is tracked in
+[infrastructure #78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+
+Temporary dashboard, public recovery SSH and administrative SSH/VPN grants were
+removed. Owner access and the separate scoped renewal peer remain. Both TLS
+status jobs succeeded after administrative peer removal. Updated controller
+recovery material was encrypted to the owner; replacement-controller recovery
+was not tested. The owner subsequently [verified authenticated decryption](evidence/owner-recovery-access-2026-11-12.json) of this updated copy locally; that check did not execute a replacement
+controller. The owner requested [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77)
+for that separate execution test. Deleting temporary keys does not rotate service credentials already read during deployment.
 
 ## Before the replacement
 

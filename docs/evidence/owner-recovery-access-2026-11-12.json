@@ -1,0 +1,36 @@
+{
+  "verification": "Owner-run local verification; reported receipt matches retained ciphertext sizes and hashes.",
+  "receipt": {
+    "passed": true,
+    "recorded_at": "2026-11-12T10:34:26.120420+00:00",
+    "backup_id": "20261112T075632Z-d975b8f1eff4",
+    "backup": {
+      "sha256": "e053e97b0495a820231c03ace55f6127d32513cfa979529296bb3f496f10cb0b",
+      "bytes": 34666268,
+      "authenticated_decryption": true
+    },
+    "controller_recovery": {
+      "sha256": "ea14e206593467255e2ffe4c0fdced33fa71ce75536ddd9f01bf619c5c88b544",
+      "bytes": 836799,
+      "authenticated_decryption": true
+    },
+    "plaintext_written": false,
+    "private_key_uploaded": false,
+    "independent_controller_restore_tested": false
+  },
+  "verifier_sha256": "cae02f4d05fe23f08afc9682b8ec711a1015e0369c84185d49fc06803a3b86a2",
+  "fixture_checks": [
+    "valid decryption",
+    "wrong key rejected",
+    "wrong checksum rejected",
+    "modified ciphertext rejected"
+  ],
+  "limits": [
+    "Decrypted content discarded; archive structure and database restore not repeated by this check.",
+    "Independent replacement-controller execution remains untested."
+  ],
+  "owner_requested_explicit_followup_issues": {
+    "replacement_controller_execution": 77,
+    "uninterrupted_production_recovery": 78
+  }
+}

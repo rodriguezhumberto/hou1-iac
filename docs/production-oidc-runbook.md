@@ -8,11 +8,11 @@ record, command argument, PR or evidence report.
 
 ## Evidence and current production gates
 
-The rehearsal infrastructure baseline is
-`f3edfcf08ea3e444f967adf078bf2899aa36f1d0`. The rehearsal used application revision
-`a0e01a9d129eb15c1a260d6eba01cb0e3a2b8d51` and image
-`ghcr.io/rodriguezhumberto/pearland-paws/app@sha256:2c481222b96799cebb53c8dd59321d812ccd9b98042500241e2c2a131a93cf42`.
-These identify evidence, not an automatic production selection.
+The latest [production replacement evidence](evidence/production-host-recovery-2026-11-12.json)
+uses infrastructure `64cbddce364e3321f9f7d6e02b71f3059a08d486`, application
+`4434c5c1b4b124054e7f1232478a8c4ae0b95608` and image digest
+`sha256:a9a90b0bae7239a682e2c1e2593c1130bfadf648d020bdbf82e97f63838b8aa4`.
+These identify the tested release, not an automatic selection for future runs.
 
 [Clean-host evidence](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
 records 187 restored PostgreSQL tables, 13 matching authorization tables,
@@ -24,26 +24,51 @@ and fresh off-host collection. The selected test point was
 passed before PR #61 merged. See also [OIDC security acceptance](oidc-security-acceptance-2026-11-07.md)
 and [signing-key overlap evidence](jwks-overlap-evidence-2026-11-07.md).
 
-Production approval remains blocked until the following have production inputs
-and a reviewed, validated procedure at the selected release ref:
+Current production evidence and remaining handoff limits:
+
+Keep the test-only recovery entry points and their environment guards intact.
+Use the dedicated production procedure for production recovery.
 
 | Gate | Current implementation and required work |
 | --- | --- |
-| Google admission | [Production identity provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) uses the separate production Google client, encrypted allowlist and staff/VPN assignments. Production Google token exchange, approved-account NetBird enrollment and personal SSH on both nodes are verified. Preserve the deny-by-default source and separate network/application grants. |
-| Monitoring | [Production operations evidence](evidence/production-operations-2026-11-11.json) records seven healthy targets, public/unrelated-peer denial and fresh synthetic staff-reader login/permission/logout. The owner confirmed staff and Grafana SSO login/logout. The stale-probe drill fired and resolved with two successful Discord notifications and no delivery errors; the owner confirmed receiving both messages. |
-| Controller TLS | [Scoped renewal evidence](evidence/scoped-renewal-peer-2026-11-11.json) records the production DNS-01 dry runs, served certificates, dedicated renewal peer, forced-command transport and fresh numeric status on both receivers. Keep these persistent jobs separate from the expiring administrative deployment grant. |
-| Replacement recovery | The first production unified point passed authenticated archive validation and an offline data restore: 187 PostgreSQL tables imported, 182 non-session tables preserved through session reset, and five NetBird SQLite databases passed integrity checks. Signing keys, clients, identities and groups were preserved; stale peer status was cleared on copies. Full service/login and clean-host recovery remain open under [production replacement recovery](production-host-recovery.md). |
-| Release inputs | Production names, addresses, VPN network, clients and certificates are selected. Staff/CMS content still needs recorded manual initialization. Retire temporary administrative/scoped grants after the remaining acceptance work and owner-only handoff; website traffic cutover still requires explicit approval. |
+| Google admission | The production client and encrypted admission policy passed live policy checks. The owner confirmed Google login, VPN reconnection, personal SSH and staff/Grafana sign-in and sign-out. Preserve [deny-by-default provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) for future changes. |
+| Monitoring | [Earlier production monitoring and alert evidence](evidence/production-operations-2026-11-11.json) retains its original snapshot and limitations. Seven production targets, seven application containers, the staff-login probe and backup metrics passed after reboot. Public management access was denied. The owner confirmed Discord firing/resolution before replacement; that delivery drill was not repeated after this replacement. See [environment-bound collectors](environment-monitoring.md). |
+| Controller TLS | Production delivery/status recovered, and both status jobs passed after temporary administrative peer removal. Retain the separate scoped renewal peer and [controller-managed renewal](controller-tls.md). The owner [authenticated decryption of the updated recovery bundle](evidence/owner-recovery-access-2026-11-12.json) locally without uploading the key or writing plaintext. Replacement-controller execution remains untested and is tracked in [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
+| Replacement recovery | [The clean-OS restore and operational handoff](production-host-recovery.md#latest-live-result) passed using a production recovery point and pinned CI image. Controller contract/host-key corrections, renewal target rebinding and an independent HOU4 NetBird restart were required. Uninterrupted end-to-end automation remains unproven and is tracked in [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). The later post-import owner-only point passed off-host size/checksum verification and owner-local authenticated decryption. This did not repeat its full database/service restore. |
+| Release inputs | [The website migration and approved cutover](evidence/website-data-migration-2026-11-12.json) preserved destination authentication state and passed owner content review and HOU4 recovery-point collection. Frozen source and destination business data matched, so final sync required no rewrite. Public records select the replacement with proxy settings retained; all 217 checks over 30 minutes passed. The owner confirmed website content, canonical redirect, staff/Grafana SSO, the operations homepage with data, and the Authentik applications overview. The overview now uses the VPN after the requested network-specific Private Relay pause; user and applications API requests returned 200. The legacy application remains stopped. Legacy SSH and the separate repair grant are retired; owner keys and the scoped renewal peer were preserved. |
 
-The production acceptance follow-up uses infrastructure ref
-`56ec4c7ca7a7e087cfda887d131100e9e13dc60d`. The owner has confirmed production
-Google/NetBird access, personal SSH on both nodes, Grafana SSO login/logout and
-staff-app SSO login/logout. Record alert delivery and backup acceptance in the
-release record; the remaining recovery and traffic cutover gates stay explicit.
+Independent HOU4 outage monitoring remains deliberately deferred. The owner
+requested separate follow-up issues for controller failover and uninterrupted
+production recovery; those unproven execution tests do not reopen the completed
+isolated rollout. Secret consolidation remains separate under #45.
 
-Keep the remaining test-only guards intact. Production identity provisioning
-does not enable the other production paths. Independent HOU4 outage monitoring
-remains deliberately deferred.
+The approved traffic cutover sends the public website to the replacement. Keep
+the old application stopped to prevent split writes, and retain the old node
+and encrypted rollback copies. Reconcile any post-cutover writes before
+returning traffic to the old application.
+
+A legacy public staff A record was corrected to the replacement VPN address
+after owner review encountered the old address. Private DNS proxy/upstream
+queries and public resolver readback passed; the owner confirmed browser
+access afterward. The owner also passed a fresh read-only replacement check:
+all nine business tables and 17 media files matched the reviewed snapshot, with SQLite integrity
+and foreign-key checks passing. The public website apex and alias records
+now select the replacement after the approved write-freeze verification and
+origin change. The owner repeated the destination check during the source
+write freeze before the change.
+
+For future cutovers, review copied data without editing the replacement before
+final sync. Before the final sync, compare its business-table hashes with the initial copy and stop on destination
+edits or new records. During the approved maintenance window, quiesce source
+writers, capture the final database/media pair, and preserve destination
+authentication and offboarding tables again. A no-op final sync is permitted
+only when the frozen source and the replacement still match the reviewed
+business-table and media hashes. Stop on any difference; the initial importer
+requires an empty destination and must not be rerun on the populated database.
+Verify the copy and collect a fresh recovery point after any actual data change
+before applying the reviewed DNS change. Retain the old node;
+rolling traffic back after new submissions requires reconciling those writes
+first. The initial copy alone does not establish a lossless cutover.
 
 ## Release record and access
 
@@ -136,10 +161,7 @@ weekly points. A failed capture extends the approximate one-day data-loss window
 
 Pair the established production VPN peers through
 [the backup protocol](hou4-backup-protocol.md), using only the HOU4 transport
-**public** key and the verified HOU1 server public key. Set
-`hou1_backup_app_project` to the actual application's Compose project from the
-selected deployment; do not inherit an old project name. Keep the nightly age
-recipient owner-only. Then run:
+**public** key and the verified HOU1 server public key. Then run:
 
 ```bash
 ansible-playbook -i "$INVENTORY" ansible/playbooks/backups.yml \
@@ -176,18 +198,6 @@ recoverability. Approval requires successful production recovery validation too.
 The normal point uses only the owner's recipient. A separate authorized test
 point may add a temporary recipient; do not change nightly recipients for a drill.
 HOU4 protects against losing HOU1, not both nodes; it is not immutable storage.
-
-The [production data-restore evidence](evidence/production-operations-2026-11-11.json)
-uses a disposable PostgreSQL container with no network or published ports and
-RAM-backed storage. It imports with `ON_ERROR_STOP` into an empty schema and
-reuses the maintained production `revoke_sessions` and `reset_peer_connections`
-functions against copies. All 182 non-session PostgreSQL tables and CMS
-non-session tables matched before/after reset; NetBird data matched except for
-connection status. The saved staff database had no active sessions, so this run
-does not prove rejection of an active staff cookie. The container and decrypted
-RAM files were removed. No restored application/IdP writer was started, and no
-cold image pull or restored login was tested. These checks narrow the remaining
-work; they do not clear the replacement-host gate or authorize a wipe.
 
 ## Deployment order and stop points
 
@@ -289,12 +299,22 @@ acknowledgment proves Discord acceptance, not that a person read the message.
 Grafana's optional [dedicated Authentik client](grafana-sso.md) uses separate
 monitoring groups. Verify Google login, the monitoring role, logout and the
 retained local emergency administrator before completing its SSO rollout.
+Start a fresh SSO session at Grafana's root URL and verify it opens **HOU1
+Operations** with data; testing only login/logout does not prove dashboard
+visibility. Also open Authentik's applications overview with an existing session.
+If it briefly appears and returns to login, compare the device's system DNS
+answer with NetBird's DNS proxy. The overview needs the VPN route to the private
+API even though Google sign-in is publicly reachable. Correct local resolution
+or resolver installation; retain the public API denial. On macOS, Private Relay
+can bypass the VPN resolver: the owner verified the overview after pausing
+**Limit IP Address Tracking** for the active network. Test the network-specific
+setting before changing DNS or ingress rules.
 Use the optional [environment-bound synthetic reader probe](staff-login-probe.md)
 with a separate SOPS credential bundle. Its code and companion HOU4 rules are
-checked offline. Production provisioning, private TCP/443, fresh reader login
-and Discord firing/resolution are recorded in the production operations evidence,
-including owner confirmation of both notifications. The probe covers local
-Authentik login, reader enforcement and logout; independently
+checked offline; the selected production identity, private transport and fresh
+login passed live checks, with owner-confirmed Discord firing/resolution before
+replacement. Repeat delivery checks after receiver or routing changes. The
+probe covers local Authentik login, reader enforcement and logout; independently
 verify a human Google login and VPN connection. Deployment requires a fresh probe
 success after container reconciliation. Never use real Google passwords in it.
 
