@@ -101,8 +101,7 @@ replacement-controller restore.
 
 Record live namespace/host-route isolation, target-only access, denied arbitrary
 commands, restart persistence, served-certificate validation and alert recovery
-before declaring this transport ready for production. Offline tests do not
-establish these facts. Keep production promotion blocked until monitoring,
-backups/recovery and renewal acceptance have passed too.
-
-Recorded validation: [scoped renewal peer evidence](evidence/scoped-renewal-peer-2026-11-11.json).
+after transport or receiver changes. [Scoped peer validation](evidence/scoped-renewal-peer-2026-11-11.json)
+and [production handoff](evidence/production-host-recovery-2026-11-12.json) record
+accepted live checks. Replacement-controller execution remains unproven under
+[#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).

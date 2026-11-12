@@ -1,65 +1,65 @@
 # NetBird operations
 
-Run commands from `ansible/`; see [initialization](../README.md#1-first-initialization-public-ip).
+Use the private production inventory and pinned SSH keys described in the
+[production runbook](production-oidc-runbook.md). NetBird remains at 0.82.0.
+Management actions require an authorized NetBird owner/administrator account.
 
-## Credentials and addresses
+## Users, groups and devices
 
-Inventory Vault supplies owner credentials and `test_netbird_ip`/`prod_netbird_ip`.
-Enrollment assigns these addresses and rejects conflicts, network/broadcast
-addresses, and NetBird's reserved DNS address. Other peers receive automatic IPs.
+At the configured NetBird dashboard, open **Users**, select a user and edit their
+automatic groups. `staff` gives their devices staff-network connectivity. Group
+propagation is enabled for existing devices; verify the resulting memberships
+under **Peers**. Users must first pass the encrypted Google allowlist and sign in.
 
-Back up the generated `ansible/vault/netbird-token.yml` off-host. PATs expire after
-365 days by default. Replace an expired PAT with `ansible-vault edit`, then rerun
-the control-plane playbook. Its structure is:
+For durable staff onboarding, update encrypted `staff_users` assignments and run
+[admission reconciliation](authentik-bootstrap.md#google-admission-and-staffvpn-assignments)
+after first login. It assigns the Authentik staff role and NetBird `staff`
+auto-group, preserving unrelated memberships. GUI-only changes are not a complete
+recovery record. Staff application roles and Grafana roles are separate grants.
 
-```yaml
-netbird_management_url: https://netbird.YOUR_DOMAIN
-netbird_api_token: REPLACEMENT_PAT
-```
+Install NetBird on each personal device, select the same management server and
+sign in with the same Google account. Each device becomes a separate owned peer
+with its own VPN address. Use interactive sign-in rather than setup keys for
+personal devices; never copy `/etc/netbird` between running machines.
 
-Never reset the owner or delete server data to recover a token. Make address
-changes through the management API while NetBird SSH is available, then rerun
-normal provisioning. Rerun `netbird-dns.yml` afterward.
-
-## Access
-
-Assign devices to `administrators` or `staff`. Enrollment manages server groups.
+Assign `administrators` to each explicitly approved **device**, rather than as a
+user-wide automatic group. This enables SSH network access, not dashboard admin
+rights or an operating-system login. SSH still requires an authorized OS key.
 
 | Source | Destination | Traffic |
 | --- | --- | --- |
-| Administrators | Both environments | TCP 22, 443 |
-| Staff | Both environments | TCP 443 |
-| Both groups | Production DNS | TCP/UDP 1053 |
+| `administrators` | Managed server groups | TCP 22, 443 |
+| `staff` | Managed server groups | TCP 443 |
+| Both | Production private DNS | TCP/UDP 1053 |
 
-All-to-All is disabled. Keep NetBird DNS enabled on operator devices. Private DNS
-records use `name` and `address`; the resolver binds to production's NetBird IP.
-NetBird uses WireGuard internally; its client UDP port is `netbird_listen_port`.
+All-to-All is disabled. Monitoring, backup and renewal peers have separate narrow
+policies; do not add them to `administrators`. Keep NetBird DNS enabled. Private
+service names must resolve through the VPN; see the production runbook for the
+verified macOS Private Relay workaround.
 
-## Recovery and rollback
+## Credentials and addresses
 
-During first initialization, Ansible arms a 180-second public-SSH fallback timer
-before the listener cutover. A fresh NetBird SSH probe cancels and removes it.
-If the controller is disconnected during cutover, retry through the original
-public IP after the timer restores the saved SSH configuration. The timer is
-not installed on later NetBird-only runs.
+Inventory supplies server VPN addresses; other peers receive automatic addresses.
+Enrollment rejects conflicts and reserved addresses. Reconcile client enrollment
+with `hou1.yml --tags netbird`; rerun `netbird-dns.yml` after server address changes.
 
-Established hosts have no password or console recovery path. Keep the controller
-connected to NetBird and repair the daemon through NetBird SSH. Do not clone a
-peer identity onto a second running host.
+The encrypted API-token document binds `netbird_management_url` to its
+`netbird_api_token`. Preserve an owner-recoverable copy off-host. Replace expired
+PATs through the applicable SOPS/Vault workflow; do not reset the owner or delete
+server state. A PAT permits API operations, not dashboard sign-in.
 
-```bash
-ssh -o ControlMaster=no new_user@NETBIRD_IP sudo -n true
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
-```
+## Recovery
 
-Before upgrades, run `/opt/hou1-netbird/backup.sh` over NetBird SSH;
-it briefly stops the management server. Back up
-`/var/backups/hou1-netbird`, the controller PAT Vault, and `/etc/netbird` off-host.
-Keep the previous infrastructure/app SHAs for rollback.
+Initial SSH cutover arms a 180-second public-SSH fallback timer. A successful
+fresh VPN SSH probe cancels and removes it. Established hosts have no automatic
+public SSH fallback; their listener is VPN-only and SSH password login is disabled.
 
-To restore the control plane, use NetBird SSH to stop its Compose project and
-restore `/opt/hou1-netbird` with original `secrets.json`, data, configuration,
-permissions, certificate lineage, and controller PAT Vault. Start the compatible
-pinned versions, verify NetBird SSH, then rerun normal provisioning. Never run two
-copies of the same server identity. Restoring a legacy infrastructure revision
-alone does not restore deleted VPN configuration or keys.
+Provider-console authentication is separate and is not disabled by SSH hardening.
+Verify independent provider console or rescue access on both nodes before changing
+the shared control plane. Repair through an existing VPN SSH session when possible;
+use [break-glass recovery](netbird-break-glass.md) when identity access fails.
+
+For backups and a lost server, follow the [unified backup protocol](hou4-backup-protocol.md)
+and [production recovery](production-host-recovery.md). The old NetBird-only
+archive is not a complete recovery set. Never run two copies of a server identity
+or restore old authorization without reconciling later revocations.

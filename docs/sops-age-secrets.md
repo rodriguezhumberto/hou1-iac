@@ -1,79 +1,47 @@
-# SOPS/age Authentik and OIDC secrets
+# SOPS/age secrets and controller access
 
-`ansible/secrets/authentik-test.enc.yaml` and
-`ansible/secrets/authentik-prod.enc.yaml` now authorize only the operator's
-public recipient:
-`age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7`.
-The creation policy preserves this boundary for future edits. The operator
-confirmed local access before controller identities were restricted. New data
-keys encrypt the same secret values; retained historical ciphertext is not a
-revocation of values or identities previously exposed.
+The repository Authentik bundles authorize the owner recipient through the
+creation policy. Keep the owner's long-lived private key offline. Deployment
+copies may add an explicitly authorized temporary recipient while retaining the
+owner; retire that grant after verified owner access and recovery handoff.
 
-The controller's ongoing SOPS access is limited to three job identities:
+Ongoing jobs use separate scoped identities for synthetic login and HOU1/HOU4
+certificate renewal. Give each only its required credential/DNS/ACME/certificate
+bundles, not the full deployment secrets, NetBird PAT or admission allowlist.
+Keep the owner as a recovery recipient. Protect files with mode 0600 and private
+directories with 0700; runtime identities and bundles remain outside Git.
 
-| Job | Decryptable inputs |
-| --- | --- |
-| HOU1 synthetic health checks | Two isolated test-account passwords |
-| HOU1 certificate renewal | Its DNS token document |
-| HOU4 certificate renewal | Its DNS token, ACME state and current/previous TLS bundles |
-
-All three are denied the repository deployment files, NetBird PAT, admission
-allowlist, offboarding inputs and complete deployment bundles. Those documents
-are operator-only. The operator remains a recipient on each job document.
-Private identities and runtime bundles remain outside Git.
-
-File modes are 0600 and private directories are 0700. This controller still has
-passwordless sudo and administrative SSH access to the test hosts, so this is
-cryptographic job scoping, not isolation from another same-user or privileged
-session. Production automation needs a separate restricted controller without
-shared sudo or routine test-host access. The operator identity stays off this
-controller.
+Cryptographic scoping is not isolation from the same privileged OS user, Docker
+or sudo. Production's separate renewal peer restricts transport and fixed commands;
+it must not be reused for administration. See [the transport contract](controller-renewal-peer.md).
+Temporary production admin grants were retired after handoff.
 
 ## Deployment and recovery
 
-Existing automation cannot deploy using the full secret bundles. An operator
-must authorize a short-lived, environment-specific deployment identity and a
-purpose-limited encrypted input before deployment. Keep operator and recovery
-identities offline. The legacy Authentik role decrypts on the managed host using
-`authentik_age_key_file`; never place the operator private identity at that path.
-Controller-side decryption and Vault removal remain infrastructure #45. This
-change leaves the existing Vault path and deployed service values unchanged.
+Some roles decrypt on the controller; Authentik still uses the managed host's
+`authentik_age_key_file`. That must be a scoped runtime identity, never the owner's
+personal identity. Ansible Vault inputs also remain. Controller-side consolidation
+and Vault removal are unfinished [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
 
-Verify operator access locally without printing secrets:
+Verify owner access locally without printing plaintext:
 
 ```bash
 sops --decrypt ansible/secrets/authentik-test.enc.yaml >/dev/null
 sops --decrypt ansible/secrets/authentik-prod.enc.yaml >/dev/null
 ```
 
-Set `SOPS_AGE_KEY_FILE` to the local operator identity if SOPS does not already
-discover it. Twelve previous deployment/recovery identity files were escrowed
-in an age archive encrypted solely to the operator, then removed from their
-controller paths after job verification. Download and verify that archive
-locally; it preserves identities needed by historical ciphertext and non-SOPS
-backup archives. Keep the decrypted recovery material offline. New encryption
-cannot erase prior copies, process memory, snapshots or access to unchanged
-underlying credentials.
+Set `SOPS_AGE_KEY_FILE` locally if needed. Preserve encrypted recovery copies of
+historical deployment identities and the independent controller handoff. Check
+actual decryption, not only that the files downloaded. Owner-local authenticated
+decryption [passed](evidence/owner-recovery-access-2026-11-12.json); executing a
+replacement controller remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
 
-The controller installer accepts separate monitor and TLS inputs:
+Changing SOPS recipients does not revoke plaintext credentials already seen,
+historical ciphertext copies, snapshots or prior memory. Rotate underlying
+credentials separately when required. Client-secret overlap uses
+`STAFF_OIDC_CLIENT_SECRET_OLD` / `NETBIRD_OIDC_CLIENT_SECRET_OLD`; verify a bounded
+rotation before removing the old value. Recipient changes are not secret rotation.
 
-```bash
-python3 scripts/install-rehearsal-monitor.py \
-  --config /private/controller/monitor.json \
-  --tls-config /private/controller/tls-controller.json
-```
-
-The monitor config selects only the health bundle/key. The TLS config selects
-only its DNS bundle/key. HOU4's private renewal `age_recipient` list contains
-its renewal recipient and the operator recipient for future writes.
-
-For client-secret rotation, add `STAFF_OIDC_CLIENT_SECRET_OLD` or
-`NETBIRD_OIDC_CLIENT_SECRET_OLD`, deploy and verify the bounded overlap, then
-remove `_OLD` in a second edit. Existing overlap checks and rollback procedures
-still apply. Secret rotation was not performed by this access change.
-
-See [controller scoping evidence](evidence/controller-key-scoping-2026-11-08.json).
-Earlier [recipient-addition evidence](evidence/operator-sops-recipient-2026-11-08.json)
-records the previous policy. HOU1's legacy TLS renewal timer was already disabled
-and its monitor reports a stale renewal receipt; that separate rollout finding
-must be resolved before production. This change preserves that scheduling state.
+[Historical scoping evidence](evidence/controller-key-scoping-2026-11-08.json)
+records the earlier test controller and retired timer. It is not the current
+production renewal status; use [controller TLS](controller-tls.md).

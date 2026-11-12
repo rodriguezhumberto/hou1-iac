@@ -1,24 +1,26 @@
-# Reversible NetBird 0.82.0 Authentik cutover
+# Legacy NetBird issuer-cutover helper
 
-The cutover is blocked unless the exact compatibility spike has passed:
+**Do not use `netbird-authentik-cutover.yml` for routine provisioning.** Its
+`config-authentik.yaml.j2` replaces `server.auth.issuer` directly, while the pinned
+NetBird 0.82.0 [compatibility contract](netbird-authentik-compatibility.md) requires
+the embedded issuer plus an Authentik external provider. The helper still exists;
+this documentation cleanup does not change or validate that implementation.
 
-```bash
-cd ansible
-ansible-playbook playbooks/netbird-authentik-cutover.yml \
-  -e netbird_authentik_compatibility_passed=true \
-  -e netbird_authentik_issuer=https://auth.example.com/application/o/netbird-prod/ \
-  --ask-vault-pass
-```
+Current production uses the external-provider/admission workflow. See
+[identity admission](authentik-bootstrap.md#google-admission-and-staffvpn-assignments).
+That command verifies an existing connector; it does not create a missing one.
+Do not set a compatibility flag merely to bypass the legacy helper's guard.
 
-Before changing the issuer, the task stops the combined server and snapshots
-`config.yaml`, `dashboard.env`, SQLite data, `secrets.json`, encryption keys,
-peers, policies, addresses, and the existing PAT state into a root-only
-cutover directory. It then swaps only the issuer/client settings and starts
-the same pinned `netbirdio/netbird-server:0.82.0` and dashboard images.
+The legacy helper snapshots configuration and state, swaps config/dashboard
+files and runs limited readiness checks. Those checks do not establish a human
+SSO login or the supported external-provider contract.
 
-The health gate checks the management API, Authentik discovery/JWKS, and running
-server/dashboard containers. A failed check automatically restores the
-embedded-IdP files and records a failure marker. Operators can run
-`/opt/hou1-netbird/authentik-rollback.sh` with a snapshot path to restore the
-embedded issuer without re-enrolling peers. The snapshot is retained for audit
-and recovery; no SQLite or encryption key is regenerated.
+`authentik-rollback.sh <reviewed-snapshot-path>` restores only `config.yaml` and
+`dashboard.env`, then restarts services. It does not import SQLite or remove an
+external-provider registration. With no argument it selects the newest cutover
+directory; that is not necessarily the correct incident snapshot. Preserve live
+state and review an explicit path before an operator-approved rollback.
+
+Removing or replacing these legacy entry points requires a separate code change.
+Until then, follow [production recovery](production-host-recovery.md) for a lost
+host and [break-glass guidance](netbird-break-glass.md) for an access incident.

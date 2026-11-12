@@ -60,11 +60,12 @@ refs and live evidence: successful private scrapes and source collection;
 public and unrelated-peer denial; service failure and recovery notifications;
 backup freshness; and request/login metrics. Configure separate production
 synthetic identities and enable the [environment-bound login probe](staff-login-probe.md)
-before relying on end-to-end login monitoring. Its offline checks are implemented;
-live identity provisioning, fresh login and Discord delivery still need evidence.
-Controller TLS renewal and production recovery
-remain separate gates. The rehearsal-only probe/renewal helpers retain their
-existing safety guards.
+before relying on end-to-end login monitoring. Production provisioning, fresh
+login and owner-confirmed Discord delivery are recorded in
+[production operations](evidence/production-operations-2026-11-11.json).
+[Replacement handoff](evidence/production-host-recovery-2026-11-12.json) rechecked
+collection/probe health, but did not repeat that delivery drill. Repeat affected
+checks after routing/receiver changes. Keep rehearsal-only helper guards intact.
 
 For rollback, remove the HOU1 scrape job and disable its HOU4 rule switches,
 stop the collector timer/exporter, then remove only the exact source-IP UFW

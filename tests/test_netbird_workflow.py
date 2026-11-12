@@ -70,11 +70,11 @@ class WorkflowTest(unittest.TestCase):
         self.assertIn('ListenAddress {{ ssh_bootstrap_public_ip }}', script)
         self.assertIn('[ -f "$state_dir/cancelled" ] && exit 0', script)
 
-    def test_bootstrap_fallback_is_the_only_public_recovery_path(self):
-        docs = (ROOT / 'docs/netbird-operations.md').read_text()
+    def test_bootstrap_fallback_is_temporary_and_console_access_is_independent(self):
+        docs = ' '.join((ROOT / 'docs/netbird-operations.md').read_text().split())
         self.assertIn('180-second public-SSH fallback timer', docs)
-        self.assertIn('Established hosts have no password or console recovery path.', docs)
-        self.assertNotIn('provider console', docs)
+        self.assertIn('Established hosts have no automatic public SSH fallback', docs)
+        self.assertIn('Provider-console authentication is separate', docs)
     def test_ssh_rollback_restores_startup_override(self):
         security = yaml.safe_load((ROLES / 'security/tasks/main.yml').read_text())
         snapshot = next(task for task in security if task['name'] ==

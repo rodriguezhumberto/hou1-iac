@@ -1,5 +1,7 @@
 # Infrastructure OIDC integration test plan
 
+> Original integration plan. Results and accepted limits are linked from [production operations](production-oidc-runbook.md); the fixed-fixture [live security suite](live-security-tests.md) remains test-only.
+
 Run the harness only with isolated test Authentik and NetBird clients,
 users/groups, domains, certificates, and SOPS/age secret references:
 

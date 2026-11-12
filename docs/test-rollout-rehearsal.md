@@ -1,5 +1,7 @@
 # Isolated test rollout and recovery rehearsal
 
+> Original isolated rollout-harness reference. Current clean-OS tests use [clean test-host recovery](clean-host-recovery.md); production uses [production recovery](production-host-recovery.md). Historical pending gates below are not current production status.
+
 Issue #27 is a gate for production approval. The rehearsal uses separate
 `hou1_test` inventory, `auth-test` and `netbird-test` endpoints, test TLS
 certificates, test Authentik clients/users/groups, and the test SOPS/age

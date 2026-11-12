@@ -83,5 +83,8 @@ isolated run above records a failed dashboard, CLI, API, gRPC, WebSocket,
 PKCE, logout, or restore check; that failure must open a separate, explicitly
 approved upgrade issue.
 
-The cutover issue (#24) remains blocked until the live evidence, Authentik
-backup/restore drill, and isolated client provisioning issues complete.
+This spike is a test reference, not a current production deployment sequence.
+The accepted production result is linked from the [production runbook](production-oidc-runbook.md).
+The [legacy direct-issuer cutover helper](netbird-authentik-cutover.md) still
+conflicts with this external-provider contract and must not be treated as a
+compatible next step.

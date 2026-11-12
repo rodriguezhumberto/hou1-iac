@@ -1,78 +1,39 @@
-# HOU1 production Authentik and OIDC runbook
+# Production operations and releases
 
-The release operator and platform/application owners use this procedure together.
-It records the tested workflow and the remaining production gates. Updating this
-runbook does not promote the rehearsal host or authorize a production deployment.
-Never put passwords, tokens, webhook URLs, allowlists or private keys in a release
-record, command argument, PR or evidence report.
+Use this runbook for established-host changes. For a lost host, use
+[production replacement recovery](production-host-recovery.md); for first-time
+identity setup, use [bootstrap](authentik-bootstrap.md). A documentation update
+does not authorize deployment, a wipe or a traffic change. Keep secrets, account
+lists and customer data out of commands, Git and evidence reports.
 
-## Evidence and current production gates
-
-The latest [production replacement evidence](evidence/production-host-recovery-2026-11-12.json)
-uses infrastructure `64cbddce364e3321f9f7d6e02b71f3059a08d486`, application
-`4434c5c1b4b124054e7f1232478a8c4ae0b95608` and image digest
-`sha256:a9a90b0bae7239a682e2c1e2593c1130bfadf648d020bdbf82e97f63838b8aa4`.
-These identify the tested release, not an automatic selection for future runs.
-
-[Clean-host evidence](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
-records 187 restored PostgreSQL tables, 13 matching authorization tables,
-29 isolated recovery checks, 23 host checks, seven staff checks, Google/VPN/
-personal SSH access, reboot, eight monitoring targets, Discord outage/resolution
-and fresh off-host collection. The selected test point was
-`20261110T230028Z-184f657a1db7`; **it must not seed production**. The final rebased
-[CI run](https://github.com/rodriguezhumberto/hou1-iac/actions/runs/42939168372)
-passed before PR #61 merged. See also [OIDC security acceptance](oidc-security-acceptance-2026-11-07.md)
-and [signing-key overlap evidence](jwks-overlap-evidence-2026-11-07.md).
+## Production status
 
 Current production evidence and remaining handoff limits:
 
-Keep the test-only recovery entry points and their environment guards intact.
-Use the dedicated production procedure for production recovery.
-
-| Gate | Current implementation and required work |
+| Area | Accepted result / remaining limit |
 | --- | --- |
-| Google admission | The production client and encrypted admission policy passed live policy checks. The owner confirmed Google login, VPN reconnection, personal SSH and staff/Grafana sign-in and sign-out. Preserve [deny-by-default provisioning](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) for future changes. |
-| Monitoring | [Earlier production monitoring and alert evidence](evidence/production-operations-2026-11-11.json) retains its original snapshot and limitations. Seven production targets, seven application containers, the staff-login probe and backup metrics passed after reboot. Public management access was denied. The owner confirmed Discord firing/resolution before replacement; that delivery drill was not repeated after this replacement. See [environment-bound collectors](environment-monitoring.md). |
-| Controller TLS | Production delivery/status recovered, and both status jobs passed after temporary administrative peer removal. Retain the separate scoped renewal peer and [controller-managed renewal](controller-tls.md). The owner [authenticated decryption of the updated recovery bundle](evidence/owner-recovery-access-2026-11-12.json) locally without uploading the key or writing plaintext. Replacement-controller execution remains untested and is tracked in [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
-| Replacement recovery | [The clean-OS restore and operational handoff](production-host-recovery.md#latest-live-result) passed using a production recovery point and pinned CI image. Controller contract/host-key corrections, renewal target rebinding and an independent HOU4 NetBird restart were required. Uninterrupted end-to-end automation remains unproven and is tracked in [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). The later post-import owner-only point passed off-host size/checksum verification and owner-local authenticated decryption. This did not repeat its full database/service restore. |
-| Release inputs | [The website migration and approved cutover](evidence/website-data-migration-2026-11-12.json) preserved destination authentication state and passed owner content review and HOU4 recovery-point collection. Frozen source and destination business data matched, so final sync required no rewrite. Public records select the replacement with proxy settings retained; all 217 checks over 30 minutes passed. The owner confirmed website content, canonical redirect, staff/Grafana SSO, the operations homepage with data, and the Authentik applications overview. The overview now uses the VPN after the requested network-specific Private Relay pause; user and applications API requests returned 200. The legacy application remains stopped. Legacy SSH and the separate repair grant are retired; owner keys and the scoped renewal peer were preserved. |
+| Application and access | Owner confirmed public content/images, canonical redirect, Google/VPN/personal SSH, staff/Grafana sign-in/out, dashboard data and Authentik overview. [Cutover evidence](evidence/website-data-migration-2026-11-12.json): 217/217 public checks over 30 minutes. |
+| Recovery | [Clean-OS production recovery](evidence/production-host-recovery-2026-11-12.json) and operational handoff passed with corrections. An uninterrupted run remains unproven: [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). |
+| Backup access | Owner [authenticated decryption](evidence/owner-recovery-access-2026-11-12.json) of the post-import backup and controller bundle locally, without uploading the key or writing plaintext. This did not execute another service restore. |
+| Monitoring and renewal | Private collection, reboot recovery, synthetic login, backups and TLS status passed. [Earlier alert-delivery evidence](evidence/production-operations-2026-11-11.json) includes owner-confirmed firing/resolution; that delivery drill was not repeated after replacement. |
+| Controller recovery | Scoped renewal jobs operate after temporary admin access retirement. Clean replacement-controller execution remains untested: [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
 
-Independent HOU4 outage monitoring remains deliberately deferred. The owner
-requested separate follow-up issues for controller failover and uninterrupted
-production recovery; those unproven execution tests do not reopen the completed
-isolated rollout. Secret consolidation remains separate under #45.
+Secret consolidation remains [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
+Independent HOU4 outage monitoring is deliberately deferred. These accepted
+follow-ups do not reopen the completed rollout.
 
-The approved traffic cutover sends the public website to the replacement. Keep
-the old application stopped to prevent split writes, and retain the old node
-and encrypted rollback copies. Reconcile any post-cutover writes before
-returning traffic to the old application.
+The [tested production release](evidence/production-host-recovery-2026-11-12.json),
+[isolated recovery](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
+[OIDC acceptance](oidc-security-acceptance-2026-11-07.md) and
+[signing-key overlap](jwks-overlap-evidence-2026-11-07.md) retain exact refs and
+results. They do not select the next release. Keep test-only recovery guards intact.
 
-A legacy public staff A record was corrected to the replacement VPN address
-after owner review encountered the old address. Private DNS proxy/upstream
-queries and public resolver readback passed; the owner confirmed browser
-access afterward. The owner also passed a fresh read-only replacement check:
-all nine business tables and 17 media files matched the reviewed snapshot, with SQLite integrity
-and foreign-key checks passing. The public website apex and alias records
-now select the replacement after the approved write-freeze verification and
-origin change. The owner repeated the destination check during the source
-write freeze before the change.
-
-For future cutovers, review copied data without editing the replacement before
-final sync. Before the final sync, compare its business-table hashes with the initial copy and stop on destination
-edits or new records. During the approved maintenance window, quiesce source
-writers, capture the final database/media pair, and preserve destination
-authentication and offboarding tables again. A no-op final sync is permitted
-only when the frozen source and the replacement still match the reviewed
-business-table and media hashes. Stop on any difference; the initial importer
-requires an empty destination and must not be rerun on the populated database.
-Verify the copy and collect a fresh recovery point after any actual data change
-before applying the reviewed DNS change. Retain the old node;
-rolling traffic back after new submissions requires reconciling those writes
-first. The initial copy alone does not establish a lossless cutover.
+The legacy website remains stopped. Retain its node and encrypted copies.
+**Reconcile replacement writes before any traffic rollback.**
 
 ## Release record and access
 
-Record actual production values before the window; no placeholder may remain:
+Record reviewed values outside Git; no placeholder may remain at execution:
 
 ```text
 INFRA_REF=<40 lowercase hex commit SHA>
@@ -83,32 +44,19 @@ PREVIOUS_STAFF_REF=<previous validated application commit>
 PREVIOUS_APP_IMAGE=<previous retained GHCR digest>
 NETBIRD_REF=<official 0.82.0 image digest and configuration revision>
 TEST_REHEARSAL=<reviewed evidence path and SHA256>
-OIDC_TESTS=<mirrored security evidence path and SHA256>
+OIDC_TESTS=<reviewed security evidence path and SHA256>
 BACKUP_ID=<production manifest.id>
 BACKUP_SHA256=<production manifest.sha256>
 RESTORE_DRILL_ID=<successful restore evidence ID>
-BREAK_GLASS_CHECK=<console/local-emergency-admin verification time and owner>
-WINDOW=<UTC start/end; release operator and escalation owners>
+BREAK_GLASS_CHECK=<console/emergency-admin verification time and owner>
+WINDOW=<UTC start/end, operator and escalation contacts>
 ```
 
-Use clean infrastructure and application checkouts at those immutable refs.
-Publish the private application image manually from tested `main` in CI, then
-select its `image-release.json` receipt. Image publication does not deploy.
-`application_image_revision`, `deploy_ref` and `STAFF_REF` must agree; the receipt
-must bind `APP_IMAGE` to that revision. HOU1 never builds the application.
-Retain every digest referenced by backups, plus the current and previous release.
-Cold recovery depends on GHCR and separately recoverable read-only pull access.
-Use the exact variable names and receipt checks in [image deployment](application-images.md).
-
-Prepare private inventory, SSH configuration and release inputs outside Git:
-
-For a single public website with a canonical alias redirect, use the
-[website routing inputs](website-routing.md): explicitly disable the secondary
-site and declare the public hostname list and redirect switch. Keep selected
-domains in encrypted release inputs, cover HTTPS aliases in the public
-certificate, and override the selected identity profile's issuer hostname when
-it differs from the shared default. A routing change requires normal runtime
-rendering rather than the image-only preserve mode.
+Use clean checkouts at these refs. Manually publish the application from tested
+`main`, then select its `image-release.json` receipt. `application_image_revision`,
+`deploy_ref` and `STAFF_REF` must agree. HOU1 pulls the digest and never builds the
+application. Retain current/previous images and every digest referenced by backups.
+See [image inputs and registry access](application-images.md).
 
 ```bash
 export INVENTORY=/private/production/inventory.yml
@@ -119,49 +67,37 @@ git status --short
 git rev-parse HEAD
 ```
 
-The checkout SHA must equal `INFRA_REF`. The private inventory retains the
-repository's group layout/defaults: `prod_hou1` belongs to `hou1_prod`, `prod_env`
-and the dedicated `netbird_control_plane` group. Require pinned ED25519 host
-keys, `StrictHostKeyChecking=yes`, `IdentitiesOnly=yes` and explicit known-hosts
-files; the repository inventory's permissive SSH defaults are unsuitable here.
-Use VPN management after bootstrap. Keep provider-console access to **both**
-nodes independent of NetBird and verify the owner's personal SSH key before
-retiring any temporary deployment grant. SSH password login policy is separate
-from provider-console authentication; do not remove the only console credential.
+Require a private inventory with pinned ED25519 keys, `StrictHostKeyChecking=yes`,
+`IdentitiesOnly=yes` and explicit known-hosts files. The repository inventory's
+permissive SSH defaults are unsuitable for production. Retain its group layout:
+`prod_hou1` belongs to `hou1_prod`, `prod_env` and `netbird_control_plane`.
+Use VPN management after bootstrap and verify independent provider-console access
+to both nodes. SSH password policy does not disable console authentication.
 
-Required release inputs include `cms_environment: production`,
-`authentik_environment: prod`, `deploy_environment: prod`, the production VPN
-network (`100.90.0.0/16`), app paths/projects, issuer/audience/redirects, pinned
-image and revision, SOPS source/key paths, and unified-backup pairing variables.
-Review all deployment inputs privately. Keep the Google allowlist encrypted;
-Google verifies identity and Authentik controls access across applications.
-Network staff access and application roles remain separate grants.
+Private inputs declare `cms_environment: production`, `authentik_environment: prod`,
+`deploy_environment: prod`, VPN network, paths/projects, exact issuers/audiences,
+callbacks, image receipt, SOPS paths and backup pairing. Set website hostnames and
+optional-site/redirect choices through [routing inputs](website-routing.md).
+Network groups, staff roles and monitoring roles are separate grants.
 
-Use SOPS/age for the new secret bundles. Existing Ansible Vault inputs are still
-required where the selected inventory loads them; supply `--ask-vault-pass` in
-those runs. Consolidation is separate work, not an accomplished migration.
-The owner identity stays offline. A temporary scoped deployment recipient may
-be added with the owner retained; retire it after verified owner access and
-owner-only handoff. Preserve separate scoped identities for ongoing jobs.
+Keep the owner age key offline. Use scoped job identities and temporary deployment
+grants; retire temporary access after verifying owner access. Supply
+`--ask-vault-pass` to commands below when the inventory loads legacy Vault files.
+SOPS/age has not yet replaced every Vault or host-side decryption path.
 
-## Backup verification before a change
+## Recovery point before a change
 
-For a first installation, preserve a verified rollback backup of the existing
-production baseline before changing it. The unified capture below requires all
-three new components to exist; create and verify its first production point
-after provisioning and before production traffic/cutover. An empty host or a
-test recovery point cannot satisfy the production backup gate.
+The authoritative set is `recovery.age`, `manifest.json` and `receipt.json` on
+HOU4. [The protocol](hou4-backup-protocol.md) captures at 02:00 UTC and collects
+at 03:00 UTC, with up to five minutes of jitter. Retention is seven daily and
+four weekly recovery points. One failed night extends the approximate one-day
+loss window. HOU4 does not protect against simultaneous loss of both nodes.
 
-The authoritative recovery set is the encrypted HOU1 export collected by HOU4:
-`recovery.age`, `manifest.json` and `receipt.json`. Legacy standalone Authentik
-archives and success markers do not prove this unified point exists.
-HOU1 captures at 02:00 UTC; HOU4 collects at 03:00 UTC, each with up to five
-minutes jitter and persistent missed-run handling. Retain seven daily and four
-weekly points. A failed capture extends the approximate one-day data-loss window.
+For first installation, preserve the old site's rollback copy before provisioning;
+create the first unified point after all components exist and before cutover.
+Do not substitute a test point or a legacy component-only success marker.
 
-Pair the established production VPN peers through
-[the backup protocol](hou4-backup-protocol.md), using only the HOU4 transport
-**public** key and the verified HOU1 server public key. Then run:
+With verified VPN peers, transport public keys and the pinned source host key:
 
 ```bash
 ansible-playbook -i "$INVENTORY" ansible/playbooks/backups.yml \
@@ -169,20 +105,18 @@ ansible-playbook -i "$INVENTORY" ansible/playbooks/backups.yml \
 ssh prod_hou1 'sudo systemctl start --no-block hou1-backup-prepare.service'
 ```
 
-The local job briefly stops writers, including the NetBird server/relay; SSH
-may disconnect. Reconnect and require a successful service result and fresh
-`/var/lib/hou1-backup/last-export.json`. Keep `hou1_backup_enabled: true` in
-future deployments so legacy schedules are not recreated. On HOU4:
+Capture briefly stops writers and the NetBird server/relay; SSH may disconnect.
+Reconnect and require successful service status and fresh
+`/var/lib/hou1-backup/last-export.json`, then collect:
 
 ```bash
 ssh hou4-prod 'sudo systemctl start hou4-backup.service'
 ssh hou4-prod 'sudo systemctl show hou4-backup.service -p Result -p ExecMainStatus'
 ```
 
-Require success and a new committed point under
-`/var/lib/hou4-backups/production/hou1/$BACKUP_ID/`. Copy its three files through
-the pinned private operator path to `/private/point/`. Verify size/SHA256 against
-the manifest and matching receipt, then authenticate decryption offline:
+Require a new committed point at `/var/lib/hou4-backups/production/hou1/$BACKUP_ID/`.
+Copy all three files through pinned operator SSH, compare size/checksum/receipt,
+and authenticate decryption locally. For extraction into protected empty storage:
 
 ```bash
 python3 scripts/verify-recovery.py \
@@ -191,26 +125,18 @@ python3 scripts/verify-recovery.py \
   --environment production
 ```
 
-This validates/extracts; it does **not** restore a service or prove login works.
-Output contains plaintext secrets: protect and remove it after validation.
-A HOU4 checksum receipt proves transfer integrity, not decryption or application
-recoverability. Approval requires successful production recovery validation too.
-The normal point uses only the owner's recipient. A separate authorized test
-point may add a temporary recipient; do not change nightly recipients for a drill.
-HOU4 protects against losing HOU1, not both nodes; it is not immutable storage.
+This writes plaintext and validates the archive; it does not restore services.
+Protect/remove output afterward. Transfer checksums alone do not prove decryption
+or recoverability. Nightly points use only the owner recipient; a separately
+approved drill point may add a temporary recipient. Keep `hou1_backup_enabled: true`
+in later deployments to avoid recreating legacy backup cron jobs.
 
-## Deployment order and stop points
+## Established-host deployment
 
-After resolving the production gates above, use these entry points on an
-**established production host** with existing private management and ingress.
-A new-host production bootstrap needs its own approved sequence; the test
-recovery entry point cannot provide it.
-
-1. Verify consoles, immutable refs, SOPS/Vault access, production restore point,
-   previous image, emergency account and capacity. The placement minimum is two
-   vCPUs, 4096 MiB RAM, 20 GiB free and 200,000 free inodes. Check measured memory,
-   filesystem, inode and I/O pressure; the rehearsal host had 16 GiB RAM.
-2. Run the placement/firewall policy, then Authentik/PostgreSQL and ingress:
+1. Verify refs, console/emergency access, secrets, backup and previous image.
+   Placement requires at least two vCPUs, 4096 MiB RAM, 20 GiB free and 200,000
+   free inodes; also review measured pressure. Production was tested with 16 GiB RAM.
+2. For identity/runtime changes, apply the placement gate and Authentik:
 
    ```bash
    ansible-playbook -i "$INVENTORY" ansible/playbooks/authentik-preflight.yml \
@@ -219,60 +145,37 @@ recovery entry point cannot provide it.
      --limit prod_hou1 -e target_hosts=hou1_prod -e deploy_environment=prod -e "@$INPUTS"
    ```
 
-   The preflight applies UFW policy; it is **not** a read-only probe. Keep console
-   access throughout. Authentik stays on HOU1 behind separate container networks,
-   resource/host-capacity checks, private management and encrypted recovery.
-3. For a genuinely new identity database only:
-
-   ```bash
-   ansible-playbook -i "$INVENTORY" ansible/playbooks/authentik-bootstrap.yml \
-     --limit prod_hou1 -e target_hosts=hou1_prod -e deploy_environment=prod -e "@$INPUTS"
-   ```
-
-   Finalize production Google
-   admission and client/claim configuration through the production procedure
-   required above. Never bootstrap over restored identity data.
-4. Deploy the selected CI image and matching configuration:
+   Preflight changes UFW; it is not read-only. Never run
+   `authentik-bootstrap.yml` over restored identity data. For reviewed account or
+   role changes, follow [admission reconciliation](authentik-bootstrap.md#google-admission-and-staffvpn-assignments).
+3. Deploy the selected CI image and matching configuration:
 
    ```bash
    ansible-playbook -i "$INVENTORY" ansible/playbooks/hou1.yml \
      --limit prod_hou1 -e target_hosts=hou1_prod -e "@$INPUTS" --tags deploy
    ```
 
-   Use `webstack_preserve_runtime_environment: true` only for a reviewed image-only
-   update with an existing `.env`. Initial provisioning renders production settings.
-   Staff/CMS content currently needs the owner's recorded manual initialization
-   source/steps; do not assume a seed command or restore test content. Authentik
-   and NetBird state come from provisioning or a verified restore, not CMS seeding.
-5. Verify staff login, exact issuer/audience, PKCE, groups/roles, protected APIs,
-   private media, logout/revocation and shared-password rejection. Follow the
-   [staff runbook](https://github.com/rodriguezhumberto/pearland-paws/blob/main/docs/production-oidc-runbook.md).
-6. Run the reversible NetBird cutover with its dedicated target group and the
-   approved compatibility result in the private inputs:
+   `webstack_preserve_runtime_environment: true` is for an image-only update with
+   an existing `.env`; configuration changes require normal rendering. Existing
+   production CMS data came from migration. A genuinely new site needs its own
+   initialization source; replacement recovery restores saved data without seeding.
+4. Verify staff issuer/audience, PKCE, roles, protected APIs/media, logout/revocation
+   and shared-password rejection using the application runbook. Confirm human
+   Google login, VPN reconnection and personal-key SSH independently.
+5. Reconcile monitoring and backups where affected. HOU1's NetBird control plane
+   precedes HOU4 enrollment/pairing. Preserve HOU4 and its independent access.
 
-   ```bash
-   ansible-playbook -i "$INVENTORY" ansible/playbooks/netbird-authentik-cutover.yml \
-     --limit prod_hou1 -e "@$INPUTS"
-   ```
+Do not run the legacy `netbird-authentik-cutover.yml` as a routine production step:
+its direct-issuer template conflicts with the supported external-provider contract.
+See [the discrepancy](netbird-authentik-cutover.md). NetBird stays pinned at 0.82.0.
 
-   For this command, the input file must **omit `target_hosts`**. It must include
-   `netbird_authentik_compatibility_passed: true`, the exact production issuer,
-   `netbird-prod` client and existing on-host client-secret file. Retain NetBird
-   0.82.0; no upgrade decision follows from this deployment.
-7. Reconcile production monitoring and backup policies after HOU1 is enrolled.
-   HOU1's NetBird control plane precedes HOU4 VPN enrollment and metrics/backup
-   pairing; deploy neither as a dependency cycle. Retained HOU4 can reconnect to
-   restored state, with its independent console available if it does not.
-
-Stop on a failed playbook or gate, preserve its first error and protected logs,
-and record the fix. Never erase failure markers or silently resume a failed
-clean-host attempt. An operator-authorized troubleshooting run is a separate
-record. No dependent change proceeds while a prerequisite has failed.
+Stop on a failed prerequisite; preserve the first error and protected logs.
+Record explicitly authorized troubleshooting separately. Do not erase failure
+markers or silently resume a failed clean-host attempt.
 
 ## Health, monitoring and renewal
 
-Use the declared production Compose files/projects, never an implicit working
-directory. For the default Authentik paths:
+Use declared Compose projects/files. For default Authentik paths:
 
 ```bash
 ssh prod_hou1 'sudo docker compose -p hou1-authentik-prod -f /opt/hou1-authentik/prod/compose.yaml ps'
@@ -283,137 +186,64 @@ curl --fail --silent --show-error "${STAFF_ISSUER}jwks/"
 curl --fail --silent --show-error "$NETBIRD_ORIGIN/api/instance"
 ```
 
-Record `AUTH_ORIGIN`, `STAFF_ISSUER` (including its final slash),
-`NETBIRD_ORIGIN`, `STAFF_ORIGIN`, production container names and dashboard URL
-in the private release inputs. Run `nginx -t` inside the declared Nginx container
-before reload. Verify WebSocket/gRPC/CLI callback and actual peer connectivity.
-Public staff and Authentik administration must be denied; public SSH, PostgreSQL
-and metrics must be inaccessible. Test from a device outside the VPN as well as
-from approved staff and administrative peers.
+Define these origins privately; `STAFF_ISSUER` includes its trailing slash.
+Validate Nginx before reload. Test actual VPN peers, WebSocket/gRPC, protected
+staff APIs and public denial of SSH, staff, administration, PostgreSQL and metrics.
 
-HOU4 runs containerized Prometheus/Grafana/Alertmanager behind private HTTPS.
-The dashboard is **HOU1 Operations**; metrics travel over the VPN, with HOU4 the
-only metrics source allowed by policy. Discord is the current receiver. Record
-actual target/rule IDs and verify firing **and resolved** delivery; HTTP
-acknowledgment proves Discord acceptance, not that a person read the message.
-Grafana's optional [dedicated Authentik client](grafana-sso.md) uses separate
-monitoring groups. Verify Google login, the monitoring role, logout and the
-retained local emergency administrator before completing its SSO rollout.
-Start a fresh SSO session at Grafana's root URL and verify it opens **HOU1
-Operations** with data; testing only login/logout does not prove dashboard
-visibility. Also open Authentik's applications overview with an existing session.
-If it briefly appears and returns to login, compare the device's system DNS
-answer with NetBird's DNS proxy. The overview needs the VPN route to the private
-API even though Google sign-in is publicly reachable. Correct local resolution
-or resolver installation; retain the public API denial. On macOS, Private Relay
-can bypass the VPN resolver: the owner verified the overview after pausing
-**Limit IP Address Tracking** for the active network. Test the network-specific
-setting before changing DNS or ingress rules.
-Use the optional [environment-bound synthetic reader probe](staff-login-probe.md)
-with a separate SOPS credential bundle. Its code and companion HOU4 rules are
-checked offline; the selected production identity, private transport and fresh
-login passed live checks, with owner-confirmed Discord firing/resolution before
-replacement. Repeat delivery checks after receiver or routing changes. The
-probe covers local Authentik login, reader enforcement and logout; independently
-verify a human Google login and VPN connection. Deployment requires a fresh probe
-success after container reconciliation. Never use real Google passwords in it.
+HOU4 scrapes over VPN. Grafana SSO uses separate monitoring groups and should open
+**HOU1 Operations** with data. Verify sign-in/out and retained emergency login.
+Test Discord firing and resolution after receiver/routing changes. The
+[synthetic reader probe](staff-login-probe.md) tests local Authentik login, reader
+enforcement and logout; it does not test the human Google journey.
 
-| Signal | Current rule / stop threshold to validate in production |
+| Signal | Operational threshold |
 | --- | --- |
-| Authentik/NetBird/Nginx availability | HTTP probes or metrics down for 2 minutes; failed container health for 2 minutes. Any invalid-token acceptance, issuer/key mismatch or public staff exposure stops immediately. |
-| PostgreSQL / collector | `Hou1PostgresqlUnavailable` and `Hou1CollectorUnavailable`, 2-minute hold; collector freshness limit 5 minutes. |
-| Nginx / Staff login | 5xx rate or callback failure rate above 1% over 2 minutes with a 2-minute hold; three consecutive synthetic login failures stop immediately. |
-| Callback latency | p95 above 5 seconds over 10 minutes, at least 10 callbacks, sustained 5 minutes. Preserve the approved low-volume filter. |
-| Capacity | Memory above 80%, disk used above 75%, inode used above 70% or device utilization above 70% blocks progression; inspect the deployed rule holds. |
-| Backup | Failed capture/collection or source age above 26 hours; require both local and off-host evidence, with 5-minute alert holds. |
-| Renewal | Failed renewal for 2 minutes, last success older than 26 hours for 5 minutes, publication older than 5 minutes for 2 minutes, certificate below 14 days for 10 minutes. |
+| Availability | HTTP/container unavailable for 2 minutes. Invalid-token acceptance, issuer/key mismatch or public staff exposure stops immediately. |
+| PostgreSQL / collector | Unavailable for 2 minutes; collector freshness limit 5 minutes. |
+| Nginx / Staff login | 5xx or callback failure rate above 1% over 2 minutes, held 2 minutes; three consecutive synthetic login failures stop progression. |
+| Callback latency | p95 above 5 seconds over 10 minutes, at least 10 callbacks, held 5 minutes. |
+| Capacity | Memory above 80%, disk above 75%, inodes above 70% or device utilization above 70% blocks progression; inspect deployed rule holds. |
+| Backup | Failed capture/collection or source age above 26 hours, with 5-minute holds. |
+| Renewal | Failed run for 2 minutes; no success within 26 hours for 5 minutes; publication older than 5 minutes for 2 minutes; certificate below 14 days for 10 minutes. |
 
-Renewal is a controller job, not work performed by an agent staying in this
-thread. Record the production controller, timer/service names, credential owner
-and recovery handoff. The rehearsal's HOU4 publisher recovered using genuine
-receipts after the VPN returned; no forced issuance was needed. Inspect receipts,
-timer results, VPN/SSH, DNS-01 permissions and served certificate before retrying
-the normal renewal/publisher service. Use the recorded controller certificate
-rollback if installation fails. Do not fabricate metrics to clear an alert.
+The Authentik overview needs private API access although sign-in is public.
+If it loops to login, compare system DNS with the NetBird proxy before changing
+server rules. The owner verified a network-specific macOS **Limit IP Address
+Tracking** pause resolved Private Relay interference. This does not establish
+that Grafana requires Private Relay to be disabled globally.
 
-## Rollback, disaster recovery and emergency access
+[Renewal](controller-tls.md) runs through systemd on the controller, independently
+of this thread. Keep the separate scoped renewal peer; never use it for admin work.
+Inspect receipts, timer results, VPN/SSH, DNS permissions and served certificates
+on failure. Do not fabricate status metrics to clear alerts.
 
-For a code rollback, select `PREVIOUS_APP_IMAGE` and its matching
-`PREVIOUS_STAFF_REF` in private inputs, then rerun the same tagged application
-deployment. Verify the saved digest receipt and all login/role/public-boundary
-checks. A code rollback does not undo SQLite/schema/media or identity changes.
-The recorded migration rollback used the retained pre-CI image; rollback between
-two published CI releases still needs evidence for that release pair.
+## Rollback and recovery
 
-A failed NetBird cutover health gate rolls configuration back automatically.
-For a later rollback, use the exact snapshot recorded at cutover:
+For application rollback, select `PREVIOUS_APP_IMAGE` and matching
+`PREVIOUS_STAFF_REF`, then repeat the tagged deployment and acceptance checks.
+Code rollback does not reverse schema, data or identity changes. Historical
+migration evidence does not prove compatibility for a new release pair.
 
-```bash
-ssh prod_hou1 'sudo /opt/hou1-netbird/authentik-rollback.sh <CUTOVER_SNAPSHOT_PATH>'
-```
+For lost-host recovery, preserve HOU4 and follow the separate
+[restore/review/publish procedure](production-host-recovery.md). PostgreSQL imports
+into empty storage with `ON_ERROR_STOP`; revoke backed-up sessions before writers,
+reconcile subsequent access changes and verify HOU4 reconnection, host-key pins,
+renewal, monitoring and a fresh off-host point. Keep test-only entry points guarded.
 
-The helper restores `config.yaml` and `dashboard.env` and restarts the projects;
-it does not import the snapshot database. Preserve current SQLite data, encryption
-keys, peers, policies and addresses. Re-enrollment and key regeneration are not
-ordinary rollback steps. A missing/corrupt snapshot requires an incident decision.
+For an identity/VPN incident, follow [break-glass recovery](netbird-break-glass.md).
+`break-glass.sh` requires working API and SSH paths; a PAT is not a dashboard login.
+The legacy `authentik-rollback.sh` restores configuration only, not the database or
+external-provider registrations. Review an exact snapshot before using it.
+For user removal, use [audited offboarding](operator-offboarding.md); GUI disable
+alone does not invalidate every service's sessions or devices.
 
-For a lost/corrupt host, keep traffic closed and preserve HOU4. Retrieve and
-verify the complete **production** recovery set and independent controller
-handoff, including source bundle, image lock, read-only GHCR access, certificate
-state and runtime-secret recovery. Follow [production replacement recovery](production-host-recovery.md)
-using `restore-production-host.yml` and `publish-production-recovery.yml`, with
-this tested ordering:
+## Window closeout
 
-1. Pin the new SSH identity and establish bounded console/bootstrap access.
-2. Recover the saved configuration, database/media pair, keys and exact image
-   digest into clean storage; PostgreSQL imports into an empty schema with
-   `ON_ERROR_STOP`. No application build, CMS seed or identity re-bootstrap.
-3. With writers stopped, revoke backed-up staff and IdP sessions/codes/tokens.
-   Reconcile every subsequent offboarding, allowlist, group, device and PAT change
-   against the current operator record before opening traffic. Session cleanup
-   alone cannot revoke every previously issued external JWT.
-4. Review authorization before publication. Replace only the pinned lost HOU1
-   peer when needed, retaining group/policy IDs. Start private DNS **before**
-   refreshing the dedicated controller transport; prove personal private SSH
-   before removing bootstrap access. Preserve HOU4 and verify its reconnection.
-5. Update HOU4's source host-key pin through its backup role; reconcile exact
-   metrics/backup policies, collect a fresh point, verify identity/JWKS continuity,
-   Google/VPN access, revocation, application data/media, alerts and reboot.
-6. Remove plaintext staging and temporary grants after owner SSH and recovery
-   access are confirmed. Retain protected first-error evidence and encrypted
-   owner-only handoff. Record provider/operator waits separately from restore time.
+Name infrastructure, application, monitoring and incident owners in the change
+record. Escalate unacknowledged pages at 5 minutes, 10 minutes and 15 minutes to
+infrastructure, incident command and the service owner respectively.
 
-The [clean test-host procedure](clean-host-recovery.md) supplies the rehearsal
-commands and reports. Its environment checks must not be disabled for production.
-The legacy Authentik-only restore drill is not the unified production restore.
-
-During an Authentik outage, use an already authorized VPN session or provider
-console and the separate local Authentik emergency administrator. The NetBird
-API PAT grants API access, not dashboard login or staff roles. The installed
-`/opt/hou1-netbird/break-glass.sh` requires `BREAK_GLASS_OPERATOR`,
-`BREAK_GLASS_REASON`, `NETBIRD_HOST` and a securely loaded PAT in its process
-environment. Inspect its prerequisite API/SSH path before invoking it: it tests
-SSH before rollback, so a VPN outage requires console-led repair first. On the
-console, use the explicit snapshot rollback above when that is the needed repair.
-Keep emergency credentials offline, audit actor/reason/start/end/snapshot/result,
-and rotate used emergency credentials/PATs after recovery.
-
-Use the authenticated audited [offboarding command](operator-offboarding.md)
-for coordinated staff/IdP/VPN denial, then verify denial and durable audit.
-Disabling a user only in the GUI does not complete that workflow. Reapply later
-offboarding after any restore before accepting traffic.
-
-## Ownership and closeout
-
-The infrastructure owner owns Ansible, restore, NetBird and host access; the
-application owner validates staff identity/roles and content; the monitoring owner
-owns controller renewal and Discord; the release operator records evidence and
-the incident commander can stop the window. Escalate an unacknowledged page at
-5 minutes to infrastructure, 10 minutes to incident command and 15 minutes to
-the service owner. Name the actual people/contact paths in the change record.
-
-Close after 30 minutes of healthy production probes, correct access boundaries,
-verified fresh off-host recovery evidence, recorded rollback/emergency access,
-resolved migration failures and retired temporary grants. Link the exact refs,
-backup ID, reviewed reports and approval to infrastructure #28 and staff #38.
-Passing the isolated rehearsal alone does not clear the production gates above.
+Close after 30 minutes of healthy probes, correct boundaries, verified fresh
+recovery evidence, recorded emergency access and retired temporary grants. Record
+exact refs, backup ID, approval, failures and accepted follow-ups. For a future
+website migration, use [the cutover checklist](website-routing.md#content-cutover).

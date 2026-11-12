@@ -1,5 +1,7 @@
 # Isolated HOU1 metrics for HOU4 (infrastructure #27)
 
+> Historical test configuration. Use [environment monitoring](environment-monitoring.md) for current environment-bound deployment and [the docs index](README.md) for accepted production results.
+
 Run `ansible/playbooks/monitoring.yml` against the established private isolated
 inventory, with `hou1_monitoring_inventory_group` selecting that one-host group,
 `hou1_monitoring_identity_profile: test`, `hou1_monitoring_enabled: true` and
