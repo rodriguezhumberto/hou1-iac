@@ -1,0 +1,315 @@
+{
+  "issue": 28,
+  "recorded_at": "2026-11-11T17:05:41.179022+00:00",
+  "scope": "Production monitoring, bounded synthetic-login staleness alert and encrypted backup pairing",
+  "infrastructure_ref": "56ec4c7ca7a7e087cfda887d131100e9e13dc60d",
+  "monitoring_code_ref": "d03d838a9b5294087635d4c346d0e00b22882953",
+  "owner_confirmed_staff_app_login_logout": true,
+  "monitoring": {
+    "targets": [
+      {
+        "job": "hou1-authentik-ready",
+        "environment": "production",
+        "health": "up"
+      },
+      {
+        "job": "hou1-netbird-api",
+        "environment": "production",
+        "health": "up"
+      },
+      {
+        "job": "hou1-node",
+        "environment": "production",
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-alertmanager",
+        "environment": null,
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-blackbox",
+        "environment": null,
+        "health": "up"
+      },
+      {
+        "job": "hou4-internal-prometheus",
+        "environment": null,
+        "health": "up"
+      },
+      {
+        "job": "hou4-node",
+        "environment": "production",
+        "health": "up"
+      }
+    ],
+    "grafana_backend_healthy": true,
+    "fresh_synthetic_login_reader_denial_logout": "passed by maintained deployment readiness check",
+    "synthetic_identity": "Dedicated local reader initialized from its existing environment-bound SOPS bundle; no human account changed",
+    "corrected_attempt": "Initial readiness rejected retained test and production series. Select the deployment environment in probe and scrape readiness queries. Reapplication: 63 ok, 0 changed, 0 unreachable, 0 failed.",
+    "public_denials": [
+      {
+        "node": "hou1",
+        "port": 22,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou1",
+        "port": 9100,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 22,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 443,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 3000,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 9090,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 9093,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 9100,
+        "public_connection_denied": true
+      },
+      {
+        "node": "hou4",
+        "port": 9115,
+        "public_connection_denied": true
+      }
+    ],
+    "unrelated_peer_isolation": {
+      "passed": true,
+      "checks": [
+        {
+          "node": "hou1",
+          "port": 22,
+          "connection_denied": true
+        },
+        {
+          "node": "hou1",
+          "port": 443,
+          "connection_denied": true
+        },
+        {
+          "node": "hou1",
+          "port": 9100,
+          "connection_denied": true
+        },
+        {
+          "node": "hou4",
+          "port": 22,
+          "connection_denied": true
+        },
+        {
+          "node": "hou4",
+          "port": 443,
+          "connection_denied": true
+        }
+      ],
+      "peer_had_no_assigned_access_groups": true,
+      "temporary_setup_key_deleted": true,
+      "temporary_peer_deleted": true,
+      "temporary_container_and_identity_removed": true,
+      "existing_peer_set_preserved": true,
+      "public_firewall_changed": false,
+      "recorded_at": "2026-11-11T17:02:38.143083+00:00"
+    },
+    "active_alerts_after_recovery": []
+  },
+  "alerts": {
+    "passed": true,
+    "alert": "Hou1SyntheticStaffProbeStale",
+    "production_staleness_detected": true,
+    "fresh_successful_probe_after_restart": true,
+    "alert_resolved": true,
+    "discord_success_counters_increased_in_both_phases": true,
+    "discord_accepted_notification_increase": 2,
+    "new_discord_notification_errors": 0,
+    "real_alerts_kept_enabled": true,
+    "automatic_recovery_timer_already_completed_and_unloaded": true,
+    "cleanup_recheck_passed": true,
+    "channel_visibility_owner_confirmation_required": false,
+    "evidence_limit": "Notification counters correlate with the drill; they do not identify individual Discord messages.",
+    "corrected_attempt": "Final cleanup tried to stop an already collected transient recovery timer. Probe restoration and alert acceptance had passed; cleanup now accepts the completed timer and final health was rechecked.",
+    "duration_seconds": 698,
+    "completed_at": "2026-11-11T17:03:31.849778+00:00",
+    "human_services_stopped_by_alert_drill": false,
+    "separate_backup_capture_briefly_stopped_writers": true,
+    "owner_confirmed_firing_and_resolved_messages": true,
+    "owner_confirmation_recorded_at": "2026-11-11T21:40:51.257754+00:00"
+  },
+  "backup": {
+    "production_manifest": {
+      "schema": 1,
+      "environment": "production",
+      "created": 1794416001,
+      "id": "20261111T165321Z-af0f3ebf8ffe",
+      "size": 29887662,
+      "sha256": "79d488bd381a231d8a2abac968bedeef59b16bad66037cd31a40bdf5c0b4a602"
+    },
+    "receiver_receipt": {
+      "schema": 1,
+      "received": 1794416039,
+      "sha256": "79d488bd381a231d8a2abac968bedeef59b16bad66037cd31a40bdf5c0b4a602",
+      "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+    },
+    "source_capture_and_offhost_ciphertext_verification": "passed",
+    "source_writers_restarted_and_journal_cleared": true,
+    "offline_recipients": "owner only; no age private key on either VPS",
+    "schedule_utc": {
+      "source": "02:00",
+      "receiver": "03:00",
+      "maximum_jitter_seconds": 300
+    },
+    "retention": {
+      "daily": 7,
+      "weekly": 4
+    },
+    "transport_denials": {
+      "passed": true,
+      "checks": [
+        {
+          "command_kind": "arbitrary-shell",
+          "denied": true,
+          "exit_code": 1
+        },
+        {
+          "command_kind": "extra-arguments",
+          "denied": true,
+          "exit_code": 1
+        },
+        {
+          "command_kind": "empty",
+          "denied": true,
+          "exit_code": 1
+        }
+      ],
+      "pinned_export_key_authenticated_and_denied_non_export_commands": true,
+      "recorded_at": "2026-11-11T17:03:57.624240+00:00"
+    },
+    "authenticated_decryption": "passed",
+    "actual_service_restore": "PostgreSQL data imported and production reset functions checked in an isolated container; full application/identity service and replacement-host recovery remain open",
+    "authentication_evidence": {
+      "passed": true,
+      "production_source_backup_id": "20261111T165321Z-af0f3ebf8ffe",
+      "source_sha256": "79d488bd381a231d8a2abac968bedeef59b16bad66037cd31a40bdf5c0b4a602",
+      "scoped_drill_id": "20261111T165321Z-8c6ba35719b2",
+      "scoped_drill_sha256": "b3917d422eed222ab50f07f369a25c328de25e61b53fb19bc09b321e893f6800",
+      "authenticated_owner_decryption": true,
+      "scoped_reencryption_verified": true,
+      "sqlite_integrity": "passed",
+      "postgresql_dump_nonempty": true,
+      "complete_component_archives": true,
+      "ci_image_receipt_matches_saved_revision": true,
+      "owner_private_key_files_removed": true,
+      "plaintext_ram_directory_removed": true,
+      "nightly_backup_recipient_changed": false,
+      "live_services_changed": false,
+      "actual_postgresql_import_or_service_restore_proven": false,
+      "completed_at": "2026-11-11T21:42:37.314381+00:00"
+    },
+    "data_restore": {
+      "passed": true,
+      "scope": "Offline production data restore; not a full replacement-host or login gate",
+      "environment": "production",
+      "source_backup_id": "20261111T165321Z-8c6ba35719b2",
+      "postgresql_image": "postgres@sha256:1d04b9ba1d4996401f2552b51beda8187f175c0645c091e4781134fc9c9a3eef",
+      "postgresql_image_selection": "Local immutable image matching the saved PostgreSQL version; no registry pull",
+      "postgres_imported_into_empty_database": true,
+      "on_error_stop": true,
+      "postgres_tables": 187,
+      "identity_counts": {
+        "authentik_core_user": 5,
+        "authentik_core_group": 8,
+        "authentik_core_application": 3,
+        "authentik_providers_oauth2_oauth2provider": 3,
+        "authentik_crypto_certificatekeypair": 2
+      },
+      "non_session_postgres_tables_unchanged": 182,
+      "signing_keys_clients_users_groups_and_policies_preserved": true,
+      "maintained_production_session_reset_reused": true,
+      "idp_session_rows_before": {
+        "django_session": 0,
+        "authentik_core_authenticatedsession": 8,
+        "authentik_providers_oauth2_authorizationcode": 0,
+        "authentik_providers_oauth2_accesstoken": 6,
+        "authentik_providers_oauth2_refreshtoken": 4
+      },
+      "idp_sessions_codes_tokens_cleared": true,
+      "staff_session_rows_before": 8,
+      "staff_active_sessions_before": 0,
+      "staff_sessions_revoked": true,
+      "cms_non_session_tables_unchanged": 12,
+      "maintained_production_peer_reset_reused": true,
+      "stale_peer_connections_cleared": 4,
+      "netbird_non_connection_data_preserved": true,
+      "netbird_sqlite_databases_integrity_checked": 5,
+      "isolated_database_network": "none",
+      "published_ports": 0,
+      "restored_writers_started": false,
+      "database_storage": "container tmpfs",
+      "database_logs": "disabled",
+      "production_services_changed": false,
+      "full_replacement_host_restore_proven": false,
+      "cold_registry_pull_proven": false,
+      "login_on_restored_services_proven": false,
+      "duration_seconds": 45.768,
+      "disposable_container_removed": true,
+      "plaintext_ram_directory_removed": true,
+      "completed_at": "2026-11-11T21:51:19.838021+00:00",
+      "evidence_limit": "No restored application/IdP writers or login checks. The saved staff database had zero unrevoked sessions; this run checks the reset operation and preservation, not rejection of a previously active staff cookie. Cold-host recovery and registry pulls remain unproven.",
+      "private_harness_sha256": "3e380b3571017b511a622ad32cd3c415d46bbc02b60f32efd347ae64eda8f809",
+      "restoration_functions_ref": "2b0abccd4379f93044fdf929559f0cd0c4a9e452"
+    }
+  },
+  "validation": {
+    "monitoring_suite": {
+      "tests": 71,
+      "skipped": 16,
+      "result": "passed"
+    },
+    "skipped_native_checks_rechecked": {
+      "tests": 15,
+      "skipped": 0,
+      "result": "passed",
+      "note": "The unchanged opt-in Grafana OAuth test was already exercised in the separate SSO acceptance evidence."
+    },
+    "monitoring_playbook_syntax": "passed",
+    "infrastructure_runbook_tests": {
+      "tests": 2,
+      "result": "passed"
+    },
+    "log_sha256": {
+      "hou4-production-monitoring-final-tests.log": "2aefd90c3b36eb5130a030ebf547f2680c1ffedc685a8c603d3cc0e2353e85f8",
+      "hou4-production-monitoring-native-rechecks.log": "e9973f36b3580835e5dc5980eb540f8a452a57aea20743d3628c0b18cef3d328",
+      "production-monitoring-verify-fixed.private.log": "a74f23324e887eae7b7f77cefd7bc6a41dd6fb3986558a4a58f05b1b7f207542",
+      "production-backup-source.private.log": "a1e9277dbef962a2ef4aaa7b5ac0aee91c7d70d56c45f00620b5a9e53f5feae0"
+    }
+  },
+  "remaining": [
+    "Complete actual production recovery validation",
+    "Record manual staff/CMS content initialization",
+    "Finish release record, outstanding publication-entrypoint review and temporary-grant retirement",
+    "Explicit website traffic cutover approval"
+  ],
+  "independent_monitoring_node_outage_monitoring": "deferred by owner",
+  "production_promotion_complete": false,
+  "website_traffic_changed": false
+}
