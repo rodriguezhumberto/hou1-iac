@@ -70,6 +70,12 @@
         state: started
       loop: ['', '-status']
 
+    - name: Publish an initial renewal status before dependent monitoring starts
+      ansible.builtin.command:
+        argv: ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec', '{{ hou1_tls_executor_job_prefix }}-status']
+      changed_when: false
+      no_log: true
+
 - name: Find existing scheduled timers before disabling
   ansible.builtin.stat:
     path: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-tls-{{ hou1_tls_schedule_environment }}{{ item }}.timer'
