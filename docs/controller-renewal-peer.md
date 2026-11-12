@@ -96,12 +96,12 @@ owner recovery copy of the peer identity, scoped job identities and keys,
 encrypted DNS/ACME/certificate state, pinned SSH profiles and executor inputs.
 Do not start two controllers with the same saved peer identity. Reinstall the
 root launcher through Ansible and validate paths and host keys before resuming
-timers on a replacement controller. An escrow copy alone does not prove a
-replacement-controller restore.
+timers on a replacement controller. Test the recovery bundle on a separate
+controller as described in [outstanding validation](documentation-review.md#outstanding-validation).
 
 Record live namespace/host-route isolation, target-only access, denied arbitrary
 commands, restart persistence, served-certificate validation and alert recovery
 after transport or receiver changes. [Scoped peer validation](evidence/scoped-renewal-peer-2026-11-11.json)
 and [production handoff](evidence/production-host-recovery-2026-11-12.json) record
-accepted live checks. Replacement-controller execution remains unproven under
+accepted live checks. Record controller recovery runs under
 [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).

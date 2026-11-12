@@ -47,9 +47,8 @@ source/image refs. Roll back the public redirect with the boolean switch and a
 normal runtime render. Never assign private service hostnames to the public list.
 
 Record native HTTP/HTTPS redirect, canonical host, absent secondary host, public
-staff denial and unknown-host checks before release. Check DNS and certificate
-coverage separately. Offline fixtures do not authorize DNS edits, deploy a node,
-publish an image, or clear live production acceptance.
+staff denial and unknown-host checks before release. Verify DNS and certificate
+coverage against the deployed configuration.
 
 ## Content cutover
 

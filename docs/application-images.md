@@ -71,5 +71,6 @@ implemented.
 publication, deployment, migration rollback and 29 isolated recovery checks.
 [Clean-host evidence](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
 records a digest-backed restore and reboot. That migration rollback used a
-pre-CI image; it does not prove rollback compatibility between future CI releases.
+pre-CI image. Test rollback between the selected CI release digests before
+deployment and record their database compatibility.
 See [production recovery status](production-host-recovery.md#latest-live-result).

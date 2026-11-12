@@ -44,13 +44,17 @@ performed. Dated evidence reports retain their original results and limitations.
   Vault inputs remain. [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45)
   tracks that work; this cleanup does not claim all decryption is controller-only.
 
-## Evidence limits retained
+## Outstanding validation
 
-Independent renewal-controller execution remains
-[#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77), and uninterrupted
-production replacement remains [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
-Owner-local decryption proved access, not either execution test. Live interrupted
-HOU4 transfer, provider power-cut testing and an offline image mirror are not
-proven or implemented. Independent HOU4 outage monitoring remains intentionally
-deferred. The Private Relay workaround was verified per network; global disablement
-is not established as a requirement for monitoring.
+| Test | Follow-up |
+| --- | --- |
+| Restore the renewal controller on a separate clean host | [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). Owner-local decryption of the recovery bundle passed. |
+| Run production replacement recovery from start to finish without corrections | [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). Include a service restore from the retained post-import point. |
+| Interrupt a live HOU4 transfer and verify retry/commit behavior | Receiver process-kill/retry checks passed locally; schedule the live test separately. |
+| Recover capture after a provider-level power cut | Writer SIGTERM/SIGKILL and normal reboot recovery passed; schedule the provider test separately. |
+| Roll back between two published CI digests | The original migration used a pre-CI rollback image. Validate the chosen release pair and database compatibility. |
+| Repeat Discord firing/resolution after replacement | Delivery was confirmed before replacement; collection and probe health passed afterward. Repeat delivery checks after receiver or routing changes. |
+
+An offline OCI mirror is unimplemented. Independent HOU4 outage monitoring is
+deliberately deferred. The owner uses a network-specific Private Relay pause for
+the Authentik overview; document a tested coexistence configuration if that changes.

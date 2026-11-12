@@ -72,6 +72,5 @@ identifies accounts by the signed subject and disables automatic email linking;
 its authorization does not depend on Authentik's stock `email_verified: false`.
 
 Before enabling the HOU4 client, verify its retained local emergency password.
-Then apply HOU4's `grafana-sso.yml` playbook and check Google login, the assigned
-role, logout and local emergency login. Record live evidence separately from the
-disposable container tests. Passing fixtures cannot prove a human Google callback.
+Apply HOU4's `grafana-sso.yml` playbook, then test Google sign-in, the assigned
+role, logout and local emergency login. Record the results with the deployment.
