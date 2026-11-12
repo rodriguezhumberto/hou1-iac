@@ -192,6 +192,11 @@ def apply_google(google, api, secret):
             api.request('POST', '/policies/bindings/', payload)
         elif any(matches[0].get(k) != v for k, v in payload.items()):
             api.request('PATCH', f'/policies/bindings/{matches[0]["pk"]}/', payload)
+    # Google can return an existing connection while the browser already has
+    # an Authentik session (for example, after an application logout). Permit
+    # that callback only after both verified-email admission gates are ready.
+    if flows[0].get('authentication') != 'none':
+        api.request('PATCH', f'/flows/instances/{flows[0]["slug"]}/', {'authentication': 'none'})
     # Internal is Authentik's normal application-user type, not superuser status.
     # Roles remain explicit and are reconciled separately after first login.
     if user_write.get('user_type') != 'internal':

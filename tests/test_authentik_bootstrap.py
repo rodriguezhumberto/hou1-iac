@@ -83,8 +83,10 @@ class AuthentikBootstrapTest(unittest.TestCase):
     def google_api(self):
         api = FixtureAPI()
         api.objects['flows/instances'] += [
-            {'pk': 'source-auth', 'pbm_uuid': 'auth-parent', 'slug': 'default-source-authentication', 'policy_engine_mode': 'any'},
-            {'pk': 'source-enroll', 'pbm_uuid': 'enroll-parent', 'slug': 'default-source-enrollment', 'policy_engine_mode': 'any'},
+            {'pk': 'source-auth', 'pbm_uuid': 'auth-parent', 'slug': 'default-source-authentication',
+             'policy_engine_mode': 'any', 'authentication': 'require_unauthenticated'},
+            {'pk': 'source-enroll', 'pbm_uuid': 'enroll-parent', 'slug': 'default-source-enrollment',
+             'policy_engine_mode': 'any', 'authentication': 'none'},
         ]
         api.objects['stages/identification'] = [
             {'pk': 'identify', 'name': 'default-authentication-identification', 'sources': ['other-source']}]
@@ -105,6 +107,9 @@ class AuthentikBootstrapTest(unittest.TestCase):
         binding_writes = [i for i, w in enumerate(api.writes) if w[1] == '/policies/bindings/']
         self.assertEqual(len(binding_writes), 2)
         self.assertTrue(all(i < source_write for i in binding_writes))
+        applicability_write = next(i for i, w in enumerate(api.writes)
+                                   if w[2] == {'authentication': 'none'})
+        self.assertTrue(all(i < applicability_write < source_write for i in binding_writes))
         self.assertEqual(source['pkce'], 'S256')
         self.assertEqual(source['user_matching_mode'], 'email_link')
         self.assertEqual(source['user_path_template'], 'goauthentik.io/sources/%(slug)s')
@@ -116,6 +121,46 @@ class AuthentikBootstrapTest(unittest.TestCase):
         self.assertEqual(len(api.writes), first_count)
         self.assertEqual(len(api.objects['sources/oauth']), 1)
         self.assertEqual(len(api.objects['policies/bindings']), 2)
+
+    def test_existing_session_callback_is_enabled_only_after_admission_guards(self):
+        api = self.google_api()
+        google = self.google_manifest()['google']
+        bootstrap.apply_google(google, api, 'fixture-secret')
+        # Reproduce an enabled source with the upstream unauthenticated-only
+        # default and a damaged admission binding, as on an existing install.
+        api.objects['flows/instances'][-2]['authentication'] = 'require_unauthenticated'
+        api.objects['policies/bindings'][0].update(enabled=False, negate=True, failure_result=True)
+        api.writes.clear()
+        bootstrap.apply_google(google, api, 'fixture-secret')
+        self.assertEqual([write[2] for write in api.writes][-1], {'authentication': 'none'})
+        self.assertEqual(api.writes[-1][1], '/flows/instances/default-source-authentication/')
+        self.assertEqual(len(api.writes), 2)
+        for binding in api.objects['policies/bindings']:
+            self.assertTrue(binding['enabled'])
+            self.assertFalse(binding['negate'])
+            self.assertFalse(binding['failure_result'])
+        self.assertTrue(all(flow['policy_engine_mode'] == 'all'
+                            for flow in api.objects['flows/instances'][-2:]))
+        self.assertEqual(api.objects['flows/instances'][-2]['authentication'], 'none')
+        self.assertEqual(api.objects['sources/oauth'][0]['pkce'], 'S256')
+        api.writes.clear()
+        bootstrap.apply_google(google, api, 'fixture-secret')
+        self.assertEqual(api.writes, [])
+
+    def test_admission_binding_failure_preserves_unauthenticated_only_flow(self):
+        api = self.google_api()
+        original_request = api.request
+
+        def fail_binding(method, path, payload=None):
+            if method == 'POST' and path == '/policies/bindings/':
+                raise RuntimeError('fixture admission failure')
+            return original_request(method, path, payload)
+
+        with patch.object(api, 'request', side_effect=fail_binding):
+            with self.assertRaisesRegex(RuntimeError, 'admission failure'):
+                bootstrap.apply_google(self.google_manifest()['google'], api, 'fixture-secret')
+        self.assertEqual(api.objects['flows/instances'][-2]['authentication'], 'require_unauthenticated')
+        self.assertNotIn('sources/oauth', api.objects)
 
     def test_delayed_defaults_finish_before_any_identity_write(self):
         for resource, field, value in [
