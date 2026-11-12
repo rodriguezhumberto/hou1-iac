@@ -1,0 +1,106 @@
+{
+  "recorded_at": "2026-11-12T06:30:14.945233+00:00",
+  "environment": "production",
+  "attempt_id": "prod-recovery-20261112-02",
+  "refs": {
+    "infrastructure": "64cbddce364e3321f9f7d6e02b71f3059a08d486",
+    "application": "4434c5c1b4b124054e7f1232478a8c4ae0b95608",
+    "hou4": "50ff3435896e37de17a5485c6377af5421e9054e",
+    "application_image_digest": "sha256:a9a90b0bae7239a682e2c1e2593c1130bfadf648d020bdbf82e97f63838b8aa4"
+  },
+  "restored_point": "20261111T165321Z-8c6ba35719b2",
+  "restore": {
+    "passed": true,
+    "postgres_tables": 187,
+    "sessions_revoked_before_writers": true,
+    "identity_bootstrap_run": false,
+    "cms_seed_run": false,
+    "cold_registry_pulls": true,
+    "cold_application_build": false,
+    "ports_bound_to_loopback": true,
+    "restore_seconds": 542.335
+  },
+  "owner_checks": {
+    "owner_google_login_verified": true,
+    "owner_vpn_verified": true,
+    "owner_personal_ssh_verified": true,
+    "owner_staff_signin_signout_verified": true,
+    "owner_grafana_signin_signout_verified": true,
+    "verified_by": "owner report",
+    "recorded_at": "2026-11-12T06:15:39.233278+00:00"
+  },
+  "reboot": {
+    "passed": true,
+    "boot_id_changed": true,
+    "private_ssh_and_sudo_restored": true,
+    "elapsed_until_verified_seconds": 82.36,
+    "recorded_at": "2026-11-12T06:17:23.051463+00:00"
+  },
+  "operational_handoff": {
+    "monitoring_targets_up": 7,
+    "application_containers_healthy": 7,
+    "staff_probe_success": true,
+    "source_backup_success": true,
+    "offhost_backup_success": true,
+    "both_tls_status_jobs_success_after_admin_peer_removal": true,
+    "current_active_prometheus_alerts": 0,
+    "public_management_denial_passed": true
+  },
+  "fresh_offhost_point": {
+    "id": "20261112T050231Z-b24098873538",
+    "bytes": 29889682,
+    "sha256": "ca3101ac9eaf779d609ac061d7dd161ace361e2a6339efe5e5a9335e32a4b035",
+    "checksum_and_size_verified": true,
+    "owner_only_encryption": true,
+    "new_point_decryption_test_performed": false
+  },
+  "temporary_access": {
+    "owner_and_scoped_renewal_keys_preserved": true,
+    "dashboard_source_removed": true,
+    "hou4_public_recovery_access_closed": true,
+    "both_public_ssh_ports_denied": true,
+    "temporary_ssh_keys_removed_and_rejected": true,
+    "administrative_vpn_peer_deleted": true,
+    "local_temporary_ssh_and_deployment_age_keys_deleted": true,
+    "persistent_renewal_peer_preserved": true,
+    "service_credentials_rotated": false
+  },
+  "controller_recovery_copy": {
+    "owner_only_encryption": true,
+    "temporary_administrative_identity_excluded": true,
+    "sha256": "ea14e206593467255e2ffe4c0fdced33fa71ce75536ddd9f01bf619c5c88b544",
+    "owner_decryption_independently_verified": false
+  },
+  "operator_corrections": [
+    "Corrected controller bootstrap contract before remote changes.",
+    "Pinned the replacement VPN SSH host key and resumed the security role after publication reached the controller verification step.",
+    "Rebound only the replacement HOU1 peer in the existing renewal destination group.",
+    "Restarted HOU4 NetBird through independent recovery SSH to discard its cached old HOU1 WireGuard key; off-host collection then succeeded."
+  ],
+  "limitations": {
+    "uninterrupted_end_to_end_automation_proven": false,
+    "discord_alert_drill_repeated_after_replacement": false,
+    "independent_controller_restore_tested": false,
+    "website_traffic_cutover_performed": false,
+    "website_checked_with_local_resolution_only": true,
+    "independent_hou4_outage_monitoring": "deferred by owner"
+  },
+  "private_evidence_sha256": {
+    "restore.result.json": "f7ecf6e840be46f0416a55335a1ce3591d4bb81b68bb6d67fc0e7d4e97a0def2",
+    "evidence/prod-recovery-20261112-02/restore-report.json": "a53dbf1cea0ff2faa6a8515346e9ed88f656bfc136250b86fbf1472dd1065759",
+    "publish.result.json": "104f8f08e96ec8a1781b3f154195cefcb87d3871109a4f7fedafee7316d43000",
+    "monitoring-health.result.json": "e7494ac9bb321452493fa6ec0611b6054f82d83cece8dd88f445584880ff1020",
+    "final-monitoring.result.json": "478351405ab4e5a5bfa3608d4f2bb25780b00099959c63affa0e7f3dc55564ab",
+    "renewal-after-retirement.result.json": "c57a8e141be6ab810dd14c09cfc5d8bc83d266a9992ce054647fbd1b8914a9a8",
+    "fresh-offhost-backup.result.json": "27d751c1a9fd7df333868aed382d51ac04850297c8d08e6768d5dff0c10279bb",
+    "external-security.result.json": "409094df8df0ede39ef9171b6518c9c18a8b398632c0f33dedad81a5c2ebadf1",
+    "owner-access.result.json": "117f45c68ecc22d65261fe105ddcb2b0e48b02c3cd629c58ce8fed4c159d24ff",
+    "reboot.result.json": "51b92f3a0778690a56f02a9777f6de59e5e004bc38cd44a1cff918fcfefac566",
+    "hou1-keys-remove.json": "b967e968f1b184f48c8759d8ce9cd6efd29020ab63e3df195ef61d24ab52f4be",
+    "hou4-keys-remove.json": "bbea8aff2efc3fb14381e21e5d274b863ed9431d571b76fac3174df1bbe7c240",
+    "controller-peer-remove.json": "3d2bbd9d9682862ca4ca5a7a6049b171158c8a3b730eccb551a20b27efe7155a",
+    "temporary-ssh-rejected.json": "7857da42a5869e3d8e7c63fe7d306921dab775a194169591b7a6a6a44a518974",
+    "temporary-local-credentials-retired.json": "2df085613ad1c2a0c3257add0add6343308ebe0f7a88ced65b6d860e96277582",
+    "final-public-ssh-denial.json": "855404ed3ce0078ee9576ab02d3fce2c6c5b192a5869856ac581b9d360d71732"
+  }
+}

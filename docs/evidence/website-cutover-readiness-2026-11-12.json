@@ -1,0 +1,39 @@
+{
+  "recorded_at": "2026-11-12T06:42:37.667343+00:00",
+  "purpose": "Public website readiness before traffic cutover",
+  "website_traffic_changed": false,
+  "dns_changed": false,
+  "candidate_checked_using_local_resolution": true,
+  "homepage_https_status": "200",
+  "alias_redirect_status": "301",
+  "alias_redirect_preserves_path_and_query": true,
+  "linked_public_pages_passed": [
+    "/",
+    "/services",
+    "/about-us",
+    "/contact",
+    "/blog",
+    "/guest-showcase",
+    "/privacy-policy"
+  ],
+  "referenced_assets_checked": 10,
+  "asset_failures": 0,
+  "published_cms_counts": {
+    "current": {
+      "pets": 9,
+      "services": 8,
+      "blog-posts": 0,
+      "media": 17
+    },
+    "candidate": {
+      "pets": 0,
+      "services": 0,
+      "blog-posts": 0,
+      "media": 0
+    }
+  },
+  "content_ready": false,
+  "blocker": "Replacement has no published CMS content; existing services, pets and media must be migrated or intentionally replaced before traffic cutover.",
+  "form_submissions_tested": false,
+  "private_comparison_sha256": "92e3437861fc2f2e7f97a713e74063b36246cf885ed0896ebf9fcd71057e32c9"
+}

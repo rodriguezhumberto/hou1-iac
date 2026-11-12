@@ -1,0 +1,441 @@
+{
+  "recorded_at": "2026-11-12T08:01:04.144291+00:00",
+  "environment": "production",
+  "refs": {
+    "infrastructure": "64cbddce364e3321f9f7d6e02b71f3059a08d486",
+    "application": "4434c5c1b4b124054e7f1232478a8c4ae0b95608",
+    "application_image_digest": "sha256:a9a90b0bae7239a682e2c1e2593c1130bfadf648d020bdbf82e97f63838b8aa4"
+  },
+  "operation": "Initial business-data copy; traffic remains on the source",
+  "source_snapshot": "2026-11-12T07:26:11.740756+00:00",
+  "dry_run_passed": true,
+  "import": {
+    "passed": true,
+    "table_counts": {
+      "cms_media": 17,
+      "cms_pets": 9,
+      "cms_services": 8,
+      "cms_blog_posts": 0,
+      "cms_import_state": 34,
+      "submissions": 41,
+      "access_codes": 41,
+      "intake_forms": 2,
+      "push_subscriptions": 1
+    },
+    "business_table_hashes_match_source": true,
+    "authentication_and_other_destination_tables_preserved": true,
+    "preserved_table_counts": {
+      "cms_schema_migrations": 2,
+      "staff_offboarding_audit": 0,
+      "staff_session_revocations": 0,
+      "staff_sessions": 172,
+      "staff_subject_blocks": 0
+    },
+    "media_files_verified": 17,
+    "sqlite_integrity": "ok",
+    "elapsed_seconds": 22.505
+  },
+  "web_checks": {
+    "passed": true,
+    "published_counts": {
+      "services": 8,
+      "pets": 9,
+      "blog-posts": 0,
+      "media": 17
+    },
+    "all_published_records_match_current_source": true,
+    "media_bytes_match_current_source": 17,
+    "legacy_service_detail_urls_passed": 8,
+    "public_page_checks_passed": 5,
+    "customer_form_submissions_sent": false
+  },
+  "rollback": {
+    "source_component_copy_encrypted_to_owner": true,
+    "target_pre_import_component_copy_encrypted_to_owner": true,
+    "component_copies_decryption_tested": false
+  },
+  "post_import_recovery_point": {
+    "manifest": {
+      "schema": 1,
+      "environment": "production",
+      "created": 1794470192,
+      "id": "20261112T075632Z-d975b8f1eff4",
+      "size": 34666268,
+      "sha256": "e053e97b0495a820231c03ace55f6127d32513cfa979529296bb3f496f10cb0b"
+    },
+    "owner_only_encryption": true,
+    "controller_copy_size_checksum_verified": true,
+    "owner_decryption_test_performed": false,
+    "hou4_collection_pending": false,
+    "owner_reported_hou4_collection_command_run": true,
+    "hou4_receipt_from_owner": {
+      "schema": 1,
+      "received": 1794471901,
+      "sha256": "e053e97b0495a820231c03ace55f6127d32513cfa979529296bb3f496f10cb0b",
+      "verification": "ciphertext-size-sha256-over-pinned-ssh; offline-decryption-drill-required"
+    },
+    "hou4_receipt_sha256_matches_source": true,
+    "hou4_received_utc": "2026-11-12T08:25:01+00:00",
+    "hou4_receipt_identification": "Owner returned receipt from the exact post-import recovery-point path supplied."
+  },
+  "source_unchanged_at_latest_comparison": true,
+  "source_accepting_writes": false,
+  "final_cutover_sync_complete": true,
+  "website_dns_or_traffic_changed": true,
+  "owner_staff_content_review_pending": false,
+  "temporary_access": {
+    "source_public_ssh_restricted_to_controller": true,
+    "source_automatic_firewall_and_listener_cleanup_utc": "2026-11-12T08:20:55Z",
+    "target_admin_grant_expiry_utc": "2026-11-12T08:35:25Z",
+    "target_ssh_publicly_opened": false,
+    "supplied_owner_age_identity_deleted": true,
+    "persistent_renewal_peer_changed": false
+  },
+  "private_evidence_sha256": {
+    "source-capture.private.json": "af4c442d9e1ae8803d0379ed191810927b243583a85e740897e4674967a60dc3",
+    "source-encrypted-copy.result.json": "1cc86f656338518a3fc1e536982838228cca5fcdedeeae81f9ea8c86e3177949",
+    "target-encrypted-backup.result.json": "f51bd86117920d61bade72cbd4a45fc2c3d958569dab0e09dd57e88b4b1c289e",
+    "staging.result.json": "b5369220249ccc14819f7472d4ca6e5c425f114fe0f4697226d7797648aca15c",
+    "import-dry-run.result.json": "b1ee3d96cff4954987d94c3d77be80e5e41addd2677e2f11de18acc9ece12622",
+    "import-apply.result.json": "0fe29986a0a7ae6018a7cbb861a27f861ba3edca5da0be56c23b71e6450e51cb",
+    "public-verification.result.json": "b617e4c69468cf6a8aa3486e506eb5d5da30aefc98c5a93ec46e6368b67b8bbf",
+    "source-latest-comparison.json": "5cd2438c23ffc406a0341cb0d76267df9537f71775e8a30de8f25f04f920fe0d",
+    "post-import-backup.result.json": "1504b6265c3acce9a4de5a6d999cc56115e22989deed5fe8079efb7bda3dbc6b",
+    "staff-dns-fix.result.json": "98a4bee078191fe98a1e78fb54c44662d94c897a8e8288175935162a92bd0c22",
+    "source-pre-final-sync-comparison.json": "2855528bbe875dfc87c17544bf99084efebabffe9a59b2442f94aea5300282a0",
+    "target-latest-comparison.json": "e547c9bc3e8f62524b4073f99e91938ef5702ed8652241aba2a1d8b5f0c1b417",
+    "source-reopened-access.result.json": "597fd326d9197ff05714edc2e7de1a164773500bf00409e53adde251b1f276cb",
+    "owner-replacement-comparison.json": "350c0ab3089cc84c7ad67bd51b19212e9f62f3b7820d54a6b3e2a3eb0d7cfb2b",
+    "final-source-write-freeze.result.json": "1f8df2598781b5e9c350755d1892bbeb74b322aeb2531a7242bc3a94b61300dd",
+    "owner-replacement-during-freeze.json": "19d31d66cec273b3a94e12b97babf4a43be54ed15c84900d299d0f33eedde0e8",
+    "website-cutover.result.json": "8a082f07f49874eae94c20d3ff0fd6368f32b361e025eef5a0fee704998459ad",
+    "post-cutover-public-content.result.json": "35d4d4625d3bc5a54b2fb31ebcdec419969f90e61e703086a43ac9ed8666a925",
+    "post-cutover-ingress.result.json": "9575cb942edf9a0eaeca59eebd4fc652f73ffc670ba7d3b44b0f73f904433e13",
+    "observation-summary.json": "2a67587675aecb3011a21d944c23dd2508428df3aa59c95094d6bf71d1e221c1",
+    "observation-samples.jsonl": "e7984399f93f7a8af88c3121c9cf4cdb7da3bb7ff48c21f12ea8c78a3ef3d322",
+    "source-access-retired.result.json": "edabf13b680312fdcce118198b7a3f8909af2adf5fc8e3bde325eb76f6554772"
+  },
+  "staff_dns_followup": {
+    "recorded_at": "2026-11-12T08:19:42.749336+00:00",
+    "owner_observed_legacy_system_resolution": true,
+    "owner_direct_queries_to_vpn_dns_proxy_and_private_upstream_returned_replacement_address": true,
+    "legacy_public_staff_A_record_corrected_to_replacement_vpn_address": true,
+    "existing_proxy_and_ttl_settings_preserved": true,
+    "cloudflare_and_google_public_resolution_verified": true,
+    "private_staff_login_http_status": 200,
+    "public_website_apex_and_alias_records_unchanged": true,
+    "owner_browser_retest_pending": false,
+    "owner_confirmed_staff_access": true
+  },
+  "owner_confirmed_imported_services_pets_and_submission_history": true,
+  "final_sync_preparation": {
+    "source_comparison_at": "2026-11-12T08:47:03.764117+00:00",
+    "source_business_and_schema_tables_unchanged": true,
+    "source_media_unchanged": true,
+    "source_still_accepting_writes": true,
+    "latest_replacement_controller_comparison_at": "2026-11-12T08:34:50.500208+00:00",
+    "replacement_business_tables_unchanged_at_that_check": true,
+    "replacement_media_unchanged_at_that_check": true,
+    "owner_replacement_recheck_pending": false,
+    "owner_verifier_sha256": "daaab0bd9980948e224cd339d513d5a20f0a83a9d581a1fb4af77d6dad913481",
+    "owner_verifier_fixture_checks": [
+      "matching copy passes",
+      "business-row edit rejected",
+      "media-byte edit rejected"
+    ],
+    "no_op_final_sync_allowed_only_if_both_sides_still_match_under_source_write_freeze": true,
+    "website_cutover_approved": true,
+    "owner_replacement_recheck": {
+      "passed": true,
+      "readonly": true,
+      "recorded_at": "2026-11-12T08:57:34.346807+00:00",
+      "source_snapshot": "2026-11-12T07:26:11.740756+00:00",
+      "manifest_sha256": "569a6875a4797c4aa3886fbbe59c2986d5441c1983dd2c7ea69c65012c976771",
+      "business_table_counts": {
+        "cms_media": 17,
+        "cms_pets": 9,
+        "cms_services": 8,
+        "cms_blog_posts": 0,
+        "cms_import_state": 34,
+        "submissions": 41,
+        "access_codes": 41,
+        "intake_forms": 2,
+        "push_subscriptions": 1
+      },
+      "media_files": 17,
+      "business_tables_match_snapshot": true,
+      "media_match_snapshot": true,
+      "sqlite_integrity": "ok",
+      "foreign_key_errors": 0
+    },
+    "owner_replacement_recheck_during_source_freeze": {
+      "passed": true,
+      "readonly": true,
+      "recorded_at": "2026-11-12T09:06:01.866411+00:00",
+      "source_snapshot": "2026-11-12T07:26:11.740756+00:00",
+      "manifest_sha256": "569a6875a4797c4aa3886fbbe59c2986d5441c1983dd2c7ea69c65012c976771",
+      "business_table_counts": {
+        "cms_media": 17,
+        "cms_pets": 9,
+        "cms_services": 8,
+        "cms_blog_posts": 0,
+        "cms_import_state": 34,
+        "submissions": 41,
+        "access_codes": 41,
+        "intake_forms": 2,
+        "push_subscriptions": 1
+      },
+      "media_files": 17,
+      "business_tables_match_snapshot": true,
+      "media_match_snapshot": true,
+      "sqlite_integrity": "ok",
+      "foreign_key_errors": 0
+    }
+  },
+  "migration_access_followup": {
+    "replacement_temporary_grant_retired_at": "2026-11-12T08:35:46.603699+00:00",
+    "replacement_admin_peer_deleted": true,
+    "replacement_container_removed": true,
+    "replacement_temporary_private_keys_deleted": true,
+    "source_ssh_reopened": true,
+    "source_ssh_password_authentication_disabled": true,
+    "source_public_ssh_restricted_to_controller": true,
+    "source_cleanup_utc": "2026-11-12T09:46:00Z",
+    "source_vpn_startup_gate_and_listener_config_restoration_scheduled": true,
+    "persistent_renewal_peer_changed": false
+  },
+  "post_import_security": {
+    "staff_public_denial": {
+      "status": "403",
+      "passed": true
+    },
+    "identity_admin_public_denial": {
+      "status": "403",
+      "passed": true
+    },
+    "netbird_api": {
+      "status": "200",
+      "passed": true
+    },
+    "target_public_ssh_denied": true,
+    "recorded_at": "2026-11-12T08:05:06.066459+00:00"
+  },
+  "latest_followup_at": "2026-11-12T10:21:02.645139+00:00",
+  "cutover": {
+    "approved_at": "2026-11-12T09:03:35.630724+00:00",
+    "source_write_freeze_verified_at": "2026-11-12T09:04:18.805700+00:00",
+    "final_sync_mode": "Verified no-op: frozen source business tables/media and destination match the reviewed snapshot.",
+    "all_source_tables_and_media_match_snapshot": true,
+    "owner_replacement_check_during_freeze_passed": true,
+    "completed_at": "2026-11-12T09:06:29.336320+00:00",
+    "dns_origin_records_changed": 2,
+    "proxy_and_ttl_preserved": true,
+    "source_application_left_stopped": true,
+    "automatic_dns_rollback_performed": false,
+    "post_cutover_public_checks": {
+      "passed": true,
+      "recorded_at": "2026-11-12T09:07:05.164619+00:00",
+      "phase": "post_cutover",
+      "published_counts": {
+        "services": 8,
+        "pets": 9,
+        "blog-posts": 0,
+        "media": 17
+      },
+      "published_records_match_direct_replacement_origin": true,
+      "media_files_match_direct_replacement_origin": 17,
+      "legacy_service_detail_urls_passed": 8,
+      "public_page_checks_passed": 5,
+      "customer_form_submissions_sent": false,
+      "website_traffic_changed": true,
+      "final_sync_mode": "verified no-op under source write freeze"
+    },
+    "public_home_and_services_api_http_status": 200,
+    "public_responses_dynamic_through_proxy": true,
+    "canonical_alias_status": 301,
+    "canonical_alias_path_and_query_preserved": true,
+    "observation": {
+      "started_at": "2026-11-12T09:10:14.102691+00:00",
+      "planned_seconds": 1800,
+      "interval_seconds": 60,
+      "samples": 31,
+      "all_samples_passed": true,
+      "failed_samples": 0,
+      "complete": true,
+      "elapsed_seconds": 1800.309,
+      "checks_per_sample": 7,
+      "customer_submissions_sent": false,
+      "finished_at": "2026-11-12T09:40:14.412193+00:00"
+    },
+    "scheduled_observation_review_utc": "2026-11-12T09:41:00Z",
+    "owner_post_cutover_checks_pending": false,
+    "source_access_retirement_pending": false,
+    "off_host_recovery_point_covers_final_business_dataset": true,
+    "rollback_after_new_writes_requires_data_reconciliation": true,
+    "owner_post_cutover_checks": {
+      "reported_at": "2026-11-12T09:21:43.694955+00:00",
+      "website_services_pets_and_images_load": true,
+      "canonical_alias_redirects": true,
+      "staff_signin_and_signout": true,
+      "grafana_signin_and_signout": true,
+      "grafana_dashboards_reported_not_visible": true,
+      "authentik_overview_flow_denial_reported": true,
+      "grafana_direct_dashboard_link_check_pending": false,
+      "authentik_denial_path_and_details_pending": false,
+      "monitoring_dashboard_acceptance_passed": true,
+      "grafana_direct_dashboard_displays_data": true,
+      "authentik_overview_denial": "Flow does not apply to current user during Google callback with an existing session.",
+      "grafana_homepage_issue_resolved": true,
+      "authentik_overview_issue_resolved": true
+    },
+    "source_access_retirement": {
+      "closed_at": "2026-11-12T09:45:11.087372+00:00",
+      "original_ssh_config_and_vpn_gate_restored": true,
+      "temporary_public_listener_stopped": true,
+      "source_application_running_before_cleanup": false,
+      "public_ssh_unreachable_after_cleanup": true
+    },
+    "usability_repairs": {
+      "authentik_source_authentication_applicability": {
+        "recorded_at": "2026-11-12T09:48:48.169641+00:00",
+        "changed": true,
+        "before_authentication": "require_unauthenticated",
+        "after_authentication": "none",
+        "existing_verified_email_admission_preserved": true,
+        "unknown_and_unverified_accounts_denied": true,
+        "source_pkce_and_both_flow_bindings_unchanged": true,
+        "unrelated_flow_configuration_unchanged": true,
+        "services_restarted": false,
+        "owner_browser_retest_pending": true
+      },
+      "grafana_homepage": {
+        "changed": true,
+        "health": "ok",
+        "home_opens_operations_dashboard": true,
+        "provisioned_dashboard_has_panels": true,
+        "other_services_restarted": false,
+        "rollback_config_root_only": true
+      },
+      "owner_fresh_browser_checks_pending": false,
+      "post_repair_public_security_checks": {
+        "recorded_at": "2026-11-12T09:50:22.143498+00:00",
+        "passed": true,
+        "checks": [
+          {
+            "name": "website_home",
+            "passed": true,
+            "status": "200",
+            "seconds": 0.13456,
+            "curl_exit": 0
+          },
+          {
+            "name": "public_services",
+            "passed": true,
+            "status": "200",
+            "seconds": 0.109102,
+            "curl_exit": 0
+          },
+          {
+            "name": "canonical_alias",
+            "passed": true,
+            "status": "301",
+            "seconds": 0.114246,
+            "curl_exit": 0
+          },
+          {
+            "name": "netbird_api",
+            "passed": true,
+            "status": "200",
+            "seconds": 0.120523,
+            "curl_exit": 0
+          },
+          {
+            "name": "identity_flow",
+            "passed": true,
+            "status": "200",
+            "seconds": 0.249077,
+            "curl_exit": 0
+          },
+          {
+            "name": "staff_public_denial",
+            "passed": true,
+            "status": "403",
+            "seconds": 0.118373,
+            "curl_exit": 0
+          },
+          {
+            "name": "identity_admin_public_denial",
+            "passed": true,
+            "status": "403",
+            "seconds": 0.116902,
+            "curl_exit": 0
+          }
+        ]
+      },
+      "grafana_owner_confirmed_homepage": true,
+      "authentik_owner_retest": "Google login succeeds, overview briefly appears then redirects to login.",
+      "authentik_private_routing_diagnosis": {
+        "nginx_portal_identity_api_status": 403,
+        "observed_browser_route": "public",
+        "owner_system_resolution_uses_public_address": true,
+        "owner_netbird_dns_proxy_returns_private_address": true,
+        "server_private_dns_record_correct": true,
+        "owner_device_has_enabled_split_dns_assignment": true,
+        "private_api_restriction_preserved": true,
+        "owner_system_resolver_correction_pending": false,
+        "owner_hosts_override_not_found": true,
+        "owner_cache_flush_did_not_change_public_answer": true,
+        "owner_reconnect_installed_expected_supplemental_resolver": true,
+        "owner_confirmed_private_relay_enabled": true,
+        "owner_network_specific_private_relay_pause_and_portal_retest_pending": false,
+        "forced_private_request_reached_vpn": true,
+        "forced_private_unauthenticated_status": 403,
+        "unauthenticated_upstream_403_is_expected": true,
+        "network_private_relay_workaround_verified": true,
+        "observed_browser_route_after_privacy_change": "vpn"
+      },
+      "authentik_final_owner_acceptance": {
+        "owner_confirmed_overview_stays_open": true,
+        "after_requested_network_private_relay_pause": true,
+        "browser_requests_use_vpn": true,
+        "authenticated_user_api_status": 200,
+        "applications_api_status": 200,
+        "server_log_verified_at": "2026-11-12T10:17:27+00:00",
+        "owner_system_dns_answer_not_reported": true
+      },
+      "temporary_access_retirement": {
+        "controller": {
+          "recorded_at": "2026-11-12T10:19:47.397135+00:00",
+          "administrative_peer_deleted": true,
+          "container_removed": true,
+          "vpn_runtime_removed": true,
+          "temporary_private_keys_deleted": true,
+          "api_error_type": null,
+          "temporary_private_files_absent": true,
+          "vpn_runtime_absent": true,
+          "container_absent": true,
+          "unrelated_peers_preserved": true
+        },
+        "nodes": {
+          "repair-hou1": {
+            "temporary_key_removed": true,
+            "owner_key_preserved": true,
+            "recorded_at": "2026-11-12T10:19:26.752306+00:00",
+            "cleanup_helper_quoting_repaired": true,
+            "redundant_key_expiry_timer_stopped": true
+          },
+          "repair-hou4": {
+            "temporary_key_removed": true,
+            "owner_key_preserved": true,
+            "recorded_at": "2026-11-12T10:19:27.162071+00:00",
+            "cleanup_helper_quoting_repaired": true,
+            "redundant_key_expiry_timer_stopped": true
+          }
+        }
+      }
+    }
+  },
+  "private_artifact_notes": {
+    "public-verification.result.json": "The historical digest identifies the initial pre-cutover run. The legacy operator helper reused this output path; the post-cutover checks are classified and retained separately."
+  }
+}
