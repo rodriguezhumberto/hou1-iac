@@ -1,5 +1,7 @@
 # Fresh-host rehearsal for issues #27 and staff #39
 
+> Historical rehearsal journal. For current deployment and recovery, use [production operations](production-oidc-runbook.md) and [production recovery](production-host-recovery.md). Pending gates below describe the recorded attempt, not current rollout status.
+
 This is a new test installation, not production promotion or a database restore.
 The operator confirmed these inputs on 2026-11-08:
 

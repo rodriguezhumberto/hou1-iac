@@ -9,8 +9,10 @@ If deployment access is temporary, provision a
 [separate renewal VPN peer](controller-renewal-peer.md) before retiring it.
 Its fixed namespace jobs retain the direct pinned SSH contract below.
 
-No live production issuance, delivery or alert validation is claimed by offline
-tests. Keep the production TLS gate open until the checks below pass.
+Production delivery/status and retirement checks are recorded in the
+[production evidence](evidence/production-host-recovery-2026-11-12.json).
+Revalidate the affected checks below after changes; offline tests alone do not
+prove delivery. Replacement-controller execution remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
 
 ## Private inputs
 
@@ -151,5 +153,6 @@ timer, select the reviewed previous encrypted bundle, and import it through the
 same administrative Ansible path. Validate the current certificate's remaining
 lifetime first; expired or near-expired material is refused. Recheck every served
 name and the renewal status before enabling the timer. Preserve the current
-controller state until the replacement is verified. Production replacement-host
-recovery remains a separate gate.
+controller state until the replacement is verified. See
+[production recovery](production-host-recovery.md) for host replacement and
+[controller recovery limits](controller-renewal-peer.md) for controller loss.

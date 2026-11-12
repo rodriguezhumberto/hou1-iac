@@ -1,5 +1,7 @@
 # Monitoring and isolation gates for the test VPS
 
+> Historical isolated-rehearsal journal. Current test/production collector configuration is in [environment monitoring](environment-monitoring.md); use the [production runbook](production-oidc-runbook.md) for current acceptance.
+
 Infrastructure #27 and staff #39 use the existing isolated stack and a trusted
 off-host controller. These controls are opt-in for the private test inventory;
 they neither change the production firewall nor replace the identity design.

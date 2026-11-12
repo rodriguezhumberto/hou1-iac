@@ -182,10 +182,10 @@ verification. The existing security role verifies VPN access before retiring
 public bootstrap SSH. Failure latches diagnostics and stops restored ingress and
 writers; correct the code and use a fresh replacement rather than resuming.
 
-## Operational handoff remains required
+## Operational handoff
 
-Publication is not a production-readiness assertion. Reconnect HOU4 through its
-independent access path; reapply the selected production TLS renewal access and
+After publication, reconnect HOU4 through its independent access path. Reapply
+the selected production TLS renewal access and
 schedule, VPN-only monitoring targets/probes, export-only backup transport and
 HOU4 collection configuration. Confirm the owner's Google sign-in, VPN and
 personal SSH key, deny-by-default admission/roles, public staff/management/metrics

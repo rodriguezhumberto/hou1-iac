@@ -1,32 +1,36 @@
-# NetBird and Authentik break-glass recovery
+# NetBird and Authentik emergency access
 
-The break-glass command is installed at
-`/opt/hou1-netbird/break-glass.sh`. It is run by an approved operator from the
-host console or an existing NetBird SSH session:
+Keep independent provider host/serial console or rescue access and the local
+emergency account verified. SSH password restrictions do not disable console
+authentication. A PAT does not create a dashboard login, grant staff roles or
+repair transport; it permits API operations only.
 
-```bash
-export BREAK_GLASS_OPERATOR=alice
-export BREAK_GLASS_REASON='Authentik outage during migration'
-export NETBIRD_API_PAT='provided from the encrypted controller vault'
-export NETBIRD_HOST=prod_hou1
-/opt/hou1-netbird/break-glass.sh
-```
+## Choose the working access path
 
-The command records only operator, reason, timestamps, pass/fail state, and
-rollback evidence. It never writes the PAT to the evidence file. It first tests
-the NetBird API with the PAT, then tests NetBird SSH independently, and finally
-restores the embedded NetBird IdP from the verified cutover snapshot when the
-rollback script is present. API PAT access authorizes API operations only; it
-does not create a dashboard login or bypass Authentik group authorization.
+If VPN SSH works, use an approved administrative key to inspect the incident and
+repair the affected service. If it does not, use provider access; never depend
+on the broken control plane to reconnect its own recovery path. Preserve SQLite,
+keys, peers, policies and current data before making changes.
 
-If NetBird SSH is unavailable, use the VPS provider's host/serial console as
-the second recovery path, authenticate as root, and run the same rollback
-script. Keep the node's SQLite state, encryption keys, peers, policies,
-addresses, and PAT untouched. Do not re-enroll peers or generate new server
-keys.
+The installed `/opt/hou1-netbird/break-glass.sh` is a **legacy helper**, not a
+universal console repair command. It requires `BREAK_GLASS_OPERATOR`,
+`BREAK_GLASS_REASON`, `NETBIRD_HOST` and a securely loaded `NETBIRD_API_PAT`.
+It tests the API and outbound SSH first; if either fails, it stops before rollback.
+Its rollback call selects the newest snapshot without an explicit path.
 
-Approved operators are recorded in `/var/log/hou1-netbird/operators` with a
-15-minute escalation target. The operator records the outage start, API PAT
-result, SSH/console result, embedded restore result, end time, and follow-up
-owner in the issue-linked recovery evidence. Rotate the PAT and close the
-incident after recovery.
+Do not use that helper to bypass a VPN outage or assume it restores the current
+external-provider contract. For an approved configuration rollback, inspect the
+exact snapshot and invoke `authentik-rollback.sh <reviewed-snapshot-path>` directly
+through the working administrative path. It restores config/dashboard files only;
+it does not restore the database or remove external-provider registrations. See
+[legacy cutover limitations](netbird-authentik-cutover.md). For host loss, follow
+[production replacement recovery](production-host-recovery.md).
+
+## Audit and close
+
+Record operator, reason, UTC start/end, snapshot, API/SSH/console results and
+follow-up owner without credentials. Approved operators are recorded under
+`/var/log/hou1-netbird/operators`, with a 15-minute escalation target. Preserve
+first errors, verify identity/peer access after repair, and rotate used emergency
+credentials/PATs. Do not regenerate server identities or re-enroll all devices
+as an ordinary identity-service rollback.

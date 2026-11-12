@@ -11,26 +11,12 @@ commands. See [production replacement recovery](production-host-recovery.md) for
 the separate environment-bound entry points. Keep HOU4 and its retained backups
 intact.
 
-The isolated component drill in [PR #59](https://github.com/rodriguezhumberto/hou1-iac/pull/59)
-already passed. The [second clean CI-image run](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
-completed restore, access review, publication, monitoring, off-host collection,
-component recovery and reboot. Local preparation and fixture tests alone do not
-complete this gate.
-The [continued-host troubleshooting evidence](evidence/hou1-recovery-iteration-2026-11-10-01.json)
-records the repaired host's monitoring, backup, alert, component recovery and
-reboot checks separately from an uninterrupted clean-host run.
-The [latest attempt and continued checks](evidence/hou1-clean-host-recovery-2026-11-10-04.json)
-include the package-access and controller-transport fixes, successful recovery,
-backup collection, real outage alerts and reboot. Its original failures remain
-preserved; it does not complete uninterrupted clean-host acceptance.
-
-The [CI-image clean attempt](evidence/hou1-ci-clean-host-recovery-2026-11-10-01.json)
-restored 187 PostgreSQL tables and matched 13 authorization tables. HOU4
-reconnected with its retained peer. Publication stopped because controller DNS
-verification preceded private resolver installation; that ordering is corrected.
-The failed attempt remains stopped. The second attempt passed with the corrected
-ordering. It also found and corrected a health-probe false positive after package
-leases; the firewall policy was unchanged.
+[Clean CI-image evidence](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
+records completed test restore, handoff and reboot. Earlier failed attempts and
+continued-host repairs remain separate historical reports; see
+[evidence](README.md#test-procedures-and-historical-results). A repaired-host
+result does not establish an uninterrupted run. Production's remaining full-run
+test is tracked separately under #78.
 
 ## Before wiping HOU1
 
@@ -47,12 +33,13 @@ leases; the firewall policy was unchanged.
 4. Provide a Git bundle with `refs/heads/recovery` at the exact saved staff
    commit. An older deployment bundle may not contain that commit. Obtain the
    missing immutable source before wiping; do not depend on HOU1's checkout.
-5. Prepare an image-lock JSON with keys `postgresql`, `authentik-server`,
-   `authentik-worker`, `netbird-server`, `dashboard`, `nginx`, `node`. Values
-   must be the respective official repository plus `@sha256:<digest>`. Capture
-   verified registry descriptors; do not transfer old Docker layers or caches.
-   NetBird remains 0.82.0. The saved Node 24.22.2 Dockerfile uses the locked
-   Node digest in a separate build recipe; the Git checkout stays unchanged.
+5. Prepare the seven-entry image lock from verified registry descriptors.
+   Digest-backed points require `astro-app` at the saved CI digest plus
+   `postgresql`, `authentik-server`, `authentik-worker`, `netbird-server`,
+   `dashboard` and `nginx`. Retained source-built points use `node` instead of
+   `astro-app`; only those need the saved Node build-base digest and recipe.
+   NetBird remains 0.82.0. Never change the saved source to make a point appear
+   compatible or transfer an unverified local image ID as a registry digest.
 6. Reconcile account disables, Google admission, group/role grants, peer grants
    and API credentials since the point. Record hashes or reviewed summaries,
    never credentials or allowlist values. Pin the lost HOU1 peer's ID, name and

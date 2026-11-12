@@ -136,8 +136,9 @@ Local regression tests use generated certificates, synthetic databases and
 Ansible tasks. They cover shared certificate selection, preserved app runtime,
 database readiness, writer-stopped session cleanup, first-error refusal and
 controller cleanup after remote failure. The live result below covers this
-entry point; separate clean-OS recovery, external Google/VPN reconnection and
-cutover checks remain. Issue #27 remains open.
+entry point only. Later clean-OS, human-login and cutover results are linked from
+the [production runbook](production-oidc-runbook.md); historical remaining gates
+below must not be read as current rollout status.
 
 The first Ansible run stopped at the NetBird discovery issuer assertion: the
 saved endpoint retained `:443`, while discovery omits the default HTTPS port.

@@ -1,21 +1,23 @@
-# Authentik DNS, TLS, and Nginx ingress
+# Authentik DNS, TLS and ingress
 
-The Authentik role publishes `auth-test.<primary_domain>` for the test
-project and `auth.<primary_domain>` for production. Cloudflare DNS must point
-each hostname at the existing HOU1 ingress address before the play is run. A
-DNS-01 certificate is stored in the existing Certbot tree and is renewed by
-the existing renewal job.
+The selected identity profile supplies `authentik_domain`; hostname prefixes are
+not fixed. Public DNS reaches HOU1 ingress so a device can authenticate before
+joining the VPN. [Controller TLS](controller-tls.md) supplies certificates in
+controller-managed mode; DNS credentials stay off the node.
 
-The virtual host is mounted into the existing Nginx container through the
-infrastructure-owned include directory. It forwards `Host`, `X-Real-IP`,
-`X-Forwarded-For`, `X-Forwarded-Proto`, and `X-Forwarded-Host`, keeps HTTP/1.1
-upgrade headers for Authentik WebSockets, and routes discovery, JWKS,
-authorization, callback, token, and logout paths to the matching environment's
-private Compose service. The issuer is the exact HTTPS hostname configured in
-the OIDC contract.
+Nginx forwards the HTTPS host/protocol and client-address headers and supports
+Authentik WebSockets. It routes discovery, JWKS, authorization, token, callback
+and logout traffic to the environment's private Compose service. Use discovery
+metadata for protocol endpoints rather than constructing them from hostnames.
 
-`/if/admin/` and `/api/v3/` are limited to the NetBird subnet. OIDC endpoints
-remain reachable over HTTPS so the staff and NetBird clients can authenticate;
-PostgreSQL is never exposed through this ingress. The role runs `nginx -t`
-before every reload and leaves the prior configuration in place when
-validation fails.
+Public sign-in includes `/api/v3/flows/executor/`. The more specific executor
+location is deliberately public; `/if/admin/` and the remaining `/api/v3/` API
+are VPN-only. PostgreSQL has no public listener. Nginx configuration validation
+must pass before reload.
+
+The applications overview needs the private API. VPN DNS resolves this hostname
+to HOU1's VPN address while public DNS remains available for first login. If the
+overview loops to login, check the actual system resolver/route before changing
+access controls. The owner verified a network-specific macOS Private Relay pause
+as a workaround; globally disabling Private Relay is not a proven requirement
+for Grafana or every service.

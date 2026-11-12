@@ -47,6 +47,25 @@ source/image refs. Roll back the public redirect with the boolean switch and a
 normal runtime render. Never assign private service hostnames to the public list.
 
 Record native HTTP/HTTPS redirect, canonical host, absent secondary host, public
-staff denial and unknown-host checks before release. Check DNS and certificate
-coverage separately. Offline fixtures do not authorize DNS edits, deploy a node,
-publish an image, or clear live production acceptance.
+staff denial and unknown-host checks before release. Verify DNS and certificate
+coverage against the deployed configuration.
+
+## Content cutover
+
+1. Review the initial database/media copy without editing the replacement.
+   Stop if the destination has new records or edits before final sync.
+2. During an approved window, stop source writers and capture the final pair.
+   Preserve destination authentication/offboarding tables; never rerun an importer
+   requiring an empty destination over populated storage.
+3. Compare business-table/media hashes. A no-op final sync is valid only when the
+   frozen source and destination both match the reviewed snapshot. Otherwise
+   reconcile differences and verify the updated copy.
+4. Collect a fresh recovery point after any actual data change. Verify the frozen
+   destination again, then apply only the reviewed DNS change, preserving proxy/TTL.
+5. Check content/media/routes/redirects and public/private boundaries. Observe for
+   30 minutes and record owner acceptance, DNS values and temporary-access cleanup.
+
+Keep the source stopped and retain its encrypted copies. Reconcile replacement
+writes before rolling traffic back; never reopen both writers blindly. The
+[November 12 evidence](evidence/website-data-migration-2026-11-12.json) records the
+completed cutover and preserved verification/cleanup timestamps.

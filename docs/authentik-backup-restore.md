@@ -1,43 +1,33 @@
-# Authentik backup, restore, and clean-host drill
+# Authentik backup and restore
 
-Each environment writes encrypted backups under
-`/var/backups/hou1-authentik/{test,prod}` and copies the verified archive,
-checksum, and success marker to the separately mounted off-host path
-`/mnt/offhost-backups/hou1-authentik/{test,prod}`. Retention is 30 days. The
-backup contains a PostgreSQL logical dump, PostgreSQL persistent state, media,
-templates, certificates, generated configuration/blueprints, Compose refs,
-root-only rendered client files, and the SOPS ciphertext used to recover the
-environment. It is encrypted with `AUTHENTIK_BACKUP_AGE_RECIPIENT`.
+## Current recovery path
 
-`backup.sh` uses `set -euo pipefail` and writes a `.failed` marker from its
-error trap. It writes `.success` only after the age decrypt and tar integrity
-check pass and all three off-host files are installed. A checksum mismatch,
-missing off-host mount, failed dump, or failed encryption leaves no success
-marker and is reported by the cron log and failure marker.
+With `hou1_backup_enabled: true`, the [unified backup protocol](hou4-backup-protocol.md)
+replaces the standalone Authentik cron. HOU4 collects the owner-encrypted recovery
+set with seven daily/four weekly retention. Use
+[production replacement recovery](production-host-recovery.md) for a lost node or
+the [test-only component drill](reproducible-recovery-drill.md) for isolated checks.
 
-Restore a selected verified archive on a clean host with the environment's
-offline age identity:
+The authoritative database copy is a logical PostgreSQL dump. A live PGDATA
+copy is unsafe and is not part of either backup implementation. Keep signing
+keys, clients, configuration and media with the database, and reconcile later
+revocations before publishing restored services.
 
-```bash
-export AGE_KEY_FILE=/root/.config/sops/age/hou1-authentik-prod.txt
-export AUTHENTIK_BACKUP_AGE_RECIPIENT=AGE1_OFFLINE_RECOVERY_RECIPIENT
-/opt/hou1-authentik/prod/restore.sh \
-  /mnt/offhost-backups/hou1-authentik/prod/authentik-YYYYMMDDTHHMMSSZ.tar.gz.age
-```
+## Legacy standalone archives
 
-The restore verifies the adjacent SHA-256 checksum, decrypts into a mode-0700
-temporary directory, restores persistent files and PostgreSQL, then starts the
-health-gated Compose project. It never merges a backup into a live database.
+`backup.sh`, `restore.sh` and `restore-drill.sh` remain installed for older
+component archives. Their cron runs only while unified backup is disabled.
+Configured local/off-host directories and 30-day retention belong to that legacy
+path, not the active HOU4 collection schedule.
 
-Run and record the clean-host drill with the expected issuer:
+The legacy archive contains SQL, media/templates/certs/config, Compose/runtime
+files and SOPS ciphertext. Its job writes success only after authenticated
+decryption/tar validation and off-host file installation; failure writes a marker.
+It requires a matching decryption identity, unlike owner-only unified capture,
+which encrypts on HOU1 without the offline owner's private key.
 
-```bash
-/opt/hou1-authentik/prod/restore-drill.sh \
-  /mnt/offhost-backups/hou1-authentik/prod/authentik-YYYYMMDDTHHMMSSZ.tar.gz.age \
-  https://auth.example.com/application/o/pearland-paws-staff/
-```
-
-Attach its output to the issue/runbook with the archive identifier, start/end
-times and duration, login result, discovery/JWKS result, signing-key continuity,
-and any gaps or accepted follow-up. The production gate requires a successful
-drill and an offline recovery identity before cutover.
+Only restore a selected verified archive into clean component storage with its
+compatible revision and protected recovery identity. Never merge it into a live
+database or count its success marker as proof of a unified recovery point.
+Historical component-drill results do not prove replacement-controller recovery
+or uninterrupted production automation.

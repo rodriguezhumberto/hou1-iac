@@ -1,67 +1,65 @@
-Run commands from `ansible/`. The controller needs Ansible dependencies, its SSH
-key, the inventory Vault password, and NetBird administrator membership.
+# HOU1 infrastructure
 
-### 1. First initialization: public IP
+This repo contains the Ansible playbooks for HOU1: the app, Nginx, Authentik and
+NetBird. App images are built in CI and deployed by digest. HOU4 handles monitoring
+and encrypted backups, with its own playbooks. Host security, the NetBird client
+and systemd jobs run directly on the OS.
 
-For a new production host, first create the application ingress and shared
-NetBird control plane. Public SSH stays available during this step:
+The [docs index](docs/README.md) lists the guides. For routine changes, use the
+[production runbook](docs/production-oidc-runbook.md). To replace a lost host, follow
+[production recovery](docs/production-host-recovery.md).
 
-```bash
-ansible-playbook playbooks/bootstrap-control-plane.yml -e "manual_root_password=YOUR_TEMP_ROOT_PASS" --ask-vault-pass
-```
+## Before running Ansible
 
-Join the controller to that NetBird instance and assign it to `administrators`.
-Then enroll the node and restrict SSH to NetBird:
+Check out the infrastructure commit you intend to deploy. The controller needs
+the [Ansible dependencies](requirements-dev.txt) and
+[collections](ansible/requirements.yml). Keep private inventory, release inputs,
+credentials and SSH configuration outside Git.
 
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod_init manual_root_password=YOUR_TEMP_ROOT_PASS" --ask-vault-pass
-```
+Use a private inventory with pinned SSH host keys for production; the example
+inventory disables strict checking. Secrets use SOPS/age, with some older inputs
+still in Ansible Vault. Add `--ask-vault-pass` when those files are loaded, and
+keep passwords and tokens out of command arguments.
 
-Test uses the existing production control plane:
-
-```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test_init" --ask-vault-pass
-```
-
-Use complete runs for initialization. The init targets connect to public IPs;
-SSH hardening requires a fresh administrative connection over NetBird to pass,
-then switches the rest of that run to the administrative user over NetBird. A
-180-second public SSH recovery timer is armed during this cutover and is
-removed after the fresh NetBird probe succeeds; if the controller disappears,
-the timer restores the original public SSH path for a retry.
-
-### 2. Subsequent runs: NetBird
+The examples below run from the repository root:
 
 ```bash
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_test" --ask-vault-pass
-ansible-playbook playbooks/hou1.yml -e "target_hosts=hou1_prod" --ask-vault-pass
+export INVENTORY=/private/production/inventory.yml
+export INPUTS=/private/production/release-inputs.yml
+export ANSIBLE_CONFIG="$PWD/ansible/ansible.cfg"
+export ANSIBLE_HOST_KEY_CHECKING=True
 ```
 
-Both use the fixed NetBird addresses in the encrypted inventory. Keep the
-controller connected to NetBird. Public-IP fallback is disabled.
+## Updating a host
 
-### 3. Targeted operations
-
-Add `--tags deploy` for application updates, `--tags ufw` for firewall and SSH
-configuration, or `--skip-tags deploy` to skip application deployment.
-
-Select the application revision with `-e deploy_ref=TAG_OR_SHA`. Legacy
-`deploy_branch` remains supported; `deploy_ref` takes precedence. The default is
-`main`. Select the infrastructure revision with Git before running Ansible.
-See [releases](docs/releases.md) and [CMS backups](docs/cms-storage-backups.md).
-
-### 4. NetBird playbooks
-
-These connect to production over NetBird:
+Connect the controller to NetBird, then run:
 
 ```bash
-ansible-playbook playbooks/netbird-control-plane.yml --ask-vault-pass
-ansible-playbook playbooks/netbird-dns.yml --ask-vault-pass
+ansible-playbook -i "$INVENTORY" ansible/playbooks/hou1.yml \
+  -e target_hosts=hou1_prod -e "@$INPUTS" --ask-vault-pass
 ```
 
-Reconcile a client's enrollment with the normal environment target and
-`--tags netbird`. Established hosts require NetBird SSH; public-IP access is
-available only during first initialization through the bootstrap fallback.
-See [NetBird operations](docs/netbird-operations.md).
+Use `--tags deploy` to update the app, `--tags ufw` to apply firewall/SSH settings,
+or `--skip-tags deploy` to skip the app. `deploy_ref` must match the selected
+image revision; it is not enough on its own. See [image inputs](docs/application-images.md).
 
-For coordinated identity removal, see [operator offboarding](docs/operator-offboarding.md).
+`netbird-control-plane.yml` and `netbird-dns.yml` manage the control plane and DNS.
+Use `hou1.yml --tags netbird` to check and update client enrollment. These also
+run over the VPN.
+
+## New or replacement hosts
+
+For a lost production host, use [replacement recovery](docs/production-host-recovery.md);
+do not run fresh identity bootstrap over restored databases.
+
+For a new deployment, prepare the private inventory, CI image receipt,
+certificates and identity settings first. `bootstrap-control-plane.yml`
+creates ingress and NetBird over public SSH. Join the controller to that control
+plane, then run `hou1.yml` against `hou1_prod_init` to enroll HOU1 and restrict SSH.
+Run initialization without tags. Follow the production runbook to finish
+Authentik, user admission and app setup, then enroll HOU4 and connect monitoring
+and backups. Verify provider-console access before restricting SSH.
+
+During initial SSH cutover, a 180-second fallback timer restores bootstrap access
+if the VPN probe fails. It is removed after success and is not an ongoing recovery
+path. See [NetBird operations](docs/netbird-operations.md).

@@ -23,8 +23,9 @@ create login failures. Unexpected/missing application outcome is recorded as
 unknown and alerts, rather than being classified as success.
 
 The HOU1 `hou1_request_metrics_enabled` switch is off by default. Enable only
-after deploying the application marker and Nginx schema. The fixed test path is
-`/opt/pearlandpaws-test/nginx-logs/metrics.jsonl`. Root-only collector state is
+after deploying the application marker and Nginx schema. The selected
+`hou1_request_metrics_log` must equal
+`<app_directory>/nginx-logs/metrics.jsonl`. Root-only collector state is
 `/var/lib/hou1-monitoring/requests.json`; numeric textfiles retain their existing
 root:prometheus 0640 boundary. The collector records counters, callback duration
 histogram and the consecutive callback failure count. It does not open another
@@ -55,7 +56,7 @@ The six additional rules are:
 | Nginx server errors per fixed service | More than 1% over 2 minutes, held for 2 minutes |
 | Staff login failures | 3 consecutive completed callback failures/unknown outcomes, or 3 initiation failures within 2 minutes |
 | Staff callback failure rate | More than 1% failure/unknown over 2 minutes, held for 2 minutes |
-| Callback processing p95 | More than 2 seconds over 5 minutes, held for 2 minutes |
+| Callback processing p95 | More than 5 seconds over 10 minutes, at least 10 callbacks, held for 5 minutes |
 | Callback outcome missing | Any unknown callback outcome within 5 minutes |
 
 The existing no-data/target/stale collector alerts remain active. Rates and
@@ -92,8 +93,10 @@ and check login, public denial and VPN metrics. Preserve private numeric state
 and avoid appending a different schema to the same stream. Existing host,
 PostgreSQL, container, backup and renewal monitoring continue separately.
 
-Production support for the test-only HOU1 role and actual production identities,
-secrets and recovery custody remain separate rollout work.
+The [environment-bound collector](environment-monitoring.md) supports test and
+production. Live production collection/probe acceptance is linked from the
+[production runbook](production-oidc-runbook.md); keep the older results below
+scoped to their original isolated rehearsal.
 
 Evidence from the isolated rehearsal is recorded in
 [evidence/request-login-monitoring-2026-11-08.json](evidence/request-login-monitoring-2026-11-08.json):
