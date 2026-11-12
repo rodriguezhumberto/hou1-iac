@@ -35,13 +35,23 @@
   },
   "browser_followup": {
     "owner_google_callback_successful": true,
-    "overview_confirmation_pending": true,
+    "overview_confirmation_pending": false,
     "remaining_login_redirect": "The browser reaches the public origin; private API calls receive 403. Owner system DNS returns the public origin while NetBird DNS returns the correct private address.",
-    "private_api_restriction_preserved": true
+    "private_api_restriction_preserved": true,
+    "final_owner_acceptance": {
+      "owner_confirmed_overview_stays_open": true,
+      "after_requested_network_private_relay_pause": true,
+      "browser_requests_use_vpn": true,
+      "authenticated_user_api_status": 200,
+      "applications_api_status": 200,
+      "server_log_verified_at": "2026-11-12T10:17:27+00:00",
+      "owner_system_dns_answer_not_reported": true
+    }
   },
   "post_repair_public_checks": {
     "passed": true,
     "checks": 7,
     "staff_and_identity_admin_public_denials": 403
-  }
+  },
+  "temporary_repair_access_retired": true
 }
