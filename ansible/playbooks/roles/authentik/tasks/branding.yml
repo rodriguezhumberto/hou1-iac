@@ -46,7 +46,7 @@
     owner: "{{ authentik_container_uid }}"
     group: "{{ authentik_container_gid }}"
     mode: '0640'
-  loop: [logo-v1.png, login-v1.css, login-v1.js]
+  loop: [logo-v1.png, login-v2.css, login-v2.js]
   when: authentik_branding_enabled | bool
 
 # Django renders this file; Ansible must not interpret its template tags.

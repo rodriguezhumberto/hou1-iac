@@ -55,7 +55,7 @@ class BrandingAPI(FixtureAPI):
 
 def branding_input(enabled=True):
     return {'enabled': enabled, 'domain': identity_profile()['issuer_host'],
-            'css': (ASSETS / 'login-v1.css').read_text()}
+            'css': (ASSETS / 'login-v2.css').read_text()}
 
 
 def render_flow(branded=True, compatibility=False):
@@ -172,7 +172,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                     self.assertEqual(manifest['branding']['enabled'], enabled)
                     self.assertIn('google', manifest)
                     if enabled:
-                        self.assertEqual(manifest['branding']['css'], (ASSETS / 'login-v1.css').read_text().rstrip())
+                        self.assertEqual(manifest['branding']['css'], (ASSETS / 'login-v2.css').read_text().rstrip())
                     else:
                         self.assertNotIn('css', manifest['branding'])
 
@@ -195,7 +195,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                 self.assertIn('/static/dist/flow/FlowInterface-2025.10.4.js', html)
                 self.assertEqual('ShadyDOM = { force: true }' in html, compatibility)
                 self.assertEqual('id="pp-login"' in html, branded)
-                self.assertEqual('src="/media/branding/login-v1.js"' in html, branded)
+                self.assertEqual('src="/media/branding/login-v2.js"' in html, branded)
                 self.assertNotIn('Private workspace', html)
                 self.assertNotIn('Team sign-in', html)
                 if branded:
@@ -222,7 +222,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                     self.assertIn('changed=0', result.stdout)
             target = Path(directory) / 'templates/if/flow.html'
             self.assertEqual(target.read_text(), (ASSETS / 'flow.html').read_text())
-            for asset in ['logo-v1.png', 'login-v1.css', 'login-v1.js']:
+            for asset in ['logo-v1.png', 'login-v2.css', 'login-v2.js']:
                 installed = Path(directory) / 'media/branding' / asset
                 self.assertEqual(installed.read_bytes(), (ASSETS / asset).read_bytes())
                 self.assertEqual(installed.stat().st_mode & 0o777, 0o640)
