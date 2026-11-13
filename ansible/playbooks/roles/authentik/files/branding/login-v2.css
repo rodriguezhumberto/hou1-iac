@@ -19,6 +19,7 @@
 #pp-login [hidden] { display: none !important; }
 #pp-login button, #pp-login a, #pp-login summary { touch-action: manipulation; }
 #pp-login button:focus-visible, #pp-login a:focus-visible, #pp-login summary:focus-visible { outline: 2px solid #f43f5e; outline-offset: 3px; }
+#pp-title:focus { outline: none; }
 .pp-header { display: flex; align-items: center; gap: 9px; padding: 16px 24px; background: #fff; border-bottom: 1px solid var(--pp-border); font-size: 14px; line-height: 1.25; font-weight: 600; }
 .pp-header img { width: 38px; height: 38px; }
 .pp-test { margin: 16px 24px 0; padding: 10px 14px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: 14px; line-height: 20px; }
@@ -46,14 +47,28 @@
     --pf-global--primary-color--100: #be123c;
     --pf-c-login__main--BackgroundColor: transparent;
     display: block;
+    width: 100%;
+    min-width: 0;
     color: #0f172a;
 }
 :host(ak-flow-executor[data-pp-branded][hidden]) { display: none !important; }
+/* The native drawer has a desktop minimum width and fills the viewport. */
+:host(ak-flow-executor[data-pp-branded]) :is(.pf-c-page__drawer, .pf-c-drawer, .pf-c-drawer__main, .pf-c-drawer__content, .pf-c-drawer__body) {
+    display: block;
+    width: 100%;
+    min-width: 0;
+    max-width: 100%;
+    height: auto;
+    min-height: 0;
+    padding: 0;
+    overflow: visible;
+}
 :host(ak-flow-executor[data-pp-branded]) .pf-c-background-image,
 :host(ak-flow-executor[data-pp-branded]) .ak-brand,
 :host(ak-flow-executor[data-pp-branded]) ak-brand-links { display: none; }
 :host(ak-flow-executor[data-pp-branded]) .pf-c-login {
     display: block;
+    height: auto;
     min-height: 0;
     padding: 0;
     background: transparent;
@@ -63,19 +78,24 @@
     display: block;
     width: 100%;
     max-width: none;
+    height: auto;
     min-height: 0;
     padding: 0;
     margin: 0;
     background: transparent;
 }
 :host(ak-flow-executor[data-pp-branded]) .pf-c-login__main {
+    height: auto;
     padding: 0;
     margin: 0;
     box-shadow: none;
     background: transparent;
 }
-:host(ak-flow-card) .pf-c-login__main-header { display: var(--pp-native-title, block); }
-:host(ak-flow-card) {
+:host(ak-flow-executor[data-pp-branded]) .pf-c-login__main > [data-pp-flow]:not(ak-loading-overlay) { display: block; padding: 0; }
+:host(ak-flow-card[data-pp-flow]) .pf-c-login__main-header { display: var(--pp-native-title, block); }
+:host(ak-flow-card[data-pp-flow]) {
+    display: block;
+    width: 100%;
     --pf-c-login__main-header--PaddingTop: 0;
     --pf-c-login__main-header--PaddingLeft: 0;
     --pf-c-login__main-header--PaddingRight: 0;
@@ -87,22 +107,34 @@
     --pf-c-login__main-footer--PaddingLeft: 0;
     --pf-c-login__main-footer--PaddingRight: 0;
 }
-:host(ak-stage-identification), :host(ak-stage-password), :host(ak-flow-input-password) {
+:host([data-pp-flow]) {
+    box-sizing: border-box;
+    min-width: 0;
+    max-width: 100%;
     font: 16px/1.5 var(--pp-font);
-    --pf-c-button--m-primary--BackgroundColor: #fecdd3;
-    --pf-c-button--m-primary--Color: #0f172a;
-    --pf-c-button--m-primary--hover--BackgroundColor: #fda4af;
-    --pf-c-button--m-primary--hover--Color: #0f172a;
-    --pf-c-form-control--BorderRadius: 8px;
+    overflow-wrap: anywhere;
 }
-:host(ak-stage-identification) .pf-c-button,
-:host(ak-stage-password) .pf-c-button { min-height: 44px; border-radius: 8px; font: 600 14px/20px var(--pp-font); }
-:host(ak-stage-identification) .pf-c-form-control,
-:host(ak-stage-password) .pf-c-form-control,
-:host(ak-flow-input-password) .pf-c-form-control { min-height: 46px; border: 1px solid #e2e8f0; border-radius: 8px; font: 400 16px/24px var(--pp-font); }
-:host(ak-stage-identification) .pf-c-form__label,
-:host(ak-stage-password) .pf-c-form__label,
-:host(ak-flow-input-password) .pf-c-form__label { font: 600 14px/24px var(--pp-font); }
+:host([data-pp-flow]) *, :host([data-pp-flow]) *::before, :host([data-pp-flow]) *::after { box-sizing: border-box; }
+:host([data-pp-flow]) :is(.pf-c-form, .pf-c-form__group, .pf-c-login__main-header, .pf-c-login__main-body, .pf-c-login__main-footer) { min-width: 0; max-width: 100%; }
+:host([data-pp-flow]) :is(.pf-c-title, p, a) { overflow-wrap: anywhere; }
+:host([data-pp-flow]) a { color: var(--pp-accent); }
+:host([data-pp-flow]) a:hover { color: #9f1239; }
+:host([data-pp-flow]) .pf-c-button { min-height: 44px; border-radius: 8px; white-space: normal; font: 600 14px/20px var(--pp-font); }
+/* Set colors on the controls: PatternFly redeclares its variables there. */
+:host([data-pp-flow]) .pf-c-button.pf-m-primary { background: var(--pp-rose); color: var(--pp-text); }
+:host([data-pp-flow]) .pf-c-button.pf-m-primary:is(:hover, :focus, :active) { background: #fda4af; color: var(--pp-text); }
+:host([data-pp-flow]) .pf-c-button.pf-m-secondary { background: transparent; color: var(--pp-accent); }
+:host([data-pp-flow]) .pf-c-button.pf-m-secondary:is(:hover, :focus, :active) { background: #fff1f2; color: #9f1239; }
+:host([data-pp-flow]) .pf-c-button::after { border-color: transparent; border-radius: inherit; }
+:host([data-pp-flow]) .pf-c-button.pf-m-secondary::after { border-color: var(--pp-accent); }
+:host([data-pp-flow]) :is(button, a, input):focus-visible { outline: 2px solid var(--pp-accent); outline-offset: 3px; }
+:host([data-pp-flow]) .pf-c-form-control { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--pp-border); border-radius: 8px; font: 400 16px/24px var(--pp-font); }
+:host([data-pp-flow]) .pf-c-form__label { font: 600 14px/24px var(--pp-font); }
+:host(ak-flow-card[data-pp-flow]) :is(.pf-c-login__main-header, .pf-c-login__main-body, .pf-c-login__main-footer) { padding: 0; }
+:host(ak-flow-card[data-pp-flow]) .pf-c-login__main-footer { padding-top: 16px; }
+:host(ak-empty-state[data-pp-flow]) { display: block; width: 100%; }
+:host(ak-empty-state[data-pp-flow]) .pf-c-empty-state { padding: 24px 0; }
+:host(ak-empty-state[data-pp-flow]) .pf-c-empty-state__content { min-width: 0; max-width: 100%; }
 @media (min-width: 640px) {
     #pp-title { font-size: 30px; line-height: 36px; }
     .pp-header { font-size: 16px; }

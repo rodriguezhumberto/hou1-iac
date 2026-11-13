@@ -76,26 +76,37 @@ if (shell) {
         await customElements.whenDefined('ak-flow-executor');
         await executor.updateComplete;
         executor.setAttribute('data-pp-branded', '');
-        const observedStages = new WeakSet();
+        const observedRoots = new WeakSet();
+        const pendingElements = new WeakSet();
         const observer = new MutationObserver(() => {
             sync();
-            observeStage();
+            observeFlow(executor.shadowRoot);
         });
-        function observeStage() {
-            const stage = executor.shadowRoot?.querySelector('ak-stage-identification');
-            if (!stage || observedStages.has(stage)) return;
-            observedStages.add(stage);
-            // A stage can connect before its definition or first Lit render completes.
-            void (async () => {
-                await customElements.whenDefined(stage.localName);
-                await stage.updateComplete;
-                observer.observe(stage.shadowRoot, {childList: true, subtree: true});
-                sync();
-            })().catch(fallback);
+        function observeFlow(root) {
+            if (!root) return;
+            if (!observedRoots.has(root)) {
+                observedRoots.add(root);
+                observer.observe(root, {childList: true, subtree: true});
+            }
+            for (const element of root.querySelectorAll('*')) {
+                if (!element.localName.includes('-')) continue;
+                // Limit shared component overrides to this branded flow, including
+                // loading, password and signed-out components in nested shadow roots.
+                element.setAttribute('data-pp-flow', '');
+                if (element.shadowRoot) observeFlow(element.shadowRoot);
+                else if (!pendingElements.has(element)) {
+                    pendingElements.add(element);
+                    void (async () => {
+                        await customElements.whenDefined(element.localName);
+                        await element.updateComplete;
+                        observeFlow(element.shadowRoot);
+                        sync();
+                    })().catch(fallback);
+                }
+            }
         }
-        observer.observe(executor.shadowRoot, {childList: true, subtree: true});
         sync();
-        observeStage();
+        observeFlow(executor.shadowRoot);
     } catch (error) {
         // A presentation failure must leave the working native login available.
         fallback(error);
