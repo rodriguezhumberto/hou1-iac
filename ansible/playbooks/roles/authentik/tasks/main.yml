@@ -23,6 +23,8 @@
       - authentik_age_key_file is match('^/')
       - authentik_secret_source is defined
       - not (authentik_google_enabled | default(false) | bool) or authentik_bootstrap_enabled | bool
+      - not (authentik_branding_enabled | default(false) | bool) or (authentik_bootstrap_enabled | bool and authentik_google_enabled | bool)
+      - not (authentik_branding_enabled | default(false) | bool) or authentik_image == 'ghcr.io/goauthentik/server:2025.10.4'
     fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
   no_log: true
 
@@ -194,6 +196,9 @@
         - "{{ authentik_project_root }}/.secrets.decrypted.yml"
       no_log: true
 
+- name: Install or remove the managed login presentation
+  ansible.builtin.include_tasks: branding.yml
+
 - name: Render the pinned isolated Compose project
   ansible.builtin.template:
     src: compose.yaml.j2
@@ -254,6 +259,17 @@
     chdir: "{{ authentik_project_root }}"
   register: authentik_compose_ps
   changed_when: false
+
+- name: Clear server template caches after changing the managed login extension
+  community.docker.docker_compose_v2:
+    project_src: "{{ authentik_project_root }}"
+    project_name: "{{ authentik_compose_project }}"
+    files: [compose.yaml]
+    services: [authentik-server]
+    state: restarted
+    wait: true
+    wait_timeout: 900
+  when: authentik_branding_template.changed | default(false) or authentik_branding_template_removed.changed | default(false)
 
 - name: Require healthy Authentik services and no public database ports
   ansible.builtin.assert:

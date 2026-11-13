@@ -39,15 +39,17 @@ missing, unknown, duplicated, or malformed. Individual users are supplied
 through `authentik_staff_users` and are added to explicit role groups without
 using email as an identity key.
 
-For either environment, set `authentik_google_enabled: true` alongside
-`authentik_bootstrap_enabled`. Its environment-specific SOPS bundle
+Google, identity bootstrap, and branded login are enabled by default for both
+environments. To restore the previous login, rerun the Authentik playbook with
+`-e authentik_branding_enabled=false`; leave bootstrap enabled for restoration.
+The environment-specific SOPS bundle
 must contain `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and
 `GOOGLE_ALLOWED_EMAILS` (an explicit lowercase address list). The selected manifest
 configures Google with S256 PKCE, gates both default source flows with the
 verified-email allowlist, enables the login button, and uses the normal internal
 user type for application access. This does not grant superuser or staff roles;
 the encrypted admission configuration still manages explicit roles after first
-login. Other login sources remain on the identification stage. This opt-in
+login. Other login sources remain on the identification stage. This
 source bootstrap validates the environment's exact client IDs and callback/logout
 contract before API writes. Production uses its own Google OAuth client and
 secret; register `https://<profile-issuer-host>/source/oauth/callback/google/`

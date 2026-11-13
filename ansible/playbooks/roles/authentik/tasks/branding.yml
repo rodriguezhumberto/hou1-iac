@@ -1,0 +1,71 @@
+---
+- name: Check for an existing flow template override
+  ansible.builtin.stat:
+    path: "{{ authentik_data_root }}/templates/if/flow.html"
+  register: authentik_existing_flow_template
+
+- name: Read the existing flow template ownership marker
+  ansible.builtin.slurp:
+    src: "{{ authentik_data_root }}/templates/if/flow.html"
+  when: authentik_existing_flow_template.stat.exists
+  register: authentik_existing_flow_content
+
+- name: Preserve flow overrides not owned by this role
+  ansible.builtin.assert:
+    that: >-
+      not authentik_existing_flow_template.stat.exists or
+      'Pearland Paws managed login extension.' in (authentik_existing_flow_content.content | b64decode)
+    fail_msg: Review the existing flow template before replacing it with managed branding.
+  when: authentik_branding_enabled | bool
+
+- name: Require bootstrap to restore Brand settings when disabling the extension
+  ansible.builtin.assert:
+    that: authentik_bootstrap_enabled | bool
+    fail_msg: Disable managed branding with bootstrap enabled to restore its previous Brand settings.
+  when:
+    - not (authentik_branding_enabled | bool)
+    - authentik_existing_flow_template.stat.exists
+    - "'Pearland Paws managed login extension.' in (authentik_existing_flow_content.content | b64decode)"
+
+- name: Create the managed login asset and template directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ authentik_container_uid }}"
+    group: "{{ authentik_container_gid }}"
+    mode: '0750'
+  loop:
+    - "{{ authentik_data_root }}/media/branding"
+    - "{{ authentik_data_root }}/templates/if"
+  when: authentik_branding_enabled | bool
+
+- name: Copy versioned login assets into the persistent media mount
+  ansible.builtin.copy:
+    src: "branding/{{ item }}"
+    dest: "{{ authentik_data_root }}/media/branding/{{ item }}"
+    owner: "{{ authentik_container_uid }}"
+    group: "{{ authentik_container_gid }}"
+    mode: '0640'
+  loop: [logo-v1.png, login-v1.css, login-v1.js]
+  when: authentik_branding_enabled | bool
+
+# Django renders this file; Ansible must not interpret its template tags.
+- name: Install the pinned native-flow template extension
+  ansible.builtin.copy:
+    src: branding/flow.html
+    dest: "{{ authentik_data_root }}/templates/if/flow.html"
+    owner: "{{ authentik_container_uid }}"
+    group: "{{ authentik_container_gid }}"
+    mode: '0640'
+  when: authentik_branding_enabled | bool
+  register: authentik_branding_template
+
+- name: Remove the managed flow template when branding is disabled
+  ansible.builtin.file:
+    path: "{{ authentik_data_root }}/templates/if/flow.html"
+    state: absent
+  when:
+    - not (authentik_branding_enabled | bool)
+    - authentik_existing_flow_template.stat.exists
+    - "'Pearland Paws managed login extension.' in (authentik_existing_flow_content.content | b64decode)"
+  register: authentik_branding_template_removed
