@@ -119,7 +119,7 @@
 :host([data-pp-flow]) :is(.pf-c-title, p, a) { overflow-wrap: anywhere; }
 :host([data-pp-flow]) a { color: var(--pp-accent); }
 :host([data-pp-flow]) a:hover { color: #9f1239; }
-:host([data-pp-flow]) .pf-c-button { min-height: 44px; border-radius: 8px; white-space: normal; font: 600 14px/20px var(--pp-font); }
+:host([data-pp-flow]) .pf-c-button { display: inline-flex; align-items: center; justify-content: center; text-align: center; min-height: 44px; border-radius: 8px; white-space: normal; font: 600 14px/20px var(--pp-font); }
 /* Set colors on the controls: PatternFly redeclares its variables there. */
 :host([data-pp-flow]) .pf-c-button.pf-m-primary { background: var(--pp-rose); color: var(--pp-text); }
 :host([data-pp-flow]) .pf-c-button.pf-m-primary:is(:hover, :focus, :active) { background: #fda4af; color: var(--pp-text); }
@@ -131,6 +131,7 @@
 :host([data-pp-flow]) .pf-c-form-control { min-width: 0; width: 100%; min-height: 46px; border: 1px solid var(--pp-border); border-radius: 8px; font: 400 16px/24px var(--pp-font); }
 :host([data-pp-flow]) .pf-c-form__label { font: 600 14px/24px var(--pp-font); }
 :host(ak-flow-card[data-pp-flow]) :is(.pf-c-login__main-header, .pf-c-login__main-body, .pf-c-login__main-footer) { padding: 0; }
+:host(ak-flow-card[data-pp-flow]:not([loading])) .pf-c-login__main-header { padding-bottom: 24px; }
 :host(ak-flow-card[data-pp-flow]) .pf-c-login__main-footer { padding-top: 16px; }
 :host(ak-empty-state[data-pp-flow]) { display: block; width: 100%; }
 :host(ak-empty-state[data-pp-flow]) .pf-c-empty-state { padding: 24px 0; }

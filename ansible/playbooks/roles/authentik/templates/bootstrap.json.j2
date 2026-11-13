@@ -5,7 +5,7 @@
   "branding": {
     "enabled": {{ authentik_branding_enabled | default(false) | bool | to_json }},
     "domain": {{ authentik_identity_profiles[authentik_environment].issuer_host | to_json }}{% if authentik_branding_enabled | default(false) | bool %},
-    "css": {{ lookup('ansible.builtin.file', role_path ~ '/files/branding/login-v2.css') | to_json }}{% endif %}
+    "css": {{ lookup('ansible.builtin.file', role_path ~ '/files/branding/login-v3.css') | to_json }}{% endif %}
   },
 {% if authentik_google_enabled | default(false) %}
   "google": {
