@@ -53,6 +53,17 @@ jobs:
           echo "NGINX_BIN=$RUNNER_TEMP/nginx-validator" >> "$GITHUB_ENV"
       - run: docker compose version
       - run: pip install -r requirements-dev.txt
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install the login browser checker
+        run: npm install --prefix "$RUNNER_TEMP/authentik-browser" --no-audit --no-fund playwright-core@1.64.1
+      - name: Check branded login navigation and native fallbacks
+        env:
+          PLAYWRIGHT_MODULE: ${{ runner.temp }}/authentik-browser/node_modules/playwright-core
+        run: |
+          export CHROMIUM_BIN="$(command -v google-chrome || command -v chromium)"
+          node tests/authentik_login_browser.cjs
       - run: ansible-galaxy collection install -r ansible/requirements.yml
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
       - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/authentik-bootstrap.yml --syntax-check

@@ -141,6 +141,13 @@ def validate_manifest(manifest, environment, profile):
     mapping_names = {mapping['scope_name']: mapping['name'] for mapping in manifest['scope_mappings']}
     if mapping_names != profile['scope_mapping_names']:
         raise ValueError('Scope mapping names must match the private identity naming contract')
+    branding = manifest.get('branding')
+    if branding is not None:
+        if (type(branding.get('enabled')) is not bool
+                or branding.get('domain') != profile['issuer_host']):
+            raise ValueError('Branding must select the exact environment identity domain')
+        if branding['enabled'] and (not manifest.get('google') or not branding.get('css')):
+            raise ValueError('Branding requires configured Google sign-in and its stylesheet')
     google = manifest.get('google')
     if google is not None:
         emails = google.get('allowed_emails', [])
@@ -213,6 +220,74 @@ def apply_google(google, api, secret):
         api.request('PATCH', f'/stages/identification/{identification["pk"]}/', {'sources': sources})
 
 
+BRANDING_FIELDS = ('branding_title', 'branding_logo', 'branding_favicon', 'branding_custom_css')
+BRAND_INHERITED_FIELDS = (
+    *BRANDING_FIELDS, 'branding_default_flow_background', 'flow_authentication',
+    'flow_invalidation', 'flow_recovery', 'flow_unenrollment', 'flow_user_settings',
+    'flow_device_code', 'default_application', 'web_certificate', 'client_certificates',
+)
+
+
+def apply_branding(branding, environment, api):
+    """Reconcile only the selected domain, retaining prior presentation for rollback."""
+    existing = api.find('core/brands', 'domain', branding['domain'])
+    if not branding['enabled'] and not existing:
+        return
+    base = existing or api.find('core/brands', 'default', True)
+    if not base:
+        raise ValueError('The default Brand must exist before creating a domain Brand')
+    attributes = copy.deepcopy(base.get('attributes', {}))
+    managed = attributes.get('pearland_paws_login')
+    if managed is not None and (not isinstance(managed, dict) or 'previous' not in managed):
+        raise ValueError('Refusing to overwrite an unrecognized login branding marker')
+    if not branding['enabled'] and not managed:
+        return
+    settings = attributes.setdefault('settings', {})
+    theme = settings.setdefault('theme', {})
+    if branding['enabled']:
+        google = api.find('sources/oauth', 'slug', 'google')
+        if not google or not google.get('enabled') or google.get('provider_type') != 'google':
+            raise ValueError('Google must be ready before enabling login branding')
+        identification = api.find('stages/identification', 'name', 'default-authentication-identification')
+        if (not identification or not identification.get('user_fields')
+                or google['pk'] not in identification.get('sources', [])):
+            raise ValueError('Branding requires the existing local identifier fields and Google source')
+        previous = managed['previous'] if managed else {
+            'fields': {key: base[key] for key in BRANDING_FIELDS},
+            'theme_base': theme.get('base'),
+        }
+        attributes['pearland_paws_login'] = {'environment': environment, 'previous': previous}
+        theme['base'] = 'light'
+        payload = {
+            'branding_title': 'Pearland Paws',
+            'branding_logo': '/media/branding/logo-v1.png',
+            'branding_favicon': '/media/branding/logo-v1.png',
+            'branding_custom_css': branding['css'],
+        }
+    else:
+        previous = attributes.pop('pearland_paws_login')['previous']
+        payload = previous['fields']
+        if previous['theme_base'] is None:
+            theme.pop('base', None)
+        else:
+            theme['base'] = previous['theme_base']
+        if not theme:
+            settings.pop('theme', None)
+        if not settings:
+            attributes.pop('settings', None)
+    payload['attributes'] = attributes
+    if existing:
+        patch = {key: value for key, value in payload.items() if existing.get(key) != value}
+        if patch:
+            api.request('PATCH', f'/core/brands/{existing["brand_uuid"]}/', patch)
+    else:
+        # Preserve the catch-all Brand's flow selections and unrelated settings.
+        inherited = {key: base[key] for key in BRAND_INHERITED_FIELDS if key in base}
+        api.request('POST', '/core/brands/', {
+            **inherited, **payload, 'domain': branding['domain'], 'default': False,
+        })
+
+
 def wait_for_defaults(manifest, api, timeout=180, poll_interval=2):
     """Health can pass before the worker finishes installing default objects."""
     required = [
@@ -230,6 +305,8 @@ def wait_for_defaults(manifest, api, timeout=180, poll_interval=2):
             ('stages/identification', 'name', 'default-authentication-identification'),
             ('stages/user_write', 'name', 'default-source-enrollment-write'),
         ]
+    if manifest.get('branding', {}).get('enabled'):
+        required.append(('core/brands', 'default', True))
     deadline = time.monotonic() + timeout
     while True:
         # Only missing defaults are polled. Authentication/API errors and
@@ -288,6 +365,8 @@ def apply(manifest, api, secrets):
             'name': client['application_name'], 'slug': client['application_slug'], 'provider': clients[client_name]})
     if manifest.get('google'):
         apply_google(manifest['google'], api, secrets.get('GOOGLE_OAUTH_CLIENT_SECRET'))
+    if manifest.get('branding'):
+        apply_branding(manifest['branding'], manifest['environment'], api)
     return {'groups': len(groups), 'users': len(users), 'providers': len(clients)}
 
 

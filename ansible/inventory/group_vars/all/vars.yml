@@ -102,9 +102,11 @@ authentik_backup_retention_days: 30
 authentik_backup_schedule_minute: '40'
 authentik_backup_schedule_hour: '2'
 authentik_backup_age_recipient: ''
-authentik_bootstrap_enabled: false
+authentik_bootstrap_enabled: true
 authentik_staff_users: []
-authentik_google_enabled: false
+authentik_google_enabled: true
+# Shared test/prod login default. Set false to restore the previous branding.
+authentik_branding_enabled: true
 authentik_identity_secret_source: "{{ playbook_dir }}/../secrets/identity-names-{{ authentik_environment }}.enc.json"
 
 # Public deployment identity. Shared bootstrap/admission code consumes a selected

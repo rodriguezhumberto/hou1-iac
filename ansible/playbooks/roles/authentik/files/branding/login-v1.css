@@ -1,0 +1,117 @@
+/* Authentik 2025.10.4: shared document styles and Brand component stylesheet. */
+#pp-login {
+    --pp-text: #0f172a;
+    --pp-muted: #64748b;
+    --pp-rose: #fecdd3;
+    --pp-accent: #be123c;
+    --pp-border: #e2e8f0;
+    --pp-font: ui-sans-serif, system-ui, sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol", "Noto Color Emoji";
+    min-height: 100svh;
+    display: flex;
+    flex-direction: column;
+    background: #f8fafc;
+    color: var(--pp-text);
+    font: 16px/1.5 var(--pp-font);
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+}
+#pp-login *, #pp-login *::before, #pp-login *::after { box-sizing: border-box; }
+#pp-login [hidden] { display: none !important; }
+#pp-login button, #pp-login a, #pp-login summary { touch-action: manipulation; }
+#pp-login button:focus-visible, #pp-login a:focus-visible, #pp-login summary:focus-visible { outline: 2px solid #f43f5e; outline-offset: 3px; }
+.pp-header { display: flex; align-items: center; gap: 9px; padding: 16px 24px; background: #fff; border-bottom: 1px solid var(--pp-border); font-size: 14px; line-height: 1.25; font-weight: 600; }
+.pp-header img { width: 38px; height: 38px; }
+.pp-test { margin: 16px 24px 0; padding: 10px 14px; border-radius: 8px; background: #fffbeb; color: #92400e; font-size: 14px; line-height: 20px; }
+.pp-main { flex: 1; width: 100%; display: flex; flex-direction: column; align-items: center; padding: 36px 20px; }
+.pp-emblem { width: 76px; height: 76px; margin-bottom: 24px; }
+.pp-card { width: 100%; max-width: 404px; padding: 30px; border: 1px solid var(--pp-border); border-radius: 12px; background: #fff; box-shadow: 0 2px 4px #0f172a04, 0 10px 30px #0f172a03; }
+#pp-title { margin: 0; font-family: inherit; font-weight: 700; font-size: 24px; line-height: 1.25; letter-spacing: normal; }
+#pp-description { margin: 10px 0 24px; color: var(--pp-muted); font-size: 16px; line-height: 1.625; }
+#pp-google { display: flex; align-items: center; justify-content: center; width: 100%; min-height: 46px; gap: 10px; padding: 11px 14px; border: 0; border-radius: 8px; background: var(--pp-rose); color: var(--pp-text); font: 600 14px/20px var(--pp-font); cursor: pointer; }
+#pp-google:hover { background: #fda4af; }
+#pp-google:disabled { opacity: .65; cursor: wait; }
+#pp-access { margin: 18px 0 0; color: var(--pp-muted); font-size: 14px; line-height: 20px; text-align: center; }
+.pp-admin { display: block; min-height: 44px; margin: 8px 0 0; padding: 10px; border-radius: 8px; color: var(--pp-muted); font-size: 14px; line-height: 20px; font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.pp-admin:hover { color: var(--pp-accent); }
+.pp-help { width: 100%; max-width: 404px; margin-top: 18px; text-align: center; color: var(--pp-muted); font-size: 14px; line-height: 20px; }
+.pp-help summary { display: inline-block; padding: 6px; cursor: pointer; color: var(--pp-accent); font-weight: 600; text-decoration: underline; text-underline-offset: 3px; }
+.pp-help p { margin: 6px 0 0; line-height: 1.625; }
+.pp-footer { padding: 18px 20px; border-top: 1px solid var(--pp-border); color: var(--pp-muted); font-size: 12px; line-height: 16px; text-align: center; }
+
+/* Brand custom CSS is adopted inside native component shadow roots. */
+:host(ak-flow-executor[data-pp-branded]) {
+    --pf-global--FontFamily--text: var(--pp-font);
+    --pf-global--FontFamily--heading: var(--pp-font);
+    --pf-global--Color--100: #0f172a;
+    --pf-global--primary-color--100: #be123c;
+    --pf-c-login__main--BackgroundColor: transparent;
+    display: block;
+    color: #0f172a;
+}
+:host(ak-flow-executor[data-pp-branded][hidden]) { display: none !important; }
+:host(ak-flow-executor[data-pp-branded]) .pf-c-background-image,
+:host(ak-flow-executor[data-pp-branded]) .ak-brand,
+:host(ak-flow-executor[data-pp-branded]) ak-brand-links { display: none; }
+:host(ak-flow-executor[data-pp-branded]) .pf-c-login {
+    display: block;
+    min-height: 0;
+    padding: 0;
+    background: transparent;
+}
+:host(ak-flow-executor[data-pp-branded]) .ak-login-container,
+:host(ak-flow-executor[data-pp-branded]) .pf-c-login__container {
+    display: block;
+    width: 100%;
+    max-width: none;
+    min-height: 0;
+    padding: 0;
+    margin: 0;
+    background: transparent;
+}
+:host(ak-flow-executor[data-pp-branded]) .pf-c-login__main {
+    padding: 0;
+    margin: 0;
+    box-shadow: none;
+    background: transparent;
+}
+:host(ak-flow-card) .pf-c-login__main-header { display: var(--pp-native-title, block); }
+:host(ak-flow-card) {
+    --pf-c-login__main-header--PaddingTop: 0;
+    --pf-c-login__main-header--PaddingLeft: 0;
+    --pf-c-login__main-header--PaddingRight: 0;
+    --pf-c-login__main-body--PaddingTop: 0;
+    --pf-c-login__main-body--PaddingLeft: 0;
+    --pf-c-login__main-body--PaddingRight: 0;
+    --pf-c-login__main-body--md--PaddingLeft: 0;
+    --pf-c-login__main-body--md--PaddingRight: 0;
+    --pf-c-login__main-footer--PaddingLeft: 0;
+    --pf-c-login__main-footer--PaddingRight: 0;
+}
+:host(ak-stage-identification), :host(ak-stage-password), :host(ak-flow-input-password) {
+    font: 16px/1.5 var(--pp-font);
+    --pf-c-button--m-primary--BackgroundColor: #fecdd3;
+    --pf-c-button--m-primary--Color: #0f172a;
+    --pf-c-button--m-primary--hover--BackgroundColor: #fda4af;
+    --pf-c-button--m-primary--hover--Color: #0f172a;
+    --pf-c-form-control--BorderRadius: 8px;
+}
+:host(ak-stage-identification) .pf-c-button,
+:host(ak-stage-password) .pf-c-button { min-height: 44px; border-radius: 8px; font: 600 14px/20px var(--pp-font); }
+:host(ak-stage-identification) .pf-c-form-control,
+:host(ak-stage-password) .pf-c-form-control,
+:host(ak-flow-input-password) .pf-c-form-control { min-height: 46px; border: 1px solid #e2e8f0; border-radius: 8px; font: 400 16px/24px var(--pp-font); }
+:host(ak-stage-identification) .pf-c-form__label,
+:host(ak-stage-password) .pf-c-form__label,
+:host(ak-flow-input-password) .pf-c-form__label { font: 600 14px/24px var(--pp-font); }
+@media (min-width: 640px) {
+    #pp-title { font-size: 30px; line-height: 36px; }
+    .pp-header { font-size: 16px; }
+}
+@media (max-width: 440px) {
+    .pp-header { padding: 14px 20px; }
+    .pp-header img { width: 30px; height: 30px; }
+    .pp-main { padding: 26px 16px; }
+    .pp-card { padding: 24px 20px; }
+    .pp-emblem { width: 64px; height: 64px; margin-bottom: 20px; }
+}
+@media (prefers-reduced-motion: reduce) { #pp-login * { scroll-behavior: auto !important; transition: none !important; } }

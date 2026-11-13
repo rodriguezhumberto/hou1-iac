@@ -3,6 +3,7 @@ import copy
 import json
 
 from jinja2 import Environment, StrictUndefined
+from ansible.plugins.filter.core import to_bool
 
 from helpers import DEFAULTS, ROLES
 
@@ -37,6 +38,7 @@ def identity_manifest(environment='test', google=False, profile=None):
     names['scope_mapping_names'] = profile['scope_mapping_names']
     env = Environment(undefined=StrictUndefined)
     env.filters['to_json'] = json.dumps
+    env.filters['bool'] = to_bool
     return json.loads(env.from_string((ROLES / 'authentik/templates/bootstrap.json.j2').read_text()).render(
         authentik_environment=environment, authentik_identity_profiles={environment: profile},
         authentik_staff_users=[], authentik_google_enabled=google,
