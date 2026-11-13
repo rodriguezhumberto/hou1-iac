@@ -12,7 +12,7 @@ const render = spawnSync('python3', ['-c',
     {cwd: root, encoding: 'utf8'});
 assert.equal(render.status, 0, render.stderr);
 const html = render.stdout;
-const css = readFileSync(process.env.AUTHENTIK_TEST_CSS || resolve(assets, 'login-v2.css'), 'utf8');
+const css = readFileSync(process.env.AUTHENTIK_TEST_CSS || resolve(assets, 'login-v3.css'), 'utf8');
 const behavior = readFileSync(resolve(assets, 'login-v2.js'), 'utf8');
 
 // Native layout constraints from 2025.10.4: the drawer has a 450px desktop
@@ -20,6 +20,7 @@ const behavior = readFileSync(resolve(assets, 'login-v2.js'), 'utf8');
 // theme variables. Keep these constraints so the outer card cannot mask overflow.
 const nativeCss = `
 * { box-sizing:border-box; }
+h1, p { margin:0; }
 .pf-c-drawer { display:flex; flex-direction:column; height:100%; min-width:50%; }
 @media(min-width:1200px) { .pf-c-drawer { min-width:28.125rem; } }
 .pf-c-drawer__main, .pf-c-drawer__content { display:flex; flex:1; }
@@ -69,7 +70,7 @@ class Password extends HTMLElement {
 }
 customElements.define('ak-stage-password',Password);
 class SessionEnd extends HTMLElement {
- constructor(){super();this.attachShadow({mode:'open'});this.shadowRoot.adoptedStyleSheets=[sheet];this.shadowRoot.innerHTML='<ak-flow-card><h1 slot="title">You have logged out of Monitoring.</h1><form class="pf-c-form"><p>administrator-with-a-long-account-name@example.invalid</p><p>You can return to the overview or log out of your account.</p><a href="#overview" class="pf-c-button pf-m-primary">Go back to overview</a><a href="#logout" class="pf-c-button pf-m-secondary">Log out of Pearland Paws</a><a href="#application" class="pf-c-button pf-m-secondary">Log back into Monitoring</a></form></ak-flow-card>';}
+ constructor(){super();this.attachShadow({mode:'open'});this.shadowRoot.adoptedStyleSheets=[sheet];this.shadowRoot.innerHTML='<ak-flow-card><h1 slot="title">You have logged out of Monitoring.</h1><form class="pf-c-form"><header aria-label="User information">administrator-with-a-long-account-name@example.invalid</header><p>You can return to the overview or log out of your account.</p><a href="#overview" class="pf-c-button pf-m-primary">Go back to overview</a><a href="#logout" class="pf-c-button pf-m-secondary">Log out of Pearland Paws</a><a href="#application" class="pf-c-button pf-m-secondary">Log back into Monitoring</a></form></ak-flow-card>';}
 }
 class Executor extends HTMLElement {
  constructor(){ super(); this.attachShadow({mode:'open'}); this.updateComplete=Promise.resolve(); this.challenge={sources:[{name:'Other source'},{name:'Google'}]}; }
@@ -112,7 +113,7 @@ customElements.define('ak-flow-executor',Executor);
         }
         await page.route('https://auth.example.invalid/**', async route => {
             const path = new URL(route.request().url()).pathname;
-            if (path === '/media/branding/login-v2.css') return route.fulfill({body:css,contentType:'text/css'});
+            if (path === '/media/branding/login-v3.css') return route.fulfill({body:css,contentType:'text/css'});
             if (path === '/media/branding/login-v2.js') return route.fulfill({body:behavior,contentType:'text/javascript'});
             if (path === '/media/branding/logo-v1.png') return route.fulfill({body:readFileSync(resolve(assets,'logo-v1.png')),contentType:'image/png'});
             if (path.startsWith('/static/')) return route.fulfill({body:native,contentType:'text/javascript'});
@@ -143,6 +144,21 @@ customElements.define('ak-flow-executor',Executor);
             const overview=page.getByRole('link',{name:'Go back to overview',exact:true});
             await overview.waitFor();
             await assertContained();
+            const headingGap=await page.locator('ak-stage-session-end').evaluate(stage=>{
+                const root=stage.shadowRoot;
+                return root.querySelector('header').getBoundingClientRect().top-root.querySelector('h1').getBoundingClientRect().bottom;
+            });
+            assert(Math.abs(headingGap-24)<1, 'Leave 24px between the heading and user information');
+            const buttons=await page.locator('ak-stage-session-end .pf-c-button').all();
+            assert.equal(buttons.length,3);
+            for(const button of buttons) {
+                const offset=await button.evaluate(el=>{
+                    const range=document.createRange(); range.selectNodeContents(el);
+                    const text=range.getBoundingClientRect(), box=el.getBoundingClientRect();
+                    return {x:Math.abs(text.x+text.width/2-box.x-box.width/2),y:Math.abs(text.y+text.height/2-box.y-box.height/2)};
+                });
+                assert(offset.x<2&&offset.y<2, 'Center signed-out button labels on both axes');
+            }
             assert.equal(await overview.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(254, 205, 211)');
             await overview.hover();
             assert.equal(await overview.evaluate(el=>getComputedStyle(el).backgroundColor),'rgb(253, 164, 175)');
@@ -175,6 +191,6 @@ customElements.define('ak-flow-executor',Executor);
         assert.equal(await page.locator('#pp-google').isVisible(),false);
         assert.equal(await page.evaluate(()=>localStorage.length+sessionStorage.length),0);
         assert.deepEqual(errors,[]);
-        console.log('PASS: navigation and native fallbacks; administrator/password/signed-out containment, loading alignment and themed hover at four viewport widths.');
+        console.log('PASS: navigation and native fallbacks; containment, heading spacing, centered button labels, loading alignment and themed hover at four viewport widths.');
     } finally { await browser.close(); }
 })().catch(error => {console.error(error); process.exit(1);});

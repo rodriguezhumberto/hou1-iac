@@ -55,7 +55,7 @@ class BrandingAPI(FixtureAPI):
 
 def branding_input(enabled=True):
     return {'enabled': enabled, 'domain': identity_profile()['issuer_host'],
-            'css': (ASSETS / 'login-v2.css').read_text()}
+            'css': (ASSETS / 'login-v3.css').read_text()}
 
 
 def render_flow(branded=True, compatibility=False):
@@ -172,7 +172,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                     self.assertEqual(manifest['branding']['enabled'], enabled)
                     self.assertIn('google', manifest)
                     if enabled:
-                        self.assertEqual(manifest['branding']['css'], (ASSETS / 'login-v2.css').read_text().rstrip())
+                        self.assertEqual(manifest['branding']['css'], (ASSETS / 'login-v3.css').read_text().rstrip())
                     else:
                         self.assertNotIn('css', manifest['branding'])
 
@@ -222,7 +222,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                     self.assertIn('changed=0', result.stdout)
             target = Path(directory) / 'templates/if/flow.html'
             self.assertEqual(target.read_text(), (ASSETS / 'flow.html').read_text())
-            for asset in ['logo-v1.png', 'login-v2.css', 'login-v2.js']:
+            for asset in ['logo-v1.png', 'login-v3.css', 'login-v2.js']:
                 installed = Path(directory) / 'media/branding' / asset
                 self.assertEqual(installed.read_bytes(), (ASSETS / asset).read_bytes())
                 self.assertEqual(installed.stat().st_mode & 0o777, 0o640)
