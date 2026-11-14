@@ -4,17 +4,19 @@ import base64
 import json
 import os
 from pathlib import Path
+import shutil
+import subprocess
 import tempfile
 import threading
 import unittest
 
-from ansible.parsing.vault import VaultLib, VaultSecret
 import yaml
 
 from helpers import ROLES, run_play
 
 
 class EnrollmentTest(unittest.TestCase):
+    @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age executables required')
     def test_first_enrollment_reconnect_membership_and_failure_cleanup(self):
         state = {}
         token = 'fixture-admin-pat'
@@ -98,12 +100,17 @@ class EnrollmentTest(unittest.TestCase):
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
                 endpoint = f'http://127.0.0.1:{server.server_port}'
-                password = root / 'password'
-                password.write_text('fixture-vault-password')
+                identity, recovery = root / 'deployment.key', root / 'recovery.key'
+                for key_file in (identity, recovery):
+                    subprocess.run(['age-keygen', '-o', str(key_file)], capture_output=True, check=True)
+                recipients = [subprocess.check_output(['age-keygen', '-y', str(key_file)], text=True).strip()
+                              for key_file in (identity, recovery)]
                 vault_file = root / 'token.yml'
-                vault = VaultLib([('default', VaultSecret(password.read_bytes()))])
-                vault_file.write_bytes(vault.encrypt(json.dumps({
-                    'netbird_management_url': endpoint, 'netbird_api_token': token})))
+                vault_file.write_text(subprocess.run(
+                    ['sops', '--encrypt', '--config', '/dev/null', '--age', ','.join(recipients),
+                     '--input-type', 'json', '--output-type', 'yaml', '/dev/stdin'],
+                    input=json.dumps({'netbird_management_url': endpoint, 'netbird_api_token': token}),
+                    text=True, capture_output=True, check=True).stdout)
                 bin_dir = root / 'bin'
                 bin_dir.mkdir()
                 cli = bin_dir / 'netbird'
@@ -132,6 +139,8 @@ if record['has_key']:
                           'wireguardPort': 51821, 'netbirdIp': server_ip + '/16'}
                 base = {'netbird_management_url': endpoint, 'netbird_ip': server_ip,
                         'netbird_token_vault_file': str(vault_file),
+                        'netbird_token_age_key_file': str(identity),
+                        'netbird_token_recovery_recipients': [recipients[1]],
                         'netbird_server_group': 'test-servers',
                         'netbird_before_status': {'netbirdIp': ''},
                         'netbird_marker_stat': {'stat': {'exists': False}},
@@ -162,10 +171,10 @@ if record['has_key']:
                         'block': connect_tasks + [membership, {
                             'ansible.builtin.import_tasks': str(ROLES / 'netbird_client/tasks/assign-address.yml')}]}]
                     result = run_play({**base, **(variables or {})}, tasks,
-                                      extra_args=['--vault-password-file', str(password), '--diff', '-v'])
+                                      extra_args=['--diff', '-v'])
                     output = result.stdout + result.stderr
                     self.assertEqual(result.returncode == 0, valid, output)
-                    for secret in [token, key, password.read_text()]:
+                    for secret in [token, key, identity.read_text(), recovery.read_text()]:
                         self.assertNotIn(secret, output)
                     return output
 

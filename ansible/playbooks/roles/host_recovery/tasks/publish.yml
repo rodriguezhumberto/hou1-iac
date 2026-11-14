@@ -14,8 +14,8 @@
       netbird_token_vault:
         path: '{{ netbird_token_vault_file }}'
         management_url: '{{ netbird_management_url }}'
-        vault_id: '{{ netbird_token_vault_id }}'
         age_key_file: '{{ netbird_token_age_key_file }}'
+        recovery_recipients: '{{ netbird_token_recovery_recipients }}'
       register: host_recovery_api_token
     - name: Require the existing token rather than creating a new account
       ansible.builtin.assert:

@@ -1,12 +1,12 @@
 ---
 - name: Prepare controller-side server enrollment
   block:
-    - name: Load the API token from the controller Vault
+    - name: Load the SOPS API token on the controller
       netbird_token_vault:
         path: "{{ netbird_token_vault_file }}"
         management_url: "{{ netbird_management_url }}"
-        vault_id: "{{ netbird_token_vault_id }}"
-        age_key_file: "{{ netbird_token_age_key_file | default(omit) }}"
+        age_key_file: "{{ netbird_token_age_key_file }}"
+        recovery_recipients: "{{ netbird_token_recovery_recipients }}"
       register: netbird_client_token
 
     - name: Require the saved control-plane token and a server group
@@ -45,5 +45,5 @@
       ansible.builtin.fail:
         msg: >-
           Could not prepare server enrollment. Run the control-plane playbook first
-          and retain its controller token Vault. Check the Vault password, API
+          and retain its SOPS controller token. Check the age identity, recovery recipients, API
           connectivity/token validity, and the test-servers or prod-servers group.

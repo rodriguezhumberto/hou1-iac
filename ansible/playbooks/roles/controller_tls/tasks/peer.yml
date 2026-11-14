@@ -26,6 +26,7 @@
     path: '{{ netbird_token_vault_file }}'
     management_url: '{{ netbird_management_url }}'
     age_key_file: '{{ netbird_token_age_key_file }}'
+    recovery_recipients: '{{ netbird_token_recovery_recipients }}'
   register: renewal_peer_token
   no_log: true
 

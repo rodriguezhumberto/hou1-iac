@@ -15,7 +15,7 @@
         msg: >-
           Could not read NetBird account settings. Check server connectivity; if
           the saved PAT is expired or revoked, replace netbird_api_token in the
-          controller Vault with a new owner PAT. Owner bootstrap is never repeated.
+          SOPS controller token with a new owner PAT. Owner bootstrap is never repeated.
 
 - name: Configure the account subnet without changing enrolled peers
   block:
@@ -79,4 +79,4 @@
         msg: >-
           Account configuration failed. Verify API availability and account settings.
           A differing subnet with existing peers requires an explicit migration;
-          this playbook will not renumber enrolled peers. The token remains in Vault.
+          this playbook will not renumber enrolled peers. The token remains encrypted with SOPS.

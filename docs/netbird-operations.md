@@ -45,7 +45,7 @@ with `hou1.yml --tags netbird`; rerun `netbird-dns.yml` after server address cha
 
 The encrypted API-token document binds `netbird_management_url` to its
 `netbird_api_token`. Preserve an owner-recoverable copy off-host. Replace expired
-PATs through the applicable SOPS/Vault workflow; do not reset the owner or delete
+PATs through the [SOPS/age workflow](sops-age-secrets.md); do not reset the owner or delete
 server state. A PAT permits API operations, not dashboard sign-in.
 
 ## Recovery
