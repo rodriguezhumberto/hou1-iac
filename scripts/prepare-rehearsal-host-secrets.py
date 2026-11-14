@@ -165,6 +165,7 @@ inventory = yaml.safe_load(p.read_text())
 h = inventory["all"]["children"]["isolated_test_vps"]["hosts"]["rehearsal_vps"]
 h.update(
     authentik_secret_source=str(cipher),
+    authentik_controller_age_key_file=str(key),
     rehearsal_host_age_key_source=str(key),
     authentik_backup_age_recipient=recipient,
     netbird_backup_age_recipient=recipient,

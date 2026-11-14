@@ -60,64 +60,13 @@
     - "{{ authentik_backup_root }}"
     - "{{ authentik_offhost_backup_root }}"
 
-- name: Decrypt SOPS/age secrets only for deployment and render root-only files
+- name: Load secrets on the controller and render root-only runtime files
   block:
-    - name: Verify the encrypted environment secret exists on the controller
-      ansible.builtin.stat:
-        path: "{{ authentik_secret_source }}"
-      delegate_to: localhost
-      become: false
-      vars:
-        ansible_python_interpreter: "{{ ansible_playbook_python }}"
-      register: authentik_secret_source_stat
-
-    - name: Refuse deployment without the environment-specific encrypted secret
-      ansible.builtin.assert:
-        that: authentik_secret_source_stat.stat.exists
-        fail_msg: Encrypt the {{ authentik_environment }} secret set with SOPS/age before deployment.
-
-    - name: Copy ciphertext to a root-only temporary path
-      ansible.builtin.copy:
-        src: "{{ authentik_secret_source }}"
-        dest: "{{ authentik_project_root }}/.secrets.encrypted.yml"
-        owner: root
-        group: root
-        mode: '0600'
-      no_log: true
-
-    - name: Decrypt ciphertext without exposing plaintext in command output
-      ansible.builtin.command:
-        argv:
-          - sops
-          - --decrypt
-          - --input-type
-          - yaml
-          - --output-type
-          - yaml
-          - --output
-          - "{{ authentik_project_root }}/.secrets.decrypted.yml"
-          - "{{ authentik_project_root }}/.secrets.encrypted.yml"
-      environment:
-        SOPS_AGE_KEY_FILE: "{{ authentik_age_key_file }}"
-      no_log: true
-
-    - name: Restrict decrypted secret ownership and mode before reading
-      ansible.builtin.file:
-        path: "{{ authentik_project_root }}/.secrets.decrypted.yml"
-        owner: root
-        group: root
-        mode: '0600'
-      no_log: true
-
-    - name: Read decrypted values from the managed host without logging them
-      ansible.builtin.slurp:
-        src: "{{ authentik_project_root }}/.secrets.decrypted.yml"
-      register: authentik_decrypted_file
-      no_log: true
-
-    - name: Load decrypted values into Ansible memory without logging them
-      ansible.builtin.set_fact:
-        authentik_decrypted: "{{ authentik_decrypted_file.content | b64decode | from_yaml }}"
+    - name: Load the environment secrets on the controller
+      community.sops.load_vars:
+        file: "{{ authentik_secret_source }}"
+        name: authentik_decrypted
+        age_keyfile: "{{ authentik_controller_age_key_file | default(omit) }}"
       no_log: true
 
     - name: Load the encrypted organization naming contract for identity bootstrap
@@ -133,16 +82,14 @@
             mode: '0600'
 
         - name: Decrypt identity names into memory only
-          ansible.builtin.command:
-            argv: [sops, --decrypt, --output-type, json, "{{ authentik_project_root }}/identity-names.enc.json"]
-          environment:
-            SOPS_AGE_KEY_FILE: "{{ authentik_age_key_file }}"
-          register: authentik_private_identity_names
-          changed_when: false
+          community.sops.load_vars:
+            file: "{{ authentik_identity_secret_source }}"
+            name: authentik_private_identity_names
+            age_keyfile: "{{ authentik_controller_age_key_file | default(omit) }}"
 
         - name: Merge the private naming contract into bootstrap inputs
           ansible.builtin.set_fact:
-            authentik_decrypted: "{{ authentik_decrypted | combine(authentik_private_identity_names.stdout | from_json) }}"
+            authentik_decrypted: "{{ authentik_decrypted | combine(authentik_private_identity_names) }}"
 
         - name: Require the naming bundle to match the selected environment
           ansible.builtin.assert:
@@ -187,7 +134,7 @@
         mode: '0600'
       no_log: true
   always:
-    - name: Remove encrypted and decrypted temporary files
+    - name: Remove temporary files from earlier deployments
       ansible.builtin.file:
         path: "{{ item }}"
         state: absent
