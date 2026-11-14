@@ -2,6 +2,7 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import re
 import shutil
 import subprocess
 import tempfile
@@ -18,6 +19,24 @@ class SopsAgeTest(unittest.TestCase):
             content = (ROOT / 'ansible/secrets' / name).read_text()
             self.assertIn('ENC[AES256_GCM', content)
             self.assertNotRegex(content, r'(?m)^\s*(?:AUTHENTIK_SECRET_KEY|AUTHENTIK_POSTGRES_PASSWORD|STAFF_OIDC_CLIENT_SECRET|NETBIRD_OIDC_CLIENT_SECRET):\s+[^E\n]')
+        recipients = {}
+        for environment, opposite in [('test', 'PROD_'), ('prod', 'TEST_')]:
+            bundle = yaml.safe_load((ROOT / f'ansible/inventory/group_vars/{environment}_env.sops.yml').read_text())
+            values = {key: value for key, value in bundle.items() if key != 'sops'}
+            self.assertTrue(all(isinstance(value, str) and value.startswith('ENC[AES256_GCM,')
+                                for value in values.values()))
+            self.assertFalse(any(key.startswith(opposite) for key in values))
+            if environment == 'test':
+                self.assertFalse(any(key.startswith('netbird_owner_') for key in values))
+            recipients[environment] = {entry['recipient'] for entry in bundle['sops']['age']}
+            self.assertEqual(len(recipients[environment]), 2)
+            rules = yaml.safe_load((ROOT / '.sops.yaml').read_text())['creation_rules']
+            matching = [rule for rule in rules if re.search(rule['path_regex'],
+                        f'ansible/inventory/group_vars/{environment}_env.sops.yml')]
+            self.assertEqual(len(matching), 1)
+            self.assertEqual(set(matching[0]['age'].split(',')), recipients[environment])
+        owner = yaml.safe_load((ROOT / 'ansible/secrets/authentik-prod.enc.yaml').read_text())['sops']['age'][0]['recipient']
+        self.assertEqual(recipients['test'] & recipients['prod'], {owner})
 
     @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age binaries required')
     def test_deployment_loads_on_controller_without_remote_access_or_logged_secrets(self):

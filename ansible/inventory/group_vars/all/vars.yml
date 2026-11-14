@@ -41,7 +41,7 @@ netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
 ssh_bootstrap_fallback_dir: /var/lib/ansible/ssh-bootstrap
 ssh_bootstrap_fallback_delay: 180s
 
-# Shared endpoint derives from the existing Vault-backed website domain.
+# Shared endpoint derives from the encrypted inventory's website domain.
 # Deployment is selected only by the dedicated playbook/inventory group.
 netbird_domain: "netbird.{{ primary_domain }}"
 netbird_control_plane_directory: /opt/hou1-netbird

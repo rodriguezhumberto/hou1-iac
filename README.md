@@ -27,6 +27,7 @@ The examples below run from the repository root:
 export INVENTORY=/private/production/inventory.yml
 export INPUTS=/private/production/release-inputs.yml
 export ANSIBLE_CONFIG="$PWD/ansible/ansible.cfg"
+export SOPS_AGE_KEY_FILE=/private/production/inventory-prod.key
 export ANSIBLE_HOST_KEY_CHECKING=True
 ```
 
