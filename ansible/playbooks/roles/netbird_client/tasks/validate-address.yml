@@ -8,4 +8,4 @@
       - netbird_ip != (netbird_subnet | ansible.utils.ipaddr('network'))
       - netbird_ip != (netbird_subnet | ansible.utils.ipaddr('broadcast'))
       - netbird_ip != (netbird_subnet | ansible.utils.ipaddr(-2) | ansible.utils.ipaddr('address'))
-    fail_msg: Set netbird_ip from Vault to an available server address in netbird_subnet, excluding network, broadcast and NetBird DNS addresses.
+    fail_msg: Set netbird_ip in the encrypted inventory to an available server address in netbird_subnet, excluding network, broadcast and NetBird DNS addresses.

@@ -81,9 +81,8 @@ optional-site/redirect choices through [routing inputs](website-routing.md).
 Network groups, staff roles and monitoring roles are separate grants.
 
 Keep the owner age key offline. Use scoped job identities and temporary deployment
-grants; retire temporary access after verifying owner access. Supply
-`--ask-vault-pass` to commands below when the inventory loads legacy Vault files.
-SOPS/age has not yet replaced every Vault or host-side decryption path.
+grants; retire temporary access after verifying owner access. Use the
+[SOPS/age guide](sops-age-secrets.md) to select controller and component identities.
 
 ## Recovery point before a change
 
