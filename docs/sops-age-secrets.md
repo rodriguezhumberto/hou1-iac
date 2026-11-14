@@ -60,6 +60,30 @@ actual decryption, not only that the files downloaded. Owner-local authenticated
 decryption [passed](evidence/owner-recovery-access-2026-11-12.json); executing a
 replacement controller remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
 
+## Recipient rotation
+
+Generate a separate replacement deployment identity for each environment. Retain
+the offline owner recipient in the complete recipient list:
+
+```bash
+SOPS_AGE_KEY_FILE=/private/current.key \
+SOPS_AGE_NEW_KEY_FILE=/private/replacement.key \
+  scripts/sops-age-rotate.sh ansible/inventory/group_vars/test_env.sops.yml \
+  age1_REPLACEMENT_RECIPIENT age1_OWNER_RECIPIENT
+```
+
+The script stages ciphertext beside the original, updates recipients and rotates
+the SOPS data key. It replaces the original only after decryption with the
+replacement identity passes; failures leave the original unchanged. Temporary
+files contain ciphertext only and are removed on exit.
+
+Repeat for every bundle granted to the retired identity and update `.sops.yaml`
+to the same recipient lists. Verify the replacement identity decrypts each
+bundle and the retired identity fails, using a clean controller without ambient
+keys. Verify owner decryption offline, refresh the owner-encrypted recovery copy,
+and update controller key paths before deleting the retired deployment key.
+Keep existing encrypted recovery material until owner-local verification passes.
+
 Changing SOPS recipients does not revoke plaintext credentials already seen,
 historical ciphertext copies, snapshots or prior memory. Rotate underlying
 credentials separately when required. Client-secret overlap uses

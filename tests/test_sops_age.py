@@ -111,6 +111,74 @@ class SopsAgeTest(unittest.TestCase):
                 for secret in ('test-fixture-secret', 'prod-fixture-secret'):
                     self.assertNotIn(secret, result.stdout + result.stderr)
 
+    @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen') and shutil.which('age'),
+                         'SOPS/age binaries required')
+    def test_recipient_rotation_verifies_replacement_before_changing_original(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            keys, recipients = {}, {}
+            for name in ('old', 'new', 'owner', 'wrong'):
+                keys[name] = root / (name + '.key')
+                subprocess.run(['age-keygen', '-o', str(keys[name])], check=True, capture_output=True)
+                recipients[name] = subprocess.check_output(
+                    ['age-keygen', '-y', str(keys[name])], text=True).strip()
+            secret = 'rotation-fixture-secret'
+            original = subprocess.run([
+                'sops', '--encrypt', '--config', '/dev/null', '--age',
+                ','.join(recipients[name] for name in ('old', 'owner')),
+                '--input-type', 'json', '--output-type', 'yaml', '/dev/stdin',
+            ], input=json.dumps({'secret': secret}), text=True, check=True, capture_output=True).stdout
+            encrypted = root / 'bundle [prod].enc.yaml'
+            config = root / 'config' / 'sops' / 'age'
+            config.mkdir(parents=True)
+            shutil.copyfile(keys['old'], config / 'keys.txt')
+            # Ambient identities must not let an incorrect explicit key pass.
+            env = {**os.environ, 'SOPS_AGE_KEY': keys['old'].read_text(),
+                   'SOPS_AGE_KEY_CMD': 'cat ' + str(keys['old']), 'XDG_CONFIG_HOME': str(root / 'config')}
+            for current, replacement, corrupt in [('wrong', 'new', False), ('old', 'wrong', False),
+                                                   ('old', 'new', True), ('old', 'new', False)]:
+                with self.subTest(current=current, replacement=replacement, corrupt=corrupt):
+                    content = yaml.safe_load(original)
+                    if corrupt:
+                        content['secret'] = content['secret'].replace('data:', 'data:AAAA', 1)
+                    before = yaml.safe_dump(content)
+                    encrypted.write_text(before)
+                    result = subprocess.run([
+                        str(ROOT / 'scripts/sops-age-rotate.sh'), str(encrypted),
+                        recipients['new'], recipients['owner'],
+                    ], env={**env, 'SOPS_AGE_KEY_FILE': str(keys[current]),
+                            'SOPS_AGE_NEW_KEY_FILE': str(keys[replacement])},
+                        text=True, capture_output=True, timeout=30)
+                    success = current == 'old' and replacement == 'new' and not corrupt
+                    self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
+                    self.assertNotIn(secret, result.stdout + result.stderr)
+                    self.assertFalse(list(root.glob('*.rotate.*')))
+                    if not success:
+                        self.assertEqual(encrypted.read_text(), before)
+                        continue
+                    self.assertEqual(encrypted.stat().st_mode & 0o777, 0o600)
+                    updated = yaml.safe_load(encrypted.read_text())
+                    self.assertEqual({entry['recipient'] for entry in updated['sops']['age']},
+                                     {recipients['new'], recipients['owner']})
+                    clean_env = {key: value for key, value in env.items()
+                                 if key not in ('SOPS_AGE_KEY', 'SOPS_AGE_KEY_CMD')}
+                    clean_env['XDG_CONFIG_HOME'] = str(root / 'empty-config')
+                    for name in ('new', 'owner', 'old'):
+                        decrypted = subprocess.run([
+                            'sops', '--decrypt', '--output-type', 'json', str(encrypted),
+                        ], env={**clean_env, 'SOPS_AGE_KEY_FILE': str(keys[name])},
+                            text=True, capture_output=True, timeout=10)
+                        self.assertEqual(decrypted.returncode == 0, name != 'old')
+                        if name != 'old':
+                            self.assertEqual(json.loads(decrypted.stdout), {'secret': secret})
+                    data_keys = []
+                    for document, identity in [(content, 'old'), (updated, 'new')]:
+                        envelope = next(entry['enc'] for entry in document['sops']['age']
+                                        if entry['recipient'] == recipients[identity])
+                        data_keys.append(subprocess.run(['age', '--decrypt', '-i', str(keys[identity])],
+                                                       input=envelope.encode(), check=True, capture_output=True).stdout)
+                    self.assertNotEqual(*data_keys)
+
     def test_rotation_and_overlap_tools_are_executable_and_sops_config_separates_envs(self):
         for name in ['sops-age-render.sh', 'sops-age-rotate.sh', 'sops-age-overlap-check.sh']:
             path = ROOT / 'scripts' / name
