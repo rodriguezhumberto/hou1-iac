@@ -12,9 +12,9 @@ environment explicitly:
 ```bash
 cd ansible
 ansible-playbook playbooks/authentik.yml \
-  -e target_hosts=hou1_test -e deploy_environment=test --ask-vault-pass
+  -e target_hosts=hou1_test -e deploy_environment=test
 ansible-playbook playbooks/authentik.yml \
-  -e target_hosts=hou1_prod -e deploy_environment=prod --ask-vault-pass
+  -e target_hosts=hou1_prod -e deploy_environment=prod
 ```
 
 The play requires `authentik_secret_key` and
