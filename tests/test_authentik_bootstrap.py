@@ -443,7 +443,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
         deployment = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text()) if 'block' in t)
         task = next(t for t in deployment['block'] if t['name'] == 'Load the encrypted organization naming contract for identity bootstrap')
         # The production role runs as root; these disposable fixtures use the
-        # current test user while exercising the real copy/decrypt/merge tasks.
+        # current test user while exercising the real copy/load/merge tasks.
         task['block'][0]['ansible.builtin.copy'].update(owner=str(os.getuid()), group=str(os.getgid()))
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -459,7 +459,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
                 encrypted.write_text(result.stdout)
                 result = run_play({'authentik_environment': 'test', 'authentik_bootstrap_enabled': True,
                                    'authentik_identity_secret_source': str(encrypted),
-                                   'authentik_project_root': str(project), 'authentik_age_key_file': str(key),
+                                   'authentik_project_root': str(project), 'authentik_controller_age_key_file': str(key),
                                    'authentik_decrypted': {}}, [task])
                 self.assertEqual(result.returncode == 0, environment == 'test', result.stdout + result.stderr)
                 self.assertNotIn(names['staff']['client_id'], result.stdout + result.stderr)

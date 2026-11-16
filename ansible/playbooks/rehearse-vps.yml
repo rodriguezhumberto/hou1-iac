@@ -151,6 +151,8 @@
         webstack_bootstrap_ingress_only: true
     - role: netbird_control_plane
     - role: authentik
+      vars:
+        authentik_controller_age_key_file: "{{ rehearsal_host_age_key_source | default(rehearsal_controller_age_key_file) }}"
     - role: netbird_client
     - role: netbird_dns
 

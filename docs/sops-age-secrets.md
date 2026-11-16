@@ -18,10 +18,15 @@ Temporary production admin grants were retired after handoff.
 
 ## Deployment and recovery
 
-Some roles decrypt on the controller; Authentik still uses the managed host's
-`authentik_age_key_file`. That must be a scoped runtime identity, never the owner's
-personal identity. Ansible Vault inputs also remain. Controller-side consolidation
-and Vault removal are unfinished [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
+Authentik loads deployment secrets and identity names on the controller through
+`community.sops.load_vars`. Set `authentik_controller_age_key_file` to the private
+controller identity, or select it with `SOPS_AGE_KEY_FILE`. Only rendered runtime
+files and retained ciphertext are copied to HOU1. Keep `authentik_age_key_file`
+as the separate host-only identity for the existing backup/restore contract;
+never install the owner's or controller's identity there.
+
+Ansible Vault inventory and NetBird's Vault fallback remain.
+[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) tracks their migration.
 
 Verify owner access locally without printing plaintext:
 
