@@ -17,9 +17,9 @@ the [Ansible dependencies](requirements-dev.txt) and
 credentials and SSH configuration outside Git.
 
 Use a private inventory with pinned SSH host keys for production; the example
-inventory disables strict checking. Secrets use SOPS/age, with some older inputs
-still in Ansible Vault. Add `--ask-vault-pass` when those files are loaded, and
-keep passwords and tokens out of command arguments.
+inventory disables strict checking. Secrets use controller-side SOPS/age.
+Select the environment's deployment identity and keep passwords and tokens out
+of command arguments.
 
 The examples below run from the repository root:
 
@@ -37,7 +37,7 @@ Connect the controller to NetBird, then run:
 
 ```bash
 ansible-playbook -i "$INVENTORY" ansible/playbooks/hou1.yml \
-  -e target_hosts=hou1_prod -e "@$INPUTS" --ask-vault-pass
+  -e target_hosts=hou1_prod -e "@$INPUTS"
 ```
 
 Use `--tags deploy` to update the app, `--tags ufw` to apply firewall/SSH settings,

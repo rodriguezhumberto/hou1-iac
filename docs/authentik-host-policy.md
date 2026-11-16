@@ -7,7 +7,7 @@ the test or production Compose project:
 ```bash
 cd ansible
 ansible-playbook playbooks/authentik-preflight.yml \
-  -e target_hosts=hou1_prod --ask-vault-pass
+  -e target_hosts=hou1_prod
 ```
 
 The gate refuses placement below 2 vCPU, 4096 MiB RAM, 20 GiB free space, or

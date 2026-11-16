@@ -1,6 +1,7 @@
 """Exercise bootstrap, encrypted persistence and account updates through Ansible."""
 from copy import deepcopy
 import json
+import os
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 from pathlib import Path
 import tempfile
@@ -11,8 +12,6 @@ import subprocess
 
 import yaml
 
-from ansible.parsing.vault import VaultLib, VaultSecret
-
 from helpers import ROLES, run_play
 
 
@@ -21,10 +20,12 @@ class BootstrapTest(unittest.TestCase):
     def test_sops_token_roundtrip_and_endpoint_isolation(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
-            identity, ciphertext = root / 'test.key', root / 'token.enc.yaml'
-            subprocess.run(['age-keygen', '-o', str(identity)], capture_output=True, check=True)
+            identity, recovery, ciphertext = root / 'test.key', root / 'recovery.key', root / 'token.enc.yaml'
+            for key in (identity, recovery):
+                subprocess.run(['age-keygen', '-o', str(key)], capture_output=True, check=True)
+            recovery_recipient = subprocess.check_output(['age-keygen', '-y', str(recovery)], text=True).strip()
             args = {'path': str(ciphertext), 'management_url': 'https://netbird-test.example.invalid',
-                    'age_key_file': str(identity)}
+                    'age_key_file': str(identity), 'recovery_recipients': [recovery_recipient]}
             token = 'isolated-fixture-pat'
             result = run_play({}, [
                 {'netbird_token_vault': args, 'register': 'before', 'no_log': True},
@@ -38,11 +39,19 @@ class BootstrapTest(unittest.TestCase):
             self.assertNotIn(token.encode(), original)
             self.assertIn(b'ENC[AES256_GCM', original)
             self.assertEqual(ciphertext.stat().st_mode & 0o777, 0o600)
-            wrong = run_play({}, [{'netbird_token_vault': {**args, 'management_url': 'https://other-test.example.invalid'}, 'no_log': True}])
-            self.assertNotEqual(wrong.returncode, 0)
-            self.assertEqual(ciphertext.read_bytes(), original)
+            recovered = subprocess.run(['sops', '--decrypt', '--output-type', 'json', str(ciphertext)],
+                                       env={**os.environ, 'SOPS_AGE_KEY_FILE': str(recovery)},
+                                       text=True, capture_output=True, check=True)
+            self.assertEqual(json.loads(recovered.stdout)['netbird_api_token'], token)
+            for change in [{'management_url': 'https://other-test.example.invalid'},
+                           {'token': 'another-token'}, {'recovery_recipients': []},
+                           {'recovery_recipients': ['unlisted-recipient']}]:
+                wrong = run_play({}, [{'netbird_token_vault': {**args, **change}, 'no_log': True}])
+                self.assertNotEqual(wrong.returncode, 0)
+                self.assertEqual(ciphertext.read_bytes(), original)
 
-    def test_bootstrap_vault_and_account_lifecycle(self):
+    @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age executables required')
+    def test_bootstrap_sops_and_account_lifecycle(self):
         # Exercise the production preflight and bootstrap together: bootstrap
         # must retain the token loaded before deployment begins.
         preflight = next(task for task in yaml.safe_load(
@@ -161,17 +170,18 @@ class BootstrapTest(unittest.TestCase):
         try:
             with tempfile.TemporaryDirectory() as directory:
                 root = Path(directory)
-                password = root / 'password'
-                password.write_text('fixture-vault-password')
-                password.chmod(0o600)
-                path = root / 'vault' / 'token.yml'
+                identity, recovery = root / 'deployment.key', root / 'recovery.key'
+                for key in (identity, recovery):
+                    subprocess.run(['age-keygen', '-o', str(key)], capture_output=True, check=True)
+                recovery_recipient = subprocess.check_output(['age-keygen', '-y', str(recovery)], text=True).strip()
+                path = root / 'tokens' / 'token.yml'
                 owner = {'netbird_owner_email': 'owner@example.org',
                          'netbird_owner_name': 'Test Owner',
                          'netbird_owner_password': 'fixture-owner-password'}
                 base = {'netbird_bootstrap_api_url': f'http://127.0.0.1:{server.server_port}',
                         'netbird_management_url': 'https://netbird.example.org',
-                        'netbird_token_vault_file': str(path)}
-                vault = VaultLib([('default', VaultSecret(password.read_bytes()))])
+                        'netbird_token_vault_file': str(path), 'netbird_token_age_key_file': str(identity),
+                        'netbird_token_recovery_recipients': [recovery_recipient]}
 
                 def reset(**overrides):
                     state.clear()
@@ -193,21 +203,21 @@ class BootstrapTest(unittest.TestCase):
                                  reject=False, revoked=False, vault_path=path)
                     state.update(overrides)
 
-                def run(valid, variables=None, credential=password):
+                def run(valid, variables=None, credential=identity):
                     args = ['--diff', '-v']
-                    if credential is not None:
-                        args += ['--vault-password-file', str(credential)]
-                    result = run_play({**base, **(variables or {})}, tasks, extra_args=args)
+                    result = run_play({**base, 'netbird_token_age_key_file': str(credential) if credential else '',
+                                       **(variables or {})}, tasks, extra_args=args)
                     output = result.stdout + result.stderr
                     self.assertEqual(result.returncode == 0, valid, output)
                     for secret in [token, owner['netbird_owner_email'], owner['netbird_owner_password'],
-                                   password.read_text()]:
+                                   identity.read_text(), recovery.read_text()]:
                         self.assertNotIn(secret, output)
                     return output
 
                 reset()
                 # Preflight fails before owner creation without an encryption credential.
                 run(False, owner, credential=None)
+                run(False, {**owner, 'netbird_token_recovery_recipients': []})
                 self.assertEqual(state['posts'], [])
                 self.assertFalse(path.exists())
                 for variables, required in [({}, True), ({**owner, 'netbird_owner_password': 'short'}, True),
@@ -231,10 +241,13 @@ class BootstrapTest(unittest.TestCase):
                     'email': owner['netbird_owner_email'], 'name': owner['netbird_owner_name'],
                     'password': owner['netbird_owner_password'], 'create_pat': True, 'pat_expire_in': 365}])
                 encrypted = path.read_bytes()
-                self.assertTrue(encrypted.startswith(b'$ANSIBLE_VAULT;'))
+                self.assertIn(b'ENC[AES256_GCM', encrypted)
                 self.assertNotIn(token.encode(), encrypted)
                 self.assertEqual(path.stat().st_mode & 0o777, 0o600)
-                self.assertEqual(json.loads(vault.decrypt(encrypted)), {
+                recovered = subprocess.run(['sops', '--decrypt', '--output-type', 'json', str(path)],
+                                           env={**os.environ, 'SOPS_AGE_KEY_FILE': str(recovery)},
+                                           text=True, capture_output=True, check=True)
+                self.assertEqual(json.loads(recovered.stdout), {
                     'netbird_management_url': base['netbird_management_url'], 'netbird_api_token': token})
                 self.assertEqual(state['settings']['network_range'], '100.90.0.0/16')
                 self.assertTrue(state['settings']['peer_login_expiration_enabled'])
@@ -290,15 +303,15 @@ class BootstrapTest(unittest.TestCase):
                 self.assertEqual(path.read_bytes(), encrypted)
                 self.assertEqual(len(state['posts']), 1)
 
-                wrong_password = root / 'wrong-password'
-                wrong_password.write_text('wrong')
-                run(False, credential=wrong_password)
+                wrong_identity = root / 'wrong.key'
+                subprocess.run(['age-keygen', '-o', str(wrong_identity)], capture_output=True, check=True)
+                run(False, credential=wrong_identity)
                 run(False, {'netbird_management_url': 'https://another.example.org'})
-                path.write_text('not an encrypted vault')
+                path.write_text('$ANSIBLE_VAULT;1.1;AES256\ninvalid\n')
                 run(False)
                 self.assertEqual(len(state['posts']), 1)
                 path.unlink()
-                self.assertIn('API token Vault is missing', run(False))
+                self.assertIn('encrypted API token is missing', run(False))
                 self.assertEqual(len(state['posts']), 1)
 
                 reset(omit_token=True)

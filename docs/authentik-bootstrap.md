@@ -8,7 +8,7 @@ cd ansible
 ansible-playbook playbooks/authentik-bootstrap.yml \
   -e target_hosts=hou1_test -e deploy_environment=test \
   -e authentik_age_key_file=/root/.config/sops/age/hou1-authentik-test.txt \
-  --ask-vault-pass
+  -e authentik_controller_age_key_file=/private/authentik-test.key
 ```
 
 The bootstrap utility uses the Authentik API and only reconciles the named
@@ -83,7 +83,7 @@ controller without connecting to that host:
 ansible-playbook -i ansible/inventory/inventory.yml \
   ansible/playbooks/export-identity-profile.yml \
   -e target_hosts=hou1_prod -e deploy_environment=prod \
-  -e identity_profile_output=/private/identity-prod.json --ask-vault-pass
+  -e identity_profile_output=/private/identity-prod.json
 ```
 
 The exported profile contains no organization-specific client or application name,

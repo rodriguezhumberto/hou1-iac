@@ -35,10 +35,17 @@ files and retained ciphertext are copied to HOU1. Keep `authentik_age_key_file`
 as the separate host-only identity for the existing backup/restore contract;
 never install the owner's or controller's identity there.
 
-NetBird's token Vault fallback remains.
-[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) tracks its migration
-and the remaining recovery checks. Verify owner-local decryption of new recovery
-copies before retiring legacy recovery material.
+NetBird token storage uses SOPS/age only. `netbird_token_age_key_file` defaults to
+`SOPS_AGE_KEY_FILE`; `netbird_token_recovery_recipients` declares offline recovery
+recipients. New PATs encrypt to both identities, and reads check the recovery
+recipients. The action and `netbird_token_vault_file` input retain their names
+for existing inventories; the file must contain SOPS ciphertext.
+
+Before using legacy private token copies, convert them on the controller and
+verify the endpoint and token are unchanged. Retain encrypted legacy copies
+until owner-local decryption of the new recovery material passes.
+[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) tracks the remaining
+deployment and recovery checks.
 
 Verify owner access locally without printing plaintext:
 
