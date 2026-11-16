@@ -18,12 +18,15 @@ Temporary production admin grants were retired after handoff.
 
 ## Deployment and recovery
 
-The Ansible configuration enables SOPS inventory loading alongside ordinary
-group and host variables. Use `group_vars/test_env.sops.yml` and
-`group_vars/prod_env.sops.yml` for environment secrets. Select the controller key
-with `SOPS_AGE_KEY_FILE`. Secrets load when needed by a target, so a test-only
+Inventory secrets are in `group_vars/test_env.sops.yml` and
+`group_vars/prod_env.sops.yml`, with separate deployment recipients and the owner
+as recovery recipient. Keep deployment identities on the controller and retain
+an owner-encrypted recovery copy. Select the matching key with
+`SOPS_AGE_KEY_FILE`. Secrets load when needed by a target, so a test-only
 play does not require the production key. `ansible-inventory --list` includes all
 hosts and requires access to both environments; its output contains secrets.
+Shared settings remain in both bundles; credential values and scopes are unchanged.
+Production NetBird bootstrap credentials are only in the production bundle.
 
 Authentik loads deployment secrets and identity names on the controller through
 `community.sops.load_vars`. Set `authentik_controller_age_key_file` to the private
@@ -32,8 +35,10 @@ files and retained ciphertext are copied to HOU1. Keep `authentik_age_key_file`
 as the separate host-only identity for the existing backup/restore contract;
 never install the owner's or controller's identity there.
 
-Ansible Vault inventory and NetBird's Vault fallback remain.
-[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) tracks their migration.
+NetBird's token Vault fallback remains.
+[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) tracks its migration
+and the remaining recovery checks. Verify owner-local decryption of new recovery
+copies before retiring legacy recovery material.
 
 Verify owner access locally without printing plaintext:
 
