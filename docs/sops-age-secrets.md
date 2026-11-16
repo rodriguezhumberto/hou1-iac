@@ -18,6 +18,13 @@ Temporary production admin grants were retired after handoff.
 
 ## Deployment and recovery
 
+The Ansible configuration enables SOPS inventory loading alongside ordinary
+group and host variables. Use `group_vars/test_env.sops.yml` and
+`group_vars/prod_env.sops.yml` for environment secrets. Select the controller key
+with `SOPS_AGE_KEY_FILE`. Secrets load when needed by a target, so a test-only
+play does not require the production key. `ansible-inventory --list` includes all
+hosts and requires access to both environments; its output contains secrets.
+
 Authentik loads deployment secrets and identity names on the controller through
 `community.sops.load_vars`. Set `authentik_controller_age_key_file` to the private
 controller identity, or select it with `SOPS_AGE_KEY_FILE`. Only rendered runtime
