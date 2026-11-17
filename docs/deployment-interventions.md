@@ -11,9 +11,9 @@ install from the final revisions without corrective commands.
 | TLS import blocked bootstrap retry or service repair | Fixed in controller TLS/webstack, `35b6cad` | Retain strict rotation checks; repeat fresh install |
 | Uptime Kuma bound an absent VPN address at boot | Fixed in activation/webstack, `f553c61`; reboot passed | Include delayed-address regression in acceptance |
 | Inter-VM TCP resets | Proxmox Terraform, corrected by local provisioning agent | Declare/check network prerequisites before bootstrap |
-| Bootstrap name resolution | Private `configure-hosts.py` and `configure-local-dns.py` | Add an opt-in lab resolver owner; preserve unrelated host settings |
-| Container DNS blocked after UFW enabled | Private `allow-container-dns.py` | Derive narrow rules from declared Docker networks, not a captured subnet list |
-| Controller administrative VPN and resolver namespace | `scripts/lab-network.py` owns command transport; enrollment remains private | Maintain peer creation/enrollment separately from renewal jobs |
+| Bootstrap name resolution | Opt-in `lab_dns` roles in both repositories; adoption and repeat passed | Verify fresh-host bootstrap; preserve provider DNS and unrelated host settings |
+| Container DNS blocked after UFW enabled | HOU1 `docker` owns daemon DNS; `lab_dns_containers` derives narrow UFW allowances from declared networks | Include replacement-network and interrupted-start checks in fresh-host acceptance |
+| Controller administrative VPN and resolver namespace | `scripts/lab-network.py` owns command transport and private resolver/hosts views; enrollment remains private | Maintain peer creation/enrollment separately from renewal jobs |
 | Inventory assembly and bootstrap/managed selection | Private `assemble-inputs.py` and state JSON | Separate authoritative inputs from generated inventories; verify cutover before switching |
 | Lab secrets and age identities | Private preparation/import helpers; scoped encrypted bundles | Maintain retry-safe creation and recipient validation; never recreate identities on rerun |
 | Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; maintained consumers | Document required capabilities and validate access before bootstrap |
@@ -50,12 +50,16 @@ install from the final revisions without corrective commands.
 5. Fresh-host deployment from frozen inputs, then interrupted/dependency-failure
    acceptance. Run destructive drills separately from routine reconciliation.
 
-The [workflow](deployment-workflow.md) implements the first slice and an isolated
-transport for an existing controller peer. Bootstrap, peer enrollment, identity
-seeding, off-host backup and recovery acceptance remain separate work.
+The [workflow](deployment-workflow.md) and [lab DNS roles](lab-dns.md) implement
+the first two slices for existing hosts and an enrolled controller peer. Resolver
+adoption, repeat reconciliation and standalone verification passed without manual
+repair. Bootstrap handoffs, peer enrollment, identity seeding, off-host backup and
+recovery acceptance remain separate work.
 
-Local validation: 23 workflow/transport tests passed, including real
+Initial workflow validation: 23 workflow/transport tests passed, including real
 Ansible/OpenSSH fixtures, plus syntax/lint and documentation links. Managed-host
 preflight, reconciliation and standalone verification passed on both lab hosts;
 the initial delegation failure and corrected retry are in the
 [lab evidence](evidence/isolated-lab-2026-11-17.md#managed-workflow-acceptance).
+DNS adoption and repeat results are recorded in the
+[same evidence](evidence/isolated-lab-2026-11-17.md#maintained-dns-adoption-and-repeat).

@@ -212,5 +212,9 @@ The [intervention audit](deployment-interventions.md) assigns the lab's correcti
 steps to maintained code, declared inputs or external prerequisites. The
 [managed lab workflow](deployment-workflow.md) passed ordered reconciliation and
 standalone verification on both hosts using maintained controller transport.
-Next: declarative bootstrap DNS/firewall ownership and input contracts, followed
-by ingress separation.
+Opt-in lab DNS/firewall ownership is implemented. Adoption, unchanged repeat and
+standalone verification passed on both hosts; container IDs, DNS files, network
+allocations and owned firewall rules stayed stable. Controller hostname pins now
+apply inside the wrapper's private mount view without changing global files.
+Next: input/release assembly, identity/backup contracts and bootstrap handoffs,
+followed by ingress separation. Fresh-host acceptance remains unproved.

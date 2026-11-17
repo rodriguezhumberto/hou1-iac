@@ -100,5 +100,36 @@ The first reconciliation failed before host changes: global SSH overrides also
 affected delegated controller tasks. Host-scoped transport inputs fixed it;
 the failed receipt remains beside the successful retry under `workflow-runs/`.
 Local validation passed 23 workflow/transport tests, syntax/lint and documentation
-links. Fresh-bootstrap DNS/firewall ownership and input contracts precede ingress
-separation in the [intervention audit](../deployment-interventions.md).
+links. Input contracts and bootstrap handoffs precede ingress separation in the
+[intervention audit](../deployment-interventions.md).
+
+## Maintained DNS adoption and repeat
+
+Adoption passed with HOU1 `d614ff5` and HOU4 `033864c`. Repeat reconciliation and
+standalone verification passed with HOU1 `b208b63` and the same HOU4 revision.
+All phases used the maintained wrapper and workflow, with no corrective commands
+during these successful runs. Private DNS inputs are included in `workflow.json`.
+
+- Both VMs adopted maintained resolvers while preserving provider drop-ins and
+  `/etc/resolv.conf` symlinks. Legacy lab hosts/cloud-init overrides were removed.
+- HOU1 adopted its identical Docker DNS setting without restarting Docker.
+  Narrow UFW rules replaced legacy allowances; Compose prepares networks and
+  DNS access before service activation.
+- All eight HOU1 and four HOU4 container records matched prior acceptance,
+  adoption, repeat and standalone verification. Image/source/TLS checks and all
+  three HTTPS checks passed.
+- DNS files, Docker networks and installed UFW rules were identical after adoption
+  and repeat. No DNS restart ran during repeat; Docker activation was skipped.
+- The controller still had old global hostname pins. Declared process-local pins
+  now replace that block inside the wrapper's private view. Live checks verified
+  all four names, dropped capabilities and unchanged global hosts/resolver/routes.
+  The global block was preserved; the wrapper no longer depends on it.
+
+Local DNS tests cover UDP/TCP answers, forwarding, removed records, production
+guards and failed-removal rollback. Firewall/Compose fixtures cover interrupted
+preparation and retry without recreating existing containers. The private-hosts
+change passed nine transport tests plus syntax/lint. Final `make check` passed
+450 HOU1 tests without skips and 91 HOU4 tests with 14 optional monitoring-validator
+skips; native DNS checks ran in both. These runs establish adoption and
+reconciliation on existing hosts; fresh-host bootstrap remains a separate
+acceptance run.
