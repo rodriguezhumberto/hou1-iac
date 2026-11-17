@@ -4,6 +4,18 @@ Separate shared Nginx from the application Compose project so application
 activation and shutdown cannot stop the VPN control-plane proxy. Keep existing
 certificate, log and backend ingress paths stable.
 
+## Current preparation
+
+TLS, identity/VPN ingress operations and monitoring share the validated
+`shared_ingress_compose_directory`, `shared_ingress_compose_project` and
+`shared_ingress_compose_file` inputs. The [owning role](../ansible/playbooks/roles/shared_ingress/README.md#compose-selection)
+keeps compatible defaults for older inventories and TLS receiver configurations.
+
+Application branch `cleanup/ingress-backend-readiness` prepares dynamic backend
+discovery and removes the health dependency. Both disposable Nginx fixtures pass;
+deployment needs a CI image receipt and source bundle containing that change.
+Listener transfer and compatible recovery export remain to be implemented.
+
 ## Prerequisites
 
 - Give TLS renewal, Authentik, NetBird and monitoring an explicit ingress

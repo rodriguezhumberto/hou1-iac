@@ -173,3 +173,22 @@ variables and scoped encrypted bundles retain their existing owners.
 
 This accepts generated inventories on the existing lab hosts. Initial bootstrap
 and SSH cutover on clean hosts remain untested by this adoption run.
+
+Local `make check` passed 469 HOU1 tests without skips, plus syntax and lint.
+
+## Ingress prerequisite validation
+
+HOU1 `4aa7a49` prepares explicit ingress selection for TLS, Authentik, NetBird and
+monitoring. Its 59 affected tests passed without skips; syntax/lint and independent
+review passed. Defaults keep the application project, existing certificate/log
+paths and old TLS receiver configurations compatible. Recovery formats are unchanged.
+
+Application source `2089f6a` adds runtime Docker DNS resolution and removes
+Nginx's backend-health startup dependency. Both disposable Docker fixtures passed:
+existing routing/access rules, startup without a backend, later availability and
+replacement at a different address. Ingress container identity and worker processes
+stayed unchanged during recovery. Source-only validation does not establish a new
+deployable release; CI image/receipt and matching source inputs are still required.
+
+The [migration sequence](../ingress-separation.md) keeps listener transfer,
+compatible recovery export and VM-local rollback as separate implementation steps.
