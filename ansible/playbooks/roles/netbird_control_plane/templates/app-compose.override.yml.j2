@@ -9,4 +9,15 @@
   }},
   'networks': {'netbird-ingress': {'external': True, 'name': netbird_ingress_network}} | combine(authentik_network)
 } %}
-{{ previous | combine(ingress, recursive=True) | to_nice_yaml }}
+{% set override = previous | combine(ingress, recursive=True) %}
+{% if not authentik_enable_ingress_network | default(false) | bool %}
+{# Recursive combine retains absent keys; explicitly remove only the managed Authentik attachment. #}
+{% set nginx = override.services.nginx | combine({
+  'networks': override.services.nginx.networks | dict2items | rejectattr('key', 'equalto', 'authentik-ingress') | items2dict
+}) %}
+{% set override = override | combine({
+  'services': override.services | combine({'nginx': nginx}),
+  'networks': override.networks | dict2items | rejectattr('key', 'equalto', 'authentik-ingress') | items2dict
+}) %}
+{% endif %}
+{{ override | to_nice_yaml }}

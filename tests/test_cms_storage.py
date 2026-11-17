@@ -76,6 +76,89 @@ class CmsStorageTest(unittest.TestCase):
                 self.assertIn('netbird-ingress', services['nginx']['networks'])
                 self.assertEqual(len(services['nginx']['volumes']), 2)
 
+    def test_authentik_ingress_toggle_preserves_storage_and_other_networks(self):
+        for order in [('cms', 'netbird'), ('netbird', 'cms')]:
+            with self.subTest(order=order), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                app = root / 'app'
+                app.mkdir()
+                subprocess.run(['git', 'init', str(app)], check=True, capture_output=True)
+                base = {'services': {
+                    'astro-app': {'image': 'node:24', 'volumes': ['./database:/var/data']},
+                    'nginx': {'image': 'nginx:alpine', 'networks': ['app-network']}},
+                    'networks': {'app-network': {}}}
+                (app / 'docker-compose.yml').write_text(yaml.safe_dump(base))
+                worker = {'image': 'busybox:1.37', 'volumes': [
+                    f'{root}/worker:/work', 'worker-cache:/cache'],
+                    'networks': {'shared': {'aliases': ['worker-internal']}}}
+                shared = {'driver': 'bridge', 'labels': {'purpose': 'unrelated'}}
+                override = app / 'docker-compose.override.yml'
+                override.write_text('# Managed by hou1-iac.\n' + yaml.safe_dump({
+                    'services': {'worker': worker, 'nginx': {
+                        'networks': {'shared': {'aliases': ['shared-proxy']}},
+                        'environment': {'KEEP_ME': 'yes'}}},
+                    'networks': {'shared': shared}, 'volumes': {'worker-cache': {}}}))
+                variables = {
+                    'app_directory': str(app), 'cms_media_directory': str(root / 'media'),
+                    'netbird_control_plane_directory': str(root / 'netbird'),
+                    'authentik_active_network': 'fixture-authentik',
+                    'netbird_ingress_network': 'fixture-netbird',
+                    'netbird_ingress_proxy_ip': '172.30.80.2',
+                }
+                tasks_by_name = {
+                    'cms': source_tasks('webstack', 'cms-compose.yml'),
+                    'netbird': source_tasks('netbird_control_plane', 'app-ingress.yml')}
+                tasks = sum((tasks_by_name[name] for name in order), [])
+                renders = {}
+                configs = {}
+                for enabled in (True, False, False, True):
+                    result = run_play({**variables, 'authentik_enable_ingress_network': enabled}, tasks)
+                    self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+                    rendered = override.read_text()
+                    managed = yaml.safe_load(rendered)
+                    merged = subprocess.run(['docker', 'compose', '--project-directory', str(app),
+                        'config', '--format', 'json'], text=True, capture_output=True)
+                    self.assertEqual(merged.returncode, 0, merged.stderr)
+                    config = json.loads(merged.stdout)
+                    services = config['services']
+                    expected_networks = {'app-network', 'netbird-ingress', 'shared'}
+                    if enabled:
+                        expected_networks.add('authentik-ingress')
+                        self.assertEqual(config['networks']['authentik-ingress']['name'],
+                                         'fixture-authentik')
+                    self.assertEqual(set(services['nginx']['networks']), expected_networks)
+                    self.assertEqual(set(config['networks']), expected_networks | {'default'})
+                    self.assertEqual('authentik-ingress' in managed['networks'], enabled)
+                    self.assertEqual('authentik-ingress' in managed['services']['nginx']['networks'],
+                                     enabled)
+                    self.assertEqual(config['networks']['netbird-ingress']['name'], 'fixture-netbird')
+                    self.assertTrue(config['networks']['netbird-ingress']['external'])
+                    self.assertEqual(services['nginx']['networks']['netbird-ingress']['ipv4_address'],
+                                     '172.30.80.2')
+                    mounts = {v['target']: v['source'] for v in services['astro-app']['volumes']}
+                    self.assertEqual(mounts, {'/var/data': str(app / 'database'),
+                                             '/var/data/media': str(root / 'media')})
+                    ingress_mounts = {v['target']: v for v in services['nginx']['volumes']}
+                    self.assertEqual(set(ingress_mounts), {
+                        '/etc/nginx/conf.d/netbird.conf', '/etc/nginx/netbird'})
+                    for target, source in [('conf.d/netbird.conf', 'nginx-include.conf'),
+                                           ('netbird', 'ingress')]:
+                        mount = ingress_mounts[f'/etc/nginx/{target}']
+                        self.assertEqual(mount['source'], str(root / 'netbird' / source))
+                        self.assertTrue(mount['read_only'])
+                    self.assertEqual(managed['services']['worker'], worker)
+                    self.assertEqual(managed['networks']['shared'], shared)
+                    self.assertEqual(managed['volumes'], {'worker-cache': {}})
+                    self.assertEqual(services['nginx']['networks']['shared']['aliases'], ['shared-proxy'])
+                    self.assertEqual(services['nginx']['environment']['KEEP_ME'], 'yes')
+                    self.assertEqual({v['target'] for v in services['worker']['volumes']},
+                                     {'/work', '/cache'})
+                    if enabled in renders:
+                        self.assertEqual(rendered, renders[enabled])
+                        self.assertEqual(config, configs[enabled])
+                    renders[enabled] = rendered
+                    configs[enabled] = config
+
     def test_owned_override_guards_do_not_replace_operator_or_app_files(self):
         for role, file in [('webstack', 'cms-compose.yml'),
                            ('netbird_control_plane', 'app-ingress.yml')]:
