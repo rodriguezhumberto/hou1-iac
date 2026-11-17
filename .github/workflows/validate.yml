@@ -52,7 +52,10 @@ jobs:
           chmod +x "$RUNNER_TEMP/nginx-validator"
           echo "NGINX_BIN=$RUNNER_TEMP/nginx-validator" >> "$GITHUB_ENV"
       - run: docker compose version
-      - run: pip install -r requirements-dev.txt
+      - name: Install pinned validation dependencies
+        run: |
+          make setup
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
       - uses: actions/setup-node@v4
         with:
           node-version: '22'
@@ -64,22 +67,5 @@ jobs:
         run: |
           export CHROMIUM_BIN="$(command -v google-chrome || command -v chromium)"
           node tests/authentik_login_browser.cjs
-      - run: ansible-galaxy collection install -r ansible/requirements.yml
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/hou1.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/authentik-bootstrap.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/export-identity-profile.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-control-plane.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/netbird-dns.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/bootstrap-control-plane.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/backups.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/rehearse-recovery.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/restore-test-host.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/publish-test-recovery.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/monitoring.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-access.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-schedule.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/tls-renewal-peer.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/grafana-identity.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/restore-production-host.yml --syntax-check
-      - run: ansible-playbook -i ansible/inventory/inventory.yml ansible/playbooks/publish-production-recovery.yml --syntax-check
-      - run: python -m unittest discover -s tests -v
+      - name: Run local syntax, lint and offline tests
+        run: make check

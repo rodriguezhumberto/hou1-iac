@@ -1,8 +1,15 @@
 ---
 collections:
   - name: ansible.posix
+    version: 2.1.0
   - name: ansible.utils
+    version: 6.0.0
   - name: community.general
+    version: 11.2.1
   - name: community.docker
+    version: 4.7.0
   - name: community.sops
     version: 2.2.2
+  # Required by community.docker; pin the installed baseline too.
+  - name: community.library_inventory_filtering_v1
+    version: 1.1.1
