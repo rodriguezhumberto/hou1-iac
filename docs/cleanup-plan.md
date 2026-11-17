@@ -78,4 +78,15 @@ converge without unnecessary changes.
   optional native-tool skips matching its baseline. Isolated setup and dependency
   consistency checks passed.
 - Independent review found no material issues in the integrated changes above.
-  The HOU1 webstack/Authentik extraction still needs integration and review.
+  A separate review of the HOU1 role extraction also found no material issues.
+- HOU1 webstack and Authentik now use named static phases. Comparison
+  confirmed all 67 original task definitions and their order, except the intended
+  copy-to-template conversion. The application template source is unchanged; four
+  fixtures cover rendered bytes, private mode and secret-log suppression.
+- The rehearsal TLS fixture uses the phase reader without changing its assertions.
+  Its 13-test module and static checks passed after the correction.
+- HOU1 final `make check` passed all 25 playbook syntax checks, source syntax,
+  lint and 333 tests, with one optional `dnsmasq` integration skip. Nginx, SOPS/age
+  and branding fixtures ran; the separate browser check also passed.
+- Both repositories remain on local `cleanup/readable-deployments` branches.
+  No pushes, PRs, deployments, live-node access or production decryption occurred.

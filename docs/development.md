@@ -29,6 +29,10 @@ procedures. The legacy direct-issuer NetBird cutover is outside routine provisio
 - HOU4 has its own repository. It runs monitoring, synthetic login checks and
   restricted collection of HOU1's encrypted recovery points.
 
+The [webstack](../ansible/playbooks/roles/webstack/README.md) and
+[Authentik](../ansible/playbooks/roles/authentik/README.md) role guides describe
+task phases, required inputs and owned resources.
+
 ## Configuration sources and outputs
 
 | Location | Responsibility |
