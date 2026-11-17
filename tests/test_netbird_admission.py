@@ -8,6 +8,7 @@ import os
 from pathlib import Path
 import shutil
 import subprocess
+import sys
 import tempfile
 from types import SimpleNamespace
 import textwrap
@@ -16,6 +17,7 @@ from unittest.mock import patch
 from contextlib import redirect_stdout
 from identity_fixtures import identity_profile, identity_names
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / 'scripts'))
 SPEC = importlib.util.spec_from_file_location('admission', Path(__file__).resolve().parents[1] / 'scripts/rehearsal-netbird-admission.py')
 m = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(m)
@@ -283,8 +285,10 @@ class ProductionAdmissionTest(AdmissionTest):
         with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml', '--age-key-file', '/private/scoped.key']), \
                 patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]) as decrypt, \
                 patch.object(m, 'configure', side_effect=configure), \
+                patch.object(m, 'pinned_ssh', return_value=config['ssh']) as pin, \
                 patch.object(m.subprocess, 'run', side_effect=[SimpleNamespace(stdout='a' * 64), SimpleNamespace(stdout='{}')]) as run, redirect_stdout(output):
             m.main()
+        pin.assert_called_once_with(config, environment='prod')
         self.assertEqual(decrypt.call_args_list[1].args, ('auth.enc.yaml', '/private/scoped.key'))
         self.assertEqual(decrypt.call_args_list[2].args, ('token.enc.json', '/private/scoped.key'))
         discovery = run.call_args_list[0].args[0][-1]
@@ -299,6 +303,7 @@ class ProductionAdmissionTest(AdmissionTest):
             with self.subTest(container=container), \
                     patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml']), \
                     patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]), \
+                    patch.object(m, 'pinned_ssh', return_value=config['ssh']), \
                     patch.object(m.subprocess, 'run', return_value=SimpleNamespace(stdout=container)) as run:
                 with self.assertRaisesRegex(ValueError, 'exactly one running'):
                     m.main()
@@ -306,6 +311,7 @@ class ProductionAdmissionTest(AdmissionTest):
         token['netbird_management_url'] = 'https://netbird-test.example.invalid'
         with patch('sys.argv', ['admission', '--config', 'admission.enc.json', '--profile', str(profile_file), '--identity-secrets', 'auth.enc.yaml']), \
                 patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names('prod')}, token]), \
+                patch.object(m, 'pinned_ssh', return_value=config['ssh']), \
                 patch.object(m, 'configure') as configure, patch.object(m.subprocess, 'run') as run:
             with self.assertRaisesRegex(ValueError, 'different NetBird deployment'):
                 m.main()

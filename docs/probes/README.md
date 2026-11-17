@@ -5,6 +5,7 @@ and their owning Ansible roles; this folder holds their procedures.
 There are no current test servers. These drills need a newly provisioned isolated
 environment; review old fixture aliases before use. See
 [environment targeting](../development.md#environment-targeting).
+Direct-SSH tools require [explicit destinations and host-key pins](rehearsal-targets.md).
 
 | Procedure | Scope |
 | --- | --- |

@@ -8,10 +8,15 @@ no credentials. See docs/probes/live-security-tests.md before invoking mutations
 import json, subprocess, os, sys, uuid
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+from ssh_target import pinned_ssh, read_config
+
 ROOT = Path(os.environ.get("HOU1_SECURITY_WORKDIR", "/var/tmp/hou1-vps-test/security"))
 ROOT.mkdir(mode=0o700, exist_ok=True)
 assert ROOT.stat().st_mode & 0o077 == 0
-SSH = ["ssh", "-F", "/var/tmp/hou1-vps-test/ssh_config", "hou1-vps-test"]
+TARGETS = read_config(ROOT.parent / 'targets.json')
+SSH = pinned_ssh(TARGETS)
+PEER_SSH = pinned_ssh(TARGETS['peer'], peer=True)
 AUTH = "https://auth-test.vps-test.pearlandpaws.com"
 STAFF = "https://staff-test.vps-test.pearlandpaws.com"
 
@@ -71,11 +76,7 @@ def secrets():
 def probe(a):
     a = {"auth_url": AUTH, "staff_url": STAFF, **a}
     r = subprocess.run(
-        [
-            "ssh",
-            "dev@192.168.0.151",
-            "docker exec -i hou1-vps-admin-test python3 /tmp/live-oidc-probe.py",
-        ],
+        [*PEER_SSH, "docker exec -i hou1-vps-admin-test python3 /tmp/live-oidc-probe.py"],
         input=json.dumps(a),
         capture_output=True,
         text=True,

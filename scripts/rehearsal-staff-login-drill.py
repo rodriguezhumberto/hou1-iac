@@ -8,12 +8,14 @@ from pathlib import Path
 import shlex
 import subprocess
 
+from ssh_target import monitor_transports, read_config
+
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("--config", required=True)
 a = p.parse_args()
 path = Path(a.config)
-c = json.loads(path.read_text())
-assert c["environment"] == "test"
+c = read_config(path)
+ssh, _, _ = monitor_transports(c)
 root = path.parent
 spec = importlib.util.spec_from_file_location(
     "monitor", Path(__file__).with_name("rehearsal-monitor.py")
@@ -24,7 +26,7 @@ spec.loader.exec_module(m)
 
 def remote(command, data=None):
     return subprocess.run(
-        c["ssh"] + [command], input=data, capture_output=True, text=True, check=True
+        ssh + [command], input=data, capture_output=True, text=True, check=True
     )
 
 

@@ -152,19 +152,20 @@ delivery contracts, and these changes do not yet establish a useful shared API.
   run under component tags; existing recovery gates remain in place.
 - HOU1 now checks SSH host keys, matching HOU4. New and replacement keys need
   independent verification before they enter the selected known-hosts file.
-- Private inventories and encrypted endpoint values were not inspected. Direct
-  SSH rehearsal tools retain fixture-specific assumptions and need rebinding
-  before reuse; Ansible guards do not cover them. In particular,
-  [`live_oidc/controller.py`](../scripts/live_oidc/controller.py) uses a fixed SSH
-  alias, while [`rehearsal-staff-login-drill.py`](../scripts/rehearsal-staff-login-drill.py)
-  accepts a test label without validating the SSH destination. Give these tools
-  a shared destination/host-key check before the next live rehearsal.
+- Direct-SSH rehearsal tools now share explicit address and ED25519 fingerprint
+  checks before remote commands or decryption. Monitor drills validate both the
+  server and auxiliary probe host; installed programs include the same helper.
+  Admission binds SSH to its independently selected inventory profile before
+  decrypting the NetBird token. See the [target contract](probes/rehearsal-targets.md).
+- Private inventories and encrypted endpoint values were not inspected. Fixed
+  fixture domains, containers and paths need review for the new lab.
 
-Validation: HOU1's full `make check` passed 382 tests without skips; HOU4's
-passed 82 tests with 14 optional native-tool skips. Final targeting modules passed
-six tests each, including tagged bootstrap rejection and HOU4 renewal suspension.
-Syntax, lint and documentation links passed; all 62 historical JSON evidence
-files are unchanged. No live-node access or production decryption occurred.
+Validation: the Ansible audit's full checks passed 382 HOU1 tests without skips
+and 82 HOU4 tests with 14 optional native-tool skips. The subsequent SSH changes
+passed 58 affected tests without skips, plus syntax and lint. Coverage includes
+retargeted aliases, host-key changes, tagged bootstrap rejection and HOU4 renewal
+suspension. Documentation links pass and all 62 historical JSON evidence files
+are unchanged. No live-node access or production decryption occurred.
 
 ## Next: test-host acceptance
 

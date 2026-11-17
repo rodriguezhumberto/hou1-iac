@@ -13,6 +13,8 @@ import sys
 import urllib.parse
 import urllib.request
 
+from ssh_target import pinned_ssh
+
 # Use the same profile validator as managed-host bootstrap.
 _spec = importlib.util.spec_from_file_location(
     'hou1_identity', Path(__file__).resolve().parents[1] /
@@ -266,6 +268,7 @@ def main():
         public_profile = json.load(stream)
     names = load_encrypted_config(args.identity_secrets, args.age_key_file)['IDENTITY_NAMES']
     profile = deployment_profile(c, identity.resolve_profile(public_profile, names))
+    ssh = pinned_ssh(c, environment=profile['environment'])
     token = load_encrypted_config(c['netbird_token_file'], c['age_key_file'])
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')
@@ -277,13 +280,13 @@ def main():
         if container is None:
             command = shlex.join(['sudo', '-n', 'docker', 'compose', '-p', profile['compose_project'],
                                   '-f', profile['compose_file'], 'ps', '-q', profile['compose_service']])
-            result = subprocess.run(c['ssh'] + [command], capture_output=True, text=True, check=True, timeout=35)
+            result = subprocess.run(ssh + [command], capture_output=True, text=True, check=True, timeout=35)
             container = result.stdout.strip()
             if not re.fullmatch(r'[0-9a-f]{12,64}', container):
                 raise ValueError('Expected exactly one running Compose service container')
         command = shlex.join(['sudo', '-n', 'docker', 'exec', '-i',
             container, 'python', '-c', AUTH_REQUEST])
-        r = subprocess.run(c['ssh'] + [command], input=json.dumps({
+        r = subprocess.run(ssh + [command], input=json.dumps({
             'method': method, 'path': path, 'body': body}), capture_output=True,
             text=True, check=True, timeout=35)
         result = json.loads(r.stdout)

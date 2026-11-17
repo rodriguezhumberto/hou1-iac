@@ -37,9 +37,9 @@ Production Authentik entry points require matching explicit identity inputs.
 Both repositories enable SSH host-key checking; verify keys before bootstrap or
 replacement, and retain them for public and VPN addresses.
 
-Direct SSH rehearsal scripts bypass these Ansible guards. Their old private
-aliases, fixture names and test labels do not establish current host identity.
-Rebind and review them before using a newly provisioned test environment.
+Direct SSH tools use [explicit address and host-key checks](probes/rehearsal-targets.md)
+through `scripts/ssh_target.py`. Old fixture domains, containers and paths still
+need review before use with a newly provisioned test environment.
 
 ## Execution locations
 

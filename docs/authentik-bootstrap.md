@@ -108,6 +108,11 @@ deployment access through encrypted copies as described in [SOPS/age](sops-age-s
 Missing or mismatched names fail closed. Changing a client or group name requires
 a coordinated identity migration.
 
+The encrypted admission config also needs the selected host's `ssh_host_ip`,
+verified ED25519 `ssh_fingerprint` and `ssh -F CONFIG ALIAS` list. See the
+[SSH target contract](probes/rehearsal-targets.md). Destination validation runs
+before token decryption and API access.
+
 The SOPS-encrypted admission configuration retains its environment and destination
 bindings. They must exactly match the independently exported profile; mismatches
 fail before API access. The default bindings are shown below. Never pass emails,

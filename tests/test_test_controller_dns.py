@@ -2,11 +2,14 @@
 import json
 from pathlib import Path
 import runpy
+import sys
 import subprocess
 import tempfile
 import unittest
 from unittest.mock import patch
 from helpers import ROOT
+
+sys.path.insert(0, str(ROOT / 'scripts'))
 
 SCRIPT = runpy.run_path(str(ROOT / 'scripts/reconnect-test-controller.py'))
 REMOTE = {'__name__':'fixture'}

@@ -5,12 +5,15 @@ import json
 from http.server import BaseHTTPRequestHandler, HTTPServer
 from pathlib import Path
 import runpy
+import sys
 import tempfile
 import threading
 import unittest
 from unittest.mock import patch
 import yaml
 from helpers import ROOT, ROLES, guard_play, read_task_phases, run_plays
+
+sys.path.insert(0, str(ROOT / 'scripts'))
 
 ISOLATION = runpy.run_path(
     str(ROOT / "ansible/playbooks/roles/rehearsal_gates/files/isolation.py")

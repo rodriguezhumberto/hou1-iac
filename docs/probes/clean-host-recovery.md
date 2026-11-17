@@ -177,8 +177,9 @@ A successfully published handoff can use the same guarded
 path; a failed cold restore still requires a fresh host and recovery ID.
 
 For this rehearsal's bare `hou1-vps-admin-test` container, use
-`[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --ssh-host,
-dev@192.168.0.151]` as the refresh argv. The helper restores public DNS before
+`[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --config,
+/private/lab/targets.json]` as the refresh argv. Declare and verify its peer in
+the [target config](rehearsal-targets.md). The helper restores public DNS before
 reconnecting, verifies the declared private records through NetBird DNS, then
 pins those records in a managed hosts block while retaining public resolution
 for Authentik. This avoids musl racing public DNS fallbacks against private
