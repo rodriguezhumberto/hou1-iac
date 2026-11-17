@@ -6,7 +6,8 @@ PYTHON ?= $(VENV)/bin/python
 COLLECTIONS_PATH ?= $(CURDIR)/.ansible/collections
 TEST_ARGS ?= discover -s tests -v
 
-export PATH := $(abspath $(dir $(PYTHON))):$(PATH)
+# Non-login shells may omit sbin, where Debian installs native validators.
+export PATH := $(abspath $(dir $(PYTHON))):$(PATH):/usr/local/sbin:/usr/sbin:/sbin
 export ANSIBLE_COLLECTIONS_PATH := $(COLLECTIONS_PATH)
 export ANSIBLE_COLLECTIONS_SCAN_SYS_PATH := False
 
@@ -18,7 +19,7 @@ help:
 	@echo 'make syntax  Compile Python, parse shell scripts and syntax-check every playbook'
 	@echo 'make lint    Check controller/test Python correctness and YAML duplicate keys'
 	@echo 'make test    Run the offline unittest suite (native tool skips are reported)'
-	@echo 'Use Python 3.12+; native fixtures use Docker Compose, OpenSSL, SOPS/age and Nginx.'
+	@echo 'Use Python 3.12+; native fixtures use Docker Compose, OpenSSL, SOPS/age, Nginx and dnsmasq.'
 	@echo 'NGINX_BIN/COMPOSE_BIN select native parsers; DNSMASQ_BIN enables optional DNS tests.'
 	@echo 'Browser checks and the Nginx parser are provisioned separately in CI.'
 	@echo 'Overrides: VENV=/tmp/hou1-tools COLLECTIONS_PATH=/tmp/hou1-collections'

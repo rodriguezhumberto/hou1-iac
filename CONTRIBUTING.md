@@ -33,6 +33,8 @@ use Docker and its image registry. Some checks require Nginx, SOPS/age or other
 external tools.
 Read each test's skip or failure message; a skip does not establish that behavior.
 Use `NGINX_BIN` and `COMPOSE_BIN` to select the local configuration validators.
+Make includes standard `sbin` paths. Install `dnsmasq-base` for local DNS checks;
+`DNSMASQ_BIN` selects another binary. CI installs it and runs the DNS check.
 CI also runs the branded-login browser check with its declared browser dependency.
 Prometheus and Alertmanager binary checks belong to the companion HOU4 repository.
 
