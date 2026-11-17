@@ -1,0 +1,89 @@
+---
+- name: Ensure Certbot directories exist before installing credentials
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop:
+    - "{{ app_directory }}/certbot"
+    - "{{ app_directory }}/certbot/conf"
+
+- name: Require a boolean controller TLS mode
+  ansible.builtin.assert:
+    that: hou1_controller_managed_tls is boolean
+
+- name: Import owner-encrypted controller certificates
+  ansible.builtin.include_role:
+    name: controller_tls
+  when: hou1_controller_managed_tls | bool
+
+- name: Require pre-issued isolated certificates when DNS capability stays on the controller
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/certbot/conf/live/{{ item.name }}/fullchain.pem"
+  loop: "{{ ssl_domains | default([]) }}"
+  register: rehearsal_imported_certificates
+  when: (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
+
+- name: Refuse controller-managed TLS until every required certificate is imported
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test' or (cms_environment == 'production' and hou1_controller_managed_tls | bool)
+      - rehearsal_imported_certificates.results | map(attribute='stat.exists') | min
+    fail_msg: Import the environment-bound controller certificates before deployment.
+  when: (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
+
+- name: Deploy Cloudflare API Credentials File
+  copy:
+    dest: "{{ app_directory }}/certbot/cloudflare.ini"
+    mode: '0600'
+    content: |
+      dns_cloudflare_api_token = {{ cloudflare_dns_api_token }}
+  no_log: true
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
+
+- name: Obtain or update SSL certificates via Cloudflare DNS-01
+  command: >
+    docker run --rm
+    -v {{ app_directory }}/certbot/conf:/etc/letsencrypt  -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro
+    {{ netbird_certbot_image }} certonly
+    -a dns-cloudflare
+    -m {{ letsencrypt_email }}  --non-interactive
+    --agree-tos
+    {{ item.flags }}
+    --expand
+    --keep-until-expiring
+    --dns-cloudflare-credentials /cloudflare.ini
+    --dns-cloudflare-propagation-seconds 20
+  loop: "{{ ssl_domains | default([]) }}"
+  loop_control:
+    label: "Hidden Domain"
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
+
+- name: Create automated SSL renewal script
+  copy:
+    dest: "{{ app_directory }}/certbot/renew_ssl.sh"
+    mode: '0755'
+    content: |
+      #!/bin/bash
+      set -euo pipefail
+
+      docker run --rm \
+        -v {{ app_directory }}/certbot/conf:/etc/letsencrypt \
+        -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro \
+        {{ netbird_certbot_image }} renew
+
+      cd "{{ app_directory }}"
+      docker compose exec -T nginx nginx -t
+      docker compose exec -T nginx nginx -s reload
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
+
+- name: Schedule cron job for SSL renewal
+  cron:
+    name: "Renew Let's Encrypt SSL Certificates"
+    minute: "0"
+    hour: "2"
+    day: "1,15"
+    job: "{{ app_directory }}/certbot/renew_ssl.sh >> /var/log/certbot-cron.log 2>&1"
+  when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)

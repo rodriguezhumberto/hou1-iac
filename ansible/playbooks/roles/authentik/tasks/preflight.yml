@@ -1,0 +1,29 @@
+---
+- name: Derive environment-specific project names and roots
+  ansible.builtin.set_fact:
+    authentik_project_root: "{{ authentik_project_root_base }}/{{ authentik_environment }}"
+    authentik_data_root: "{{ authentik_data_root_base }}/{{ authentik_environment }}"
+    authentik_compose_project: "{{ authentik_identity_profiles[authentik_environment].compose_project }}"
+    authentik_ingress_network: "{{ authentik_test_network if authentik_environment == 'test' else authentik_prod_network }}"
+    authentik_backup_root: "{{ authentik_backup_root_base }}/{{ authentik_environment }}"
+    authentik_offhost_backup_root: "{{ authentik_offhost_backup_root_base }}/{{ authentik_environment }}"
+
+- name: Validate Authentik environment and isolated roots
+  ansible.builtin.assert:
+    that:
+      - authentik_environment in ['test', 'prod']
+      - authentik_environment in authentik_identity_profiles
+      - authentik_identity_profiles[authentik_environment].environment == authentik_environment
+      - authentik_project_root is match('^/opt/hou1-authentik/(test|prod)$')
+      - authentik_data_root is match('^/var/lib/hou1-authentik/(test|prod)$')
+      - authentik_compose_project is match('^[a-z0-9][a-z0-9_-]*$')
+      - authentik_identity_profiles[authentik_environment].compose_file == authentik_project_root ~ '/compose.yaml'
+      - authentik_identity_profiles[authentik_environment].compose_service == 'authentik-server'
+      - authentik_age_key_file is defined
+      - authentik_age_key_file is match('^/')
+      - authentik_secret_source is defined
+      - not (authentik_google_enabled | default(false) | bool) or authentik_bootstrap_enabled | bool
+      - not (authentik_branding_enabled | default(false) | bool) or (authentik_bootstrap_enabled | bool and authentik_google_enabled | bool)
+      - not (authentik_branding_enabled | default(false) | bool) or authentik_image == 'ghcr.io/goauthentik/server:2025.10.4'
+    fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
+  no_log: true

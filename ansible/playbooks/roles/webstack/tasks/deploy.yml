@@ -1,0 +1,51 @@
+---
+- name: Validate Compose configuration before deployment
+  ansible.builtin.command: docker compose config --format json
+  args:
+    chdir: "{{ app_directory }}"
+  register: cms_compose_config
+  changed_when: false
+  no_log: true
+
+- name: Refuse unexpected build definitions in the rendered deployment
+  ansible.builtin.assert:
+    that:
+      - (cms_compose_config.stdout | from_json).services.values() | selectattr('build', 'defined') | list | length == 0
+      - (cms_compose_config.stdout | from_json).services['astro-app'].image == application_image_reference
+    fail_msg: Deployment requires the verified digest and no host-side builds.
+
+- name: Freeze and archive this project's retired Directus service
+  ansible.builtin.import_tasks: retire-directus.yml
+
+- name: Deploy the verified application without building on the host
+  # Public bootstrap needs Nginx and its dependencies before NetBird exists.
+  # Defer services that bind the NetBird IP until enrollment completes.
+  command: "docker compose up -d --no-build --wait --wait-timeout 120{{ ' nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}"
+  args:
+    chdir: "{{ app_directory }}"
+
+- name: Record the deployed artifact for encrypted backups and recovery
+  ansible.builtin.copy:
+    dest: '{{ app_directory }}/application-image.json'
+    owner: root
+    group: root
+    mode: '0644'
+    content: '{{ application_image_verified | to_nice_json }}'
+
+# Nginx's entrypoint renders bind-mounted templates only at container startup.
+# Recreate it so changed CMS ACLs and atomic Git checkouts are actually applied.
+- name: Recreate Nginx to render the current ingress templates
+  ansible.builtin.command: docker compose up -d --no-deps --force-recreate nginx
+  args:
+    chdir: "{{ app_directory }}"
+
+- name: Validate the deployed Nginx configuration
+  ansible.builtin.command: docker compose exec -T nginx nginx -t
+  args:
+    chdir: "{{ app_directory }}"
+  changed_when: false
+
+- name: Remove archived Directus containers from this project
+  ansible.builtin.command:
+    argv: [docker, rm, "{{ item }}"]
+  loop: "{{ retired_directus_containers.stdout_lines }}"

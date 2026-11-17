@@ -1,0 +1,80 @@
+---
+- name: Validate CMS environment and the existing database mount
+  ansible.builtin.assert:
+    that:
+      - cms_environment in ['test', 'production']
+      - cms_database_directory == (app_directory ~ '/database')
+    fail_msg: Keep the existing database mount during rollout and select test or production.
+
+- name: Ensure CMS database and replacement media directories exist
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: "{{ cms_storage_mode }}"
+  loop:
+    - "{{ cms_database_directory }}"
+    - "{{ cms_data_directory }}"
+    - "{{ cms_media_directory }}"
+
+- name: Find existing Astro database and WAL files without moving them
+  ansible.builtin.find:
+    paths: "{{ cms_database_directory }}"
+    patterns: ['forms.db', 'forms.db-wal', 'forms.db-shm']
+    file_type: file
+  register: cms_existing_database
+
+- name: Keep the existing Astro database writable by the application
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0640'
+  loop: "{{ cms_existing_database.files }}"
+
+- name: Preserve ingress while configuring the media mount
+  ansible.builtin.import_tasks: cms-compose.yml
+
+- name: Ensure CMS backup directory exists
+  ansible.builtin.file:
+    path: "{{ cms_backup_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS backup script
+  ansible.builtin.template:
+    src: cms-backup.sh.j2
+    dest: "{{ app_directory }}/cms-backup.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install CMS restore and validation script
+  ansible.builtin.template:
+    src: cms-restore.sh.j2
+    dest: "{{ app_directory }}/cms-restore.sh"
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Schedule CMS database and media backups
+  ansible.builtin.cron:
+    name: "Pearland Paws {{ cms_environment }} CMS backup"
+    minute: "{{ cms_backup_schedule_minute }}"
+    hour: "{{ cms_backup_schedule_hour }}"
+    job: "{{ app_directory }}/cms-backup.sh >> /var/log/pearlandpaws-cms-backup.log 2>&1"
+  when: not (hou1_backup_enabled | default(false) | bool)
+
+- name: Seed initial replacement CMS media (will NOT overwrite existing production media)
+  copy:
+    src: "{{ seed_cms_media_source_path }}/"
+    dest: "{{ cms_media_directory }}/"
+    owner: "{{ cms_storage_owner }}"
+    group: "{{ cms_storage_group }}"
+    mode: '0644'
+    directory_mode: "{{ cms_storage_mode }}"
+    force: no
+  when: seed_cms_media_source_path is defined
