@@ -107,6 +107,16 @@ class LabWorkflowTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(workflow.WorkflowError):
                 self.load()
 
+    def test_https_checks_allow_the_selected_namespace_root_but_reject_lookalikes(self):
+        namespace = self.config['namespace']
+        for name in [namespace, 'app.' + namespace]:
+            self.config['https_checks'] = [{'url': 'https://' + name + '/api/ready.json', 'status': 200}]
+            self.load()
+        for name in ['another-' + namespace, namespace + '.foreign.invalid',
+                     namespace.split('.', 1)[1]]:
+            self.config['https_checks'] = [{'url': 'https://' + name + '/api/ready.json', 'status': 200}]
+            with self.subTest(name=name), self.assertRaises(workflow.WorkflowError): self.load()
+
     def test_checkout_and_input_drift_are_detected(self):
         host = self.config['hosts']['hou1']
         workflow.check_revision(host)

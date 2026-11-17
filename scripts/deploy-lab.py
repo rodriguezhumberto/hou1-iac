@@ -121,7 +121,8 @@ def load_config(path):
     for check in config['https_checks']:
         require(set(check) == {'url', 'status'}, 'Declare a URL and exact expected status')
         url = urlsplit(check['url'])
-        require(url.scheme == 'https' and url.hostname and url.hostname.endswith('.' + namespace)
+        require(url.scheme == 'https' and url.hostname
+                and (url.hostname == namespace or url.hostname.endswith('.' + namespace))
                 and not url.username and not url.password and not url.fragment and not url.query
                 and url.port in (None, 443) and type(check['status']) is int
                 and 200 <= check['status'] < 500 and not 300 <= check['status'] < 400,
