@@ -171,6 +171,9 @@ class LabInventoryTest(unittest.TestCase):
         self.declaration['hosts']['hou1']['group_vars'] = {'test_env.sops.yml': str(encrypted)}
         self.source.write_text(json.dumps(self.declaration))
         snapshot = self.render(); selected = prepare.check_snapshot(snapshot)
+        inventory_values = self.hostvars(selected, 'hou1')[host['target']]
+        self.assertNotIn('generated_secret', inventory_values)
+        self.assertNotIn('sops', inventory_values)
         play = self.root / 'check-secret.yml'
         play.write_text(yaml.safe_dump([{'hosts': host['target'], 'gather_facts': False,
             'tasks': [{'ansible.builtin.assert': {'that': "generated_secret == 'private-runtime-marker'"},

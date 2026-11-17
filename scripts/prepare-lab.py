@@ -133,7 +133,11 @@ def render(source, destination):
                 require(re.fullmatch(r'test_env(?:\.sops)?\.(?:json|ya?ml)', name),
                         'Only scoped test_env group-variable references are supported')
                 private_file(path); sources[str(path)] = digest(path)
-                (root / 'group_vars/test_env' / ('90-' + name)).symlink_to(path)
+                # Keep ciphertext at the plugin's exact sibling filename. The
+                # regular vars plugin reads every YAML file inside group dirs.
+                target = (root / 'group_vars' / name if '.sops.' in name else
+                          root / 'group_vars/test_env' / ('90-' + name))
+                target.symlink_to(path)
             for mode in ('bootstrap', 'managed'):
                 initial = mode == 'bootstrap'
                 alias = selected['bootstrap_target'] if initial else host['target']
