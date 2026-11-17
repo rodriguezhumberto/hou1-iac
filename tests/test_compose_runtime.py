@@ -271,7 +271,10 @@ class ComposeRuntimeTest(unittest.TestCase):
         self.ids.clear()
         with self.assertRaises(FileNotFoundError):
             self.reconcile(['nginx'])
-        task = yaml.safe_load((ROLES / 'webstack/tasks/tls.yml').read_text())[0]
+        tasks = yaml.safe_load((ROLES / 'webstack/tasks/tls.yml').read_text())
+        task = next(task for task in tasks
+                    if '{{ app_directory }}/certbot/www' in task.get('loop', [])
+                    and task.get('ansible.builtin.file', {}).get('state') == 'directory')
         task['ansible.builtin.file'].update(
             owner=pwd.getpwuid(os.getuid()).pw_name,
             group=grp.getgrgid(os.getgid()).gr_name)

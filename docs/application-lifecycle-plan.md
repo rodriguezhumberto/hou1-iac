@@ -31,6 +31,14 @@ Keep orchestration-specific behavior in deployment configuration.
 5. Run unit, built-application and release-image fixtures. Review integrated code
    and verify the lab using frozen, matching image/source inputs where available.
 
+## Current implementation
+
+Application branch `cleanup/application-readiness` implements this contract.
+Its `docs/application-lifecycle.md` maps runtime ownership and supported launch.
+Deployment verification validates declared capabilities and checks readiness;
+older releases retain their existing checks. See the
+[validation record](evidence/application-lifecycle-2026-11-17.md).
+
 ## Deployment boundary
 
 Test-host deployment is authorized for this work. Keep production, unrelated
