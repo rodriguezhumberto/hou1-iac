@@ -2,9 +2,9 @@
 
 `scripts/deploy-lab.py` coordinates the existing HOU1 and HOU4 playbooks. It
 supports existing test hosts on `100.91.0.0/16`, with controller-managed HOU1 TLS.
-It does not bootstrap hosts, enroll the controller, change DNS, seed identities,
+It does not bootstrap hosts, enroll the controller, change public DNS, seed identities,
 deploy Authentik/control-plane changes or run destructive acceptance drills.
-Those gaps are assigned in the [intervention audit](deployment-interventions.md).
+Bootstrap and enrollment gaps are assigned in the [intervention audit](deployment-interventions.md).
 
 ## Inputs
 
@@ -59,6 +59,11 @@ overlay address and private resolver file. The resolver file accepts
 `nameserver ADDRESS` and `options timeout:N attempts:N` lines. Keep both files
 mode `0600` and peer state mode `0700`.
 
+Optional `hosts` entries pin exact names within the selected test namespace to
+private LAN or test-overlay addresses. They apply only to the wrapped command.
+The private view replaces the legacy lab hosts block; declare all names in that
+block. Unrelated aliases remain, and conflicting entries stop execution.
+
 ```bash
 python3 scripts/lab-network.py --config /private/lab/network.json -- \
   .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase preflight
@@ -69,7 +74,7 @@ sudo, and Linux `unshare`, `nsenter`, `mount` and `setpriv`. It verifies the run
 container's image, isolation, state mount, connected management origin and overlay
 address, then rechecks them before entry. A private mount namespace supplies DNS;
 the command enters only the selected network namespace and runs as the operator
-without capabilities. Controller routes and resolver stay unchanged. It does not
+without capabilities. Controller routes, resolver and hosts file stay unchanged. It does not
 create, enroll or restart peers, modify firewall rules, or use renewal peers.
 
 `plan` is the default and makes no managed-host connections. It validates the

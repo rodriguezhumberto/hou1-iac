@@ -12,7 +12,10 @@ import re
 import stat
 import subprocess
 import sys
+import tempfile
 from urllib.parse import urlsplit
+
+HOSTS_FILE = Path('/etc/hosts')
 
 
 class TransportError(ValueError):
@@ -45,7 +48,7 @@ def private_file(value, uid):
 
 def load_config(path, uid):
     config = json.loads(private_file(path, uid).read_text())
-    require(set(config) == {'version', 'environment', 'container', 'image',
+    require(set(config) - {'hosts'} == {'version', 'environment', 'container', 'image',
             'state_directory', 'resolver_file', 'management_url', 'address'},
             'Declare the complete lab transport configuration')
     require(type(config['version']) is int and config['version'] == 1 and config['environment'] == 'test',
@@ -73,9 +76,57 @@ def load_config(path, uid):
         servers.append(ipaddress.ip_address(fields[1]))
     require(bool(servers), 'Declare at least one namespace DNS server')
     management_origin(config['management_url'])
+    validate_hosts(config)
     require(ipaddress.ip_address(config['address']) in ipaddress.ip_network('100.91.0.0/16'),
             'Select the test administrative peer overlay address')
     return config
+
+
+def validate_hosts(config):
+    hosts = config.get('hosts', {})
+    namespace = management_origin(config['management_url'])[1].removeprefix('netbird-test.')
+    require(isinstance(hosts, dict), 'Declare optional process-local host records as a mapping')
+    for name, value in hosts.items():
+        require(isinstance(name, str) and len(name) <= 253 and name.endswith('.' + namespace)
+                and re.fullmatch(r'(?:[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?\.)+[a-z]{2,63}', name),
+                'Process-local host records must stay within the selected test namespace')
+        address = ipaddress.IPv4Address(value)
+        require(any(address in ipaddress.ip_network(cidr) for cidr in
+                ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16', '100.91.0.0/16')),
+                'Process-local host records must select lab LAN or test overlay addresses')
+    return hosts
+
+
+def hosts_view(original, config):
+    """Replace only the legacy lab block in a private copy, preserving other aliases."""
+    hosts = validate_hosts(config)
+    output, covered = [], set()
+    managed = False
+    seen = False
+    for line in original.splitlines(keepends=True):
+        marker = line.rstrip('\r\n')
+        if marker == '# BEGIN hou-lab bootstrap':
+            require(not managed and not seen, 'The legacy lab hosts block is ambiguous')
+            managed = True; seen = True
+            continue
+        if marker == '# END hou-lab bootstrap':
+            require(managed, 'The legacy lab hosts block is incomplete')
+            managed = False
+            continue
+        fields = line.split('#', 1)[0].split()
+        if managed:
+            require(not fields or len(fields) > 1 and all(name in hosts for name in fields[1:]),
+                    'Preserve unrelated names found inside the legacy lab hosts block')
+            continue
+        if len(fields) > 1:
+            for name in set(fields[1:]) & set(hosts):
+                require(fields[0] == hosts[name], 'A declared lab name conflicts with an unrelated hosts entry')
+                covered.add(name)
+        output.append(line)
+    require(not managed, 'The legacy lab hosts block is incomplete')
+    base = ''.join(output)
+    suffix = ''.join(hosts[name] + ' ' + name + '\n' for name in sorted(set(hosts) - covered))
+    return base + ('\n' if base and not base.endswith('\n') else '') + '# Process-local lab names\n' + suffix
 
 
 def inspect_peer(config):
@@ -121,8 +172,16 @@ def enter(config_path, contract, command):
             and inspect_peer(config) == contract['peer'],
             'The dedicated transport changed before namespace entry')
     agent = agent_socket(contract['agent'], contract['uid'])
+    hosts = hosts_view(HOSTS_FILE.read_text(), config) if config.get('hosts') else None
     # The caller created a private mount namespace before entering this function.
     subprocess.run(['mount', '--bind', config['resolver_file'], '/etc/resolv.conf'], check=True)
+    if hosts is not None:
+        # The bind mount retains the inode after unlink; no generated hosts file
+        # remains on the controller after the private namespace exits.
+        with tempfile.TemporaryDirectory(prefix='hou-lab-hosts-') as folder:
+            path = Path(folder) / 'hosts'
+            path.write_text(hosts); path.chmod(0o644)
+            subprocess.run(['mount', '--bind', str(path), '/etc/hosts'], check=True)
     operator = pwd.getpwuid(contract['uid'])
     argv = ['nsenter', '--target', str(contract['peer']['pid']), '--net',
             'setpriv', '--reuid', str(contract['uid']), '--regid', str(contract['gid']),

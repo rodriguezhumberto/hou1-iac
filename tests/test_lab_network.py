@@ -24,6 +24,7 @@ class LabNetworkTest(unittest.TestCase):
         self.addCleanup(temporary.cleanup)
         self.root = Path(temporary.name)
         self.config = json.loads((ROOT / 'examples/lab-network.json').read_text())
+        self.config.pop('hosts')  # The original transport contract remains supported.
         state = self.root / 'peer'; state.mkdir(mode=0o700)
         resolver = self.root / 'resolv.conf'; resolver.write_text('nameserver 192.0.2.53\n'); resolver.chmod(0o600)
         self.config.update(state_directory=str(state), resolver_file=str(resolver))
@@ -135,6 +136,52 @@ class LabNetworkTest(unittest.TestCase):
             with patch.object(network, 'inspect_peer', side_effect=error), patch.object(network.os, 'execvp') as execute:
                 self.assertEqual(network.main(['--config', str(self.path), '--', '/bin/true']), 1)
                 execute.assert_not_called()
+
+    def test_private_hosts_view_replaces_legacy_pins_and_preserves_other_entries(self):
+        name = 'netbird-test.lab-test.example.invalid'
+        self.config['hosts'] = {name: '192.168.50.11'}
+        original = ('127.0.0.1 localhost\n192.168.50.99 unrelated.example.invalid\n'
+                    '# BEGIN hou-lab bootstrap\n192.168.50.10 ' + name + '\n# END hou-lab bootstrap\n')
+        rendered = network.hosts_view(original, self.config)
+        self.assertIn('192.168.50.11 ' + name, rendered)
+        self.assertIn('192.168.50.99 unrelated.example.invalid', rendered)
+        self.assertNotIn('192.168.50.10', rendered)
+        self.assertNotIn('# BEGIN hou-lab bootstrap', rendered)
+        # Fresh controllers have no old global block at all.
+        self.assertIn('192.168.50.11 ' + name, network.hosts_view('127.0.0.1 localhost\n', self.config))
+        for bad in ['192.168.50.12 ' + name + '\n', '# BEGIN hou-lab bootstrap\n',
+                    '# BEGIN hou-lab bootstrap\n192.168.50.12 unrelated.example.invalid\n# END hou-lab bootstrap\n']:
+            with self.assertRaises(ValueError): network.hosts_view(bad, self.config)
+
+    def test_host_records_cannot_select_production_or_escape_the_namespace(self):
+        for hosts in [{'production.example.invalid': '192.168.50.11'},
+                      {'netbird-test.lab-test.example.invalid': '100.90.0.10'},
+                      {'bad\nname.lab-test.example.invalid': '192.168.50.11'},
+                      {'netbird-test.lab-test.example.invalid': '0.0.0.0'}]:
+            self.config['hosts'] = hosts; self.path.write_text(json.dumps(self.config))
+            with self.assertRaises(ValueError): network.load_config(self.path, os.getuid())
+
+    def test_private_hosts_mount_is_built_before_dropping_privileges_and_leaves_no_file(self):
+        name = 'netbird-test.lab-test.example.invalid'
+        self.config['hosts'] = {name: '192.168.50.11'}; self.path.write_text(json.dumps(self.config))
+        contract = self.contract()
+        mounted = []
+        original_hosts = self.root / 'hosts'
+        original_hosts.write_text('127.0.0.1 localhost\n')
+        def mount(argv, **kwargs):
+            if argv[-1] == '/etc/hosts':
+                path = Path(argv[2]); mounted.append((path, path.read_text()))
+                self.assertEqual(path.stat().st_mode & 0o777, 0o644)
+        with patch.object(network.os, 'geteuid', return_value=0), \
+                patch.dict(os.environ, {'SUDO_UID': str(os.getuid()), 'SUDO_GID': str(os.getgid())}), \
+                patch.object(network.os, 'readlink', return_value='mnt:[private]'), \
+                patch.object(network, 'inspect_peer', return_value=self.peer), \
+                patch.object(network, 'HOSTS_FILE', original_hosts), \
+                patch.object(network.subprocess, 'run', side_effect=mount), patch.object(network.os, 'execvp'):
+            network.enter(self.path, contract, ['/bin/true'])
+        self.assertEqual(len(mounted), 1)
+        self.assertIn('192.168.50.11 ' + name, mounted[0][1])
+        self.assertFalse(mounted[0][0].exists())
 
 
 if __name__ == '__main__':
