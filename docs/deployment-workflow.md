@@ -50,6 +50,7 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 ```bash
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase plan
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase inputs
+.venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase handoff
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase preflight
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase reconcile
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase verify
@@ -90,6 +91,8 @@ Version 2 `inputs` checks both inventories and release/identity/backup contracts
 without managed-host commands. These checks also precede host access in other
 execution phases. Version 1 remains supported with its original checks and
 explicit `application` selection; it has no `inputs` phase or capability tracking.
+`handoff` additionally checks the running VPN-only SSH policy without deploying.
+The [inventory tool](lab-inventory.md) uses it before selecting a generated snapshot.
 
 `preflight` runs the existing target guards on the controller, binds effective
 inputs to the declared release/SSH targets, then verifies each hostname, sudo

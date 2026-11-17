@@ -59,6 +59,33 @@ def probe(contract):
     if contract['address'] not in addresses:
         raise ValueError('VPN address missing')
     report = {'hostname': platform.node(), 'address_present': True}
+    if contract.get('handoff'):
+        policy = {}
+        for line in output(['sshd', '-T']).splitlines():
+            key, _, value = line.partition(' ')
+            policy.setdefault(key, []).append(value)
+        if (policy.get('passwordauthentication') != ['no']
+                or policy.get('kbdinteractiveauthentication') != ['no']
+                or policy.get('permitrootlogin') != ['no']):
+            raise ValueError('SSH authentication is not ready for managed access')
+        listeners = policy.get('listenaddress', [])
+        if not listeners or any(value.rsplit(':', 1)[0] != contract['address'] for value in listeners):
+            raise ValueError('SSH must listen only on the selected VPN address')
+        sockets = [line.split()[3] for line in output(['ss', '-H', '-lntp']).splitlines()
+                   if '"sshd"' in line]
+        if not sockets or any(value.rsplit(':', 1)[0] != contract['address'] for value in sockets):
+            raise ValueError('The running SSH daemon differs from the selected VPN listener')
+        active = subprocess.run(['systemctl', 'is-active', 'ssh.socket'],
+                                capture_output=True, text=True, timeout=15)
+        if active.returncode not in (3, 4) or active.stdout.strip() not in ('inactive', 'unknown'):
+            raise ValueError('SSH socket activation can bypass the selected listener')
+        fallback = ('ansible-ssh-bootstrap-fallback.timer' if contract['service'] == 'hou1'
+                    else 'ansible-hou4-ssh-bootstrap-fallback.timer')
+        active = subprocess.run(['systemctl', 'is-active', fallback],
+                                capture_output=True, text=True, timeout=15)
+        if active.returncode not in (3, 4) or active.stdout.strip() not in ('inactive', 'unknown'):
+            raise ValueError('The bootstrap fallback timer is still active')
+        report['ssh_policy_verified'] = True
     if not contract['verify']:
         return report
 

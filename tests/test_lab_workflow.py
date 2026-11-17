@@ -353,6 +353,11 @@ from pathlib import Path
             f'with Path({str(self.calls)!r}).open("a") as log: log.write(json.dumps(sys.argv)+"\\n")\n' + '''name=Path(sys.argv[0]).name
 args=sys.argv[1:]
 if name=='ip': print(json.dumps([{'addr_info':[{'local':state.get('address','100.91.0.10')}]}]))
+elif name=='sshd': print('passwordauthentication '+state.get('password','no')+'\\nkbdinteractiveauthentication no\\npermitrootlogin no\\nlistenaddress '+state.get('listener','100.91.0.10')+':22')
+elif name=='ss': print('LISTEN 0 128 '+state.get('running_listener','100.91.0.10')+':22 0.0.0.0:* users:(("sshd",pid=123,fd=3))')
+elif name=='systemctl':
+ active=state.get('socket_active',False) if args[-1]=='ssh.socket' else state.get('fallback_active',False)
+ print('active' if active else 'inactive'); sys.exit(0 if active else 3)
 elif name=='git': print(state.get('revision','1'*40) if args[-1]=='HEAD' else state.get('dirty',''))
 elif name=='python3': print('PRIVATE_TLS_DIAGNOSTIC')
 elif '--services' in args: print('astro-app')
@@ -361,7 +366,7 @@ elif '.Config.Image' in ' '.join(args): print(json.dumps(state.get('image','fixt
 else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':state.get('health','healthy'),'Log':['PRIVATE_HEALTH_DIAGNOSTIC']}}))
 ''')
         binary.chmod(0o700)
-        for name in ('ip', 'git', 'docker', 'python3'):
+        for name in ('ip', 'git', 'docker', 'python3', 'sshd', 'ss', 'systemctl'):
             (self.root / name).symlink_to(binary)
 
     def probe(self, **state):
@@ -383,6 +388,23 @@ else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':s
                 self.assertEqual(json.loads(result.stdout), {'failed': True})
         self.assertFalse(any(set(json.loads(line)) & {'up', 'down', 'start', 'stop', 'rm'}
                              for line in self.calls.read_text().splitlines()))
+
+    def test_handoff_requires_private_live_listener_and_no_bootstrap_fallback(self):
+        self.contract.update(verify=False, handoff=True, service='hou1')
+        good = self.probe()
+        self.assertEqual(good.returncode, 0, good.stderr)
+        self.assertTrue(json.loads(good.stdout)['ssh_policy_verified'])
+        for state in [{'password': 'yes'}, {'listener': '0.0.0.0'},
+                      {'running_listener': '0.0.0.0'}, {'socket_active': True}, {'fallback_active': True}]:
+            with self.subTest(state=state):
+                result = self.probe(**state)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(json.loads(result.stdout), {'failed': True})
+        self.contract['service'] = 'hou4'
+        self.assertEqual(self.probe().returncode, 0)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertTrue(any(call[-1] == 'ansible-hou4-ssh-bootstrap-fallback.timer' for call in calls))
+        self.assertFalse(any(Path(call[0]).name in ('docker', 'git') for call in calls))
 
     def test_https_denial_is_checked_and_redirect_is_not_followed(self):
         requests = []

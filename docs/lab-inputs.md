@@ -19,9 +19,8 @@ The controller needs Git, SOPS, age and OpenSSH, plus the tools from `make setup
 
 Preserve Ansible precedence. Existing copied inventory values remain explicit
 overrides until reviewed; deleting them automatically could change deployment.
-The old private assembler is not a maintained entry point and must not overwrite
-reviewed inputs. Inventory generation and bootstrap-to-VPN handoffs remain separate
-work.
+Use [maintained inventory generation and handoff](lab-inventory.md) for new snapshots.
+The old private assembler must not overwrite reviewed inputs.
 
 ## Checks
 

@@ -360,7 +360,7 @@ class Workflow:
                                environment(self.config, self.config['hosts']['hou1']))
         self.check_inputs()
 
-    def probe(self, service, verify=True):
+    def probe(self, service, verify=True, handoff=False):
         host = self.config['hosts'][service]
         self.check_inputs()
         fixed, _, _ = self.transports[service]
@@ -368,6 +368,8 @@ class Workflow:
         contract = {'hostname': host['hostname'], 'address': host['ssh_host_ip'],
                     'interface': self.selections[service]['interface'], 'verify': verify, 'compose': host['compose'],
                     'tls': service == 'hou1', 'https': self.config['https_checks'] if service == 'hou4' else []}
+        if handoff:
+            contract.update(handoff=True, service=service)
         if service == 'hou1':
             contract.update(source=self.selections[service]['source'], application=self.config['application'])
         program = Path(lab_runtime.__file__).read_text()
@@ -376,7 +378,8 @@ class Workflow:
         require(result.returncode == 0, service + ' private access or readiness check failed')
         report = json.loads(result.stdout)
         require(not report.get('failed'), service + ' private access or readiness check failed')
-        path = self.run / (service + ('-runtime.json' if verify else '-access.json'))
+        suffix = '-handoff.json' if handoff else '-runtime.json' if verify else '-access.json'
+        path = self.run / (service + suffix)
         write_private(path, json.dumps(report, indent=2) + '\n')
 
     def execute(self, phase):
@@ -392,7 +395,10 @@ class Workflow:
             require(phase != 'inputs', 'The inputs phase requires a version 2 workflow')
             for service in SERVICES:
                 self.step(service + '-preflight', lambda s=service: self.preflight(s))
-        if phase not in ('preflight', 'inputs'):
+        if phase == 'handoff':
+            for service in SERVICES:
+                self.step(service + '-handoff', lambda s=service: self.probe(s, verify=False, handoff=True))
+        if phase not in ('preflight', 'inputs', 'handoff'):
             for service in SERVICES:
                 if phase == 'reconcile':
                     play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
@@ -405,7 +411,7 @@ class Workflow:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
-    parser.add_argument('--phase', choices=('plan', 'inputs', 'preflight', 'reconcile', 'verify'), default='plan')
+    parser.add_argument('--phase', choices=('plan', 'inputs', 'handoff', 'preflight', 'reconcile', 'verify'), default='plan')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:

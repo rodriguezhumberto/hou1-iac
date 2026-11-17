@@ -33,6 +33,8 @@ The [intervention audit](deployment-interventions.md) tracks reproducibility gap
 the [managed lab workflow](deployment-workflow.md) coordinates existing test hosts.
 [Lab DNS](lab-dns.md) owns opt-in bootstrap resolution and container DNS access.
 [Input contracts](lab-inputs.md) check release, identity and backup bindings locally.
+[Inventory generation](lab-inventory.md) prepares both access profiles and verifies
+the managed handoff before selecting a new snapshot.
 
 ## Probes and drills
 

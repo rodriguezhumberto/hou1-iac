@@ -1,0 +1,21 @@
+{
+  "version": 1,
+  "environment": "test",
+  "workflow": "/private/lab/workflow.json",
+  "hosts": {
+    "hou1": {
+      "variables": "/private/lab/hou1/variables.yml",
+      "group_vars": {"test_env.sops.yml": "/private/lab/secrets/hou1-runtime.enc.yaml"},
+      "bootstrap_address": "192.168.50.11",
+      "bootstrap_target": "hou1_lab_init",
+      "bootstrap_user": "dev"
+    },
+    "hou4": {
+      "variables": "/private/lab/hou4/variables.yml",
+      "group_vars": {"test_env.yml": "/private/lab/hou4/secret-lookups.yml"},
+      "bootstrap_address": "192.168.50.12",
+      "bootstrap_target": "hou4_lab_init",
+      "bootstrap_user": "dev"
+    }
+  }
+}

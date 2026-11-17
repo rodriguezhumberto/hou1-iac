@@ -10,6 +10,7 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
 | Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
 | Check lab release, identity and backup inputs locally | `scripts/deploy-lab.py --phase inputs` | [Input contracts](lab-inputs.md) |
+| Generate private inventories and verify managed access | `scripts/prepare-lab.py` | [Inventory generation](lab-inventory.md) |
 | Use an existing isolated controller VPN | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
 | Prepare isolated host/container DNS | `ansible/playbooks/lab-dns.yml` | [Lab DNS](lab-dns.md) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
