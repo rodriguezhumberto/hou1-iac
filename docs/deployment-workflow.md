@@ -43,8 +43,7 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
   outside this initial workflow.
 - Declare HTTPS checks with exact statuses. They run on HOU4, use normal TLS
   validation, and refuse redirects. Include both readiness and expected-denial
-  endpoints on the selected namespace root or its subdomains. This is separate
-  from checking container health.
+  endpoints. This is separate from checking container health.
 
 ## Commands
 
