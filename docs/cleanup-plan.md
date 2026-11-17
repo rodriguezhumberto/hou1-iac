@@ -142,3 +142,26 @@ delivery contracts, and these changes do not yet establish a useful shared API.
   tag repair coverage and final syntax/lint checks passed in both repositories.
 - Documentation links resolve and all 62 historical JSON evidence files are
   unchanged. No deployments, live-node access or production decryption.
+
+## Next: test-host acceptance
+
+Use the established test hosts first, with the existing environment and SSH guards.
+Record the HOU1/HOU4 infrastructure refs, selected application image/revision and
+a verified recovery point using the [release record](production-oidc-runbook.md#release-record-and-access).
+
+1. Run each host's normal playbook with its test inventory and declared inputs.
+   Record container IDs, source/runtime paths, private access and probe results.
+2. Repeat unchanged inputs. Container IDs must stay stable and the application
+   source checkout must remain clean.
+3. Add a temporary Nginx label through `app_compose_extensions`, reconcile, then
+   remove it. Only the Nginx consumer should be recreated for each change.
+4. Stop a test application container and reconcile unchanged inputs. The service
+   must recover without recreating unrelated containers.
+5. Change one service-specific HOU4 monitoring input, restore it, then repeat
+   unchanged inputs. Verify its consumers update, the rest stay stable and probes
+   recover.
+6. Capture and verify a fresh encrypted backup using the separate source layout.
+
+Live deployment requires separate authorization. Clean-host recovery and peer
+replacement remain a later run with independent console access and the explicit
+[recovery checkpoints](probes/clean-host-recovery.md#before-wiping-hou1).

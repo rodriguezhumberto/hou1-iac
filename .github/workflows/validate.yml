@@ -13,6 +13,11 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: '3.12'
+      - name: Install the native DNS test resolver
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes --no-install-recommends dnsmasq-base
+          echo 'DNSMASQ_BIN=/usr/sbin/dnsmasq' >> "$GITHUB_ENV"
       - name: Install SOPS/age test tools
         env:
           GH_TOKEN: ${{ github.token }}
