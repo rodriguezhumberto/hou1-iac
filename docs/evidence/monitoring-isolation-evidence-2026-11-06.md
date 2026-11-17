@@ -17,7 +17,7 @@ directory. Base infrastructure remains
 `sha256:8dc72772a33a6ba570d9e5ecd5184001faded60bf254a4fd789cf324600c0c85`.
 NetBird remains 0.82.0 with the embedded issuer and external Authentik provider.
 
-The [mirrored JSON receipt](evidence/monitoring-isolation-2026-11-06.json)
+The [mirrored JSON receipt](monitoring-isolation-2026-11-06.json)
 contains assertions, timestamps and hashes of private logs. Raw destinations,
 credentials, tokens and session cookies are excluded.
 

@@ -6,7 +6,7 @@ controller-managed Grafana renewal job, and provisions HOU4 Operations in Grafan
 Infrastructure #27 remains open for the complete isolated rollout acceptance.
 HOU4 changes stay in its local repository; no production promotion occurred.
 
-[Redacted measured evidence](evidence/monitoring-vpn-discord-renewal-2026-11-08.json)
+[Redacted measured evidence](monitoring-vpn-discord-renewal-2026-11-08.json)
 records source hashes, timestamps, deployment recaps, service/policy readback,
 queries and notification counters. Webhook values, personal identities, tokens,
 passwords, DNS credentials and age private keys are excluded.

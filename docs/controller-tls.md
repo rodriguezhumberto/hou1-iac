@@ -1,4 +1,4 @@
-# Controller-managed HOU1 TLS (infrastructure #20)
+# Controller-managed HOU1 TLS
 
 This path supports initial issuance and renewal for explicitly configured test or
 production certificates. DNS credentials and ACME account state stay on the

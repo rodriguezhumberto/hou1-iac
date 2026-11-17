@@ -1,7 +1,7 @@
 # Scoped controller VPN transport
 
-Follow-up to infrastructure #20. A controller that retires its temporary
-administrative VPN peer still needs a persistent transport for certificate
+A controller that retires its temporary administrative VPN peer still needs
+a persistent transport for certificate
 delivery and numeric renewal status. This optional entry point enrolls a separate
 NetBird 0.82.0 peer in a pinned container and isolated network namespace. It
 does not change the host's existing VPN interface or routes.
@@ -96,12 +96,10 @@ owner recovery copy of the peer identity, scoped job identities and keys,
 encrypted DNS/ACME/certificate state, pinned SSH profiles and executor inputs.
 Do not start two controllers with the same saved peer identity. Reinstall the
 root launcher through Ansible and validate paths and host keys before resuming
-timers on a replacement controller. Test the recovery bundle on a separate
-controller as described in [outstanding validation](documentation-review.md#outstanding-validation).
+timers on a replacement controller. Replacement-controller execution is tracked
+in [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
 
 Record live namespace/host-route isolation, target-only access, denied arbitrary
 commands, restart persistence, served-certificate validation and alert recovery
-after transport or receiver changes. [Scoped peer validation](evidence/scoped-renewal-peer-2026-11-11.json)
-and [production handoff](evidence/production-host-recovery-2026-11-12.json) record
-accepted live checks. Record controller recovery runs under
-[#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
+after transport or receiver changes. Historical results: [scoped peer validation](evidence/scoped-renewal-peer-2026-11-11.json)
+and [production handoff](evidence/production-host-recovery-2026-11-12.json).

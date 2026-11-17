@@ -5,7 +5,7 @@ accepted production evidence. No live node changes or new production tests were
 performed. Dated evidence reports retain their original results and limitations.
 
 > Historical snapshot. Later SOPS changes supersede the secret-handling findings
-> below. Use the [SOPS/age guide](sops-age-secrets.md) for current deployment inputs.
+> below. Use the [SOPS/age guide](../sops-age-secrets.md) for current deployment inputs.
 
 ## Corrected documentation
 
@@ -27,20 +27,20 @@ performed. Dated evidence reports retain their original results and limitations.
 ## Implementation discrepancies still present
 
 - **Legacy direct-issuer cutover:**
-  [the template](../ansible/playbooks/roles/netbird_control_plane/templates/config-authentik.yaml.j2)
+  [the template](../../ansible/playbooks/roles/netbird_control_plane/templates/config-authentik.yaml.j2)
   writes Authentik into `server.auth.issuer`, contrary to the
-  [pinned compatibility contract](netbird-authentik-compatibility.md). The helper's
+  [pinned compatibility contract](../netbird-authentik-compatibility.md). The helper's
   compatibility flag/readiness probes do not establish that contract. It remains
   executable, but is removed from recommended procedures. A code change should
   retire it or replace it with guarded external-provider reconciliation.
 - **Legacy emergency helper:**
-  [break-glass.sh](../ansible/playbooks/roles/netbird_control_plane/templates/break-glass.sh.j2)
+  [break-glass.sh](../../ansible/playbooks/roles/netbird_control_plane/templates/break-glass.sh.j2)
   stops when API/SSH is unavailable and invokes rollback without an explicit
-  snapshot. [Rollback](../ansible/playbooks/roles/netbird_control_plane/templates/authentik-rollback.sh.j2)
+  snapshot. [Rollback](../../ansible/playbooks/roles/netbird_control_plane/templates/authentik-rollback.sh.j2)
   restores two configuration files only; it does not remove provider registrations.
   A code change is needed before presenting this as a general recovery command.
 - **Permissive repository inventory:**
-  [the checked-in SSH options](../ansible/inventory/inventory.yml) disable host-key
+  [the checked-in SSH options](../../ansible/inventory/inventory.yml) disable host-key
   checking. Current production instructions require a separate strict private
   inventory; this review did not change defaults or inspect live SSH settings.
 - **Incomplete secret consolidation:** Authentik still decrypts on-host and legacy

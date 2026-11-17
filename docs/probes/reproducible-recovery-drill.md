@@ -1,13 +1,11 @@
 # Reproducible isolated recovery drill
 
 CI-backed recovery points use their saved image digest and temporary registry
-access; see [Application images](application-images.md). Cached build dependencies
+access; see [Application images](../application-images.md). Cached build dependencies
 and application builds described below apply only to legacy source-built points.
 
-Issue #27's component recovery rehearsal now has a repository entry point:
-`ansible/playbooks/rehearse-recovery.yml`. The `recovery_drill` role contains the
-preparation, build, restore, identity, application and cleanup programs. No code
-or credentials from a controller's previous `/var/tmp` attempt are required.
+`ansible/playbooks/rehearse-recovery.yml` runs the `recovery_drill` role's
+preparation, restore, identity, application and cleanup phases.
 
 This restores the combined HOU4 recovery archive into seven private containers
 on the existing test HOU1. It requires a running test stack, its matching source
@@ -22,8 +20,7 @@ isolated Compose project.
 ## Controller inputs
 
 Use the exact infrastructure commit under review and the staff commit recorded
-in the selected backup. Install `requirements-dev.txt`, the Ansible collections
-and the `age` executable. Pin the test host's SSH identity in the established
+in the selected backup. Use [contributor setup](../../CONTRIBUTING.md) and install `age`. Pin the test host's SSH identity in the established
 private inventory. Reserve at least 4 GiB available RAM and 10 GiB free disk
 before the drill; allow additional room for application builds and backup growth.
 
@@ -94,9 +91,10 @@ The recovery sequence is:
 2. Prepare an internal Docker network and private binds. Resolve saved
    certificate lineages by SAN coverage, matching key and validity. Preserve
    the saved app environment and HTTP healthcheck, including `HOST=0.0.0.0`.
-3. Build the exact saved staff Git revision with saved public build arguments.
-   Use image IDs from the existing test stack for the remaining services. No
-   NetBird upgrade is performed. Record source revision and resulting image ID.
+3. Pull and verify the saved CI application digest, or build the saved revision
+   with public build arguments for a legacy point. Other services use image IDs
+   from the existing test stack. Record the source revision and image ID; retain
+   the saved NetBird version.
 4. Start empty PostgreSQL. Require a successful query against the actual
    database over TCP, rather than accepting the temporary initialization socket.
    Refuse a nonempty schema and import with `ON_ERROR_STOP`.
@@ -124,37 +122,8 @@ Reconcile later offboarding/access changes before any real restored system
 accepts traffic. Clearing sessions does not replay those changes or revoke
 every JWT held outside the restored system.
 
-## Evidence and limits
+## Recorded results
 
-The private baseline harness passed on 2026-11-09: PostgreSQL 187 tables, six
-identity-material assertions and 29 application/session/media/restart/rollback
-checks. After cleanup, all 23 primary health checks and eight monitoring targets
-passed; primary container IDs and start times were unchanged. That evidence
-motivated this versioned workflow. It is not a live pass of this refactored role.
-
-Local regression tests use generated certificates, synthetic databases and
-Ansible tasks. They cover shared certificate selection, preserved app runtime,
-database readiness, writer-stopped session cleanup, first-error refusal and
-controller cleanup after remote failure. The live result below covers this
-entry point only. Later clean-OS, human-login and cutover results are linked from
-the [production runbook](production-oidc-runbook.md); historical remaining gates
-below must not be read as current rollout status.
-
-The first Ansible run stopped at the NetBird discovery issuer assertion: the
-saved endpoint retained `:443`, while discovery omits the default HTTPS port.
-Preparation now validates saved URLs before canonicalizing service origins;
-the saved staff issuer and exact issuer checks are preserved. Eleven focused
-regressions and the recovery playbook syntax check pass. Cleanup preserved all
-primary container IDs/start times; subsequent health checks passed 23/23 with
-eight monitoring targets up and no active alerts. No host wipe was needed. See the
-[failed-attempt evidence](evidence/hou1-recovery-ansible-2026-11-10.json).
-
-The operator-authorized corrected attempt passed at infrastructure revision
-`95ca59eeb78d365001c407aa8736ffe4512b9c27`: Ansible completed 26 tasks with no
-failures, importing 187 PostgreSQL tables and passing six identity assertions
-and all 29 application/session/media/restart/rollback checks. Cleanup removed
-the drill containers, network and plaintext; primary container IDs/start times
-were unchanged. Post-test checks passed 23/23 with eight monitoring targets up
-and no active alerts. The temporary recovery identity was retired after the
-checks; the operator's encrypted archive remains intact. See the
-[successful-attempt evidence](evidence/hou1-recovery-ansible-2026-11-10-02.json).
+The [execution notes](../evidence/component-recovery-drill-2026-11-10.md) retain
+the baseline, failed attempt and corrected run. Later host-replacement results
+are linked from the [production runbook](../production-oidc-runbook.md).

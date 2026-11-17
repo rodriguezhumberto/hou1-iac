@@ -1,6 +1,6 @@
 # Isolated HOU1 metrics for HOU4 (infrastructure #27)
 
-> Historical test configuration. Use [environment monitoring](environment-monitoring.md) for current environment-bound deployment and [the docs index](README.md) for accepted production results.
+> Historical test configuration. Use [environment monitoring](../environment-monitoring.md) for current environment-bound deployment and [the docs index](../README.md) for accepted production results.
 
 Run `ansible/playbooks/monitoring.yml` against the established private isolated
 inventory, with `hou1_monitoring_inventory_group` selecting that one-host group,
@@ -50,7 +50,7 @@ checking they have no other references. Remove the installed collector/config,
 units, exporter override and textfiles if retiring this integration. Keep SSH,
 NetBird and all shared policies intact. This is an additive test integration;
 production support and remaining live acceptance checks are described in
-[environment monitoring](environment-monitoring.md).
+[environment monitoring](../environment-monitoring.md).
 
 See the dated evidence document for live results and known limits. Independent
 outage detection for HOU4 is explicitly deferred by the operator.

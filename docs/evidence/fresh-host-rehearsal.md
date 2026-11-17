@@ -1,6 +1,6 @@
 # Fresh-host rehearsal for issues #27 and staff #39
 
-> Historical rehearsal journal. For current deployment and recovery, use [production operations](production-oidc-runbook.md) and [production recovery](production-host-recovery.md). Pending gates below describe the recorded attempt, not current rollout status.
+> Historical rehearsal journal. For current deployment and recovery, use [production operations](../production-oidc-runbook.md) and [production recovery](../production-host-recovery.md). Pending gates below describe the recorded attempt, not current rollout status.
 
 This is a new test installation, not production promotion or a database restore.
 The operator confirmed these inputs on 2026-11-08:
@@ -81,7 +81,7 @@ verified; the password delivery file was deleted afterward.
    A first Google web login creates the fresh identity; it does not prove device
    enrollment. Run `scripts/rehearsal-netbird-admission.py` with
    `--identity-secrets` selecting the matching owner-encrypted naming bundle, and `--profile`
-   pointing to the [inventory-exported identity profile](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) and the encrypted
+   pointing to the [inventory-exported identity profile](../authentik-bootstrap.md#google-admission-and-staffvpn-assignments) and the encrypted
    admission inputs and verify its positive/negative policy checks, disabled
    approval requirement, exact pending-user reconciliation, and explicit staff
    assignments before asking the operator to test a NetBird client. Until then,
@@ -202,7 +202,7 @@ for this handoff; the earlier repository test results remain applicable.
 
 ## Prepared off-host recovery follow-up
 
-The [HOU4 backup protocol](hou4-backup-protocol.md) now provides the restricted
+The [HOU4 backup protocol](../hou4-backup-protocol.md) now provides the restricted
 encrypted source role, receiver contract and offline validation procedure. This
 is implementation/test preparation; the earlier live checkpoint still has no
 verified off-host backup or clean-node restore. Repeat the live gates after the
@@ -224,7 +224,7 @@ directories, links, hidden files and cache-like WAL names, still requires the
 original secrets. Existing secrets are never replaced. Regression tests exercise
 the real Ansible guard and generator against these cases.
 
-See [attempt evidence](evidence/fresh-host-stopped-2026-11-09.json). The fix has
+See [attempt evidence](fresh-host-stopped-2026-11-09.json). The fix has
 not been deployed: another operator-confirmed wipe is required before starting
 again from preparation. This stopped attempt does not satisfy the rollout or
 recovery gates in #27 and staff #39.
@@ -249,7 +249,7 @@ are never retried.
 
 Focused tests passed 17 cases, the full suite passed 164 with one optional
 dnsmasq skip, and eight playbook syntax checks passed. See the
-[attempt evidence](evidence/fresh-host-authentik-stopped-2026-11-09.json).
+[attempt evidence](fresh-host-authentik-stopped-2026-11-09.json).
 These are local checks; fresh-host validation remains pending.
 
 Immediate termination bypassed Ansible cleanup, so only the generated root-only
@@ -282,7 +282,7 @@ The checklist now makes both enrollment and admission prerequisites explicit.
 Local controller prerequisite checks cover 16 missing/invalid/ready HOU4 cases
 without remote calls. The infrastructure policy remains unchanged.
 
-See [attempt evidence](evidence/fresh-host-monitoring-stopped-2026-11-09.json).
+See [attempt evidence](fresh-host-monitoring-stopped-2026-11-09.json).
 Production approval and rollout issues remain open.
 
 ## Fresh-wipe attempt stopped at the provider package lock (2026-11-09 UTC)
@@ -299,6 +299,6 @@ Preparation now waits for cloud-init when installed, then gives the initial
 package task a bounded lock wait. Local Ansible fixtures cover delayed successful
 initialization, failed initialization, timeout and hosts without cloud-init.
 The corrected order for HOU4 enrollment and allowlist admission remains required.
-See [attempt evidence](evidence/fresh-host-package-lock-stopped-2026-11-09.json).
+See [attempt evidence](fresh-host-package-lock-stopped-2026-11-09.json).
 Fresh-host validation requires another confirmed HOU1-only wipe; production
 approval and rollout issues remain open.

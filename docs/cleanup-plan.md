@@ -46,12 +46,15 @@ converge without unnecessary changes.
   introducing additional role interfaces.
 - Keep scoped encrypted bundles separate: their different access and rotation
   requirements are intentional.
-- Preserve historical evidence and current runtime paths: external commands and
-  retained recovery workflows may depend on them.
+- Preserve historical evidence content and current runtime paths: recovery
+  commands and retained procedures may depend on them.
 - Treat the network-removal correction as an explicit behavior change, separate
   from file extraction.
 - Use matching Make targets and isolated dependencies in each repository: local
   checks and CI should exercise the same commands without a shared tool package.
+- Keep current guides in `docs/`, probe and drill procedures in `docs/probes/`,
+  dated records in `docs/evidence/` and superseded guidance in `docs/archive/`.
+  Public script paths and recorded results stay stable when documentation moves.
 
 ## Later reliability work
 

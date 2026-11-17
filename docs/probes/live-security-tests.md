@@ -1,7 +1,7 @@
 # Live isolated OIDC security tests
 
-These are infrastructure #26 and staff #37 checks for the existing isolated VPS
-fixture described in [the deployment evidence](vps-test-evidence-2026-11-06.md).
+These mutating checks use the fixed isolated VPS
+fixture in [the deployment evidence](../evidence/vps-test-evidence-2026-11-06.md).
 They mutate only test Authentik provider 1 and a fresh test CLI peer. Run each
 suite sequentially; do not run them against production or concurrently with
 another operator changing that fixture. They do not deploy or merge anything.
@@ -25,7 +25,8 @@ Before running:
    probes. Record immutable app/infra refs and running container identities.
 2. Install `auth_api.py` as `/root/hou1-test-auth-api.py` and `session_db.py` as
    `/root/hou1-test-session-db.py` on the test VPS, root-owned mode 0700. Their
-   fixed SOPS paths and container names are specific to this test fixture.
+   container names and database paths are fixed to this fixture. The Auth API
+   helper uses the bootstrap token inside Authentik; it does not decrypt SOPS.
 3. Copy the staff repository's `astro-app/scripts/live-oidc-probe.py` to
    `/tmp/live-oidc-probe.py` inside `hou1-vps-admin-test`. It stores pending flow
    codes/cookies privately in `/tmp/pp-live-oidc`; remove interrupted flows.
@@ -104,9 +105,7 @@ with its actual assertions, refs, immutable artifact hashes and stated limits.
 ## JWKS lifetime and IdP revocation follow-up
 
 Use a fresh mode-0700 directory via `HOU1_SECURITY_WORKDIR` for the follow-up.
-The updated `auth_api.py` obtains API authorization inside the test Authentik
-container; no host SOPS path or controller identity is needed by that helper.
-Install the updated staff probe before running. Pause the test monitor timer
+Install the matching staff probe before running. Pause the test monitor timer
 and service during deliberate authentication failures, and restore them after
 all cleanup and healthy-login checks.
 
@@ -138,15 +137,12 @@ restores the signing key and exact saved ingress without controller access.
 Cleanup verifies original native JWKS publication and deletes only the generated
 key and the dedicated fixture container/directory.
 
-The overlap helper now uses `controller.container_api` directly; it does not
-require installing `/root/hou1-test-auth-api.py`. Its root recovery script is
-self-contained, uses the container-local bootstrap token, and attempts ingress
-restoration independently if Authentik is unavailable. The timer is armed before
-switching signing keys. `--wait` finishes after natural expiry in a foreground
-process retained by the execution tool; avoid detached shell sleep jobs. Start
-refuses an active rehearsal-monitor timer to prevent incidental cache refresh.
-Stop both `hou1-test-monitor.timer` and `hou1-test-monitor.service` before start,
-then restore monitoring after cleanup and require all 33 rules healthy.
+The overlap helper uses `controller.container_api` without the root RPC helper.
+It arms recovery before switching keys and can restore ingress while Authentik
+is unavailable. Keep `--wait` in the foreground. Stop both
+`hou1-test-monitor.timer` and `hou1-test-monitor.service` before start to avoid
+incidental cache refresh; after cleanup restore monitoring and verify all 33
+fixture rules are healthy.
 
 `revocation_boundary.py` changes only the internal `vps-staff-admin` fixture,
 with an independent five-minute recovery timer. It retains two admin sessions
@@ -220,7 +216,7 @@ healthy final state. Keep earlier NetBird state-rollback and real 905-second
 JWKS-cache evidence under their original refs; neither is silently relabeled
 as a new drill or as native Authentik dual-key publication.
 
-The [2026-11-07 coordinated acceptance evidence](oidc-security-acceptance-2026-11-07.md)
+The [2026-11-07 coordinated acceptance evidence](../evidence/oidc-security-acceptance-2026-11-07.md)
 records the executed phases, exact images, encrypted restore point, measured
 restore duration and final cleanup. Its machine-readable report is mirrored
 in the staff repository for issue #37.

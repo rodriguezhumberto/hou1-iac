@@ -1,8 +1,8 @@
 # Environment-bound staff login monitoring
 
-This follow-up to infrastructure #28 supplies an optional synthetic login probe.
-It is disabled by default. Offline verification does not clear the live production
-monitoring gate or prove the upstream Google token exchange.
+This optional synthetic login probe is disabled by default. It checks local
+Authentik login, not the upstream Google token exchange. Validate live operation
+with the acceptance steps below.
 
 ## Identity and encrypted inputs
 
@@ -31,7 +31,7 @@ the probe container. Rotate the account password separately when retiring access
 ## Explicit deployment contract
 
 First reconcile `ansible/playbooks/monitoring.yml` using the inventory/profile
-inputs in [environment-monitoring.md](environment-monitoring.md), adding boolean
+inputs in [environment-monitoring.md](../environment-monitoring.md), adding boolean
 `hou1_staff_probe_enabled: true`. This adds one marked, unidirectional TCP/443
 NetBird policy between the existing single-peer HOU4/HOU1 metrics groups. It
 does not grant staff or administrative membership. Keep the existing VPN-only
@@ -109,7 +109,7 @@ connection separately; this local synthetic login does not exercise Google.
 
 For rollback set both enable flags to false and rerun the respective playbooks.
 HOU4 removes the optional container, runtime credential and alert rules, and HOU1
-disables only its marked HTTPS probe policy. Numeric output and dashboard panels
-may retain the last observation as historical evidence. Disable/delete or rotate the synthetic account
-separately, and retire the temporary controller grant. Preserve metrics, backup,
+disables only its marked HTTPS probe policy. Numeric output and dashboard panels may retain the last observation.
+Disable/delete or rotate the synthetic account separately and retire the
+temporary controller grant. Preserve metrics, backup,
 VPN enrollment and administrative policies.

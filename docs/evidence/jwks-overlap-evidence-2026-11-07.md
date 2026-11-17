@@ -29,7 +29,7 @@ the Authentik container-local bootstrap token path and independently restores
 ingress if the provider is unavailable. The monitor was paused during the timed
 window and restored afterward with 33 healthy rules and no pending alerts.
 
-The [mirrored JSON evidence](evidence/jwks-overlap-gate-2026-11-07.json) records
+The [mirrored JSON evidence](jwks-overlap-gate-2026-11-07.json) records
 the eight assertions, public-key request receipts, runtime image identities and
 verified cleanup. An earlier run detected an intervening refresh and was
 discarded; only the controlled repeat is evidence. No NetBird provider key,

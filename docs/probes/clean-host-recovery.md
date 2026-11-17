@@ -1,22 +1,22 @@
 # Clean test-host recovery
 
 For CI-built recovery points, follow the digest and registry requirements in
-[Application images](application-images.md). Source-build instructions below
+[Application images](../application-images.md). Source-build instructions below
 apply to retained legacy recovery points.
 
-Issue #27's replacement-host gate uses `restore-test-host.yml`, followed by
+Test replacement recovery uses `restore-test-host.yml`, followed by
 `publish-test-recovery.yml`. These entry points recover the selected test point
 on fresh Debian 12 at the same HOU1 address. They are not production restore
-commands. See [production replacement recovery](production-host-recovery.md) for
+commands. See [production replacement recovery](../production-host-recovery.md) for
 the separate environment-bound entry points. Keep HOU4 and its retained backups
 intact.
 
-[Clean CI-image evidence](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
+[Clean CI-image evidence](../evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
 records completed test restore, handoff and reboot. Earlier failed attempts and
 continued-host repairs remain separate historical reports; see
-[evidence](README.md#test-procedures-and-historical-results). A repaired-host
-result does not establish an uninterrupted run. Production's remaining full-run
-test is tracked separately under #78.
+[evidence](../evidence/README.md). A repaired-host
+result does not establish an uninterrupted run. See the production recovery
+guide for the separate production acceptance requirements.
 
 ## Before wiping HOU1
 
@@ -193,8 +193,7 @@ services, external Google sign-in, approved/rejected VPN access, public staff
 and admin denials, revocation, renewal and reboot/outage checks. Verify recovered
 signing/client/emergency-admin material and reconcile later offboarding before
 accepting the restored system. Record time and data recovered separately from
-provisioning and operator pauses. Keep issues #27/#39 open until their criteria
-are met; this workflow does not authorize production promotion.
+provisioning and operator pauses. Record the test acceptance results separately from production promotion.
 
 For the component drill, supply the test fixture passwords associated with the
 selected recovery point, from its recovered encrypted application bundle. A

@@ -1,9 +1,8 @@
-# Private HOU1 monitoring (follow-up to infrastructure #19)
+# Private HOU1 monitoring
 
 The same collector role supports test and production. It requires one declared
 private inventory target, the existing identity profile, and a distinct enrolled
-HOU4 peer in the selected VPN account. No production deployment or live alert
-validation is implied by offline tests.
+HOU4 peer in the selected VPN account.
 
 Select these public inputs explicitly:
 
@@ -14,7 +13,7 @@ Select these public inputs explicitly:
 | `hou1_monitoring_enabled` | Boolean `true`; collection is otherwise refused. |
 | `hou1_monitoring_peer_ip` | HOU4's enrolled VPN IPv4 address, different from HOU1. |
 | `hou1_request_metrics_enabled` | Boolean opt-in for the existing credential-free Nginx request schema. |
-| `hou1_staff_probe_enabled` | Boolean opt-in for HOU4-to-HOU1 TCP/443 using the exact existing metrics peer groups; see [staff-login-probe.md](staff-login-probe.md). |
+| `hou1_staff_probe_enabled` | Boolean opt-in for HOU4-to-HOU1 TCP/443 using the exact existing metrics peer groups; see [staff-login-probe.md](probes/staff-login-probe.md). |
 
 Keep organization-specific deployment roots, domains, allowlists, receiver URLs
 and credentials in encrypted inputs. `app_directory` supplies the application
@@ -50,22 +49,18 @@ address at port 9100. The target must be a distinct VPN peer. Enable
 `hou4_request_metrics_enabled` together with request collection on HOU1. HTTPS
 probe domains must be explicit allowlisted encrypted inputs for the selected
 environment. Keep the Discord destination in its encrypted receiver input.
-The companion HOU4 change adds environment labels to target samples and validates
-alert firing, hold time, missing data and recovery in both environments. Callback
-latency retains the existing 10-minute window, minimum 10 samples, 5-second p95
-threshold and 5-minute hold.
+HOU4 labels target samples by environment. [Request monitoring](request-login-monitoring.md)
+defines callback thresholds and source requirements.
 
 Before clearing the production monitoring gate, record the selected HOU1/HOU4
 refs and live evidence: successful private scrapes and source collection;
 public and unrelated-peer denial; service failure and recovery notifications;
 backup freshness; and request/login metrics. Configure separate production
-synthetic identities and enable the [environment-bound login probe](staff-login-probe.md)
-before relying on end-to-end login monitoring. Production provisioning, fresh
-login and owner-confirmed Discord delivery are recorded in
-[production operations](evidence/production-operations-2026-11-11.json).
-[Replacement handoff](evidence/production-host-recovery-2026-11-12.json) rechecked
-collection/probe health, but did not repeat that delivery drill. Repeat affected
-checks after routing/receiver changes. Keep rehearsal-only helper guards intact.
+synthetic identities and enable the [environment-bound login probe](probes/staff-login-probe.md)
+before relying on end-to-end login monitoring. Repeat affected checks after
+routing/receiver changes and keep rehearsal-only guards intact. See the
+[production status](production-oidc-runbook.md#production-status) for accepted
+results and remaining validation limits.
 
 For rollback, remove the HOU1 scrape job and disable its HOU4 rule switches,
 stop the collector timer/exporter, then remove only the exact source-IP UFW

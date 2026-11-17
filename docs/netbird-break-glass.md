@@ -23,7 +23,7 @@ external-provider contract. For an approved configuration rollback, inspect the
 exact snapshot and invoke `authentik-rollback.sh <reviewed-snapshot-path>` directly
 through the working administrative path. It restores config/dashboard files only;
 it does not restore the database or remove external-provider registrations. See
-[legacy cutover limitations](netbird-authentik-cutover.md). For host loss, follow
+[legacy cutover limitations](archive/netbird-authentik-cutover.md). For host loss, follow
 [production replacement recovery](production-host-recovery.md).
 
 ## Audit and close

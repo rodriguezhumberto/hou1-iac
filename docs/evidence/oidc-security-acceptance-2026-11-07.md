@@ -3,7 +3,7 @@
 Staff [#37](https://github.com/rodriguezhumberto/pearland-paws/issues/37) and
 infrastructure [#26](https://github.com/rodriguezhumberto/hou1-iac/issues/26)
 share this test plan and the byte-identical
-[assertion report](evidence/oidc-security-acceptance-2026-11-07.json).
+[assertion report](oidc-security-acceptance-2026-11-07.json).
 The current-release run passed on the isolated VPS `139.177.151.12`.
 This is test acceptance evidence; production rollout remains separate.
 

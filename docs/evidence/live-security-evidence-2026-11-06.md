@@ -1,7 +1,7 @@
 # Live VPS security evidence — 2026-11-06
 
 Infrastructure #26 and staff #37 were tested together against isolated VPS
-`139.177.151.12`. The [machine-readable assertions](evidence/live-security-2026-11-06.json)
+`139.177.151.12`. The [machine-readable assertions](live-security-2026-11-06.json)
 are mirrored in both repositories. Deployment refs remain infrastructure
 `8db0d2563ce314498a4a4840538fe5a1c720de81`, staff
 `af9a46b3f3b7a96543481c82979fe4068bc01f4c`, image
@@ -76,7 +76,7 @@ These issues remain open for coordinated acceptance:
   alert delivery remain deployment gates. Production promotion, prerequisite
   merges and issue #24's issuer-swapping scripts were not attempted.
 
-See the infrastructure [execution notes](live-security-tests.md). Passwords,
+See the infrastructure [execution notes](../probes/live-security-tests.md). Passwords,
 private keys, raw codes, tokens and session cookies are excluded from evidence.
 
 The [2026-11-07 follow-up](live-security-followup-2026-11-07.md) measures the

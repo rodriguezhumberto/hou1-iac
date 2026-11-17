@@ -4,7 +4,7 @@ Coordinated infrastructure #26 and staff #37 checks used the existing isolated
 VPS, test Authentik staff client, internal admin/reader fixtures, test DNS and
 certificates, and controller SOPS/age secrets. NetBird remains on 0.82.0.
 No production deployment, human Google membership, or application behavior
-was changed. See the [mirrored assertions](evidence/live-security-followup-2026-11-07.json)
+was changed. See the [mirrored assertions](live-security-followup-2026-11-07.json)
 for runtime image identities, source hashes, receipts and cleanup evidence.
 
 ## Deployed JWKS lifecycle

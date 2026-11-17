@@ -1,6 +1,6 @@
 # Monitoring and isolation gates for the test VPS
 
-> Historical isolated-rehearsal journal. Current test/production collector configuration is in [environment monitoring](environment-monitoring.md); use the [production runbook](production-oidc-runbook.md) for current acceptance.
+> Historical isolated-rehearsal journal. Current test/production collector configuration is in [environment monitoring](../environment-monitoring.md); use the [production runbook](../production-oidc-runbook.md) for current acceptance.
 
 Infrastructure #27 and staff #39 use the existing isolated stack and a trusted
 off-host controller. These controls are opt-in for the private test inventory;
@@ -87,7 +87,7 @@ python3 scripts/rehearsal-netbird-admission.py \
   --config <private-admission.enc.json> --age-key-file <private-age-identity>
 ```
 
-First export the test profile using the [inventory export procedure](authentik-bootstrap.md#google-admission-and-staffvpn-assignments),
+First export the test profile using the [inventory export procedure](../authentik-bootstrap.md#google-admission-and-staffvpn-assignments),
 selecting the same rehearsal inventory and `deploy_environment=test`.
 The entire private JSON file must be SOPS/age encrypted, including every email
 and staff-role value. The script decrypts it in memory and rejects plaintext,
