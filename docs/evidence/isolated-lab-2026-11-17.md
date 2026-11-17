@@ -152,3 +152,24 @@ standalone/incremental bundles, role/client mismatches, wrong backup keys,
 one-sided backup enablement and input/ref/capability drift on either host before
 deployment. Version 1 compatibility remains covered. Inventory generation,
 bootstrap handoffs, installed-key verification and recovery remain separate work.
+
+## Generated inventory adoption
+
+HOU1 `8a30b03` and HOU4 `77e56ec` passed generated-inventory input contracts,
+fresh managed-access handoff and ordered reconciliation. Evaluated values matched
+the prior private inventories across 105 HOU1 and 58 HOU4 variables, including
+test-group membership. Reviewed overrides remain explicit; shared repository
+variables and scoped encrypted bundles retain their existing owners.
+
+- Both hosts passed fresh pinned VPN connections, sudo, key-only non-root SSH,
+  VPN-only live listeners and inactive socket/fallback-timer checks. Only the
+  controller's active workflow selection changed during handoff.
+- Reconciliation completed without corrective commands. All eight HOU1 and four
+  HOU4 container IDs matched the previous read-only acceptance. Application
+  image/source, served TLS and all three declared HTTPS checks passed.
+- Generated ciphertext references remain at the SOPS plugin's sibling filename,
+  outside ordinary group-variable directories. Native fixtures verify task-stage
+  decryption without treating encrypted metadata as deployment variables.
+
+This accepts generated inventories on the existing lab hosts. Initial bootstrap
+and SSH cutover on clean hosts remain untested by this adoption run.

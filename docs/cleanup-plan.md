@@ -220,5 +220,12 @@ Version 2 adds [input contracts](lab-inputs.md): release receipt/bundle checks,
 identity-role/client checks and backup key/endpoint checks before host access.
 Both repositories' refs, inventories and referenced capabilities are rechecked
 before later commands. Version 1 remains compatible with its original contracts.
-Fresh-host acceptance remains unproved. Next: review copied inventory overrides,
-maintain input generation and bootstrap handoffs, then separate ingress.
+Generated inventory adoption preserved all 163 evaluated variables and test-group
+membership across both hosts. Fresh VPN handoff checks passed before selecting
+the new managed profiles; SSH configuration stayed with the existing security
+roles. Reviewed private overrides remain explicit; repository shared variables
+are referenced rather than copied. See [inventory generation](lab-inventory.md).
+
+Next: [separate ingress](ingress-separation.md), preserving routing and cold
+recovery before live cutover. Fresh-host bootstrap, peer enrollment and destructive
+recovery acceptance remain separate work.

@@ -14,7 +14,7 @@ install from the final revisions without corrective commands.
 | Bootstrap name resolution | Opt-in `lab_dns` roles in both repositories; adoption and repeat passed | Verify fresh-host bootstrap; preserve provider DNS and unrelated host settings |
 | Container DNS blocked after UFW enabled | HOU1 `docker` owns daemon DNS; `lab_dns_containers` derives narrow UFW allowances from declared networks | Include replacement-network and interrupted-start checks in fresh-host acceptance |
 | Controller administrative VPN and resolver namespace | `scripts/lab-network.py` owns command transport and private resolver/hosts views; enrollment remains private | Maintain peer creation/enrollment separately from renewal jobs |
-| Inventory assembly and bootstrap/managed selection | Private inventories are authoritative for current runs; the old assembler copies defaults and must not overwrite reviewed inputs | Review copied overrides, maintain inventory generation and verify cutover before switching |
+| Inventory assembly and bootstrap/managed selection | `scripts/prepare-lab.py` owns generated profiles and verifies fresh managed SSH before selecting them | Retain reviewed overrides; test initial cutover on fresh hosts |
 | Lab secrets and age identities | Private preparation/import helpers; scoped encrypted bundles | Maintain retry-safe creation and recipient validation; never recreate identities on rerun |
 | Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; version 2 fingerprints known and declared capability files | Validate provider/registry authorization before bootstrap |
 | Application digest and matching source bundle | Version 2 derives selection from the CI receipt and verifies a standalone bundle/ref before host access; runtime artifact checks remain | Maintain release-input generation from this selection |
@@ -56,8 +56,13 @@ adoption, repeat reconciliation and standalone verification passed without manua
 repair. Bootstrap handoffs, peer enrollment, identity seeding, off-host backup and
 recovery acceptance remain separate work.
 Version 2 adds [controller-only input contracts](lab-inputs.md), including checks
-that stop before host access. Inventory generation and bootstrap handoffs still
-need maintained owners; the private default-copying assembler is not promoted.
+that stop before host access. [Inventory generation](lab-inventory.md) references
+repository defaults and explicit private overrides. Its handoff checks the live
+VPN-only SSH policy before selecting generated managed profiles. Initial VM
+bootstrap and peer enrollment remain separate from this managed-host workflow.
+
+The [ingress migration sequence](ingress-separation.md) preserves application
+routing, TLS consumers and the existing cold-recovery contract before cutover.
 
 Initial workflow validation: 23 workflow/transport tests passed, including real
 Ansible/OpenSSH fixtures, plus syntax/lint and documentation links. Managed-host

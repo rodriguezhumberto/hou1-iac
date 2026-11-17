@@ -35,6 +35,8 @@ the [managed lab workflow](deployment-workflow.md) coordinates existing test hos
 [Input contracts](lab-inputs.md) check release, identity and backup bindings locally.
 [Inventory generation](lab-inventory.md) prepares both access profiles and verifies
 the managed handoff before selecting a new snapshot.
+[Ingress separation](ingress-separation.md) records migration prerequisites and
+acceptance order.
 
 ## Probes and drills
 
