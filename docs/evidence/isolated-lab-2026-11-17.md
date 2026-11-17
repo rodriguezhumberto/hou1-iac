@@ -133,3 +133,22 @@ change passed nine transport tests plus syntax/lint. Final `make check` passed
 skips; native DNS checks ran in both. These runs establish adoption and
 reconciliation on existing hosts; fresh-host bootstrap remains a separate
 acceptance run.
+
+## Controller input contracts
+
+HOU1 `5a05479` passed version 2 input checks and read-only verification with HOU4
+`77e56ec`. The workflow selected the existing CI receipt and standalone bundle,
+compared application role groups with encrypted identity names and OIDC inputs,
+and proved the legacy Authentik backup key/recipient pair. Twelve referenced
+files were fingerprinted. Private inventories, credentials, identities and release
+files matched their pre-check hashes.
+
+Both hosts passed pinned access checks; image/source/TLS and three HTTPS checks
+passed. All twelve container records matched prior acceptance. No deployment
+playbook, identity mutation or backup operation ran in these checks.
+
+Syntax/lint and 53 affected tests passed without skips. Native fixtures cover
+standalone/incremental bundles, role/client mismatches, wrong backup keys,
+one-sided backup enablement and input/ref/capability drift on either host before
+deployment. Version 1 compatibility remains covered. Inventory generation,
+bootstrap handoffs, installed-key verification and recovery remain separate work.
