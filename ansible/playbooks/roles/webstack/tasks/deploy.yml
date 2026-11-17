@@ -52,6 +52,10 @@
     mode: '0644'
     content: '{{ application_image_verified | to_nice_json }}'
 
+- name: Configure boot recovery only after full application activation
+  ansible.builtin.include_tasks: startup.yml
+  when: not (webstack_bootstrap_ingress_only | default(false) | bool)
+
 - name: Remove archived Directus containers from this project
   ansible.builtin.command:
     argv: [docker, rm, "{{ item }}"]

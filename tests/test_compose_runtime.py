@@ -8,6 +8,7 @@ from pathlib import Path
 import pwd
 import shutil
 import subprocess
+import sys
 import tempfile
 import unittest
 import uuid
@@ -184,6 +185,67 @@ class ComposeRuntimeTest(unittest.TestCase):
             with self.assertRaises((FileNotFoundError, ValueError)):
                 self.reconcile()
             self.assertFalse(any('up' in command for command in self.commands))
+
+    def test_boot_activation_waits_for_exact_vpn_address_before_any_mutation(self):
+        command = ['ip', '-j', '-4', 'address', 'show', 'dev', 'wt0']
+        with patch.object(runtime.subprocess, 'check_output', return_value=json.dumps([
+                {'addr_info': [{'family': 'inet', 'local': '100.91.0.11'}]}]).encode()) as probe:
+            with self.assertRaises(ValueError):
+                runtime.require_address('100.91.0.10', 'wt0')
+            probe.assert_called_once_with(command, stderr=subprocess.DEVNULL, timeout=10)
+        with patch.object(runtime.subprocess, 'check_output', return_value=json.dumps([
+                {'addr_info': [{'family': 'inet', 'local': '100.91.0.10'}]}]).encode()):
+            runtime.require_address('100.91.0.10', 'wt0')
+
+        arguments = ['apply.py', str(self.root), '--require-address', '100.91.0.10',
+                     '--interface', 'wt0']
+        with patch.object(sys, 'argv', arguments), patch.object(runtime, 'require_address') as ready:
+            ready.side_effect = ValueError('address not present')
+            with self.assertRaises(ValueError):
+                runtime.main()
+            self.assertEqual(self.commands, [])
+            self.assertFalse((self.root / '.compose-apply.lock').exists())
+            self.assertFalse((self.root / '.compose-applied-inputs.json').exists())
+            ready.side_effect = None
+            runtime.main()
+            self.assertTrue((self.root / '.compose-applied-inputs.json').exists())
+
+    def test_address_gate_requires_both_arguments(self):
+        for option, value in [('--require-address', '100.91.0.10'), ('--interface', 'wt0')]:
+            with patch.object(sys, 'argv', ['apply.py', str(self.root), option, value]):
+                with self.assertRaises(SystemExit) as error:
+                    runtime.main()
+                self.assertEqual(error.exception.code, 2)
+        self.assertEqual(self.commands, [])
+
+    def test_boot_unit_retries_without_holding_docker_or_ingress_startup(self):
+        target = self.root / 'hou1-webstack.service'
+        task = yaml.safe_load((ROLES / 'webstack/tasks/startup.yml').read_text())[0]
+        task['ansible.builtin.template'].update(
+            src=str(ROLES / 'webstack/templates/hou1-webstack.service.j2'), dest=str(target),
+            owner=pwd.getpwuid(os.getuid()).pw_name, group=grp.getgrgid(os.getgid()).gr_name)
+        result = run_play({'app_directory': '/srv/application space%name', 'netbird_ip': '100.91.0.10',
+                           'netbird_interface': 'wt0'}, [task])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        unit = target.read_text()
+        self.assertIn('Restart=on-failure', unit)
+        self.assertIn('StartLimitIntervalSec=0', unit)
+        self.assertIn('"/srv/application space%%name"', unit)
+        self.assertIn('--require-address "100.91.0.10" --interface "wt0"', unit)
+        self.assertNotIn('ExecStop=', unit)
+        self.assertNotIn('Before=', unit)
+        target.write_text(unit.replace('/usr/local/libexec/hou1-compose-apply', '/usr/bin/true'))
+        for dependency in ('docker', 'netbird'):
+            (self.root / (dependency + '.service')).write_text('[Service]\nExecStart=/usr/bin/true\n')
+        verified = subprocess.run(['systemd-analyze', 'verify', str(target)],
+                                  capture_output=True, text=True, timeout=15)
+        self.assertEqual(verified.returncode, 0, verified.stderr)
+        deployment = yaml.safe_load((ROLES / 'webstack/tasks/deploy.yml').read_text())
+        startup = next(task for task in deployment if task.get('ansible.builtin.include_tasks') == 'startup.yml')
+        self.assertEqual(startup['when'], 'not (webstack_bootstrap_ingress_only | default(false) | bool)')
+        enable = yaml.safe_load((ROLES / 'webstack/tasks/startup.yml').read_text())[1]
+        self.assertTrue(enable['ansible.builtin.systemd_service']['enabled'])
+        self.assertNotIn('state', enable['ansible.builtin.systemd_service'])
 
     def test_fresh_webstack_prepares_readonly_challenge_directory_before_activation(self):
         challenge = self.root / 'certbot/www'

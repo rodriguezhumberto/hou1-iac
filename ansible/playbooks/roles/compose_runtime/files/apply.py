@@ -59,6 +59,16 @@ def container_ids(command, directory, services):
             for name in services}
 
 
+def require_address(address, interface):
+    """Refuse activation until the expected address exists on its interface."""
+    output = subprocess.check_output(['ip', '-j', '-4', 'address', 'show', 'dev', interface],
+                                     stderr=subprocess.DEVNULL, timeout=10)
+    addresses = [item['local'] for device in json.loads(output)
+                 for item in device.get('addr_info', []) if item.get('family') == 'inet']
+    if address not in addresses:
+        raise ValueError('Required VPN address is not ready')
+
+
 def reconcile(directory, command, selected=None, validate_nginx=False, dependencies=True):
     document = json.loads(run(command + ['config', '--format', 'json'], directory))
     definitions = document['services']
@@ -98,7 +108,13 @@ def main():
     parser.add_argument('--services', nargs='+')
     parser.add_argument('--no-deps', action='store_true')
     parser.add_argument('--validate-nginx', action='store_true')
+    parser.add_argument('--require-address')
+    parser.add_argument('--interface')
     args = parser.parse_args()
+    if bool(args.require_address) != bool(args.interface):
+        parser.error('--require-address and --interface must be supplied together')
+    if args.require_address:
+        require_address(args.require_address, args.interface)
     command = ['docker', 'compose']
     if args.project:
         command += ['--project-name', args.project]

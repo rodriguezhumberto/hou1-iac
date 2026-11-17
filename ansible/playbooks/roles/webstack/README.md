@@ -19,6 +19,10 @@ Deploys the verified application image and existing Nginx ingress through
    Directus data, apply changed service inputs, validate Nginx and record the
    artifact before cleanup. Failed activation retains inputs for retry.
 
+`hou1-webstack.service` retries activation at boot once the declared VPN address
+exists. Docker starts ingress independently so NetBird can reconnect first. The
+unit has no stop action; stopping it does not remove shared ingress or VPN access.
+
 ## Inputs and ownership
 
 Inputs come from `ansible/inventory/group_vars/all/vars.yml`, environment
