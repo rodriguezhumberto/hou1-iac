@@ -19,13 +19,13 @@ from urllib.parse import urlsplit
 import yaml
 
 import lab_runtime
+import lab_contracts
 from ssh_target import pinned_ssh, private_file
 
 ROOT = Path(__file__).resolve().parents[1]
 SERVICES = ('hou1', 'hou4')
-SHA = r'[a-f0-9]{40}'
-GHCR_IMAGE = (r'ghcr\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*'
-              r'(?:/[a-z0-9]+(?:[._-][a-z0-9]+)*)+@sha256:[a-f0-9]{64}')
+SHA = lab_contracts.SHA
+GHCR_IMAGE = lab_contracts.GHCR_IMAGE
 
 
 class WorkflowError(ValueError):
@@ -53,11 +53,15 @@ def write_private(path, content):
 
 def load_config(path):
     config = json.loads(private_file(path).read_text())
+    version = config.get('version')
+    require(type(version) is int and version in (1, 2) and config.get('environment') == 'test',
+            'Only version 1 or 2 test workflows are supported')
+    release_field = 'application' if version == 1 else 'release'
     require(set(config) == {'version', 'environment', 'namespace', 'management_url',
-            'application', 'ansible_bin_directory', 'collections_path', 'age_key_file',
+            release_field, 'ansible_bin_directory', 'collections_path', 'age_key_file',
             'run_directory', 'hosts', 'https_checks'}, 'Declare the complete workflow configuration')
-    require(type(config['version']) is int and config['version'] == 1 and config['environment'] == 'test',
-            'Only version 1 test workflows are supported')
+    if version == 2:
+        config['application'] = lab_contracts.load_release(config['release'])
     namespace = config['namespace']
     require(isinstance(namespace, str) and 'test' in namespace and
             len(namespace) <= 253 and
@@ -75,9 +79,14 @@ def load_config(path):
     directory(config['collections_path'])
     require(set(config['hosts']) == set(SERVICES), 'Declare exactly HOU1 and HOU4')
     for service, host in config['hosts'].items():
-        require(set(host) == {'repository', 'revision', 'inventory', 'inputs', 'target',
-                'hostname', 'ssh', 'ssh_host_ip', 'ssh_fingerprint', 'compose'},
+        fields = {'repository', 'revision', 'inventory', 'inputs', 'target',
+                  'hostname', 'ssh', 'ssh_host_ip', 'ssh_fingerprint', 'compose'}
+        require(set(host) == fields | ({'capabilities'} if version == 2 else set()),
                 'Declare the complete host contract')
+        if version == 2:
+            require(isinstance(host['capabilities'], list), 'Declare additional referenced capability files as a list')
+            for source in host['capabilities']:
+                private_file(source)
         repo = directory(host['repository'])
         require(re.fullmatch(SHA, host['revision']) and
                 (repo / f'ansible/playbooks/{service}.yml').is_file() and
@@ -194,6 +203,8 @@ def guard_play(config, service, user, port, destination):
                   "app_source_directory is match('^/')", 'app_source_directory != app_directory']
     selection = ('{{ {"interface": netbird_interface, "source": app_source_directory} | to_json }}'
                  if service == 'hou1' else '{{ {"interface": netbird_interface} | to_json }}')
+    if config['version'] == 2:
+        selection = contract_selection(service)
     return [{'name': 'Validate managed lab inputs without host connections', 'hosts': host['target'],
              'gather_facts': False, 'become': False, 'tasks': [
                  {'ansible.builtin.import_tasks': str(Path(host['repository']) / 'ansible/playbooks/tasks/validate-target.yml')},
@@ -206,11 +217,41 @@ def guard_play(config, service, user, port, destination):
              ]}]
 
 
+def contract_selection(service):
+    """Select only contract inputs; never serialize passwords, tokens or all vars."""
+    files = '{' + ', '.join(repr(name) + ': ' + name + " | default('')"
+                           for name in lab_contracts.CAPABILITY_VARIABLES[service]) + '}'
+    fields = {'files': files, 'backup_enabled':
+              ('hou1_backup_enabled' if service == 'hou1' else 'hou4_backup_enabled') + ' | default(false) | bool'}
+    if service == 'hou1':
+        fields.update(identity_profile='authentik_identity_profiles[authentik_environment]',
+                      staff_client_id='staff_oidc_client_id', staff_issuer='staff_oidc_issuer',
+                      netbird_client_id='netbird_authentik_client_id',
+                      staff_users="authentik_staff_users | default([]) | map('dict2items') "
+                                  "| map('selectattr', 'key', 'in', ['username', 'groups']) | map('items2dict') | list",
+                      authentik_backup_recipient="authentik_backup_age_recipient | default('')",
+                      backup_recipient="hou1_backup_recipient | default('')",
+                      backup_receiver_ip="hou1_backup_receiver_ip | default('')",
+                      source_bundle='rehearsal_staff_bundle', bundle_ref='rehearsal_staff_bundle_ref',
+                      source_revision='rehearsal_staff_ref')
+    else:
+        fields['backup_source_ip'] = "hou4_backup_source_ip | default('')"
+        fields['backup_source_host_key'] = "hou4_backup_source_host_key | default('')"
+    contracts = '{' + ', '.join(repr(name) + ': ' + expr for name, expr in fields.items()) + '}'
+    source = ', "source": app_source_directory' if service == 'hou1' else ''
+    return '{{ {"interface": netbird_interface' + source + ', "contracts": ' + contracts + '} | to_json }}'
+
+
 class Workflow:
     def __init__(self, config, run):
         self.config, self.run = config, run
         self.results, self.transports, self.selections = [], {}, {}
         self.inputs = {s: input_fingerprints(h) for s, h in config['hosts'].items()}
+        self.capabilities = {}
+        if config['version'] == 2:
+            self.capabilities = lab_contracts.fingerprints(
+                [config['age_key_file'], *(config['release'][name] for name in ('receipt', 'source_bundle'))]
+                + [p for host in config['hosts'].values() for p in host['capabilities']])
         self.phase = None
         self.status = 'running'
 
@@ -232,18 +273,26 @@ class Workflow:
     def save(self):
         path = self.run / 'receipt.json'
         temporary = path.with_suffix('.tmp')
-        write_private(temporary, json.dumps({'version': 1, 'environment': 'test',
+        value = {'version': 1, 'environment': 'test',
             'scope': 'managed test hosts', 'phase': self.phase, 'status': self.status,
             'configuration_sha256': hashlib.sha256(json.dumps(self.config, sort_keys=True).encode()).hexdigest(),
             'inputs': self.inputs,
             'revisions': {s: h['revision'] for s, h in self.config['hosts'].items()},
-            'application': self.config['application'], 'steps': self.results}, indent=2) + '\n')
+            'application': self.config['application'], 'steps': self.results}
+        if self.config['version'] == 2:
+            value['capabilities'] = self.capabilities
+        write_private(temporary, json.dumps(value, indent=2) + '\n')
         temporary.replace(path)
+
+    def check_capabilities(self):
+        require(lab_contracts.fingerprints(self.capabilities) == self.capabilities,
+                'Referenced capability files changed during this attempt; rerun input checks')
 
     def playbook(self, service, play, log_name, local=False):
         host = self.config['hosts'][service]
         check_revision(host)
         require(input_fingerprints(host) == self.inputs[service], 'Deployment inputs changed during this attempt; rerun preflight')
+        self.check_capabilities()
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
         argv = [str(Path(self.config['ansible_bin_directory']) / 'ansible-playbook'),
                 '-i', host['inventory'], str(play), '--limit', host['target']]
@@ -283,7 +332,7 @@ class Workflow:
                                     stdout=stream, stderr=subprocess.STDOUT)
         require(result.returncode == 0, f'{log_name} failed; see the private run log')
 
-    def preflight(self, service):
+    def prepare_inputs(self, service):
         host = self.config['hosts'][service]
         fixed, user, port = transport(host)
         self.transports[service] = fixed, user, port
@@ -293,12 +342,30 @@ class Workflow:
         self.playbook(service, guard, service + '-inputs', local=True)
         require(selection.is_file(), 'The inventory selected no host; preflight did not run')
         self.selections[service] = json.loads(selection.read_text())
+
+    def preflight(self, service):
+        self.prepare_inputs(service)
         self.probe(service, verify=False)
+
+    def validate_contracts(self):
+        for service, host in self.config['hosts'].items():
+            require(input_fingerprints(host) == self.inputs[service],
+                    'Deployment inputs changed before contract validation; rerun input checks')
+        self.check_capabilities()
+        paths = lab_contracts.capability_paths(self.config, self.selections)
+        effective = lab_contracts.fingerprints(paths)
+        require(all(effective.get(p) == value for p, value in self.capabilities.items()),
+                'Referenced capability files changed before contract validation')
+        self.capabilities = effective
+        lab_contracts.validate(self.config, self.selections,
+                               environment(self.config, self.config['hosts']['hou1']))
+        self.check_capabilities()
 
     def probe(self, service, verify=True):
         host = self.config['hosts'][service]
         check_revision(host)
         require(input_fingerprints(host) == self.inputs[service], 'Deployment inputs changed during this attempt; rerun preflight')
+        self.check_capabilities()
         fixed, _, _ = self.transports[service]
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
         contract = {'hostname': host['hostname'], 'address': host['ssh_host_ip'],
@@ -317,9 +384,18 @@ class Workflow:
 
     def execute(self, phase):
         self.phase = phase
-        for service in SERVICES:
-            self.step(service + '-preflight', lambda s=service: self.preflight(s))
-        if phase != 'preflight':
+        if self.config['version'] == 2:
+            for service in SERVICES:
+                self.step(service + '-inputs', lambda s=service: self.prepare_inputs(s))
+            self.step('input-contracts', self.validate_contracts)
+            if phase != 'inputs':
+                for service in SERVICES:
+                    self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
+        else:
+            require(phase != 'inputs', 'The inputs phase requires a version 2 workflow')
+            for service in SERVICES:
+                self.step(service + '-preflight', lambda s=service: self.preflight(s))
+        if phase not in ('preflight', 'inputs'):
             for service in SERVICES:
                 if phase == 'reconcile':
                     play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
@@ -332,14 +408,15 @@ class Workflow:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
-    parser.add_argument('--phase', choices=('plan', 'preflight', 'reconcile', 'verify'), default='plan')
+    parser.add_argument('--phase', choices=('plan', 'inputs', 'preflight', 'reconcile', 'verify'), default='plan')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
         config = load_config(args.config)
         if args.phase == 'plan':
+            inputs = ['hou1-inputs', 'hou4-inputs', 'input-contracts'] if config['version'] == 2 else []
             print(json.dumps({'scope': 'managed test hosts; no bootstrap',
-                              'sequence': ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile',
+                              'sequence': inputs + ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile',
                                            'hou1-verify', 'hou4-reconcile', 'hou4-verify']}, indent=2))
             return 0
         with (Path(config['run_directory']) / '.workflow.lock').open('a') as lock:

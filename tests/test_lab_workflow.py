@@ -44,6 +44,12 @@ class LabWorkflowTest(unittest.TestCase):
         self.addCleanup(self.folder.cleanup)
         self.root = Path(self.folder.name)
         self.config = json.loads((ROOT / 'examples/lab-workflow.json').read_text())
+        # Preserve coverage of the original public workflow contract.
+        self.config.pop('release')
+        self.config.update(version=1, application={'revision': '1' * 40,
+            'image': 'ghcr.io/example/application/app@sha256:' + '2' * 64})
+        for host in self.config['hosts'].values():
+            host.pop('capabilities')
         self.config.update(ansible_bin_directory=str(Path(shutil.which('ansible-playbook')).parent),
                            collections_path=str(self.root), age_key_file=str(self.private('agekey', 'fixture')),
                            run_directory=str(self.root / 'runs'))

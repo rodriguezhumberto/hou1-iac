@@ -8,12 +8,15 @@ Bootstrap and enrollment gaps are assigned in the [intervention audit](deploymen
 
 ## Inputs
 
-Copy [the example](../examples/lab-workflow.json) outside Git and replace its
+Copy [the version 2 example](../examples/lab-workflow.json) outside Git and replace its
 paths, revisions, fingerprints and runtime projects. Keep the JSON, inventory,
 extra-variable files and SSH config operator-owned, mode `0600`; create the run
 directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 
-- Pin both infrastructure commits and the application digest/revision. Execution
+- Pin both infrastructure commits and select the application's CI release receipt
+  and standalone source bundle. The receipt supplies the digest/revision;
+  [input contracts](lab-inputs.md) check the bundle, identity and backup bindings.
+  Execution
   rejects tracked checkout changes and untracked deployment code. Untracked notes
   such as `docs/mockups/` do not affect execution.
 - Keep the actual namespace, image repository and runtime paths in private inputs;
@@ -25,6 +28,9 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
   global overrides also affect controller delegation.
   Include opted-in [lab DNS inputs](lab-dns.md) in this list so reconciliation
   maintains the resolver, Docker DNS and declared network allowances.
+- Declare additional referenced files under each host's `capabilities`, including
+  ciphertext loaded by custom inventory lookups. Known component file references
+  and the deployment identity are included automatically.
 - Use verified ED25519 fingerprints, one explicit SSH `IdentityFile` per host,
   and the private SSH contract in [targeting](probes/rehearsal-targets.md).
   Direct VPN access is required; SSH proxy commands are not supported.
@@ -43,6 +49,7 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 
 ```bash
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase plan
+.venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase inputs
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase preflight
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase reconcile
 .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase verify
@@ -79,6 +86,11 @@ create, enroll or restart peers, modify firewall rules, or use renewal peers.
 
 `plan` is the default and makes no managed-host connections. It validates the
 local configuration and lists the sequence; it does not establish connectivity.
+Version 2 `inputs` checks both inventories and release/identity/backup contracts
+without managed-host commands. These checks also precede host access in other
+execution phases. Version 1 remains supported with its original checks and
+explicit `application` selection; it has no `inputs` phase or capability tracking.
+
 `preflight` runs the existing target guards on the controller, binds effective
 inputs to the declared release/SSH targets, then verifies each hostname, sudo
 access and VPN address. It does not validate every component input; the existing
@@ -107,9 +119,10 @@ the selected run directory at a time.
 
 Receipts record the phase, infrastructure/application refs, input fingerprints
 and passed/failed steps. Overall success is written only after the phase finishes;
-an unfinished attempt remains running or failed. Fingerprints cover inventories, their sibling
-`group_vars`/`host_vars`, and declared extra-variable files. Referenced capabilities
-outside those paths are not a complete frozen release bundle yet. Input or SSH
+an unfinished attempt remains running or failed. Fingerprints cover inventories,
+their sibling `group_vars`/`host_vars`, and declared extra-variable files. Version 2
+also fingerprints the release and referenced capabilities described in
+[input contracts](lab-inputs.md). This is not a complete frozen bootstrap bundle. Input or SSH
 drift during an attempt stops later playbook execution.
 
 Logs may contain private operational details; keep the run directory outside

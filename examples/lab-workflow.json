@@ -1,11 +1,13 @@
 {
-  "version": 1,
+  "version": 2,
   "environment": "test",
   "namespace": "lab-test.example.invalid",
   "management_url": "https://netbird-test.lab-test.example.invalid",
-  "application": {
-    "revision": "1111111111111111111111111111111111111111",
-    "image": "ghcr.io/example/application/app@sha256:2222222222222222222222222222222222222222222222222222222222222222"
+  "release": {
+    "receipt": "/private/lab/release/image-release.json",
+    "source_bundle": "/private/lab/release/source.bundle",
+    "bundle_ref": "refs/heads/lab",
+    "authorization_file": "astro-app/src/lib/staffAuthorization.js"
   },
   "ansible_bin_directory": "/private/lab/tools/bin",
   "collections_path": "/private/lab/collections",
@@ -17,6 +19,7 @@
       "revision": "3333333333333333333333333333333333333333",
       "inventory": "/private/lab/hou1/inventory.yml",
       "inputs": ["/private/lab/hou1/release-inputs.yml"],
+      "capabilities": [],
       "target": "hou1_lab",
       "hostname": "hou1-test",
       "ssh": ["ssh", "-F", "/private/lab/ssh_config", "hou1-lab"],
@@ -33,6 +36,7 @@
       "revision": "4444444444444444444444444444444444444444",
       "inventory": "/private/lab/hou4/inventory.yml",
       "inputs": ["/private/lab/hou4/release-inputs.yml"],
+      "capabilities": ["/private/lab/hou4/runtime.enc.yaml"],
       "target": "hou4_lab",
       "hostname": "hou4-test",
       "ssh": ["ssh", "-F", "/private/lab/ssh_config", "hou4-lab"],

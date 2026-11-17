@@ -83,3 +83,4 @@ fresh installation remains to be proved.
 See the [intervention audit](docs/deployment-interventions.md) and
 [deployment workflow](docs/deployment-workflow.md) for coordinated reconciliation
 and isolated controller transport, plus the remaining bootstrap work.
+Version 2 adds [controller-only input checks](docs/lab-inputs.md) before host access.
