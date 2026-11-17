@@ -6,9 +6,13 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import runpy
 import stat
 import subprocess
 import tempfile
+
+LAB_DNS_POLICY = Path('/etc/hou-lab-dns-firewall.json')
+LAB_DNS_HELPER = '/usr/local/libexec/hou-lab-dns-firewall'
 
 
 def run(argv, directory):
@@ -80,6 +84,9 @@ def reconcile(directory, command, selected=None, validate_nginx=False, dependenc
     previous = json.loads(state_path.read_text()) if state_path.exists() else {}
     applied = previous.get('services', {}) if previous.get('version') == 1 else {}
     before = container_ids(command, directory, services)
+    if LAB_DNS_POLICY.exists():
+        runpy.run_path(LAB_DNS_HELPER)['prepare_compose'](
+            directory, command, document, selected, run)
     # Replace existing consumers first: waiting on their old unhealthy startup
     # configuration would prevent a repaired input from ever being activated.
     changed = [name for name in services if current[name] != applied.get(name) and before[name]]

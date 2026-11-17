@@ -1,0 +1,80 @@
+---
+- name: Read Docker DNS configuration before stopping the resolver
+  ansible.builtin.command:
+    argv: [python3, -c, "import json; from pathlib import Path; p=Path('/etc/docker/daemon.json'); print(json.dumps(json.loads(p.read_text()).get('dns',[]) if p.exists() else []))"]
+  register: lab_dns_docker_servers
+  changed_when: false
+
+- name: Require Docker DNS consumers to be removed first
+  ansible.builtin.assert:
+    that: lab_dns_listen_address not in (lab_dns_docker_servers.stdout | from_json)
+    fail_msg: Remove the managed Docker DNS setting before stopping lab DNS.
+
+- name: Inspect the managed resolver drop-in
+  ansible.builtin.stat:
+    path: /etc/systemd/resolved.conf.d/90-hou-lab-dns.conf
+  register: lab_dns_dropin_stat
+
+- name: Save the managed resolver drop-in for rollback
+  ansible.builtin.slurp:
+    src: /etc/systemd/resolved.conf.d/90-hou-lab-dns.conf
+  register: lab_dns_dropin_before
+  when: lab_dns_dropin_stat.stat.exists
+
+- name: Restore host DNS before stopping the lab resolver
+  block:
+    - name: Remove only the lab resolver drop-in
+      ansible.builtin.file:
+        path: /etc/systemd/resolved.conf.d/90-hou-lab-dns.conf
+        state: absent
+      register: lab_dns_dropin_removed
+    - name: Apply the remaining provider resolver settings
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: restarted
+      when: lab_dns_dropin_removed.changed
+    - name: Verify public resolution through the remaining configuration
+      ansible.builtin.command:
+        argv: [getent, ahostsv4, '{{ lab_dns_public_probe }}']
+      changed_when: false
+  rescue:
+    - name: Restore the lab drop-in after a failed DNS handoff
+      ansible.builtin.copy:
+        dest: /etc/systemd/resolved.conf.d/90-hou-lab-dns.conf
+        content: '{{ lab_dns_dropin_before.content | b64decode }}'
+        owner: root
+        group: root
+        mode: '0644'
+      when: lab_dns_dropin_before.content is defined
+      no_log: true
+    - name: Reload the restored resolver
+      ansible.builtin.systemd_service:
+        name: systemd-resolved
+        state: restarted
+    - name: Stop after retaining the working lab resolver
+      ansible.builtin.fail:
+        msg: The provider DNS handoff failed; the lab resolver remains installed and running.
+
+- name: Discover the installed lab resolver service
+  ansible.builtin.service_facts:
+
+- name: Stop and disable only the lab resolver
+  ansible.builtin.systemd_service:
+    name: hou-lab-dns
+    enabled: false
+    state: stopped
+  when: "'hou-lab-dns.service' in ansible_facts.services"
+
+- name: Remove the owned resolver files
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: absent
+  loop:
+    - /etc/hou-lab-dns.conf
+    - /etc/systemd/system/hou-lab-dns.service
+  register: lab_dns_removed
+
+- name: Reload systemd after removing the lab service
+  ansible.builtin.systemd_service:
+    daemon_reload: true
+  when: lab_dns_removed.changed

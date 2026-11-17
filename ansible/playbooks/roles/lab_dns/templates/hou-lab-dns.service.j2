@@ -1,0 +1,16 @@
+[Unit]
+Description=Isolated lab bootstrap DNS
+After=network-online.target
+Wants=network-online.target
+Before=docker.service
+
+[Service]
+ExecStart=/usr/sbin/dnsmasq --keep-in-foreground --conf-file=/etc/hou-lab-dns.conf
+Restart=on-failure
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ProtectHome=true
+
+[Install]
+WantedBy=multi-user.target

@@ -19,6 +19,8 @@ def probe(role_specs, assertions, overrides=None, tags=None, extra_vars=None,
         fixture_roles = root / 'roles'
         for spec in role_specs:
             role_root = fixture_roles / spec['role']
+            if role_root.exists():
+                continue
             (role_root / 'tasks').mkdir(parents=True)
             (role_root / 'tasks/main.yml').write_text(yaml.safe_dump([
                 {'ansible.builtin.debug': {'msg': 'defaults loaded'}}]))

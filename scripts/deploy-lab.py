@@ -272,7 +272,7 @@ class Workflow:
             write_private(variables / 'localhost.json', json.dumps({
                 'ansible_connection': 'local', 'ansible_host': '127.0.0.1',
                 'ansible_ssh_host': '127.0.0.1',
-                'ansible_python_interpreter': str(Path(self.config['ansible_bin_directory']) / 'python')}))
+                'ansible_python_interpreter': '{{ ansible_playbook_python }}'}))
             write_private(overlay, json.dumps({'all': {'hosts': {host['target']: {}, 'localhost': {}}}}))
             argv += ['-i', str(overlay)]
         argv += ['-e', json.dumps(overrides)]

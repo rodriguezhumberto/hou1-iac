@@ -31,6 +31,7 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 The [cleanup plan](cleanup-plan.md) records development decisions and follow-up work.
 The [intervention audit](deployment-interventions.md) tracks reproducibility gaps;
 the [managed lab workflow](deployment-workflow.md) coordinates existing test hosts.
+[Lab DNS](lab-dns.md) owns opt-in bootstrap resolution and container DNS access.
 
 ## Probes and drills
 

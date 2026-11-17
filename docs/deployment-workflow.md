@@ -23,6 +23,8 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
   Inventories must select managed test hosts; default test groups remain empty.
   Keep `ansible_*` execution variables in inventory, not extra-variable files;
   global overrides also affect controller delegation.
+  Include opted-in [lab DNS inputs](lab-dns.md) in this list so reconciliation
+  maintains the resolver, Docker DNS and declared network allowances.
 - Use verified ED25519 fingerprints, one explicit SSH `IdentityFile` per host,
   and the private SSH contract in [targeting](probes/rehearsal-targets.md).
   Direct VPN access is required; SSH proxy commands are not supported.

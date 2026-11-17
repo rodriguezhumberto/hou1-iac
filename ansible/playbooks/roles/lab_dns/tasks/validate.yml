@@ -1,0 +1,31 @@
+---
+- name: Validate the isolated lab DNS contract
+  ansible.builtin.import_tasks: guard.yml
+
+- name: Require the existing systemd resolver
+  ansible.builtin.command: systemctl is-active systemd-resolved
+  changed_when: false
+
+- name: Inspect the provider resolver link without replacing it
+  ansible.builtin.stat:
+    path: /etc/resolv.conf
+    follow: false
+  register: lab_dns_resolver_link
+
+- name: Require a resolver link owned by systemd-resolved
+  ansible.builtin.assert:
+    that:
+      - lab_dns_resolver_link.stat.islnk | default(false)
+      - lab_dns_resolver_link.stat.lnk_source | default('') in ['/run/systemd/resolve/resolv.conf', '/run/systemd/resolve/stub-resolv.conf']
+    fail_msg: Provision systemd-resolved and its resolver link before enabling lab DNS; this role preserves the existing link.
+
+- name: Verify the declared listener belongs to this host
+  ansible.builtin.command: ip -j -4 address show
+  changed_when: false
+  register: lab_dns_addresses
+
+- name: Require the declared LAN address before configuring DNS
+  ansible.builtin.assert:
+    that:
+      - lab_dns_listen_address in (lab_dns_addresses.stdout | from_json | map(attribute='addr_info') | flatten | map(attribute='local') | list)
+    fail_msg: The declared lab DNS listener is not assigned to this host.

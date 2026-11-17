@@ -131,6 +131,23 @@ class ComposeRuntimeTest(unittest.TestCase):
         self.assertIn('--force-recreate', ups[0])
         self.assertNotIn('--force-recreate', ups[1])
 
+    def test_failed_lab_dns_preparation_blocks_activation_and_preserves_applied_inputs(self):
+        self.reconcile()
+        previous = self.state()
+        self.template.write_text('new input')
+        policy = self.root / 'dns-policy.json'; policy.write_text('{}')
+        self.commands.clear()
+        with patch.object(runtime, 'LAB_DNS_POLICY', policy), patch.object(runtime.runpy, 'run_path') as loader:
+            prepare = loader.return_value['prepare_compose']
+            prepare.side_effect = ValueError('DNS access not ready')
+            with self.assertRaises(ValueError): self.reconcile()
+            self.assertFalse(any('up' in command for command in self.commands))
+            self.assertEqual(self.state(), previous)
+            prepare.side_effect = None
+            self.assertTrue(self.reconcile())
+            prepare.assert_called_with(self.root, ['docker', 'compose'], self.document, None, runtime.run)
+        self.assertNotEqual(self.state(), previous)
+
     def test_directory_contents_and_writable_data_do_not_trigger_recreate(self):
         data = self.root / 'database'
         data.write_text('initial data')

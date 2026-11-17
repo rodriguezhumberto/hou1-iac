@@ -1,0 +1,17 @@
+---
+# Private host input alongside an environment-matched test inventory.
+lab_dns_state: present
+lab_dns_namespace: lab-test.example.invalid
+lab_dns_listen_address: 192.168.50.11
+lab_dns_upstreams: [1.1.1.1, 9.9.9.9]
+lab_dns_records:
+  - {name: auth-test.lab-test.example.invalid, address: 192.168.50.11}
+  - {name: netbird-test.lab-test.example.invalid, address: 192.168.50.11}
+  - {name: staff-test.lab-test.example.invalid, address: 192.168.50.11}
+# HOU1 only: include every non-host network used by the selected Compose projects.
+lab_dns_container_networks:
+  - bridge
+  - lab-ingress
+  - lab-identity
+  - lab-identity-backend
+  - application-test_default

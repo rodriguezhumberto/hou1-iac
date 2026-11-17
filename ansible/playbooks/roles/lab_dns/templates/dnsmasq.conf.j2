@@ -1,0 +1,18 @@
+# Managed by Ansible. Bootstrap DNS is independent of the lab VPN.
+listen-address=127.0.0.1,{{ lab_dns_desired.address }}
+bind-dynamic
+port=53
+user=nobody
+group=nogroup
+pid-file=
+no-resolv
+no-hosts
+cache-size=150
+local-ttl=30
+{% for upstream in lab_dns_desired.upstreams %}
+server={{ upstream }}
+{% endfor %}
+local=/{{ lab_dns_desired.namespace }}/
+{% for record in lab_dns_desired.records %}
+host-record={{ record.name }},{{ record.address }}
+{% endfor %}
