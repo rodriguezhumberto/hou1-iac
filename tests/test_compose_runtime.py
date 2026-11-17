@@ -1,9 +1,11 @@
 """Static input changes, repair and failure retries against the host activation helper."""
 import copy
+import grp
 import importlib.util
 import json
 import os
 from pathlib import Path
+import pwd
 import shutil
 import subprocess
 import tempfile
@@ -11,7 +13,9 @@ import unittest
 import uuid
 from unittest.mock import patch
 
-from helpers import ROLES
+import yaml
+
+from helpers import ROLES, run_play
 
 SPEC = importlib.util.spec_from_file_location('compose_runtime', ROLES / 'compose_runtime/files/apply.py')
 runtime = importlib.util.module_from_spec(SPEC)
@@ -180,6 +184,23 @@ class ComposeRuntimeTest(unittest.TestCase):
             with self.assertRaises((FileNotFoundError, ValueError)):
                 self.reconcile()
             self.assertFalse(any('up' in command for command in self.commands))
+
+    def test_fresh_webstack_prepares_readonly_challenge_directory_before_activation(self):
+        challenge = self.root / 'certbot/www'
+        self.document['services']['nginx']['volumes'].append(
+            {'type': 'bind', 'source': str(challenge), 'read_only': True})
+        self.ids.clear()
+        with self.assertRaises(FileNotFoundError):
+            self.reconcile(['nginx'])
+        task = yaml.safe_load((ROLES / 'webstack/tasks/tls.yml').read_text())[0]
+        task['ansible.builtin.file'].update(
+            owner=pwd.getpwuid(os.getuid()).pw_name,
+            group=grp.getgrgid(os.getgid()).gr_name)
+        result = run_play({'app_directory': str(self.root)}, [task])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertTrue(challenge.is_dir())
+        self.assertTrue(self.reconcile(['nginx']))
+        self.assertFalse(self.reconcile(['nginx']))
 
     def test_server_config_recreates_server_only(self):
         self.document = {'services': {

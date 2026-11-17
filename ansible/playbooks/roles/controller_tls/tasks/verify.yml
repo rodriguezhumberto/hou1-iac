@@ -1,0 +1,6 @@
+---
+- name: Verify installed and served certificates after service activation
+  ansible.builtin.command:
+    argv: [python3, /usr/local/libexec/hou1-tls-receive, --verify]
+  changed_when: false
+  no_log: true

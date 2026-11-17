@@ -34,6 +34,16 @@
   register: webstack_activation
   changed_when: (webstack_activation.stdout | from_json).changed
 
+- name: Verify controller certificates after repairing application services
+  ansible.builtin.include_role:
+    name: controller_tls
+    tasks_from: verify
+    apply:
+      tags: [deploy, webstack, ssl]
+  when:
+    - hou1_controller_managed_tls | default(false) | bool
+    - not (webstack_bootstrap_ingress_only | default(false) | bool)
+
 - name: Record the deployed artifact for encrypted backups and recovery
   ansible.builtin.copy:
     dest: '{{ app_directory }}/application-image.json'

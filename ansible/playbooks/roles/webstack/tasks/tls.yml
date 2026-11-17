@@ -9,6 +9,7 @@
   loop:
     - "{{ app_directory }}/certbot"
     - "{{ app_directory }}/certbot/conf"
+    - "{{ app_directory }}/certbot/www"
 
 - name: Require a boolean controller TLS mode
   ansible.builtin.assert:
@@ -17,6 +18,10 @@
 - name: Import owner-encrypted controller certificates
   ansible.builtin.include_role:
     name: controller_tls
+    apply:
+      tags: [deploy, webstack, ssl]
+  vars:
+    hou1_tls_prepare_only: true
   when: hou1_controller_managed_tls | bool
 
 - name: Require pre-issued isolated certificates when DNS capability stays on the controller

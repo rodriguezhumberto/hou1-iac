@@ -63,7 +63,10 @@
 
 - name: Import only validated certificates with automatic rollback on a managed host
   ansible.builtin.command:
-    argv: [python3, /usr/local/libexec/hou1-tls-receive, --bootstrap]
+    argv: >-
+      {{ ['python3', '/usr/local/libexec/hou1-tls-receive'] +
+         (['--bootstrap'] if node_bootstrap | bool else []) +
+         (['--prepare'] if hou1_tls_prepare_only | default(false) | bool else []) }}
     stdin: '{{ hou1_tls_decrypted.stdout }}'
     stdin_add_newline: false
   register: hou1_tls_import

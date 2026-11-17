@@ -211,3 +211,9 @@
       when:
         - rehearsal_controller_managed_tls | default(false) | bool
         - not (node_bootstrap | bool)
+
+    - name: Verify controller certificates after all rehearsal ingress is ready
+      ansible.builtin.include_role:
+        name: controller_tls
+        tasks_from: verify
+      when: hou1_controller_managed_tls | default(false) | bool

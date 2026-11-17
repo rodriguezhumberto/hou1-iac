@@ -69,7 +69,32 @@ def snapshot(path, root):
     return ('absent',None)
 
 
-def install(c, bundle, bootstrap=False):
+def verify_served(c, metadata):
+    # Nginx reload is asynchronous; retry verification, never installation.
+    for attempt in range(10):
+        try:served(c,metadata);return
+        except Exception:
+            if attempt==9:raise
+            time.sleep(0.2)
+
+
+def verify_installed(c):
+    root=Path(c['certificate_directory'])
+    if root.is_symlink() or (root/'live').is_symlink():
+        raise ValueError('Certificate directories cannot be symlinks')
+    bundle={'environment':c['environment'],'certificates':{}}
+    for name in c['lineages']:
+        folder=root/'live'/name
+        if folder.is_symlink():raise ValueError('Certificate lineage cannot be a symlink')
+        for filename in ('fullchain.pem','privkey.pem'):snapshot(folder/filename,root)
+        bundle['certificates'][name]={'fullchain':(folder/'fullchain.pem').read_text(),
+                                    'private_key':(folder/'privkey.pem').read_text()}
+    metadata=validate_bundle(bundle,c['environment'],c['lineages'])
+    nginx(c,'-t');verify_served(c,metadata)
+    return {'passed':True,'verified_served_certificate':True}
+
+
+def install(c, bundle, bootstrap=False, prepare=False):
     metadata = validate_bundle(bundle,c['environment'],c['lineages'])
     root = Path(c['certificate_directory'])
     if root.is_symlink() or (root/'live').is_symlink():
@@ -81,24 +106,25 @@ def install(c, bundle, bootstrap=False):
         for filename, key in [('fullchain.pem','fullchain'),('privkey.pem','private_key')]:
             path = folder/filename
             paths.append((path,item[key].encode(),snapshot(path,root)))
-    initial = bootstrap and all(previous[0]=='absent' for _,_,previous in paths)
-    if not initial:
-        nginx(c,'-t')
     changed = any(not path.is_file() or path.read_bytes()!=data for path,data,_ in paths)
+    # Bootstrap may stop after import or after starting only part of ingress.
+    # Identical material needs no mutation while that first deployment resumes.
+    # Managed imports and any rotation retain live validation and rollback.
+    initial = bootstrap and (not changed or all(previous[0]=='absent' for _,_,previous in paths))
+    # Unchanged material can wait for the application's activation phase to
+    # repair stopped backends before Nginx resolves their Docker DNS names.
+    verify_runtime = not (initial or (prepare and not changed))
+    if verify_runtime:
+        nginx(c,'-t')
     try:
         if changed:
             for path,data,_ in paths:
                 path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
                 private_write(path,data)
-        if not initial:
+        if verify_runtime:
             nginx(c,'-t')
             if changed:nginx(c,'-s','reload')
-            # Nginx reload is asynchronous; retry only verification, never installation.
-            for attempt in range(10):
-                try:served(c,metadata);break
-                except Exception:
-                    if attempt==9:raise
-                    time.sleep(0.2)
+            verify_served(c,metadata)
     except Exception:
         if changed:
             for path,_,previous in reversed(paths):
@@ -110,7 +136,7 @@ def install(c, bundle, bootstrap=False):
             nginx(c,'-t');nginx(c,'-s','reload')
         raise RuntimeError('TLS deployment failed; previous certificate files restored') from None
     return {'passed':True,'changed':changed,'bootstrap_only':initial,
-            'verified_served_certificate':not initial,
+            'verified_served_certificate':verify_runtime,
             'sha256':{name:item['sha256'] for name,item in metadata.items()}}
 
 
@@ -141,13 +167,18 @@ def publish_status(c, data, now=None):
 
 def main():
     c=read_config()
-    if sys.argv[1:] not in ([],['--bootstrap'],['--metrics']):raise ValueError('Unknown receiver action')
-    payload=sys.stdin.buffer.read(MAX_BYTES+1)
-    if len(payload)>MAX_BYTES:raise ValueError('Certificate payload too large')
-    data=json.loads(payload)
+    args=sys.argv[1:]
+    if args not in ([],['--bootstrap'],['--prepare'],['--bootstrap','--prepare'],['--verify'],['--metrics']):
+        raise ValueError('Unknown receiver action')
+    if args!=['--verify']:
+        payload=sys.stdin.buffer.read(MAX_BYTES+1)
+        if len(payload)>MAX_BYTES:raise ValueError('Certificate payload too large')
+        data=json.loads(payload)
     with open(STATE/'receiver.lock','a') as lock:
         os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
-        receipt=publish_status(c,data) if sys.argv[1:]==['--metrics'] else install(c,data,sys.argv[1:]==['--bootstrap'])
+        if args==['--metrics']:receipt=publish_status(c,data)
+        elif args==['--verify']:receipt=verify_installed(c)
+        else:receipt=install(c,data,bootstrap='--bootstrap' in args,prepare='--prepare' in args)
     print(json.dumps(receipt))
 
 
