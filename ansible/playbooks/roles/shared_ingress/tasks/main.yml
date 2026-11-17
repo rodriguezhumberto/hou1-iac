@@ -1,4 +1,7 @@
 ---
+- name: Select the shared ingress Compose deployment
+  ansible.builtin.import_tasks: selector.yml
+
 - name: Create the shared ingress root
   ansible.builtin.file:
     path: "{{ netbird_control_plane_directory }}"

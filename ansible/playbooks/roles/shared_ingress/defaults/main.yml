@@ -1,3 +1,7 @@
 ---
 # Authentik may provision its isolated environment before publishing it.
 shared_ingress_additional_authentik_networks: []
+# Keep existing inventories and Compose discovery until an explicit migration.
+shared_ingress_compose_directory: '{{ app_directory }}'
+shared_ingress_compose_project: ''
+shared_ingress_compose_file: ''

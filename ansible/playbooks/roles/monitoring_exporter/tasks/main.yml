@@ -47,7 +47,10 @@
       - >-
         hou1_monitoring_containers['staff-app'] == {'directory': app_directory, 'service': 'astro-app'}
       - >-
-        hou1_monitoring_containers.nginx == {'directory': app_directory, 'service': 'nginx'}
+        hou1_monitoring_containers.nginx ==
+        ({'directory': shared_ingress_compose_directory, 'service': 'nginx'} |
+         combine({'project': shared_ingress_compose_project} if shared_ingress_compose_project else {}) |
+         combine({'file': shared_ingress_compose_file} if shared_ingress_compose_file else {}))
       - >-
         hou1_monitoring_containers.netbird == {'directory': netbird_control_plane_directory, 'service': 'netbird-server'}
       - >-
@@ -56,6 +59,11 @@
       - netbird_control_plane_directory is match('^/[a-zA-Z0-9_/-]+$')
     fail_msg: Metrics must use the declared Compose deployment roots and credential-free log.
   no_log: true
+
+- name: Validate the shared ingress monitoring selector
+  ansible.builtin.import_role:
+    name: shared_ingress
+    tasks_from: selector
 
 - name: Prepare controller API context without reenrolling any peer
   ansible.builtin.import_tasks: ../../netbird_client/tasks/api-context.yml

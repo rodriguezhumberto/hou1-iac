@@ -41,11 +41,33 @@ def read_config():
     if (c['certificate_directory'] != c['app_directory']+'/certbot/conf'
             or c['environment'] not in ('test','production')):
         raise ValueError('Invalid receiver contract')
+    ingress_command(c)
     return c
 
 
+def ingress_command(c):
+    selector = c.get('ingress_compose')
+    if selector is None and 'ingress_compose' not in c:
+        # Existing root-owned receiver configurations keep their original target.
+        return ['docker', 'compose', '--project-directory', c['app_directory']]
+    if not isinstance(selector, dict) or set(selector) != {'directory', 'project', 'file'}:
+        raise ValueError('Invalid ingress Compose selector')
+    directory, project, filename = (selector[key] for key in ('directory', 'project', 'file'))
+    if (not all(isinstance(value, str) for value in (directory, project, filename))
+            or not re.fullmatch(r'/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*', directory)
+            or (project and not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', project))
+            or (filename and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml', filename))):
+        raise ValueError('Invalid ingress Compose selector')
+    command = ['docker', 'compose', '--project-directory', directory]
+    if project:
+        command += ['--project-name', project]
+    if filename:
+        command += ['--file', str(Path(directory) / filename)]
+    return command
+
+
 def nginx(c, *args):
-    return run(['docker','compose','--project-directory',c['app_directory'],'exec','-T','nginx','nginx',*args])
+    return run(ingress_command(c) + ['exec', '-T', 'nginx', 'nginx', *args])
 
 
 def served(c, metadata):

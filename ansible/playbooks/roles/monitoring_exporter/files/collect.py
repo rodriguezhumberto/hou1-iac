@@ -27,10 +27,14 @@ def validate_config(config):
         raise ValueError('Missing aggregate sources')
     for label, source in containers.items():
         if (not re.fullmatch(r'[a-z0-9-]+', label) or not isinstance(source, dict)
-                or set(source) != {'directory', 'service'}
+                or not {'directory', 'service'}.issubset(source)
+                or not set(source).issubset({'directory', 'service', 'project', 'file'})
+                or not all(isinstance(value, str) for value in source.values())
                 or not re.fullmatch(r'/[a-zA-Z0-9_/-]+', source['directory'])
                 or '..' in Path(source['directory']).parts
-                or not re.fullmatch(r'[a-z0-9-]+', source['service'])):
+                or not re.fullmatch(r'[a-z0-9-]+', source['service'])
+                or ('project' in source and not re.fullmatch(r'[a-z0-9][a-z0-9_-]*', source['project']))
+                or ('file' in source and not re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml', source['file']))):
             raise ValueError('Invalid Compose selector')
     for key in ('authentik_backup_directory', 'request_metrics_log'):
         value = config.get(key, '')
@@ -44,15 +48,21 @@ def validate_config(config):
 
 def source_container(source):
     # Include stopped containers: duplicates/stale replacements must fail closed.
-    ids = command(['docker', 'ps', '--all', '--quiet', '--no-trunc',
-                   '--filter', 'label=com.docker.compose.project.working_dir=' + source['directory'],
-                   '--filter', 'label=com.docker.compose.service=' + source['service']]).split()
+    expected = {'com.docker.compose.project.working_dir': source['directory'],
+                'com.docker.compose.service': source['service']}
+    if 'project' in source:
+        expected['com.docker.compose.project'] = source['project']
+    if 'file' in source:
+        expected['com.docker.compose.project.config_files'] = str(Path(source['directory']) / source['file'])
+    arguments = ['docker', 'ps', '--all', '--quiet', '--no-trunc']
+    for key, value in expected.items():
+        arguments += ['--filter', 'label=' + key + '=' + value]
+    ids = command(arguments).split()
     if len(ids) != 1 or not re.fullmatch(r'[a-f0-9]{64}', ids[0]):
         raise ValueError('Expected exactly one Compose service container')
     state = json.loads(command(['docker', 'inspect', '--format', INSPECT, ids[0]]))
     labels = state['labels']
-    if (labels.get('com.docker.compose.project.working_dir') != source['directory']
-            or labels.get('com.docker.compose.service') != source['service']
+    if (any(labels.get(key) != value for key, value in expected.items())
             or not labels.get('com.docker.compose.project')
             or labels.get('com.docker.compose.oneoff', '').lower() != 'false'):
         raise ValueError('Unexpected Compose identity')

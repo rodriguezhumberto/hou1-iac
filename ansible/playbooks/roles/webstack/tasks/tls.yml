@@ -1,4 +1,9 @@
 ---
+- name: Select shared ingress for legacy certificate renewal
+  ansible.builtin.import_role:
+    name: shared_ingress
+    tasks_from: selector
+
 - name: Ensure Certbot directories exist before installing credentials
   ansible.builtin.file:
     path: "{{ item }}"
@@ -79,9 +84,8 @@
         -v {{ app_directory }}/certbot/cloudflare.ini:/cloudflare.ini:ro \
         {{ netbird_certbot_image }} renew
 
-      cd "{{ app_directory }}"
-      docker compose exec -T nginx nginx -t
-      docker compose exec -T nginx nginx -s reload
+      {{ shared_ingress_compose_argv | map('quote') | join(' ') }} exec -T nginx nginx -t
+      {{ shared_ingress_compose_argv | map('quote') | join(' ') }} exec -T nginx nginx -s reload
   when: not (hou1_controller_managed_tls | default(false) | bool or rehearsal_controller_managed_tls | default(false) | bool)
 
 - name: Schedule cron job for SSL renewal
