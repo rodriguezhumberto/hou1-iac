@@ -7,7 +7,10 @@ and systemd jobs run directly on the OS.
 
 The [docs index](docs/README.md) lists the guides. For routine changes, use the
 [production runbook](docs/production-oidc-runbook.md). To replace a lost host, follow
-[production recovery](docs/production-host-recovery.md).
+[production recovery](docs/production-host-recovery.md). For development commands
+(`make help/check/test/syntax/lint`), execution locations and configuration ownership,
+see the [development map](docs/development.md) and [contributor guide](CONTRIBUTING.md).
+Automated agent guidelines are in [AGENTS.md](AGENTS.md).
 
 ## Before running Ansible
 

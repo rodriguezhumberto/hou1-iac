@@ -2,8 +2,9 @@
 
 Use the operational guides below for current procedures. Dated evidence and
 rehearsal journals record results at a particular revision; they are not current
-deployment instructions. The [documentation review](documentation-review.md)
-lists corrected conflicts and remaining implementation limits.
+deployment instructions. The [documentation review](documentation-review.md) is a dated historical snapshot
+of earlier conflicts; claims regarding secret handling are superseded by current
+[SOPS/age](sops-age-secrets.md) practices.
 
 ## Operations
 
@@ -24,6 +25,8 @@ lists corrected conflicts and remaining implementation limits.
 
 ## Design and setup references
 
+[Development and architecture map](development.md) outlines execution environments,
+configuration ownership, and validation commands.
 [Architecture](oidc-architecture.md), [Authentik Compose](authentik-compose.md),
 [capacity/firewall gate](authentik-host-policy.md), [ingress](authentik-ingress.md),
 [identity bootstrap](authentik-bootstrap.md) and
