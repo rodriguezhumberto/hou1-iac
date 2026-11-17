@@ -1,60 +1,45 @@
-# Development and architecture map
+# Development map
 
-## Execution locations and supported operations
+Use [CONTRIBUTING.md](../CONTRIBUTING.md) for setup and local checks.
+The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 
-Operations span three execution environments:
+## Supported entry points
 
-### Controller
-- Orchestrates Ansible playbooks (`ansible/playbooks/hou1.yml`, `ansible/playbooks/monitoring.yml`, `ansible/playbooks/backups.yml`).
-- Decrypts SOPS/age credentials at task time via `community.sops.load_vars`.
-- Verifies release selectors, image digests, and git revisions before deployment.
-- Coordinates TLS issuance and renewal transports (`scripts/controller-tls.py`, `scripts/controller-renewal-peer.py`).
-- Executes offline unit tests, lints, and recovery checks (`scripts/verify-recovery.py`).
+| Operation | Entry point | Current procedure |
+| --- | --- | --- |
+| Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
+| Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
+| Configure identity | `ansible/playbooks/authentik.yml` | [Identity bootstrap](authentik-bootstrap.md) |
+| Configure VPN control plane and DNS | `ansible/playbooks/netbird-control-plane.yml`, `netbird-dns.yml` | [NetBird operations](netbird-operations.md) |
+| Export private monitoring metrics | `ansible/playbooks/monitoring.yml` | [Monitoring](environment-monitoring.md) |
+| Prepare off-host backups | `ansible/playbooks/backups.yml` | [Backup protocol](hou4-backup-protocol.md) |
+| Restore and publish a replacement host | `ansible/playbooks/restore-production-host.yml`, `publish-production-recovery.yml` | [Recovery](production-host-recovery.md) |
+| Revoke user access | `scripts/offboard-user.py` | [Offboarding](operator-offboarding.md) |
+| Renew controller-managed TLS | `scripts/controller-tls.py` | [Controller TLS](controller-tls.md) |
 
-### HOU1 host
-- Runs system services, UFW firewall rules, and the NetBird VPN client.
-- Runs Docker Compose containers: application image, Nginx ingress proxy, Authentik server/worker, PostgreSQL, and Redis.
-- Exposes private metrics to HOU4 via the `monitoring_exporter` role over VPN.
-- Creates staged encrypted backup snapshots via the `backup_source` role.
+The [documentation index](README.md) identifies test-only tools and historical
+procedures. The legacy direct-issuer NetBird cutover is outside routine provisioning.
 
-### HOU4 companion
-- Operates the monitoring stack (Prometheus, Alertmanager, Grafana SSO).
-- Scrapes HOU1 metrics privately across the NetBird VPN mesh.
-- Collects nightly encrypted backup archives from HOU1 via restricted SSH ([backup protocol](hou4-backup-protocol.md)).
-- Executes synthetic health and login probes (`scripts/staff-login-probe.py`).
+## Execution locations
 
-## Configuration ownership
+- The controller runs Ansible, decrypts deployment inputs, validates release
+  artifacts and manages TLS issuance and renewal. Local tests use disposable fixtures.
+- HOU1 runs OS security, the NetBird client, application/Nginx, Authentik/PostgreSQL
+  and the NetBird server/dashboard. Host jobs collect metrics and prepare backups.
+- HOU4 has its own repository. It runs monitoring, synthetic login checks and
+  restricted collection of HOU1's encrypted recovery points.
 
-Configuration flows strictly from authoritative inputs to downstream outputs:
+## Configuration sources and outputs
 
-1. **Role defaults** (`ansible/playbooks/roles/*/defaults/main.yml`): Baseline variables, fallback directory paths, and default ports.
-2. **Environment inventory** (`ansible/inventory/inventory.yml`, `ansible/inventory/group_vars/`): Topology definitions, host groups, IP addresses, and SSH parameters.
-3. **Scoped SOPS source bundles** (`ansible/inventory/group_vars/*.sops.yml`, `ansible/secrets/*.enc.*`): Encrypted credentials and identity tokens scoped to environment keys in `.sops.yaml`.
-4. **Private release selectors** (e.g. `release-inputs.yml`): Run-time parameters passed via `-e "@$INPUTS"` defining image digests and Git refs (`deploy_ref`).
-5. **Generated runtime files**: Target files rendered by Ansible templates (Docker Compose files, Nginx configurations, container `.env` files).
+| Location | Responsibility |
+| --- | --- |
+| Role `defaults/main.yml` | Component defaults for roles that declare them |
+| Inventory and `group_vars` | Host groups, environment settings and shared defaults; some defaults still overlap role defaults |
+| SOPS inventory and component bundles | Encrypted deployment inputs with environment or job-specific access |
+| Private release-input file | Selected image/revision and current deployment overrides, including paths, networking and integrations |
+| Generated host configuration | Compose, Nginx, service environments and host-job configuration rendered from inputs |
 
-> Generated `.env` files are operational outputs rendered from authoritative inputs; they must not be manually edited or synchronized across hosts.
-
-## Development workflow and tooling
-
-### Dependencies
-Install Python prerequisites and Ansible collections:
-```bash
-pip install -r requirements-dev.txt
-ansible-galaxy collection install -r ansible/requirements.yml
-```
-
-### Makefile targets
-- `make help`: Display available targets and descriptions.
-- `make check`: Run repository preflight checks.
-- `make test`: Run offline unit tests (`python3 -m unittest discover -s tests`).
-- `make syntax`: Validate playbook syntax (`ansible-playbook --syntax-check`).
-- `make lint`: Run YAML and code linters.
-
-### Optional integration checks
-Offline unit tests automatically skip assertions requiring external binaries. To enable these optional checks locally, install the respective tools and set their environment variables:
-- `PROMTOOL_BIN`: Path to `promtool` for alert rules.
-- `AMTOOL_BIN`: Path to `amtool` for Alertmanager configuration checks.
-- `NGINX_BIN`: Path to `nginx` for configuration syntax validation.
-- `ALERTMANAGER_BIN`: Path to `prometheus-alertmanager`.
-- `BLACKBOX_BIN`: Path to `prometheus-blackbox-exporter`.
+Treat generated `.env` files as outputs. Change their declared inputs and render
+them through the owning role rather than editing or synchronizing runtime copies.
+Private `-e @file` inputs override inventory; keep their source explicit.
+The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery access.

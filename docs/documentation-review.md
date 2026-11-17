@@ -4,8 +4,8 @@ Scope: repository Markdown, cross-checked against Ansible roles, templates and
 accepted production evidence. No live node changes or new production tests were
 performed. Dated evidence reports retain their original results and limitations.
 
-> [!NOTE]
-> **Historical snapshot (2026-11-12):** This document records findings from a specific review date and is preserved as a historical snapshot. Findings regarding secret handling—such as on-host Authentik decryption and legacy Vault inputs—are superseded by newer SOPS code. The current [SOPS/age guide](sops-age-secrets.md) explains controller-side Authentik deployment decryption via `community.sops.load_vars` and the retained `netbird_token_vault_file` compatibility parameter name for SOPS ciphertext.
+> Historical snapshot. Later SOPS changes supersede the secret-handling findings
+> below. Use the [SOPS/age guide](sops-age-secrets.md) for current deployment inputs.
 
 ## Corrected documentation
 
@@ -46,7 +46,7 @@ performed. Dated evidence reports retain their original results and limitations.
 - **Incomplete secret consolidation:** Authentik still decrypts on-host and legacy
   Vault inputs remain. [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45)
   tracks that work; this cleanup does not claim all decryption is controller-only.
-  *(Superseded: see [SOPS/age](sops-age-secrets.md) for controller-side Authentik deployment decryption and retained `netbird_token_vault_file` compatibility).*
+  This finding predates the controller-side deployment and SOPS-only token changes.
 
 ## Outstanding validation
 
