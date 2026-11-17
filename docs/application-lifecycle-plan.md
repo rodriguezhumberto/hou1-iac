@@ -33,8 +33,9 @@ Keep orchestration-specific behavior in deployment configuration.
 
 ## Current implementation
 
-Application branch `cleanup/application-readiness` implements this contract.
-Its `docs/application-lifecycle.md` maps runtime ownership and supported launch.
+Application PR #69 merged this contract as `463a28b`; its trusted release is
+deployed to the isolated lab. The application's `docs/application-lifecycle.md`
+maps runtime ownership and supported launch.
 Deployment verification validates declared capabilities and checks readiness;
 older releases retain their existing checks. See the
 [validation record](evidence/application-lifecycle-2026-11-17.md).

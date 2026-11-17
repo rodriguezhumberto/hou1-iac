@@ -48,6 +48,7 @@
   "https_checks": [
     {"url": "https://auth-test.lab-test.example.invalid/-/health/ready/", "status": 200},
     {"url": "https://netbird-test.lab-test.example.invalid/api/instance", "status": 200},
-    {"url": "https://staff-test.lab-test.example.invalid/api/staff/cms/pets", "status": 403}
+    {"url": "https://staff-test.lab-test.example.invalid/api/staff/cms/pets", "status": 403},
+    {"url": "https://test.lab-test.example.invalid/api/ready.json", "status": 200}
   ]
 }

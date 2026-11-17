@@ -18,6 +18,7 @@ install from the final revisions without corrective commands.
 | Lab secrets and age identities | Private preparation/import helpers; scoped encrypted bundles | Maintain retry-safe creation and recipient validation; never recreate identities on rerun |
 | Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; version 2 fingerprints known and declared capability files | Validate provider/registry authorization before bootstrap |
 | Application digest and matching source bundle | Version 2 derives selection from the CI receipt and verifies a standalone bundle/ref before host access; runtime artifact checks remain | Maintain release-input generation from this selection |
+| VM source mirror stayed on its bootstrap bundle | `test_application_source` now owns bundle import for bootstrap and webstack updates; checks the commit before selecting the ref | Retain mismatch, repeat and explicit rollback coverage |
 | Application role claims differed from lab IdP groups | Version 2 compares selected source groups, encrypted identity names, OIDC inputs and user grants | Maintain identity provisioning and optional test seeding separately |
 | Empty `prod-servers` group required in lab account | Private input override for current policy planner | Make required policy groups explicit; the name does not authorize production peers |
 | Synthetic passwords applied after identity provisioning | Private host-local Authentik adapter | Maintain an optional test-identity seed path; keep credentials out of arguments |
