@@ -207,7 +207,7 @@ class LabContractsTest(unittest.TestCase):
             if path.is_file(): self.assertNotIn('private-password-marker', path.read_text())
         # Every selected reference remains checked after validation.
         self.encrypted.write_text('changed ciphertext')
-        with self.assertRaises(workflow.WorkflowError): runner.check_capabilities()
+        with self.assertRaises(workflow.WorkflowError): runner.check_inputs()
 
     def test_failed_contract_stops_before_host_access_or_reconciliation(self):
         self.inventories()
@@ -220,19 +220,44 @@ class LabContractsTest(unittest.TestCase):
         self.assertTrue(all(call.kwargs.get('local') for call in playbook.call_args_list))
         self.assertEqual(json.loads((runner.run / 'receipt.json').read_text())['status'], 'failed')
 
-    def test_capability_drift_after_preflight_stops_before_remote_playbook(self):
+    def test_any_host_input_or_capability_drift_stops_before_remote_playbook(self):
         self.inventories()
-        runner = self.runner('drift')
+        other = self.config['hosts']['hou4']
+        for index, path in enumerate([self.encrypted, Path(other['inventory']),
+                                     Path(other['repository']) / 'ansible/ansible.cfg']):
+            with self.subTest(path=path.name):
+                before = path.read_text()
+                runner = self.runner('drift-' + str(index))
+                def probe(service, verify=True):
+                    if service == 'hou4': path.write_text(before + '\n# changed after validation\n')
+                original = runner.playbook
+                try:
+                    with patch.object(runner, 'probe', side_effect=probe), \
+                            patch.object(runner, 'playbook', wraps=original) as playbook:
+                        with self.assertRaises(workflow.WorkflowError): runner.execute('reconcile')
+                    remote = [call for call in playbook.call_args_list if not call.kwargs.get('local')]
+                    self.assertEqual(len(remote), 1)  # Rejected before spawning that playbook.
+                    self.assertFalse((runner.run / 'hou1-reconcile.log').exists())
+                finally:
+                    path.write_text(before)
+
+    def test_version_two_reconcile_checks_contracts_before_host_commands(self):
+        self.inventories()
+        runner = self.runner('ordered')
+        events = []
+        original, validate = runner.playbook, runner.validate_contracts
+        def checked():
+            validate(); events.append('contracts')
+        def playbook(service, play, log_name, local=False):
+            if local: return original(service, play, log_name, local=True)
+            events.append('deploy-' + service)
         def probe(service, verify=True):
-            if service == 'hou4': self.encrypted.write_text('changed after contract validation')
-        original = runner.playbook
-        with patch.object(runner, 'probe', side_effect=probe), \
-                patch.object(runner, 'playbook', wraps=original) as playbook:
-            with self.assertRaisesRegex(workflow.WorkflowError, 'capability files changed'):
-                runner.execute('reconcile')
-        remote = [call for call in playbook.call_args_list if not call.kwargs.get('local')]
-        self.assertEqual(len(remote), 1)  # Rejected before spawning that playbook.
-        self.assertFalse((runner.run / 'hou1-reconcile.log').exists())
+            events.append(('verify-' if verify else 'access-') + service)
+        with patch.object(runner, 'validate_contracts', side_effect=checked), \
+                patch.object(runner, 'playbook', side_effect=playbook), patch.object(runner, 'probe', side_effect=probe):
+            runner.execute('reconcile')
+        self.assertEqual(events, ['contracts', 'access-hou1', 'access-hou4',
+                                 'deploy-hou1', 'verify-hou1', 'deploy-hou4', 'verify-hou4'])
 
     def test_version_two_production_membership_fails_before_contract_or_host_access(self):
         self.inventories()

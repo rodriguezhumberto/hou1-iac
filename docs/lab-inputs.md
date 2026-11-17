@@ -41,7 +41,8 @@ The workflow checks both inventories locally, then:
   source/receiver enablement, lab endpoints, the pinned source key and a valid recipient.
 
 Release files, the deployment identity and known referenced capability files are
-fingerprinted and rechecked before subsequent commands. Each host's `capabilities`
+fingerprinted and rechecked before subsequent commands, alongside both repository
+refs and inventories. Each host's `capabilities`
 list declares additional files used by opaque lookups, such as HOU4's encrypted
 Grafana input. Keep all these files operator-owned and mode `0600`.
 Arbitrary custom lookups are not automatically discovered.

@@ -216,5 +216,9 @@ Opt-in lab DNS/firewall ownership is implemented. Adoption, unchanged repeat and
 standalone verification passed on both hosts; container IDs, DNS files, network
 allocations and owned firewall rules stayed stable. Controller hostname pins now
 apply inside the wrapper's private mount view without changing global files.
-Next: input/release assembly, identity/backup contracts and bootstrap handoffs,
-followed by ingress separation. Fresh-host acceptance remains unproved.
+Version 2 adds [input contracts](lab-inputs.md): release receipt/bundle checks,
+identity-role/client checks and backup key/endpoint checks before host access.
+Both repositories' refs, inventories and referenced capabilities are rechecked
+before later commands. Version 1 remains compatible with its original contracts.
+Fresh-host acceptance remains unproved. Next: review copied inventory overrides,
+maintain input generation and bootstrap handoffs, then separate ingress.

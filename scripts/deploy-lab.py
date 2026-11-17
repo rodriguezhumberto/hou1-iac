@@ -284,15 +284,17 @@ class Workflow:
         write_private(temporary, json.dumps(value, indent=2) + '\n')
         temporary.replace(path)
 
-    def check_capabilities(self):
+    def check_inputs(self):
+        for service, host in self.config['hosts'].items():
+            check_revision(host)
+            require(input_fingerprints(host) == self.inputs[service],
+                    'Deployment inputs changed during this attempt; rerun preflight')
         require(lab_contracts.fingerprints(self.capabilities) == self.capabilities,
                 'Referenced capability files changed during this attempt; rerun input checks')
 
     def playbook(self, service, play, log_name, local=False):
         host = self.config['hosts'][service]
-        check_revision(host)
-        require(input_fingerprints(host) == self.inputs[service], 'Deployment inputs changed during this attempt; rerun preflight')
-        self.check_capabilities()
+        self.check_inputs()
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
         argv = [str(Path(self.config['ansible_bin_directory']) / 'ansible-playbook'),
                 '-i', host['inventory'], str(play), '--limit', host['target']]
@@ -348,10 +350,7 @@ class Workflow:
         self.probe(service, verify=False)
 
     def validate_contracts(self):
-        for service, host in self.config['hosts'].items():
-            require(input_fingerprints(host) == self.inputs[service],
-                    'Deployment inputs changed before contract validation; rerun input checks')
-        self.check_capabilities()
+        self.check_inputs()
         paths = lab_contracts.capability_paths(self.config, self.selections)
         effective = lab_contracts.fingerprints(paths)
         require(all(effective.get(p) == value for p, value in self.capabilities.items()),
@@ -359,13 +358,11 @@ class Workflow:
         self.capabilities = effective
         lab_contracts.validate(self.config, self.selections,
                                environment(self.config, self.config['hosts']['hou1']))
-        self.check_capabilities()
+        self.check_inputs()
 
     def probe(self, service, verify=True):
         host = self.config['hosts'][service]
-        check_revision(host)
-        require(input_fingerprints(host) == self.inputs[service], 'Deployment inputs changed during this attempt; rerun preflight')
-        self.check_capabilities()
+        self.check_inputs()
         fixed, _, _ = self.transports[service]
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
         contract = {'hostname': host['hostname'], 'address': host['ssh_host_ip'],

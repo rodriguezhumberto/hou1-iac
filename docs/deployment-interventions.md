@@ -14,14 +14,14 @@ install from the final revisions without corrective commands.
 | Bootstrap name resolution | Opt-in `lab_dns` roles in both repositories; adoption and repeat passed | Verify fresh-host bootstrap; preserve provider DNS and unrelated host settings |
 | Container DNS blocked after UFW enabled | HOU1 `docker` owns daemon DNS; `lab_dns_containers` derives narrow UFW allowances from declared networks | Include replacement-network and interrupted-start checks in fresh-host acceptance |
 | Controller administrative VPN and resolver namespace | `scripts/lab-network.py` owns command transport and private resolver/hosts views; enrollment remains private | Maintain peer creation/enrollment separately from renewal jobs |
-| Inventory assembly and bootstrap/managed selection | Private `assemble-inputs.py` and state JSON | Separate authoritative inputs from generated inventories; verify cutover before switching |
+| Inventory assembly and bootstrap/managed selection | Private inventories are authoritative for current runs; the old assembler copies defaults and must not overwrite reviewed inputs | Review copied overrides, maintain inventory generation and verify cutover before switching |
 | Lab secrets and age identities | Private preparation/import helpers; scoped encrypted bundles | Maintain retry-safe creation and recipient validation; never recreate identities on rerun |
-| Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; maintained consumers | Document required capabilities and validate access before bootstrap |
-| Application digest and matching source bundle | Private release selection; maintained artifact verification | Declare the release once and check the bundle/ref/digest contract |
-| Application role claims differed from lab IdP groups | Private role alignment and input generation | Validate the selected application's claim contract before identity mutation |
+| Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; version 2 fingerprints known and declared capability files | Validate provider/registry authorization before bootstrap |
+| Application digest and matching source bundle | Version 2 derives selection from the CI receipt and verifies a standalone bundle/ref before host access; runtime artifact checks remain | Maintain release-input generation from this selection |
+| Application role claims differed from lab IdP groups | Version 2 compares selected source groups, encrypted identity names, OIDC inputs and user grants | Maintain identity provisioning and optional test seeding separately |
 | Empty `prod-servers` group required in lab account | Private input override for current policy planner | Make required policy groups explicit; the name does not authorize production peers |
 | Synthetic passwords applied after identity provisioning | Private host-local Authentik adapter | Maintain an optional test-identity seed path; keep credentials out of arguments |
-| Authentik backup self-check needed host decryption | Private recipient override and owner-encrypted host-key recovery copy | Validate recipient/recovery compatibility before enabling backup jobs |
+| Authentik backup self-check needed host decryption | Version 2 proves the legacy recipient/self-check key pair; unified mode checks endpoint/key bindings; owner-encrypted recovery copy retained | Verify installed identities, offline recovery and actual backup collection |
 | Google callback not verified | External OAuth registration; login/branding disabled | Verify callback before enabling; preserve the approved allowlist |
 | Nginx-stop drill removed administrative VPN access | Console recovery; failed drill preserved | Require independent recovery access and a VM-local restart timer for ingress drills |
 | Runtime snapshots, login checks and reboot receipts | Workflow owns container/source/TLS/HTTPS checks; login and reboot wrappers remain private | Maintain the remaining acceptance tools with declared targets and distinct failure records |
@@ -55,6 +55,9 @@ the first two slices for existing hosts and an enrolled controller peer. Resolve
 adoption, repeat reconciliation and standalone verification passed without manual
 repair. Bootstrap handoffs, peer enrollment, identity seeding, off-host backup and
 recovery acceptance remain separate work.
+Version 2 adds [controller-only input contracts](lab-inputs.md), including checks
+that stop before host access. Inventory generation and bootstrap handoffs still
+need maintained owners; the private default-copying assembler is not promoted.
 
 Initial workflow validation: 23 workflow/transport tests passed, including real
 Ansible/OpenSSH fixtures, plus syntax/lint and documentation links. Managed-host
