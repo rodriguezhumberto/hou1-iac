@@ -1,0 +1,14 @@
+---
+- name: Maintain installed operating-system packages
+  hosts: '{{ target_hosts | default(''hou1_test'') }}'
+  become: true
+  pre_tasks:
+  - name: Validate established host management
+    ansible.builtin.import_role:
+      name: netbird_common
+    tags:
+    - always
+  roles:
+  - role: os_maintenance
+    tags:
+    - maintenance

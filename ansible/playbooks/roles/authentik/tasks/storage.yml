@@ -1,8 +1,9 @@
 ---
-- name: Create the dedicated Authentik ingress network
-  community.docker.docker_network:
-    name: "{{ authentik_ingress_network }}"
-    state: present
+- name: Prepare shared ingress and the isolated Authentik network
+  ansible.builtin.import_role:
+    name: shared_ingress
+  vars:
+    shared_ingress_additional_authentik_networks: "{{ [authentik_ingress_network] }}"
 
 - name: Create persistent Authentik directories with restrictive ownership
   ansible.builtin.file:

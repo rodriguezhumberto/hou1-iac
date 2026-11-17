@@ -13,19 +13,11 @@ import unittest
 import yaml
 
 from helpers import ROOT, ROLES, run_play
+from compose_fixtures import local_tasks
 
 
 def source_tasks(role, filename):
-    tasks = yaml.safe_load((ROLES / role / 'tasks' / filename).read_text())
-    for task in tasks:
-        template = task.get('ansible.builtin.template')
-        if template:
-            template['src'] = template['src'].replace('{{ role_path }}', str(ROLES / role))
-            # Keep the production tasks; only substitute local test ownership.
-            if 'owner' in template:
-                template['owner'] = str(os.getuid())
-                template['group'] = str(os.getgid())
-    return tasks
+    return local_tasks(role, filename)
 
 
 class CmsStorageTest(unittest.TestCase):
@@ -98,12 +90,14 @@ class CmsStorageTest(unittest.TestCase):
                         'networks': {'shared': {'aliases': ['shared-proxy']}},
                         'environment': {'KEEP_ME': 'yes'}}},
                     'networks': {'shared': shared}, 'volumes': {'worker-cache': {}}}))
+                declared = yaml.safe_load(override.read_text())
                 variables = {
                     'app_directory': str(app), 'cms_media_directory': str(root / 'media'),
                     'netbird_control_plane_directory': str(root / 'netbird'),
                     'authentik_active_network': 'fixture-authentik',
                     'netbird_ingress_network': 'fixture-netbird',
                     'netbird_ingress_proxy_ip': '172.30.80.2',
+                    'app_compose_extensions': declared,
                 }
                 tasks_by_name = {
                     'cms': source_tasks('webstack', 'cms-compose.yml'),

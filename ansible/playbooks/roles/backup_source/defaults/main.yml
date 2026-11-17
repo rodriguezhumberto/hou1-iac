@@ -9,3 +9,5 @@ hou1_backup_minimum_free_bytes: 16106127360
 # Include the runtime identity inside the offline-encrypted archive for clean recovery.
 hou1_backup_recovery_files: ['{{ authentik_age_key_file }}']
 hou1_backup_app_project: "{{ 'pearlandpaws-test' if cms_environment == 'test' else 'pearlandpaws' }}"
+# Optional explicit source checkout; empty discovers the source record or legacy root.
+hou1_backup_app_source_directory: ''

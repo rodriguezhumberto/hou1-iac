@@ -14,3 +14,25 @@
          netbird_recovery_source_groups(host_recovery_policy_state.results[1].json,
          host_recovery_policy_state.results[2].json, hou1_backup_receiver_ip,
          netbird_ip, netbird_subnet, host_recovery_lost_peer_id, cms_environment) }}
+
+- name: Pin an explicitly enabled renewal receiver handoff
+  when: host_recovery_renewal_handoff | default(false) | bool
+  block:
+    - name: Require renewal inputs for the same recovery environment
+      ansible.builtin.assert:
+        that:
+          - hou1_tls_peer_config.environment == cms_environment
+          - (hou1_tls_peer_config.management_url | netbird_endpoint) == (netbird_management_url | netbird_endpoint)
+          - hou1_tls_peer_config.subnet == netbird_subnet
+          - hou1_tls_peer_config.server_group == netbird_server_group
+          - host_recovery_renewal_peer_id is match('^[a-zA-Z0-9_-]+$')
+    - name: Verify exact existing renewal groups and policy before retirement
+      ansible.builtin.set_fact:
+        host_recovery_renewal_group: >-
+          {{ host_recovery_policy_state.results[0].json |
+             host_recovery_renewal_plan(host_recovery_policy_state.results[1].json,
+             host_recovery_policy_state.results[2].json, hou1_tls_peer_config,
+             cms_environment, netbird_ip, host_recovery_lost_peer_id, host_recovery_renewal_peer_id) }}
+    - name: Retain the unchanged renewal receivers in the pinned group plan
+      ansible.builtin.set_fact:
+        host_recovery_source_groups: '{{ host_recovery_source_groups + [host_recovery_renewal_group] }}'

@@ -51,7 +51,7 @@ def add_receipt(payload, revision):
 
 class ApplicationArtifactTest(unittest.TestCase):
     def test_recovered_single_branch_checkout_can_fetch_the_next_exact_release(self):
-        task = read_task_phases('webstack')[1]
+        task = next(task for task in read_task_phases('webstack') if 'git' in task)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); source = root / 'source'; checkout = root / 'checkout'; mirror = root / 'mirror.git'
             def git(*args):
@@ -68,7 +68,7 @@ class ApplicationArtifactTest(unittest.TestCase):
             revision = git('-C', source, 'rev-parse', 'HEAD')
             git('clone', '--bare', source, mirror)
             self.assertIn('refs/heads/recovery:', git('-C', checkout, 'config', '--get', 'remote.origin.fetch'))
-            result = run_plays([dict(variables={'app_repo_pat': str(mirror), 'app_directory': str(checkout),
+            result = run_plays([dict(variables={'app_repo_pat': str(mirror), 'app_source_directory': str(checkout),
                                                 'application_image_revision': revision}, tasks=[task])])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(git('-C', checkout, 'rev-parse', 'HEAD'), revision)
@@ -186,7 +186,7 @@ class ApplicationArtifactTest(unittest.TestCase):
                 'nginx': dict(image='nginx:1.28.0-alpine', ports=['443:443'], networks=['app-network'])},
                 networks={'app-network': {'driver': 'bridge'}})
             path = root / 'docker-compose.yml'; path.write_text(yaml.safe_dump(config))
-            result = run_plays([dict(variables={'app_directory': directory, 'application_image_reference': IMAGE},
+            result = run_plays([dict(variables={'app_directory': directory, 'app_source_directory': directory, 'application_image_reference': IMAGE},
                                     tasks=[{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/image-compose.yml')}])])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             expected = copy.deepcopy(config)

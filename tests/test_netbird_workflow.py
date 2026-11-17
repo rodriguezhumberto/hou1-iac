@@ -136,10 +136,17 @@ class WorkflowTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             docker = root / 'docker'
-            docker.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$COMPOSE_ARGUMENTS"\n')
+            docker.write_text('#!' + sys.executable + '\n' +
+                'import json, os, sys\nfrom pathlib import Path\n' +
+                'args = sys.argv[1:]\n' +
+                'if args[1] == "config": print(json.dumps({"services": {"nginx": {}, "astro-app": {}}}))\n' +
+                'elif args[1] == "up": Path(os.environ["COMPOSE_ARGUMENTS"]).write_text("\\n".join(args))\n')
             docker.chmod(0o755)
             for variables, expected_tail in [(web['vars'], 'nginx'), ({}, '120')]:
                 task = copy.deepcopy(deploy)
+                task['ansible.builtin.command'] = task['ansible.builtin.command'].replace(
+                    '/usr/local/libexec/hou1-compose-apply',
+                    sys.executable + ' ' + str(ROLES / 'compose_runtime/files/apply.py'))
                 task.update(environment={'PATH': directory + ':' + os.environ['PATH'],
                                          'COMPOSE_ARGUMENTS': str(root / 'args')})
                 result = run_play({**variables, 'app_directory': directory}, [task])

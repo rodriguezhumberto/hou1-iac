@@ -1,0 +1,16 @@
+---
+- name: Create the local program directory
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the Compose activation helper
+  ansible.builtin.copy:
+    src: apply.py
+    dest: /usr/local/libexec/hou1-compose-apply
+    owner: root
+    group: root
+    mode: '0700'

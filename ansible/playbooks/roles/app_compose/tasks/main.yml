@@ -1,0 +1,76 @@
+---
+- name: Check for the runtime source receipt
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/application-source.json"
+  register: app_compose_source_receipt_stat
+
+- name: Read the runtime source receipt
+  ansible.builtin.slurp:
+    src: "{{ app_directory }}/application-source.json"
+  register: app_compose_source_receipt
+  when: app_compose_source_receipt_stat.stat.exists
+
+- name: Check for a separate selected source checkout
+  ansible.builtin.stat:
+    path: "{{ app_source_directory | default(app_directory ~ '-source') }}/.git"
+  register: app_compose_source_checkout
+
+- name: Refuse an application-owned Compose override
+  ansible.builtin.command:
+    argv: [git, ls-files, --error-unmatch, docker-compose.override.yml]
+    chdir: >-
+      {{ (app_compose_source_receipt.content | b64decode | from_json).source_root
+         if app_compose_source_receipt_stat.stat.exists
+         else (app_source_directory | default(app_directory ~ '-source'))
+              if app_compose_source_checkout.stat.exists else app_directory }}
+  register: app_compose_tracked_override
+  failed_when: app_compose_tracked_override.rc not in [0, 1]
+  changed_when: false
+
+- name: Require an infrastructure-owned Compose override
+  ansible.builtin.assert:
+    that: app_compose_tracked_override.rc == 1
+    fail_msg: The app owns docker-compose.override.yml. Review storage and ingress before deploying.
+
+- name: Check for an existing Compose override
+  ansible.builtin.stat:
+    path: "{{ app_directory }}/docker-compose.override.yml"
+  register: app_compose_override_stat
+
+- name: Read the existing Compose override for ownership validation
+  ansible.builtin.slurp:
+    src: "{{ app_directory }}/docker-compose.override.yml"
+  register: app_compose_override_before
+  when: app_compose_override_stat.stat.exists
+
+- name: Preserve operator-owned Compose overrides
+  ansible.builtin.assert:
+    that: "(app_compose_override_before.content | b64decode).startswith('# Managed by hou1-iac.')"
+    fail_msg: Merge the operator-owned docker-compose.override.yml before configuring application integration.
+  when: app_compose_override_stat.stat.exists
+
+- name: Require declared additions before migrating an existing managed override
+  ansible.builtin.assert:
+    that: app_compose_unknown | length == 0
+    fail_msg: >-
+      The existing override has undeclared additions: {{ app_compose_unknown | join(', ') }}.
+      Add these settings to app_compose_extensions in inventory before retrying.
+      The existing file has not been changed.
+  vars:
+    app_compose_unknown: "{{ (app_compose_override_before.content | b64decode) | app_compose_migration_errors(app_compose_extensions) }}"
+  when: app_compose_override_stat.stat.exists
+
+- name: Render application storage and ingress from declared inputs
+  ansible.builtin.template:
+    src: override.yml.j2
+    dest: "{{ app_directory }}/docker-compose.override.yml"
+    owner: root
+    group: root
+    mode: '0644'
+  vars:
+    app_compose_desired: >-
+      {{ cms_media_directory | app_compose_override(netbird_control_plane_directory,
+         netbird_ingress_network, netbird_ingress_proxy_ip,
+         authentik_active_network if authentik_enable_ingress_network | default(false) | bool else none,
+         app_compose_extensions) }}
+  register: app_compose_render

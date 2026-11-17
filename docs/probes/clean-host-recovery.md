@@ -124,14 +124,14 @@ ansible-playbook -i /private/point/inventory.yml \
   ansible/playbooks/publish-test-recovery.yml --limit YOUR_TEST_HOST
 ```
 
-Publication accepts only the expected loopback port baseline. Enrollment then
+Initial publication accepts only the expected loopback port baseline. Enrollment then
 requires the pinned lost peer to match its ID/name/IP and be disconnected before
 deleting that identity. The existing NetBird client role enrolls the replacement
 and restores its declared address/group. Before deletion, recovery pins the two
 existing metrics/backup source groups only if their policies exactly match the
 managed policies, their sole member is the lost peer, and they have no resource
-grants. After enrollment, those same groups must be empty and their policies
-must still match before binding only the replacement. Group IDs and policies stay intact; ordinary monitoring and
+grants. After enrollment, those same groups must be empty or already bound to
+the pinned replacement, and their policies must still match before assignment. Group IDs and policies stay intact; ordinary monitoring and
 backup roles retain their strict membership checks.
 Existing DNS and security roles verify
 fresh administrative VPN SSH before retiring public bootstrap access. Existing
@@ -165,8 +165,12 @@ publication play runs that command after replacement enrollment/group attachment
 and private resolver setup, before private SSH verification, and stops if it fails.
 The controller's split-DNS checks require the restored resolver to be running.
 Do not target an
-operator's personal VPN device. Check retained HOU4's map too and reconnect its
-NetBird daemon if necessary; preserve its monitoring data, identity and backups.
+operator's personal VPN device. Retained HOU4 can use the optional
+[independent companion refresh and renewal handoff](../production-host-recovery.md#optional-transport-handoffs);
+otherwise reconnect it manually without changing its identity or persistent data.
+A successfully published handoff can use the same guarded
+[publication resume](../production-host-recovery.md#resume-a-published-peer-handoff)
+path; a failed cold restore still requires a fresh host and recovery ID.
 
 For this rehearsal's bare `hou1-vps-admin-test` container, use
 `[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --ssh-host,
@@ -221,11 +225,12 @@ empty-host restore over installed databases.
 
 For a failure after publication, inspect the existing state and make only the
 verified repair needed before rerunning the affected management playbook.
-Publication itself is not replayable after it has exposed ingress or deleted
-the lost peer. If it stops before enrollment, preserve that failure and recover
-the exact pre-deletion source-group/policy plan from the selected recovery point
-before invoking the remaining roles in a separately recorded troubleshooting
-run. Empty groups alone do not establish ownership or authorize reassignment.
+After a successful publication checkpoint, use explicit
+[publication resume](../production-host-recovery.md#resume-a-published-peer-handoff)
+with the original private handoff plan. It validates the retained replacement
+identity and exact group/policy scope before repairing remaining stages. Missing
+plans or latched restore/publication errors still stop recovery. Empty groups
+alone do not establish ownership or authorize reassignment.
 Reapply `monitoring.yml` and `backups.yml` over VPN, then HOU4's backup receiver
 role with the verified HOU1 SSH host key. Existing group membership and policy
 ownership guards still apply; do not bypass them to adopt unknown groups.

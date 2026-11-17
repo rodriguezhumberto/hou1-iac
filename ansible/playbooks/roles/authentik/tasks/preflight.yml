@@ -27,3 +27,6 @@
       - not (authentik_branding_enabled | default(false) | bool) or authentik_image == 'ghcr.io/goauthentik/server:2025.10.4'
     fail_msg: Authentik requires an isolated test/prod root and SOPS-rendered secrets of at least 32 characters.
   no_log: true
+
+- name: Validate the declared Authentik ingress attachment before mutation
+  ansible.builtin.import_tasks: ingress-inputs.yml

@@ -1,0 +1,4 @@
+---
+# A one-shot public SSH fallback is removed after private SSH validation.
+ssh_bootstrap_fallback_dir: /var/lib/ansible/ssh-bootstrap
+ssh_bootstrap_fallback_delay: 180s

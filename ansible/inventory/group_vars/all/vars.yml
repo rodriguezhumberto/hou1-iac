@@ -1,4 +1,6 @@
 new_user_public_key: "{{ users_public_ssh }}"
+# Source stays separate from generated configuration and persistent runtime paths.
+app_source_directory: "{{ app_directory }}-source"
 staff_vpn_subnet: "{{ netbird_subnet }}"
 
 # Preserve existing environments; production opts in through encrypted inputs.
@@ -11,18 +13,6 @@ cms_environment: unknown
 cms_data_directory: "/var/lib/pearlandpaws/{{ cms_environment }}/cms"
 cms_database_directory: "{{ app_directory }}/database"
 cms_media_directory: "{{ cms_data_directory }}/media"
-# Verified against the application's pinned node:24.22.2 appuser/appgroup.
-# Override these together if a later application image changes its user.
-cms_storage_owner: "100"
-cms_storage_group: "102"
-cms_storage_mode: "0750"
-cms_backup_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/cms"
-directus_retirement_archive_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/directus-retirement"
-directus_retirement_archive: "{{ directus_retirement_archive_directory }}/directus-legacy.tar.gz"
-cms_backup_retention_days: 30
-cms_backup_schedule_minute: "25"
-cms_backup_schedule_hour: "2"
-cms_upload_max_bytes: 10485760
 
 ansible_python_interpreter: /usr/bin/python3.11
 
@@ -34,80 +24,30 @@ netbird_interface: wt0
 netbird_listen_port: 51821
 # Shared server/client release; the dashboard has its own version scheme.
 netbird_version: "0.82.0"
-netbird_enrollment_marker: /etc/netbird/ansible-enrollment.json
-
-# A one-shot public SSH recovery window is armed only while a node is first
-# enrolled.  Successful NetBird SSH validation removes it before handoff.
-ssh_bootstrap_fallback_dir: /var/lib/ansible/ssh-bootstrap
-ssh_bootstrap_fallback_delay: 180s
 
 # Shared endpoint derives from the encrypted inventory's website domain.
 # Deployment is selected only by the dedicated playbook/inventory group.
 netbird_domain: "netbird.{{ primary_domain }}"
 netbird_control_plane_directory: /opt/hou1-netbird
 netbird_control_plane_project: hou1-netbird
-netbird_server_image: "netbirdio/netbird-server:{{ netbird_version }}"
-netbird_dashboard_image: netbirdio/dashboard:v2.96.0
-netbird_authentik_client_secret_file: "/opt/hou1-authentik/prod/oidc-clients.env"
-netbird_authentik_issuer: ""
-netbird_authentik_client_id: "netbird-prod"
-netbird_break_glass_operators: []
-netbird_break_glass_escalation_minutes: 15
-netbird_break_glass_evidence_directory: /var/log/hou1-netbird
 netbird_certbot_image: certbot/dns-cloudflare:v5.1.0
 netbird_ingress_network: hou1-netbird-ingress
 netbird_ingress_subnet: 172.30.80.0/29
 # Keep automatically assigned backend addresses away from Nginx's fixed IP.
 netbird_ingress_dynamic_range: 172.30.80.4/30
 netbird_ingress_proxy_ip: 172.30.80.2
-netbird_backup_directory: /var/backups/hou1-netbird
-netbird_backup_age_recipient: ''
 
 # Authentik is placed on the existing node only after authentik-preflight.yml.
 # Keep test and production projects on separate private networks and data roots.
-authentik_capacity_path: /var/lib
-authentik_min_vcpus: 2
-authentik_min_memory_mb: 4096
-authentik_min_free_bytes: 21474836480
-authentik_min_free_inodes: 200000
 authentik_test_network: hou1-authentik-test
 authentik_prod_network: hou1-authentik-prod
 
-# Authentik Compose defaults. Secrets are supplied by the SOPS/age deployment
-# in issue #21 and are deliberately not committed here.
-authentik_image: ghcr.io/goauthentik/server:2025.10.4
-authentik_postgres_image: postgres:16.6-alpine
+# Shared Authentik roots and identity; component defaults live in its role.
 authentik_compose_project_prefix: hou1-authentik
 authentik_project_root_base: /opt/hou1-authentik
 authentik_data_root_base: /var/lib/hou1-authentik
-authentik_postgres_uid: 70
-authentik_postgres_gid: 70
-authentik_container_uid: 1000
-authentik_container_gid: 1000
-authentik_server_cpus: '1.00'
-authentik_worker_cpus: '1.00'
-authentik_postgres_cpus: '1.00'
-authentik_server_memory: 1536M
-authentik_worker_memory: 1024M
-authentik_postgres_memory: 1024M
-authentik_server_pids: 256
-authentik_worker_pids: 256
-authentik_postgres_pids: 128
-authentik_certbot_image: certbot/dns-cloudflare:v5.1.0
-authentik_ingress_directory: "{{ netbird_control_plane_directory }}/ingress"
 authentik_active_network: "{{ authentik_test_network if cms_environment == 'test' else authentik_prod_network }}"
 authentik_backup_root_base: /var/backups/hou1-authentik
-authentik_offhost_backup_root_base: /mnt/offhost-backups/hou1-authentik
-authentik_backup_retention_days: 30
-authentik_backup_schedule_minute: '40'
-authentik_backup_schedule_hour: '2'
-authentik_backup_age_recipient: ''
-authentik_bootstrap_enabled: true
-authentik_staff_users: []
-authentik_google_enabled: true
-# Shared test/prod login default. Set false to restore the previous branding.
-authentik_branding_enabled: true
-authentik_identity_secret_source: "{{ playbook_dir }}/../secrets/identity-names-{{ authentik_environment }}.enc.json"
 
 # Public deployment identity. Shared bootstrap/admission code consumes a selected
 # profile; organization identity names, allowlists and OAuth secrets stay in SOPS.
@@ -163,7 +103,6 @@ rehearsal_google_oauth_project: "hou1-authentik-test"
 netbird_token_vault_file: "{{ playbook_dir }}/../vault/netbird-token.yml"
 netbird_token_age_key_file: "{{ lookup('ansible.builtin.env', 'SOPS_AGE_KEY_FILE') }}"
 netbird_token_recovery_recipients: [age1ne73ewzuzw9l6cjstaykp5w79h9sv7h04j6y53g32kktleqeny9qeq3hf7]
-netbird_api_token_expire_days: 365
 
 # Groups are created if missing; policies and peer membership are managed separately.
 netbird_groups:
@@ -177,7 +116,6 @@ netbird_dns_domain: "{{ primary_domain }}"
 netbird_dns_records:
   - {name: "test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
   - {name: "staff-test.{{ primary_domain }}", address: "{{ test_netbird_ip }}"}
-netbird_dns_upstreams: [1.1.1.1, 9.9.9.9]
 netbird_dns_port: 1053
 
 # Controller-only DNS capability; production/rehearsal helpers remain separate.

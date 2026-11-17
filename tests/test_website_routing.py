@@ -41,12 +41,12 @@ class WebsiteRoutingTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); (root / 'nginx').mkdir()
             tasks = yaml.safe_load((ROLES / 'webstack/tasks/website.yml').read_text())
-            result = run_play({**settings(), 'app_directory': directory}, tasks)
+            result = run_play({**settings(), 'app_directory': directory, 'app_source_directory': directory}, tasks)
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Require a compatible immutable application revision', result.stdout)
             (root / 'nginx/secondary.conf.template').write_text('fixture capability')
             guard = tasks[0]
-            result = run_plays([dict(variables={**settings(), 'app_directory': directory}, tasks=tasks),
+            result = run_plays([dict(variables={**settings(), 'app_directory': directory, 'app_source_directory': directory}, tasks=tasks),
                                guard_play({**settings(), 'webstack_secondary_site_enabled': 'false'}, [guard], guard['name'])])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
@@ -62,7 +62,7 @@ class WebsiteRoutingTest(unittest.TestCase):
             root = Path(directory); path = root / 'docker-compose.yml'
             for enabled in (True, False):
                 path.write_text(yaml.safe_dump(source))
-                result = run_play(dict(app_directory=directory, webstack_secondary_site_enabled=enabled,
+                result = run_play(dict(app_directory=directory, app_source_directory=directory, webstack_secondary_site_enabled=enabled,
                                        application_image_reference='registry.example.invalid/app@sha256:' + 'a' * 64),
                                   [{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/image-compose.yml')}])
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
@@ -81,7 +81,7 @@ class WebsiteRoutingTest(unittest.TestCase):
         task = next(task for task in tasks if task['name'] == 'Inject production .env file for Astro')
         task['ansible.builtin.template']['src'] = str(ROLES / 'webstack/templates/app.env.j2')
         with tempfile.TemporaryDirectory() as directory:
-            values = {**settings(), 'app_directory': directory, 'ssl_domains': [{'name': 'site.example.invalid'}],
+            values = {**settings(), 'app_directory': directory, 'app_source_directory': directory, 'ssl_domains': [{'name': 'site.example.invalid'}],
                       'netbird_ip': '100.90.0.10', 'staff_cert_dir': 'site.example.invalid',
                       'deploy_environment': 'prod', 'cms_environment': 'production'}
             for name in ('public_hcaptcha_site_key', 'hcaptcha_secret_key', 'VAPID_PUBLIC_KEY', 'VAPID_PRIVATE_KEY',

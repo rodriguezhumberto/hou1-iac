@@ -12,6 +12,7 @@ import unittest
 import yaml
 
 from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
+from compose_fixtures import local_tasks
 
 
 class ControlPlaneTest(unittest.TestCase):
@@ -207,11 +208,12 @@ class ControlPlaneTest(unittest.TestCase):
             paths = Path(directory)
             app = paths / 'app'
             app.mkdir()
+            subprocess.run(['git', 'init', str(app)], check=True, capture_output=True)
             server = paths / 'server'
             server.mkdir()
             (server / 'data').mkdir()
             templates = ['compose.yaml', 'config.yaml', 'dashboard.env',
-                         'app-compose.override.yml', 'nginx.conf', 'backup.sh']
+                         'nginx.conf', 'backup.sh']
             tasks = [{'ansible.builtin.copy': {
                 'dest': str(paths / name),
                 'content': "{{ lookup('template', '" + str(ROLES / 'netbird_control_plane/templates' / (name + '.j2')) + "') }}",
@@ -237,11 +239,14 @@ class ControlPlaneTest(unittest.TestCase):
             self.assertEqual(stack['services']['netbird-server']['environment']['NB_SETUP_PAT_ENABLED'], 'true')
             # Compose must correctly merge a list-style app network with the
             # mapping-style override and retain all original ingress settings.
-            base = {'services': {'nginx': {'image': 'nginx:alpine',
+            base = {'services': {'astro-app': {'image': 'node:24'},
+                'nginx': {'image': 'nginx:alpine',
                 'ports': ['80:80', '443:443'], 'volumes': ['./original.conf:/etc/nginx/templates/default.conf.template:ro'],
                 'networks': ['app-network']}}, 'networks': {'app-network': {}}}
             (app / 'docker-compose.yml').write_text(yaml.safe_dump(base))
-            (paths / 'app-compose.override.yml').replace(app / 'docker-compose.override.yml')
+            integration = local_tasks('app_compose')
+            result = run_play(self.variables(directory), integration)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             merged = subprocess.run(compose + ['--project-directory', str(app), 'config', '--format', 'json'],
                 text=True, capture_output=True)
             self.assertEqual(merged.returncode, 0, merged.stderr)
@@ -255,13 +260,12 @@ class ControlPlaneTest(unittest.TestCase):
             # Include the former broken map to verify reruns repair it too.
             for previous in [{}, {'services': {'nginx': {'networks': {
                     'authentik-ingress': {'external': True, 'name': 'hou1-authentik-test'}}}}}]:
+                (app / 'docker-compose.override.yml').write_text(
+                    '# Managed by hou1-iac.\n' + yaml.safe_dump(previous))
                 result = run_play({**self.variables(directory),
                     'authentik_enable_ingress_network': True,
-                    'authentik_active_network': 'hou1-authentik-test',
-                    'netbird_app_override_before': {'content': base64.b64encode(
-                        yaml.safe_dump(previous).encode()).decode()}}, [tasks[3]])
+                    'authentik_active_network': 'hou1-authentik-test'}, integration)
                 self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
-                (paths / 'app-compose.override.yml').replace(app / 'docker-compose.override.yml')
                 merged = subprocess.run(compose + ['--project-directory', str(app), 'config', '--format', 'json'],
                     text=True, capture_output=True)
                 self.assertEqual(merged.returncode, 0, merged.stderr)

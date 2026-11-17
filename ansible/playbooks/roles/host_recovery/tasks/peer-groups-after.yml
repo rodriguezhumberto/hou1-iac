@@ -1,5 +1,5 @@
 ---
-- name: Read the two pinned source groups after replacement enrollment
+- name: Read the pinned recovery groups after replacement enrollment
   ansible.builtin.uri:
     url: '{{ netbird_api_url }}/api/groups/{{ item.id }}'
     headers: '{{ netbird_api_headers }}'
@@ -14,7 +14,10 @@
       - netbird_server_peer.ip == netbird_ip
       - item.json.id == item.item.id
       - item.json.name == item.item.name
-      - item.json.peers | default([], true) | length == 0
+      - >-
+        (item.json.peers | default([], true) | map(attribute='id') | sort | list) in
+        [(item.item.peers | default([]) | sort | list),
+         ((item.item.peers | default([]) + [netbird_server_peer.id]) | sort | list)]
       - item.json.resources | default([], true) | length == 0
     fail_msg: A pinned recovery group changed; do not overwrite other access.
   loop: '{{ host_recovery_empty_groups.results }}'
@@ -26,6 +29,26 @@
     status_code: 200
   register: host_recovery_policies_after
 
+- name: Recheck renewal ownership and other receivers before reassignment
+  when: host_recovery_renewal_handoff | default(false) | bool
+  block:
+    - name: Read current renewal group and peer membership
+      ansible.builtin.uri:
+        url: '{{ netbird_api_url }}/api/{{ item }}'
+        headers: '{{ netbird_api_headers }}'
+        status_code: 200
+      loop: [groups, peers]
+      register: host_recovery_renewal_state_after
+    - name: Refuse changed renewal source, receivers or policy
+      ansible.builtin.assert:
+        that: current == host_recovery_renewal_group
+      vars:
+        current: >-
+          {{ host_recovery_renewal_state_after.results[0].json |
+             host_recovery_renewal_plan(host_recovery_renewal_state_after.results[1].json,
+             host_recovery_policies_after.json, hou1_tls_peer_config,
+             cms_environment, netbird_ip, netbird_server_peer.id, host_recovery_renewal_peer_id, true) }}
+
 - name: Refuse changed policy ownership or grants before reassignment
   ansible.builtin.assert:
     that:
@@ -36,18 +59,21 @@
     matches: '{{ host_recovery_policies_after.json | selectattr("id", "equalto", item.policy.id) | list }}'
   loop: '{{ host_recovery_source_groups }}'
 
-- name: Bind only the enrolled replacement to the two empty source groups
+- name: Bind only the enrolled replacement while preserving other pinned receivers
   ansible.builtin.uri:
-    url: '{{ netbird_api_url }}/api/groups/{{ item.id }}'
+    url: '{{ netbird_api_url }}/api/groups/{{ item.item.id }}'
     headers: '{{ netbird_api_headers }}'
     method: PUT
     body_format: json
     body:
-      name: '{{ item.name }}'
-      peers: ['{{ netbird_server_peer.id }}']
+      name: '{{ item.item.name }}'
+      peers: '{{ item.item.peers | default([]) + [netbird_server_peer.id] }}'
       resources: []
     status_code: 200
-  loop: '{{ host_recovery_source_groups }}'
+  loop: '{{ host_recovery_empty_groups.results }}'
+  when: >-
+    (item.json.peers | default([], true) | map(attribute='id') | sort | list) !=
+    ((item.item.peers | default([]) + [netbird_server_peer.id]) | sort | list)
   changed_when: true
 
 - name: Read back the pinned source groups
@@ -63,6 +89,6 @@
     that:
       - item.json.id == item.item.id
       - item.json.name == item.item.name
-      - item.json.peers | map(attribute='id') | list == [netbird_server_peer.id]
+      - (item.json.peers | map(attribute='id') | sort | list) == ((item.item.peers | default([]) + [netbird_server_peer.id]) | sort | list)
       - item.json.resources | default([], true) | length == 0
   loop: '{{ host_recovery_bound_groups.results }}'

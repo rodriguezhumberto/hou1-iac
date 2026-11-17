@@ -68,8 +68,8 @@ under `no_log`; no age identity or DNS credential is copied to HOU1.
    `--issue` does not connect to HOU1. `--dry-run` requires existing issued state
    and changes neither encrypted state nor the remote host.
 2. Run the existing authorized bootstrap/deployment with the matching private
-   Ansible inputs. After the app checkout exists, `webstack` imports the encrypted
-   bundle before requiring its certificates. An entirely empty certificate set
+   Ansible inputs. Once the app runtime directory exists, `webstack` imports the
+   encrypted bundle before requiring its certificates. An entirely empty certificate set
    can be imported before Nginx or NetBird exists, over the bootstrap access path.
    It does not count as a verified renewal. On a running host, import validates
    Nginx, reloads only changed material, verifies served certificates and restores

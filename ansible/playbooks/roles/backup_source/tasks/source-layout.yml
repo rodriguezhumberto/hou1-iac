@@ -1,0 +1,21 @@
+---
+- name: Discover installed backup configuration before source-layout migration
+  ansible.builtin.stat:
+    path: /etc/hou1-backup/source.json
+    follow: false
+  register: hou1_backup_layout_config
+
+- name: Require regular backup configuration before updating its reader
+  ansible.builtin.assert:
+    that: hou1_backup_layout_config.stat.isreg | default(false)
+    fail_msg: Preserve and review the existing backup configuration before source migration.
+  when: hou1_backup_layout_config.stat.exists
+
+- name: Install the source-aware exporter for configured backups
+  ansible.builtin.copy:
+    src: export.py
+    dest: /usr/local/libexec/hou1-backup-prepare
+    owner: root
+    group: root
+    mode: '0700'
+  when: hou1_backup_layout_config.stat.isreg | default(false)

@@ -51,6 +51,9 @@ image revision; it is not enough on its own. See [image inputs](docs/application
 Use `hou1.yml --tags netbird` to check and update client enrollment. These also
 run over the VPN.
 
+Routine reconciliation refreshes package metadata and installs required packages.
+Use [OS maintenance](docs/os-maintenance.md) for installed-package upgrades.
+
 ## New or replacement hosts
 
 For a lost production host, use [replacement recovery](docs/production-host-recovery.md);

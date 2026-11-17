@@ -1,0 +1,12 @@
+---
+# Matches the pinned node:24.22.2 appuser/appgroup; update both for user changes.
+cms_storage_owner: "100"
+cms_storage_group: "102"
+cms_storage_mode: "0750"
+cms_backup_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/cms"
+directus_retirement_archive_directory: "/var/backups/pearlandpaws/{{ cms_environment }}/directus-retirement"
+directus_retirement_archive: "{{ directus_retirement_archive_directory }}/directus-legacy.tar.gz"
+cms_backup_retention_days: 30
+cms_backup_schedule_minute: "25"
+cms_backup_schedule_hour: "2"
+cms_upload_max_bytes: 10485760

@@ -3,7 +3,7 @@
 Make HOU1 and HOU4 easier to navigate, change and validate before changing their
 deployment architecture. Work stays local on cleanup branches.
 
-## Execution order
+## Initial cleanup order
 
 1. Record the existing test results and controller dependencies for each repo.
 2. Add consistent local validation commands and concise contributor guidance.
@@ -16,7 +16,8 @@ deployment architecture. Work stays local on cleanup branches.
 
 Independent documentation and tooling changes may run in parallel. Integrate
 their local commits before starting work that depends on the new interfaces.
-Review every delegated result; use isolated worktrees for implementation.
+Review every delegated result. Use isolated worktrees for overlapping changes;
+independent owners can work in the same checkout.
 
 ## Cleanup rules
 
@@ -55,18 +56,43 @@ converge without unnecessary changes.
 - Keep current guides in `docs/`, probe and drill procedures in `docs/probes/`,
   dated records in `docs/evidence/` and superseded guidance in `docs/archive/`.
   Public script paths and recorded results stay stable when documentation moves.
+- Keep shared paths/topology in inventory and component knobs in role defaults:
+  standalone recovery and backup entry points need the shared values too.
+- Treat generated Compose fingerprints as ownership checks, never desired input.
+  Explicit extensions preserve custom settings without carrying stale output forward.
+- Retain `app_directory` as the runtime root and Compose identity. A separate Git
+  checkout avoids modifying tracked configuration; regular installed assets keep
+  backups compatible. Cold restore retains its old layout until reconciliation.
+- Advance applied-input state only after successful activation. This retries
+  interrupted changes even when Ansible has already written the new files.
+- Require explicit companion transports and recovery resume. Pin the original
+  handoff and replacement rather than guessing identities from a desired address.
 
-## Later reliability work
+## Reliability implementation
 
-- Render Compose configuration from declared inputs rather than previous outputs.
-- Separate source checkouts from generated deployment configuration.
-- Limit reloads and container recreation to affected services and inputs.
-- Separate shared ingress from application deployment ownership.
-- Separate OS upgrades from routine application reconciliation.
-- Reconcile VPN peer replacement and readiness across both hosts.
-- Consider shared collections or Python packaging after interfaces are stable.
+Implemented locally in the order below.
 
-## Review record
+1. Move component settings to their owning role defaults; keep shared topology,
+   paths and identity inputs in inventory. Verify actual Ansible precedence.
+2. Move OS upgrades into explicit maintenance playbooks. Routine reconciliation
+   still refreshes package metadata and installs required packages.
+3. Give the application Compose override one owner. Generate desired state from
+   declared inputs and refuse unexplained additions during migration.
+4. Prepare shared ingress resources before application or backend startup.
+   Authentik requires an explicit environment-matched network declaration.
+5. Keep the application runtime directory and project identity stable; use a
+   separate source checkout and regular installed assets. Preserve older backup
+   configuration and recovery archives through source-discovery fallbacks.
+6. Track successfully applied service inputs. Recreate affected consumers, repair
+   stopped/missing services and retry failed activation on subsequent runs.
+7. Add an explicitly scoped companion/renewal handoff to peer replacement;
+   retain lost-peer identity checks and independent recovery access.
+8. Review integrated changes and run both complete local check suites.
+
+Shared packaging remains deferred: controller and host programs have different
+delivery contracts, and these changes do not yet establish a useful shared API.
+
+## Initial cleanup review
 
 - HOU1 and HOU4 contributor guides identify configuration sources, generated
   outputs and local checks. Historical documentation is marked as historical.
@@ -93,3 +119,25 @@ converge without unnecessary changes.
   and branding fixtures ran; the separate browser check also passed.
 - Both repositories remain on local `cleanup/readable-deployments` branches.
   No pushes, PRs, deployments, live-node access or production decryption occurred.
+
+## Reliability review
+
+- Effective defaults stayed unchanged across 100 HOU1 and 77 HOU4 shared inputs.
+  Real Ansible fixtures verify role visibility and inventory/extra-var precedence.
+- Review corrected unchanged HOU4 deployments skipping repair, legacy standalone
+  backup configuration assuming migration, and interrupted asset installs blocking
+  retry. Full and component-tag runs now repair containers; security-only tags do
+  not apply monitoring.
+- Disposable Docker tests verify stable container IDs on no-op, consumer-only
+  recreation after atomic file replacement and repair of stopped/deleted services.
+- Recovery fixtures cover deletion, enrollment, saved receipts and partial group
+  assignment, plus repeated resumes and refusal of changed identities or grants.
+- Independent review found no remaining material issues. Runtime paths, archive
+  schemas and historical evidence remain compatible; changes are local only.
+- HOU1 validation covered all 377 current tests, with one optional DNS skip.
+  The broad run loaded two fixtures before their task paths were updated; both
+  modules passed against the final files. Three added resume cases also passed.
+- HOU4's full check passed 78 tests with 15 optional native-tool skips. Component
+  tag repair coverage and final syntax/lint checks passed in both repositories.
+- Documentation links resolve and all 62 historical JSON evidence files are
+  unchanged. No pushes, deployments, live-node access or production decryption.

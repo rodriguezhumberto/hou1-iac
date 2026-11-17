@@ -9,7 +9,24 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ROOT / 'ansible/playbooks/roles'
-DEFAULTS = yaml.safe_load((ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
+def fixture_defaults():
+    """Combine component defaults and shared inputs for isolated task fixtures.
+
+    Real role loading and inventory precedence are covered separately. Fixture
+    scenarios override this mapping in run_plays, just as before relocation.
+    """
+    values = {}
+    for source in sorted(ROLES.glob('*/defaults/main.yml')):
+        for name, value in (yaml.safe_load(source.read_text()) or {}).items():
+            if name in values and values[name] != value:
+                raise ValueError(f'Conflicting role defaults for {name}: {source}')
+            values[name] = value
+    values.update(yaml.safe_load(
+        (ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text()))
+    return values
+
+
+DEFAULTS = fixture_defaults()
 
 
 def read_task_phases(role):

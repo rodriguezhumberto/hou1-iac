@@ -1,0 +1,3 @@
+---
+os_maintenance_upgrade: dist
+os_maintenance_cache_valid_time: 3600

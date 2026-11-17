@@ -1,0 +1,25 @@
+---
+- name: Refresh only the explicitly configured companion VPN over independent SSH
+  block:
+    - name: Recheck the selected companion before restarting its VPN
+      ansible.builtin.include_tasks: companion-status.yml
+      vars:
+        host_recovery_companion_require_connected: false
+    - name: Discard the old HOU1 peer key from the selected HOU4 daemon
+      ansible.builtin.systemd:
+        name: netbird
+        state: restarted
+      delegate_to: '{{ host_recovery_companion.inventory_host }}'
+      become: true
+      vars:
+        ansible_connection: ssh
+        ansible_host: '{{ host_recovery_companion.public_ip }}'
+        ansible_ssh_args: >-
+          -o ControlMaster=no -o ControlPersist=no -o ProxyCommand=none -o ProxyJump=none -o StrictHostKeyChecking=yes
+          -o UserKnownHostsFile={{ host_recovery_companion.known_hosts_file | quote }}
+        ansible_ssh_common_args: ''
+        ansible_ssh_extra_args: ''
+    - name: Require the declared companion address and endpoint to reconnect
+      ansible.builtin.include_tasks: companion-status.yml
+      vars:
+        host_recovery_companion_require_connected: true

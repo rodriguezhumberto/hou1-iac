@@ -6,13 +6,8 @@
 - name: Require configured private source inputs
   ansible.builtin.assert:
     that: hou1_backup_source_config.stat.isreg | default(false)
-- name: Install interruption-safe preparation and fixed recovery
-  ansible.builtin.copy:
-    src: export.py
-    dest: /usr/local/libexec/hou1-backup-prepare
-    owner: root
-    group: root
-    mode: '0700'
+- name: Install the source-aware local preparation program
+  ansible.builtin.import_tasks: source-layout.yml
 - name: Install the shared application artifact verifier for backup capture
   ansible.builtin.copy:
     src: '{{ role_path }}/../application_image/files/artifact.py'

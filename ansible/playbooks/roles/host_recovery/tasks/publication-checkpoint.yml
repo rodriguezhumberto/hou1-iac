@@ -1,0 +1,58 @@
+---
+- name: Inspect the retained publication and failure checkpoints
+  ansible.builtin.stat:
+    path: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/{{ item }}'
+  loop: [first-error.json, publish-report.json]
+  register: host_recovery_publication_files
+
+- name: Require an explicit resume of successful publication only
+  ansible.builtin.assert:
+    that:
+      - host_recovery_resume | default(false) is boolean
+      - not host_recovery_publication_files.results[0].stat.exists
+      - not host_recovery_publication_files.results[1].stat.exists or host_recovery_resume | default(false)
+      - not (host_recovery_resume | default(false)) or host_recovery_publication_files.results[1].stat.exists
+    fail_msg: Resume requires a successful retained publication checkpoint without a latched restore/publication error.
+
+- name: Read the retained request before initial publication or resume
+  ansible.builtin.slurp:
+    src: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/request.json'
+  register: host_recovery_publication_request
+  no_log: true
+
+- name: Bind publication to the restored recovery ID, environment and VPN address
+  ansible.builtin.assert:
+    that:
+      - request.id == host_recovery_id
+      - request.environment == cms_environment
+      - request.server_ip == netbird_ip
+  vars:
+    request: '{{ host_recovery_publication_request.content | b64decode | from_json }}'
+  no_log: true
+
+- name: Validate the retained successful publication checkpoint on resume
+  when: host_recovery_resume | default(false)
+  block:
+    - name: Read the retained publication result
+      ansible.builtin.slurp:
+        src: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/publish-report.json'
+      register: host_recovery_publication_report
+      no_log: true
+    - name: Refuse incomplete or foreign publication results
+      ansible.builtin.assert:
+        that:
+          - report.passed is sameas true
+          - report.environment == cms_environment
+          - report.ports_published is sameas true
+          - report.access_reconciliation_operator_asserted is sameas true
+          - report.host_enrollment_pending is sameas true
+      vars:
+        report: '{{ host_recovery_publication_report.content | b64decode | from_json }}'
+      no_log: true
+
+- name: Publish only the previously restored ingress and STUN ports
+  ansible.builtin.command:
+    argv: [python3, '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/restore.py', publish]
+  no_log: true
+  changed_when: true
+  when: not (host_recovery_resume | default(false))

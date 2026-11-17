@@ -1,0 +1,5 @@
+---
+# Skip before expanding delegated connection variables for existing inventories.
+- name: Refresh only the explicitly configured companion VPN over independent SSH
+  ansible.builtin.include_tasks: companion-refresh.yml
+  when: host_recovery_companion is defined

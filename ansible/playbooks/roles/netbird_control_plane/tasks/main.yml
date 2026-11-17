@@ -26,6 +26,10 @@
     that: netbird_application_compose.stat.exists
     fail_msg: Deploy the production application with hou1.yml before running the dedicated control-plane playbook.
 
+- name: Prepare shared ingress without requiring backend startup
+  ansible.builtin.import_role:
+    name: shared_ingress
+
 - name: Create persistent control-plane directories outside the application checkout
   ansible.builtin.file:
     path: "{{ item }}"
@@ -34,17 +38,8 @@
     group: root
     mode: '0700'
   loop:
-    - "{{ netbird_control_plane_directory }}"
     - "{{ netbird_control_plane_directory }}/data"
     - "{{ netbird_backup_directory }}"
-
-- name: Create the ingress configuration directory
-  ansible.builtin.file:
-    path: "{{ netbird_control_plane_directory }}/ingress"
-    state: directory
-    owner: root
-    group: root
-    mode: '0755'
 
 - name: Check for persistent encryption secrets
   ansible.builtin.stat:
@@ -133,13 +128,6 @@
     - {src: dashboard.env.j2, dest: dashboard.env}
     - {src: compose.yaml.j2, dest: compose.yaml}
 
-- name: Create the dedicated ingress network
-  community.docker.docker_network:
-    name: "{{ netbird_ingress_network }}"
-    ipam_config:
-      - subnet: "{{ netbird_ingress_subnet }}"
-        iprange: "{{ netbird_ingress_dynamic_range }}"
-
 - name: Prepare DNS challenge credentials for the NetBird certificate
   ansible.builtin.copy:
     dest: "{{ netbird_control_plane_directory }}/cloudflare.ini"
@@ -206,14 +194,6 @@
     group: root
     mode: '0644'
 
-- name: Install the stable Nginx include file
-  ansible.builtin.copy:
-    dest: "{{ netbird_control_plane_directory }}/nginx-include.conf"
-    content: "include /etc/nginx/netbird/*.conf;\n"
-    owner: root
-    group: root
-    mode: '0644'
-
 - name: Install the application ingress integration
   ansible.builtin.import_tasks: app-ingress.yml
 
@@ -224,14 +204,20 @@
     proto: udp
 
 - name: Start the separate NetBird Compose project
-  community.docker.docker_compose_v2:
-    project_src: "{{ netbird_control_plane_directory }}"
-    project_name: "{{ netbird_control_plane_project }}"
-    files: [compose.yaml]
-    state: present
-    recreate: "{{ 'always' if netbird_server_config.changed else 'auto' }}"
-    wait: true
-    wait_timeout: 60
+  ansible.builtin.import_role:
+    name: compose_runtime
+
+- name: Apply changed NetBird service inputs and repair stopped services
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/hou1-compose-apply
+      - "{{ netbird_control_plane_directory }}"
+      - --project
+      - "{{ netbird_control_plane_project }}"
+      - --file
+      - compose.yaml
+  register: netbird_activation
+  changed_when: (netbird_activation.stdout | from_json).changed
 
 - name: Apply the Nginx network and mounts without rebuilding application services
   community.docker.docker_compose_v2:
@@ -239,7 +225,7 @@
     services: [nginx]
     dependencies: false
     state: present
-    recreate: "{{ 'always' if netbird_app_override.changed else 'auto' }}"
+    recreate: auto
 
 - name: Validate the active Nginx configuration before reload
   ansible.builtin.command: docker compose exec -T nginx nginx -t

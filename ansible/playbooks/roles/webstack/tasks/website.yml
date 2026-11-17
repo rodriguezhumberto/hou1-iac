@@ -7,7 +7,7 @@
 
 - name: Check selected application support for optional website routing
   ansible.builtin.stat:
-    path: '{{ app_directory }}/nginx/secondary.conf.template'
+    path: '{{ app_source_directory }}/nginx/secondary.conf.template'
   register: webstack_secondary_template
   when: not (webstack_secondary_site_enabled | default(true)) or webstack_public_canonical_redirect | default(false)
 

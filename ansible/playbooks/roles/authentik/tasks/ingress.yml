@@ -1,18 +1,27 @@
 ---
+- name: Validate the declared Authentik ingress attachment
+  ansible.builtin.import_tasks: ingress-inputs.yml
+
 - name: Derive the environment-specific public Authentik hostname
   ansible.builtin.set_fact:
     authentik_domain: "{{ authentik_identity_profiles[authentik_environment].issuer_host }}"
     authentik_server_alias: "authentik-server-{{ authentik_environment }}"
 
-- name: Require the existing Nginx ingress mount before publishing Authentik
-  ansible.builtin.stat:
-    path: "{{ netbird_control_plane_directory }}/nginx-include.conf"
-  register: authentik_ingress_include
+- name: Prepare shared ingress without requiring a NetBird deployment
+  ansible.builtin.import_role:
+    name: shared_ingress
 
-- name: Refuse to publish an ingress that Nginx cannot load
-  ansible.builtin.assert:
-    that: authentik_ingress_include.stat.exists
-    fail_msg: Deploy the existing Nginx/NetBird ingress integration before Authentik DNS and TLS.
+- name: Reconcile the application storage and declared ingress attachments
+  ansible.builtin.import_role:
+    name: app_compose
+
+- name: Attach application Nginx before publishing the Authentik virtual host
+  community.docker.docker_compose_v2:
+    project_src: "{{ app_directory }}"
+    services: [nginx]
+    dependencies: false
+    state: present
+    recreate: auto
 
 - name: Check the environment-specific Authentik certificate
   ansible.builtin.stat:

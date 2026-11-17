@@ -80,16 +80,16 @@ class HostRecoveryPreparationTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as directory:
             marker = Path(directory) / 'refreshed'
             command = ['python3', '-c', 'from pathlib import Path; import sys; Path(sys.argv[1]).touch()', str(marker)]
-            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': command}, tasks=tasks)])
+            result = run_plays([dict(variables={'cms_environment': 'test', 'host_recovery_management_refresh_argv': command}, tasks=tasks)])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(marker.exists())
-            plays = [guard_play({'host_recovery_management_refresh_argv': value}, tasks,
+            plays = [guard_play({'cms_environment': 'test', 'host_recovery_management_refresh_argv': value}, tasks,
                                 'Validate the optional dedicated controller VPN reconnect command')
                      for value in ['shell command', [], ['valid', 7]]]
             result = run_plays(plays)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             marker.unlink()
-            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': ['false']}, tasks=tasks + [
+            result = run_plays([dict(variables={'cms_environment': 'test', 'host_recovery_management_refresh_argv': ['false']}, tasks=tasks + [
                 {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}},
             ])])
             self.assertNotEqual(result.returncode, 0)
@@ -241,7 +241,7 @@ class HostRecoveryPreparationTest(unittest.TestCase):
             command = ['python3', '-c',
                        'from pathlib import Path; import sys; assert Path(sys.argv[1]).is_file(); Path(sys.argv[2]).touch()',
                        str(resolver), str(refreshed)]
-            result = run_plays([dict(variables={'host_recovery_management_refresh_argv': command}, tasks=tasks)])
+            result = run_plays([dict(variables={'cms_environment': 'test', 'host_recovery_management_refresh_argv': command}, tasks=tasks)])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertTrue(cutover.is_file())
 
@@ -259,13 +259,12 @@ class HostRecoveryPreparationTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_lost_peer_guard_refuses_live_or_different_devices(self):
-        play = {'tasks': yaml.safe_load((FILES.parent / 'tasks/publish.yml').read_text())}
-        block = next(task['block'] for task in play['tasks'] if 'block' in task)
-        guard = next(task for task in block if task['name'] == 'Refuse another device or a connected peer')
+        tasks = yaml.safe_load((FILES.parent / 'tasks/peer-retirement.yml').read_text())
+        guard = next(task for task in tasks if task['name'] == 'Refuse another device or a connected peer')
         peer = dict(id='lost-hou1', name='fixture-host', ip='100.91.0.10', connected=False)
         variables = dict(host_recovery_lost_peer_id=peer['id'], host_recovery_lost_peer_name=peer['name'], netbird_ip=peer['ip'])
         scenarios = [{}, {'connected': True}, {'id': 'different'}, {'ip': '100.91.0.22'}]
-        plays = [guard_play({**variables, 'host_recovery_old_peer': {'json': {**peer, **change}}},
+        plays = [guard_play({**variables, 'host_recovery_old_peer': {'status': 200, 'json': {**peer, **change}}},
                             [guard], guard['name'] if change else None) for change in scenarios]
         result = run_plays(plays)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

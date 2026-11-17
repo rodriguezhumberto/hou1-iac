@@ -8,6 +8,7 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 
 | Task | Guide |
 | --- | --- |
+| Upgrade installed OS packages | [OS maintenance](os-maintenance.md) |
 | Deploy, accept or roll back a release | [Production runbook](production-oidc-runbook.md) |
 | Select a CI image | [Application images](application-images.md), [release policy](releases.md) |
 | Replace a lost production host | [Production recovery](production-host-recovery.md) |

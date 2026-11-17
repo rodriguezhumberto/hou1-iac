@@ -1,0 +1,76 @@
+---
+- name: Inspect a previously pinned replacement identity
+  ansible.builtin.stat:
+    path: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/replacement-peer.json'
+  delegate_to: localhost
+  become: false
+  register: host_recovery_replacement_file
+
+- name: Begin without an inferred replacement identity
+  ansible.builtin.set_fact:
+    host_recovery_replacement: {}
+
+- name: Validate a retained replacement receipt
+  when: host_recovery_replacement_file.stat.exists
+  delegate_to: localhost
+  become: false
+  no_log: true
+  block:
+    - name: Require a regular private replacement receipt
+      ansible.builtin.assert:
+        that:
+          - host_recovery_replacement_file.stat.isreg
+          - not host_recovery_replacement_file.stat.islnk
+          - host_recovery_replacement_file.stat.mode == '0600'
+    - name: Read the exact previously verified replacement
+      ansible.builtin.slurp:
+        src: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/replacement-peer.json'
+      register: host_recovery_replacement_contents
+    - name: Decode the pinned replacement
+      ansible.builtin.set_fact:
+        host_recovery_replacement: '{{ host_recovery_replacement_contents.content | b64decode | from_json }}'
+    - name: Require the same handoff plan and distinct declared replacement
+      ansible.builtin.assert:
+        that:
+          - host_recovery_replacement.plan == host_recovery_handoff
+          - host_recovery_replacement.peer.id != host_recovery_lost_peer_id
+          - host_recovery_replacement.peer.ip == netbird_ip
+          - host_recovery_replacement.peer.id is match('^[a-zA-Z0-9_-]+$')
+          - host_recovery_replacement.peer.name | length > 0
+
+- name: Read current API peers without selecting a replacement by desired IP
+  ansible.builtin.uri:
+    url: '{{ netbird_api_url }}/api/peers'
+    headers: '{{ netbird_api_headers }}'
+    status_code: 200
+  delegate_to: localhost
+  become: false
+  register: host_recovery_enrollment_peers
+  no_log: true
+
+- name: Observe the replacement host's existing local enrollment if present
+  ansible.builtin.command:
+    argv: [netbird, status, --json]
+  register: host_recovery_local_enrollment
+  changed_when: false
+  failed_when: false
+  no_log: true
+
+- name: Reject an unexplained occupant before enrollment or group changes
+  ansible.builtin.assert:
+    that:
+      - host_recovery_enrollment_peers.json | selectattr('id', 'equalto', host_recovery_lost_peer_id) | list | length == 0
+      - occupants | length <= 1
+      - >-
+        occupants | length == 0 or
+        (host_recovery_local_enrollment.rc == 0 and
+         ((host_recovery_local_enrollment.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) == netbird_ip and
+         ((host_recovery_local_enrollment.stdout | from_json).management.url | netbird_endpoint) == (netbird_management_url | netbird_endpoint))
+      - >-
+        not host_recovery_replacement or
+        (occupants | length == 1 and occupants[0].id == host_recovery_replacement.peer.id and
+         occupants[0].name == host_recovery_replacement.peer.name and occupants[0].ip == host_recovery_replacement.peer.ip)
+    fail_msg: The planned address is occupied without the verified local identity or its pinned replacement receipt.
+  vars:
+    occupants: '{{ host_recovery_enrollment_peers.json | selectattr("ip", "equalto", netbird_ip) | list }}'
+  no_log: true

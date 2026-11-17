@@ -1,0 +1,29 @@
+---
+- name: Require established VPN management before OS maintenance
+  ansible.builtin.assert:
+    that:
+      - not (node_bootstrap | default(true) | bool)
+      - ansible_host == netbird_ip
+    fail_msg: Run OS maintenance against an initialized host at its declared NetBird address.
+
+- name: Validate the requested package upgrade mode
+  ansible.builtin.assert:
+    that:
+      - os_maintenance_upgrade in ['safe', 'dist']
+      - os_maintenance_cache_valid_time | int >= 0
+    fail_msg: Choose safe or dist package upgrades and a nonnegative cache lifetime.
+
+- name: Upgrade installed system packages
+  ansible.builtin.apt:
+    update_cache: true
+    cache_valid_time: '{{ os_maintenance_cache_valid_time }}'
+    upgrade: '{{ os_maintenance_upgrade }}'
+
+- name: Check whether the host requests a reboot
+  ansible.builtin.stat:
+    path: /var/run/reboot-required
+  register: os_maintenance_reboot
+
+- name: Report the reboot requirement
+  ansible.builtin.debug:
+    msg: "Reboot required: {{ os_maintenance_reboot.stat.exists }}. Schedule any reboot separately."

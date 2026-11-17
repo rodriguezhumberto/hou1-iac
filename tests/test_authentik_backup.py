@@ -76,4 +76,4 @@ class AuthentikBackupTest(unittest.TestCase):
         tasks = yaml.safe_dump(read_task_phases('authentik'))
         self.assertIn('authentik_offhost_backup_root', tasks)
         self.assertIn('Schedule encrypted Authentik backups', tasks)
-        self.assertIn('authentik_backup_retention_days', (ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
+        self.assertIn('authentik_backup_retention_days', (ROOT / 'ansible/playbooks/roles/authentik/defaults/main.yml').read_text())
