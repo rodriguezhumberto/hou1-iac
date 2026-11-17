@@ -37,6 +37,8 @@ the [managed lab workflow](deployment-workflow.md) coordinates existing test hos
 the managed handoff before selecting a new snapshot.
 [Ingress separation](ingress-separation.md) records migration prerequisites and
 acceptance order.
+[Application lifecycle](application-lifecycle-plan.md) records portable health,
+storage recovery and shutdown work.
 
 ## Probes and drills
 

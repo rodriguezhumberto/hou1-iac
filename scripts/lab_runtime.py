@@ -13,12 +13,33 @@ def output(argv):
     return subprocess.check_output(argv, stderr=subprocess.DEVNULL, text=True, timeout=30)
 
 
+def runtime_contract(content):
+    """An absent manifest is legacy; declared contracts must be understood exactly."""
+    if content is None:
+        return None
+    def unique(pairs):
+        result = {}
+        for key, value in pairs:
+            if key in result:
+                raise ValueError('Duplicate application runtime field')
+            result[key] = value
+        return result
+    declared = json.loads(content, object_pairs_hook=unique)
+    expected = {'schema': 1, 'liveness_path': '/api/health.json',
+                'readiness_path': '/api/ready.json', 'stop_grace_seconds': 30}
+    if (not isinstance(declared, dict) or declared != expected
+            or type(declared['schema']) is not int
+            or type(declared['stop_grace_seconds']) is not int):
+        raise ValueError('Unsupported application runtime contract')
+    return declared
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
 
 
-def check_project(project, application):
+def check_project(project, application, runtime=None):
     command = ['docker', 'compose', '--project-directory', project['directory']]
     if project.get('project'):
         command += ['--project-name', project['project']]
@@ -47,6 +68,17 @@ def check_project(project, application):
                 ['docker', 'inspect', '--format', '{{json .Config.Image}}', *ids]).splitlines()]
             if len(images) != len(ids) or any(image != application['image'] for image in images):
                 raise ValueError('Application image differs')
+            if runtime:
+                for container in ids:
+                    response = output(['docker', 'exec', container, 'curl', '--fail', '--silent',
+                                   '--show-error', '--max-time', '3',
+                                   '--write-out', '\n%{http_code}',
+                                   'http://127.0.0.1:4321' + runtime['readiness_path']])
+                    body, status = response.rsplit('\n', 1)
+                    ready = json.loads(body)
+                    if (status != '200' or not isinstance(ready, dict)
+                            or set(ready) != {'ok'} or ready['ok'] is not True):
+                        raise ValueError('Application is not ready')
             application_found = True
     return containers, application_found
 
@@ -90,20 +122,28 @@ def probe(contract):
         return report
 
     application = contract['application'] if contract['tls'] else None
+    runtime = None
+    if application:
+        revision = output(['git', '-C', contract['source'], 'rev-parse', 'HEAD']).strip()
+        if revision != application['revision'] or output(
+                ['git', '-C', contract['source'], 'status', '--porcelain']).strip():
+            raise ValueError('Application source differs')
+        manifest = Path(contract['source']) / 'runtime-contract.json'
+        if manifest.is_symlink():
+            raise ValueError('Application runtime contract must be a regular file')
+        runtime = runtime_contract(manifest.read_text() if manifest.exists() else None)
+        report.update(application_revision=revision, source_clean=True)
     application_found = False
     report['containers'] = {}
     for project in contract['compose']:
-        containers, found = check_project(project, application)
+        containers, found = check_project(project, application, runtime)
         report['containers'].update(containers)
         application_found |= found
     if contract['tls']:
         if not application_found:
             raise ValueError('Application project missing')
-        revision = output(['git', '-C', contract['source'], 'rev-parse', 'HEAD']).strip()
-        if revision != application['revision'] or output(
-                ['git', '-C', contract['source'], 'status', '--porcelain']).strip():
-            raise ValueError('Application source differs')
-        report.update(application_revision=revision, source_clean=True)
+        if runtime:
+            report['application_ready'] = True
         output(['python3', '/usr/local/libexec/hou1-tls-receive', '--verify'])
         report['tls_verified'] = True
 

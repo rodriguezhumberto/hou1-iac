@@ -32,6 +32,11 @@ The workflow checks both inventories locally, then:
   application code. The supported form is `const GROUP_ROLES = Object.freeze({...});`
   with three quoted group names mapped to `reader`, `editor` and `admin`.
   A changed representation needs an explicit adapter or a published JSON contract.
+- Validates an optional root `runtime-contract.json` from that same source revision.
+  Schema 1 declares `/api/health.json`, `/api/ready.json` and a 30-second stop grace.
+  Unknown or malformed declarations fail before host access. Releases without
+  the file keep their existing health checks; declared releases also need a
+  successful readiness response from each running application container.
 - Decrypts the identity naming bundle in memory, reuses the existing
   identity-profile validator, and compares role groups, clients, issuer and user grants.
 - For legacy Authentik backups, encrypts a disposable value and decrypts it with

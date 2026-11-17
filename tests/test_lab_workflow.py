@@ -346,6 +346,9 @@ class LabRuntimeTest(unittest.TestCase):
         self.contract = {'hostname': platform.node(), 'address': '100.91.0.10', 'interface': 'wt0',
             'verify': True, 'compose': [{'directory': '/fixture'}], 'tls': True, 'https': [], 'source': '/fixture-source',
             'application': {'revision': '1' * 40, 'image': 'fixture@sha256:' + '2' * 64}}
+        self.source = self.root / 'source'
+        self.source.mkdir()
+        self.contract['source'] = str(self.source)
         binary = self.root / 'command'
         binary.write_text(f'#!{sys.executable}\n' + '''import json,sys
 from pathlib import Path
@@ -360,6 +363,8 @@ elif name=='systemctl':
  print('active' if active else 'inactive'); sys.exit(0 if active else 3)
 elif name=='git': print(state.get('revision','1'*40) if args[-1]=='HEAD' else state.get('dirty',''))
 elif name=='python3': print('PRIVATE_TLS_DIAGNOSTIC')
+elif 'exec' in args:
+ print(state.get('ready_body','{"ok":true}')+'\\n'+str(state.get('ready_status',200)),end=''); sys.exit(state.get('ready_exit',0))
 elif '--services' in args: print('astro-app')
 elif 'ps' in args: print('fixture-id')
 elif '.Config.Image' in ' '.join(args): print(json.dumps(state.get('image','fixture@sha256:'+'2'*64)))
@@ -388,6 +393,45 @@ else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':s
                 self.assertEqual(json.loads(result.stdout), {'failed': True})
         self.assertFalse(any(set(json.loads(line)) & {'up', 'down', 'start', 'stop', 'rm'}
                              for line in self.calls.read_text().splitlines()))
+
+    def test_declared_readiness_is_required_even_when_container_health_is_good(self):
+        manifest = {'schema': 1, 'liveness_path': '/api/health.json',
+                    'readiness_path': '/api/ready.json', 'stop_grace_seconds': 30}
+        (self.source / 'runtime-contract.json').write_text(json.dumps(manifest))
+        good = self.probe()
+        self.assertEqual(good.returncode, 0, good.stderr)
+        self.assertTrue(json.loads(good.stdout)['application_ready'])
+        for state in [{'ready_body': '{"ok":false}'}, {'ready_body': '{"ok":1}'},
+                      {'ready_body': 'PRIVATE_READINESS_ERROR'}, {'ready_exit': 22}, {'ready_status': 302}]:
+            with self.subTest(state=state):
+                result = self.probe(**state)
+                self.assertEqual(result.returncode, 1)
+                self.assertEqual(json.loads(result.stdout), {'failed': True})
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertTrue(any('exec' in call and call[-1].endswith('/api/ready.json') for call in calls))
+
+    def test_legacy_source_does_not_invent_readiness_and_invalid_manifests_fail_closed(self):
+        self.assertEqual(self.probe().returncode, 0)
+        calls = [json.loads(line) for line in self.calls.read_text().splitlines()]
+        self.assertFalse(any('exec' in call for call in calls))
+        path = self.source / 'runtime-contract.json'
+        for invalid in ['null', '[]', '{"schema":2}', 'PRIVATE_INVALID_JSON']:
+            path.write_text(invalid)
+            result = self.probe()
+            self.assertEqual(result.returncode, 1)
+            self.assertEqual(json.loads(result.stdout), {'failed': True})
+        path.unlink(); path.symlink_to(self.source / 'missing')
+        self.assertEqual(self.probe().returncode, 1)
+
+    def test_runtime_contract_rejects_duplicate_fields_and_boolean_schema(self):
+        expected = {'schema': 1, 'liveness_path': '/api/health.json',
+                    'readiness_path': '/api/ready.json', 'stop_grace_seconds': 30}
+        validator = workflow.lab_runtime.runtime_contract
+        self.assertIsNone(validator(None))
+        self.assertEqual(validator(json.dumps(expected)), expected)
+        for content in [json.dumps({**expected, 'schema': True}),
+                        json.dumps(expected).replace('"schema": 1', '"schema": 2, "schema": 1')]:
+            with self.assertRaises(ValueError): validator(content)
 
     def test_handoff_requires_private_live_listener_and_no_bootstrap_fallback(self):
         self.contract.update(verify=False, handoff=True, service='hou1')

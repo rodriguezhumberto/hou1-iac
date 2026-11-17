@@ -11,6 +11,7 @@ import subprocess
 import tempfile
 
 from ssh_target import private_file
+from lab_runtime import runtime_contract
 
 SHA = r'[a-f0-9]{40}'
 GHCR_IMAGE = (r'ghcr\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*'
@@ -84,6 +85,11 @@ def source_roles(config):
         revision = run(['git', '-C', repo, 'rev-parse', 'FETCH_HEAD^{commit}']).decode().strip()
         require(revision == config['application']['revision'], 'The standalone bundle ref differs from the image release')
         source = run(['git', '-C', repo, 'show', revision + ':' + release['authorization_file']]).decode()
+        entry = run(['git', '-C', repo, 'ls-tree', revision, '--', 'runtime-contract.json']).decode().strip()
+        if entry:
+            require(entry.split()[:2] == ['100644', 'blob'],
+                    'The application runtime contract must be a regular source file')
+            runtime_contract(run(['git', '-C', repo, 'show', revision + ':runtime-contract.json']))
     # The current application publishes a static mapping, not a JSON contract.
     # Accept that exact literal form without importing or executing release code.
     matches = re.findall(r'\bconst\s+GROUP_ROLES\s*=\s*Object\.freeze\(\s*(\{[^{}]*\})\s*\)\s*;', source)

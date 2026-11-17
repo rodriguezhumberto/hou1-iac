@@ -139,6 +139,25 @@ class LabContractsTest(unittest.TestCase):
             self.one['source_revision'] = self.config['application']['revision']
             with self.assertRaises(ValueError): self.validate()
 
+    def test_optional_runtime_manifest_is_validated_from_matching_release_source(self):
+        expected = {'schema': 1, 'liveness_path': '/api/health.json',
+                    'readiness_path': '/api/ready.json', 'stop_grace_seconds': 30}
+        self.assertEqual(contracts.source_roles(self.config), self.names['role_groups'])
+        manifest = self.source / 'runtime-contract.json'
+        for declared in [expected, {**expected, 'schema': 2}, {**expected, 'readiness_path': '/private'},
+                         {**expected, 'extra': True}, {**expected, 'stop_grace_seconds': 5}]:
+            manifest.write_text(json.dumps(declared))
+            self.git('-C', str(self.source), 'add', '.')
+            self.commit('runtime contract'); self.refresh_release()
+            if declared == expected:
+                self.assertEqual(contracts.source_roles(self.config), self.names['role_groups'])
+            else:
+                with self.assertRaises(ValueError): contracts.source_roles(self.config)
+        manifest.unlink(); manifest.symlink_to(self.module)
+        self.git('-C', str(self.source), 'add', '.')
+        self.commit('invalid manifest symlink'); self.refresh_release()
+        with self.assertRaises(ValueError): contracts.source_roles(self.config)
+
     def test_wrong_identity_environment_client_or_unknown_user_group_is_rejected(self):
         for field, value in [('staff_client_id', 'another-client'),
                              ('staff_issuer', 'https://another.example.invalid/'),

@@ -90,3 +90,5 @@ steps to code, private inputs or external prerequisites. The
 and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies that must be handled before cutover.
+The [application lifecycle plan](application-lifecycle-plan.md) defines portable
+health, storage-recovery and shutdown behavior before further orchestration work.
