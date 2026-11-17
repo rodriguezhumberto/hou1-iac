@@ -354,7 +354,7 @@ def main(argv=None):
     except KeyboardInterrupt:
         print('Workflow interrupted; inspect private logs before retrying', file=sys.stderr)
         return 130
-    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
+    except (OSError, ValueError, KeyError, TypeError, yaml.YAMLError, subprocess.SubprocessError):
         print('Workflow failed; check the declared inputs and private run logs', file=sys.stderr)
         return 1
     return 0

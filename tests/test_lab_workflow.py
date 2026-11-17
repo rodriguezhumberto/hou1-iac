@@ -1,7 +1,9 @@
 """Local Ansible/OpenSSH fixtures and read-only probe tests; no managed hosts."""
 
 import copy
+from contextlib import redirect_stderr
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -307,6 +309,16 @@ class LabWorkflowTest(unittest.TestCase):
         self.config['hosts']['hou1']['inputs'] = [str(source)]
         with self.assertRaisesRegex(workflow.WorkflowError, 'in inventory'):
             self.load()
+
+    def test_invalid_private_yaml_does_not_expose_input_content(self):
+        source = self.private('malformed.yml', 'credential: [private-marker\n')
+        self.config['hosts']['hou1']['inputs'] = [str(source)]
+        self.input.write_text(json.dumps(self.config))
+        error = io.StringIO()
+        with redirect_stderr(error):
+            self.assertEqual(workflow.main(['--config', str(self.input)]), 1)
+        self.assertNotIn('private-marker', error.getvalue())
+        self.assertNotIn('Traceback', error.getvalue())
 
     def test_repository_environment_replaces_ambient_plugin_and_secret_settings(self):
         with patch.dict(os.environ, {'ANSIBLE_LOG_PATH': '/unexpected/log', 'SOPS_AGE_KEY': 'not-the-selected-key'}):
