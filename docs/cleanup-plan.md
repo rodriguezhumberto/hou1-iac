@@ -50,6 +50,8 @@ converge without unnecessary changes.
   retained recovery workflows may depend on them.
 - Treat the network-removal correction as an explicit behavior change, separate
   from file extraction.
+- Use matching Make targets and isolated dependencies in each repository: local
+  checks and CI should exercise the same commands without a shared tool package.
 
 ## Later reliability work
 
@@ -60,3 +62,20 @@ converge without unnecessary changes.
 - Separate OS upgrades from routine application reconciliation.
 - Reconcile VPN peer replacement and readiness across both hosts.
 - Consider shared collections or Python packaging after interfaces are stable.
+
+## Review record
+
+- HOU1 and HOU4 contributor guides identify configuration sources, generated
+  outputs and local checks. Historical documentation is marked as historical.
+- Both repositories provide `make setup`, `check`, `syntax`, `lint` and `test`.
+  Setup installs pinned dependencies; checks do not install them or deploy.
+- HOU4 monitoring runtime uses named static phases. Comparing flattened tasks
+  against the original found identical definitions and order for all 18 tasks.
+- HOU1 removes the managed Authentik ingress network when disabled. Regression
+  coverage exercises enabled, disabled, repeated disabled and re-enabled states
+  in both CMS/NetBird reconciliation orders, preserving unrelated configuration.
+- HOU4 final `make check` passed all syntax/lint checks and 60 tests, with 15
+  optional native-tool skips matching its baseline. Isolated setup and dependency
+  consistency checks passed.
+- Independent review found no material issues in the integrated changes above.
+  The HOU1 webstack/Authentik extraction still needs integration and review.
