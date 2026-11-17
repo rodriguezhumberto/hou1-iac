@@ -10,7 +10,7 @@ import threading
 import unittest
 from unittest.mock import patch
 import yaml
-from helpers import ROOT, guard_play, run_plays
+from helpers import ROOT, ROLES, guard_play, read_task_phases, run_plays
 
 ISOLATION = runpy.run_path(
     str(ROOT / "ansible/playbooks/roles/rehearsal_gates/files/isolation.py")
@@ -337,20 +337,11 @@ class RehearsalGateTest(unittest.TestCase):
                 "netbird_control_plane": "Prepare DNS challenge credentials for the NetBird certificate",
             }
             for role, name in names.items():
-                tasks.append(
-                    next(
-                        t
-                        for t in yaml.safe_load(
-                            (
-                                ROOT
-                                / "ansible/playbooks/roles"
-                                / role
-                                / "tasks/main.yml"
-                            ).read_text()
-                        )
-                        if t["name"] == name
-                    )
+                source = (
+                    read_task_phases(role) if role == "webstack"
+                    else yaml.safe_load((ROLES / role / "tasks/main.yml").read_text())
                 )
+                tasks.append(next(t for t in source if t["name"] == name))
             result = run_plays(
                 [
                     {

@@ -9,7 +9,42 @@ import yaml
 
 ROOT = Path(__file__).resolve().parents[1]
 ROLES = ROOT / 'ansible/playbooks/roles'
-DEFAULTS = yaml.safe_load((ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
+def fixture_defaults():
+    """Combine component defaults and shared inputs for isolated task fixtures.
+
+    Real role loading and inventory precedence are covered separately. Fixture
+    scenarios override this mapping in run_plays, just as before relocation.
+    """
+    values = {}
+    for source in sorted(ROLES.glob('*/defaults/main.yml')):
+        for name, value in (yaml.safe_load(source.read_text()) or {}).items():
+            if name in values and values[name] != value:
+                raise ValueError(f'Conflicting role defaults for {name}: {source}')
+            values[name] = value
+    values.update(yaml.safe_load(
+        (ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text()))
+    return values
+
+
+DEFAULTS = fixture_defaults()
+
+
+def read_task_phases(role):
+    """Read entry tasks and one level of bare static phase imports.
+
+    Nested imports and dynamic includes remain explicit, as do imports carrying
+    vars, conditions, tags or other task keywords that a fixture must preserve.
+    """
+    task_root = ROLES / role / 'tasks'
+    tasks = []
+    for task in yaml.safe_load((task_root / 'main.yml').read_text()):
+        source = task.get('ansible.builtin.import_tasks')
+        if (set(task) == {'name', 'ansible.builtin.import_tasks'}
+                and isinstance(source, str) and '{{' not in source):
+            tasks.extend(yaml.safe_load((task_root / source).read_text()))
+        else:
+            tasks.append(task)
+    return tasks
 
 
 def run_plays(play_specs, extra_args=(), inventory_source=None):

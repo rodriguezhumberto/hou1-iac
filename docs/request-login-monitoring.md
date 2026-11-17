@@ -1,9 +1,7 @@
 # Credential-free HTTP and staff login monitoring
 
-Infrastructure #27 and staff #39 add HTTP/login coverage to the existing private
-HOU1 exporter and HOU4 Prometheus integration. No new public API, logging service,
-identity database or external metrics service is introduced. NetBird stays
-0.82.0 and independent HOU4-loss detection remains deferred.
+The private HOU1 exporter supplies HTTP/login metrics to HOU4 Prometheus.
+Independent HOU4-loss detection remains deferred.
 
 The staff OIDC callback sends a fixed `X-Staff-Login-Result` upstream response
 header: success only after token validation and session creation, failure after
@@ -93,15 +91,7 @@ and check login, public denial and VPN metrics. Preserve private numeric state
 and avoid appending a different schema to the same stream. Existing host,
 PostgreSQL, container, backup and renewal monitoring continue separately.
 
-The [environment-bound collector](environment-monitoring.md) supports test and
-production. Live production collection/probe acceptance is linked from the
-[production runbook](production-oidc-runbook.md); keep the older results below
-scoped to their original isolated rehearsal.
-
-Evidence from the isolated rehearsal is recorded in
-[evidence/request-login-monitoring-2026-11-08.json](evidence/request-login-monitoring-2026-11-08.json):
-93 staff tests, 139 infrastructure tests with one existing DNS-tool skip, 39 HOU4
-tests, native Nginx privacy/error/latency checks, successful live firing and
-resolved Discord notifications, preserved counters across rotation, eight healthy
-targets, 23 inactive rules and 22 provisioned dashboard queries. Both scoped
-Ansible reruns reported zero changes. No production promotion was performed.
+The [collector](environment-monitoring.md) supports test and production. See
+[production status](production-oidc-runbook.md#production-status) and the
+[isolated rehearsal results](evidence/request-login-monitoring-2026-11-08.json)
+for recorded validation.

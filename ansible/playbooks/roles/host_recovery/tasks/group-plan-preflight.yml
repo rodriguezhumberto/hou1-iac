@@ -1,0 +1,42 @@
+---
+- name: Read all pinned groups and policies before initial or resumed enrollment
+  ansible.builtin.uri:
+    url: '{{ netbird_api_url }}/api/{{ item }}'
+    headers: '{{ netbird_api_headers }}'
+    status_code: 200
+  loop: [groups, policies]
+  register: host_recovery_plan_state
+  delegate_to: localhost
+  become: false
+  no_log: true
+
+- name: Require unchanged group identities, remaining receivers and grants
+  ansible.builtin.assert:
+    that:
+      - matches | length == 1
+      - matches[0].name == item.name
+      - matches[0].resources | default([], true) | length == 0
+      - >-
+        (matches[0].peers | default([], true) | map(attribute='id') | sort | list) in
+        [(item.peers | default([]) | sort | list),
+         ((item.peers | default([]) + candidate) | sort | list)]
+      - policies | length == 1
+      - policies[0] | netbird_policy_body == item.policy.body | netbird_policy_body
+  vars:
+    matches: '{{ host_recovery_plan_state.results[0].json | selectattr("id", "equalto", item.id) | list }}'
+    policies: '{{ host_recovery_plan_state.results[1].json | selectattr("id", "equalto", item.policy.id) | list }}'
+    candidate: '{{ (host_recovery_enrollment_peers.json | selectattr("ip", "equalto", netbird_ip) | map(attribute="id") | list) }}'
+  loop: '{{ host_recovery_source_groups }}'
+  no_log: true
+
+- name: Require the pinned renewal source before enrollment when enabled
+  ansible.builtin.assert:
+    that:
+      - matches | length == 1
+      - matches[0].name == host_recovery_renewal_group.source.name
+      - matches[0].resources | default([], true) | length == 0
+      - (matches[0].peers | default([], true) | map(attribute='id') | list) == host_recovery_renewal_group.source.peers
+  vars:
+    matches: '{{ host_recovery_plan_state.results[0].json | selectattr("id", "equalto", host_recovery_renewal_group.source.id) | list }}'
+  no_log: true
+  when: host_recovery_renewal_handoff | default(false) | bool

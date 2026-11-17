@@ -2,6 +2,7 @@
 """Validate the fixed application artifact and its deployed/recovery identity."""
 import argparse
 import json
+import os
 from pathlib import Path
 import re
 import subprocess
@@ -50,7 +51,32 @@ def verify(image, revision, pull=False):
                                  platform='linux/amd64', image_id=info['Id']), revision)
 
 
-def running(root):
+def source_directory(root, source_root=None):
+    """Use explicit or recorded checkout paths; older runtimes remain Git roots."""
+    root = Path(root)
+    intent = root / '.application-source-pending.json'
+    if intent.exists() or intent.is_symlink():
+        raise ValueError('Complete the pending application source installation before backup')
+    marker = root / 'application-source.json'
+    if marker.is_symlink():
+        raise ValueError('Application source record must be a regular file')
+    if marker.exists():
+        if (not marker.is_file() or marker.stat().st_uid != os.geteuid()
+                or marker.stat().st_mode & 0o022):
+            raise ValueError('Application source record has unsafe ownership')
+        record = json.loads(marker.read_text())
+        if (record.get('schema') != 1 or not isinstance(record.get('source_root'), str)
+                or not re.fullmatch(r'[a-f0-9]{40}', record.get('revision', ''))):
+            raise ValueError('Invalid application source record')
+        source_root = source_root or record['source_root']
+    source = Path(source_root) if source_root is not None else root
+    if (not source.is_absolute() or '..' in source.parts or source.is_symlink()
+            or any(parent.is_symlink() for parent in source.parents)):
+        raise ValueError('Application source must be an absolute regular checkout path')
+    return source
+
+
+def running(root, source_root=None):
     root = Path(root)
     path = root / 'application-image.json'
     if not path.exists():
@@ -62,7 +88,7 @@ def running(root):
         if '@sha256:' in info['Config']['Image']:
             raise ValueError('Digest deployment is missing its application image receipt')
         return None
-    revision = run('git', '-C', str(root), 'rev-parse', 'HEAD').decode().strip()
+    revision = run('git', '-C', str(source_directory(root, source_root)), 'rev-parse', 'HEAD').decode().strip()
     receipt = validate_receipt(json.loads(path.read_text()), revision)
     validate_compose(root, receipt)
     if verify(receipt['image'], revision) != receipt:

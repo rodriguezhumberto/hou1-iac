@@ -32,7 +32,7 @@ The pinned NetBird combined server retains its own `/oauth2` issuer and register
 Authentik through `/api/identity-providers`. A direct Authentik replacement of
 `server.auth.issuer` is not the supported 0.82.0 design. The
 [compatibility guide](netbird-authentik-compatibility.md) explains this; the
-[legacy cutover helper](netbird-authentik-cutover.md) still conflicts with it.
+[legacy cutover helper](archive/netbird-authentik-cutover.md) still conflicts with it.
 
 Client, application, role-group and scope names come from encrypted naming
 bundles. Public hostnames, origins, Compose selectors and callback lists are
@@ -70,7 +70,5 @@ opening ingress. Never run two copies of the same VPN identity. A code or
 configuration rollback does not undo data or external-provider changes. After
 website cutover, reconcile new writes before reopening the old application.
 
-Independent renewal-controller execution and uninterrupted production replacement
-remain [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77) and
-[#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). Secret consolidation
-remains [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
+See [production status](production-oidc-runbook.md#production-status) for accepted
+results and outstanding recovery validation.

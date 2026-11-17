@@ -1,9 +1,7 @@
 # Explicit public website routing
 
-Follow-up to infrastructure #27 and staff #39: the selected deployment can omit
-the secondary static website and redirect public aliases to one canonical HTTPS
-hostname. Configure these choices in encrypted release inputs; no real domain
-name is required in shared code or a PR description.
+A deployment can omit the secondary website and redirect public aliases to one
+canonical HTTPS hostname. Configure these choices in private release inputs:
 
 ```yaml
 webstack_secondary_site_enabled: false

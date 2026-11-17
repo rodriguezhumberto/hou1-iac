@@ -1,0 +1,144 @@
+# Deployment code cleanup
+
+Make HOU1 and HOU4 easier to navigate, change and validate before changing their
+deployment architecture. HOU1 can be pushed for PR review; HOU4 stays local.
+
+## Initial cleanup order
+
+1. Record the existing test results and controller dependencies for each repo.
+2. Add consistent local validation commands and concise contributor guidance.
+3. Map supported entry points, execution locations and configuration ownership.
+4. Extract task phases and templates without changing runtime behavior. Update
+   tests that depend on the old file layout while preserving their assertions.
+5. Fix the confirmed Authentik ingress-network removal bug with a transition test.
+6. Review effective configuration, run the relevant suites and record follow-up
+   reliability work.
+
+Independent documentation and tooling changes may run in parallel. Integrate
+their local commits before starting work that depends on the new interfaces.
+Review every delegated result. Use isolated worktrees for overlapping changes;
+independent owners can work in the same checkout.
+
+## Cleanup rules
+
+- Keep public playbook names, variable names and installed paths compatible.
+- Preserve task ordering, environment guards, secret handling and recovery data.
+- Use named task files for phases; create a role only for a separate owner or
+  lifecycle.
+- Keep generated runtime files separate from authoritative configuration inputs
+  in the documentation. Changing generation behavior requires a focused fix.
+- Separate controller programs from files installed on hosts. Extract shared
+  Python code only when its execution and delivery contracts are clear.
+- Document required inputs and owned resources for roles being changed.
+- Keep documentation short. Record consequential design choices with their reason.
+- Keep HOU4 local. HOU1 may be pushed for PR review; do not deploy, decrypt
+  production inputs or change live nodes.
+
+## Validation
+
+Run existing offline suites before refactoring. Distinguish failures, missing-tool
+skips and optional integration checks. Use rendered configuration and real Ansible
+task fixtures where possible. Preserve tests of SSH cutover and recovery ordering.
+Add transition coverage for configuration removals; routine reconciliation should
+converge without unnecessary changes.
+
+## Decisions
+
+- Use task files within existing roles first: this improves navigation without
+  introducing additional role interfaces.
+- Keep scoped encrypted bundles separate: their different access and rotation
+  requirements are intentional.
+- Preserve historical evidence content and current runtime paths: recovery
+  commands and retained procedures may depend on them.
+- Treat the network-removal correction as an explicit behavior change, separate
+  from file extraction.
+- Use matching Make targets and isolated dependencies in each repository: local
+  checks and CI should exercise the same commands without a shared tool package.
+- Keep current guides in `docs/`, probe and drill procedures in `docs/probes/`,
+  dated records in `docs/evidence/` and superseded guidance in `docs/archive/`.
+  Public script paths and recorded results stay stable when documentation moves.
+- Keep shared paths/topology in inventory and component knobs in role defaults:
+  standalone recovery and backup entry points need the shared values too.
+- Treat generated Compose fingerprints as ownership checks, never desired input.
+  Explicit extensions preserve custom settings without carrying stale output forward.
+- Retain `app_directory` as the runtime root and Compose identity. A separate Git
+  checkout avoids modifying tracked configuration; regular installed assets keep
+  backups compatible. Cold restore retains its old layout until reconciliation.
+- Advance applied-input state only after successful activation. This retries
+  interrupted changes even when Ansible has already written the new files.
+- Require explicit companion transports and recovery resume. Pin the original
+  handoff and replacement rather than guessing identities from a desired address.
+
+## Reliability implementation
+
+Implemented locally in the order below.
+
+1. Move component settings to their owning role defaults; keep shared topology,
+   paths and identity inputs in inventory. Verify actual Ansible precedence.
+2. Move OS upgrades into explicit maintenance playbooks. Routine reconciliation
+   still refreshes package metadata and installs required packages.
+3. Give the application Compose override one owner. Generate desired state from
+   declared inputs and refuse unexplained additions during migration.
+4. Prepare shared ingress resources before application or backend startup.
+   Authentik requires an explicit environment-matched network declaration.
+5. Keep the application runtime directory and project identity stable; use a
+   separate source checkout and regular installed assets. Preserve older backup
+   configuration and recovery archives through source-discovery fallbacks.
+6. Track successfully applied service inputs. Recreate affected consumers, repair
+   stopped/missing services and retry failed activation on subsequent runs.
+7. Add an explicitly scoped companion/renewal handoff to peer replacement;
+   retain lost-peer identity checks and independent recovery access.
+8. Review integrated changes and run both complete local check suites.
+
+Shared packaging remains deferred: controller and host programs have different
+delivery contracts, and these changes do not yet establish a useful shared API.
+
+## Initial cleanup review
+
+- HOU1 and HOU4 contributor guides identify configuration sources, generated
+  outputs and local checks. Historical documentation is marked as historical.
+- Both repositories provide `make setup`, `check`, `syntax`, `lint` and `test`.
+  Setup installs pinned dependencies; checks do not install them or deploy.
+- HOU4 monitoring runtime uses named static phases. Comparing flattened tasks
+  against the original found identical definitions and order for all 18 tasks.
+- HOU1 removes the managed Authentik ingress network when disabled. Regression
+  coverage exercises enabled, disabled, repeated disabled and re-enabled states
+  in both CMS/NetBird reconciliation orders, preserving unrelated configuration.
+- HOU4 final `make check` passed all syntax/lint checks and 60 tests, with 15
+  optional native-tool skips matching its baseline. Isolated setup and dependency
+  consistency checks passed.
+- Independent review found no material issues in the integrated changes above.
+  A separate review of the HOU1 role extraction also found no material issues.
+- HOU1 webstack and Authentik now use named static phases. Comparison
+  confirmed all 67 original task definitions and their order, except the intended
+  copy-to-template conversion. The application template source is unchanged; four
+  fixtures cover rendered bytes, private mode and secret-log suppression.
+- The rehearsal TLS fixture uses the phase reader without changing its assertions.
+  Its 13-test module and static checks passed after the correction.
+- HOU1 final `make check` passed all 25 playbook syntax checks, source syntax,
+  lint and 333 tests, with one optional `dnsmasq` integration skip. Nginx, SOPS/age
+  and branding fixtures ran; the separate browser check also passed.
+- At the initial cleanup checkpoint, both repositories were on local
+  `cleanup/readable-deployments` branches. No pushes, PRs, deployments, live-node
+  access or production decryption had occurred.
+
+## Reliability review
+
+- Effective defaults stayed unchanged across 100 HOU1 and 77 HOU4 shared inputs.
+  Real Ansible fixtures verify role visibility and inventory/extra-var precedence.
+- Review corrected unchanged HOU4 deployments skipping repair, legacy standalone
+  backup configuration assuming migration, and interrupted asset installs blocking
+  retry. Full and component-tag runs now repair containers; security-only tags do
+  not apply monitoring.
+- Disposable Docker tests verify stable container IDs on no-op, consumer-only
+  recreation after atomic file replacement and repair of stopped/deleted services.
+- Recovery fixtures cover deletion, enrollment, saved receipts and partial group
+  assignment, plus repeated resumes and refusal of changed identities or grants.
+- Independent review found no remaining material issues. Runtime paths, archive
+  schemas and historical evidence remain compatible.
+- HOU1's full pre-PR `make check` passed syntax, lint and 377 tests, with one
+  optional DNS skip. The branded-login browser check also passed.
+- HOU4's full check passed 78 tests with 15 optional native-tool skips. Component
+  tag repair coverage and final syntax/lint checks passed in both repositories.
+- Documentation links resolve and all 62 historical JSON evidence files are
+  unchanged. No deployments, live-node access or production decryption.

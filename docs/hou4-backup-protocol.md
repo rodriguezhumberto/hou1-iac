@@ -128,8 +128,8 @@ required components and SQLite integrity. It writes plaintext secrets; protect
 and remove output afterward. It does not change services or prove a live restore.
 
 Use the maintained [production replacement playbooks](production-host-recovery.md),
-[clean test-host workflow](clean-host-recovery.md) or
-[test-only isolated component drill](reproducible-recovery-drill.md) for execution.
+[clean test-host workflow](probes/clean-host-recovery.md) or
+[test-only isolated component drill](probes/reproducible-recovery-drill.md) for execution.
 Do not manually seed or bootstrap over restored databases. Revoke backed-up
 sessions and reconcile all later user/role/device/token changes before publication.
 Retain the matching source bundle, pinned images and separately recoverable GHCR

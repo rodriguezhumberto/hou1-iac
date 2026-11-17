@@ -1,8 +1,7 @@
 # Releases and rollback
 
 PRs target `main`. Application image publication is a manual CI action from tested
-`main`; deployment is a separate explicit Ansible action. The former `cms-rollout`
-integration-branch process is not the current release workflow.
+`main`; deployment is a separate explicit Ansible action.
 
 ## Release record
 

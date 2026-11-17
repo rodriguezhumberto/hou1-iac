@@ -1,0 +1,31 @@
+---
+- name: Read only the selected companion VPN status over independent SSH
+  ansible.builtin.command:
+    argv: [netbird, status, --json]
+  delegate_to: '{{ host_recovery_companion.inventory_host }}'
+  become: true
+  vars:
+    ansible_connection: ssh
+    ansible_host: '{{ host_recovery_companion.public_ip }}'
+    ansible_ssh_args: >-
+      -o ControlMaster=no -o ControlPersist=no -o ProxyCommand=none -o ProxyJump=none -o StrictHostKeyChecking=yes
+      -o UserKnownHostsFile={{ host_recovery_companion.known_hosts_file | quote }}
+    ansible_ssh_common_args: ''
+    ansible_ssh_extra_args: ''
+  register: host_recovery_companion_status
+  changed_when: false
+  no_log: true
+  until: >-
+    host_recovery_companion_status.rc == 0 and
+    (not (host_recovery_companion_require_connected | bool) or
+     ((host_recovery_companion_status.stdout | from_json).management.connected | default(false)))
+  retries: '{{ 12 if host_recovery_companion_require_connected | bool else 0 }}'
+  delay: 5
+
+- name: Require the declared HOU4 address and recovered management endpoint
+  ansible.builtin.assert:
+    that:
+      - not (host_recovery_companion_require_connected | bool) or (host_recovery_companion_status.stdout | from_json).management.connected | default(false)
+      - ((host_recovery_companion_status.stdout | from_json).netbirdIp | regex_replace('/.*$', '')) == hou1_backup_receiver_ip
+      - ((host_recovery_companion_status.stdout | from_json).management.url | netbird_endpoint) == (netbird_management_url | netbird_endpoint)
+  no_log: true

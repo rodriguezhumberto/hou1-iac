@@ -1,9 +1,9 @@
-# Identity offboarding (#47)
+# Identity offboarding
 
 `scripts/offboard-user.py` coordinates denial for one immutable Authentik user
 UUID. It uses the existing private, pinned SSH/sudo management path, not a public
-HTTP endpoint. Deploy pearland-paws #51 first: the runtime image must advertise
-staff-offboarding schema 1 and include persistent subject blocking. Authentik
+HTTP endpoint. The runtime image must advertise staff-offboarding schema 1 and
+include persistent subject blocking. Authentik
 2025.10.4 and NetBird 0.82.0 are the supported releases.
 
 ## Management and secrets
@@ -45,10 +45,10 @@ The encrypted PAT document uses `netbird_management_url` and
 `netbird_api_token`. It stays on the controller. Authentik's bootstrap token
 stays in its container. No token is passed in shell arguments or returned in the
 report. The admission document is the encrypted desired state used by the
-admission reconciler (currently PR #46): `environment`, `netbird_url`,
-`authentik_issuer`, `google_emails`, `staff_users` with email/role assignments,
-and `fixture_users`. Other fields and age recipients are preserved. This
-command does not import or merge that prerequisite PR.
+[admission reconciler](authentik-bootstrap.md#google-admission-and-staffvpn-assignments):
+`environment`, `netbird_url`, `authentik_issuer`, `google_emails`, `staff_users`
+with email/role assignments, and `fixture_users`. Other fields and age recipients
+are preserved.
 
 The operator environment is `test` or `production`; existing Ansible/admission
 configuration calls production `prod`. Test addresses use `100.91.0.0/16`;
@@ -124,5 +124,3 @@ fresh IdP-login denial, blocked NetBird API access and deletion of an owned
 peer, unchanged control-user access, durable actor auditing, a nonzero partial
 outage, same-operation retry, and admission reconciliation without restored
 access. Keep any browser/token artifacts private and remove them after testing.
-
-Signing-key overlap and production promotion are separate gates.

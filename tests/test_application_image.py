@@ -12,7 +12,7 @@ from unittest.mock import patch
 
 import yaml
 
-from helpers import ROLES, guard_play, run_plays
+from helpers import ROLES, read_task_phases, guard_play, run_plays
 import test_host_recovery as host
 import test_recovery_drill as drill
 
@@ -51,7 +51,7 @@ def add_receipt(payload, revision):
 
 class ApplicationArtifactTest(unittest.TestCase):
     def test_recovered_single_branch_checkout_can_fetch_the_next_exact_release(self):
-        task = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[1]
+        task = next(task for task in read_task_phases('webstack') if 'git' in task)
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory); source = root / 'source'; checkout = root / 'checkout'; mirror = root / 'mirror.git'
             def git(*args):
@@ -68,13 +68,13 @@ class ApplicationArtifactTest(unittest.TestCase):
             revision = git('-C', source, 'rev-parse', 'HEAD')
             git('clone', '--bare', source, mirror)
             self.assertIn('refs/heads/recovery:', git('-C', checkout, 'config', '--get', 'remote.origin.fetch'))
-            result = run_plays([dict(variables={'app_repo_pat': str(mirror), 'app_directory': str(checkout),
+            result = run_plays([dict(variables={'app_repo_pat': str(mirror), 'app_source_directory': str(checkout),
                                                 'application_image_revision': revision}, tasks=[task])])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(git('-C', checkout, 'rev-parse', 'HEAD'), revision)
 
     def test_existing_node_image_update_preserves_runtime_and_rejects_missing_file(self):
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        tasks = read_task_phases('webstack')
         names = ['Check the retained runtime file for an image-only update',
                  'Require an existing regular runtime file before preserving it',
                  'Inject production .env file for Astro']
@@ -83,24 +83,38 @@ class ApplicationArtifactTest(unittest.TestCase):
             root = Path(directory)
             env = root / '.env'; original = b'FIXTURE=preserve-existing-runtime\n'
             env.write_bytes(original)
+            env.chmod(0o640)
+            original_mtime = env.stat().st_mtime_ns
             variables = dict(app_directory=directory, webstack_preserve_runtime_environment=True)
             result = run_plays([dict(variables=variables, tasks=selected)])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(env.read_bytes(), original)
+            self.assertEqual(env.stat().st_mode & 0o777, 0o640)
+            self.assertEqual(env.stat().st_mtime_ns, original_mtime)
             env.unlink()
             result = run_plays([dict(variables=variables, tasks=selected)])
             self.assertNotEqual(result.returncode, 0)
             self.assertIn('Require an existing regular runtime file before preserving it', result.stdout)
+            retained = root / 'retained.env'
+            retained.write_bytes(original)
+            env.symlink_to(retained)
+            result = run_plays([dict(variables=variables, tasks=selected)])
+            self.assertNotEqual(result.returncode, 0)
+            self.assertIn('Require an existing regular runtime file before preserving it', result.stdout)
+            self.assertTrue(env.is_symlink())
+            self.assertEqual(retained.read_bytes(), original)
 
     def test_tagged_webstack_deployment_cannot_skip_artifact_verification(self):
-        task = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())[0]
-        task['tags'] = ['deploy']
         variables = dict(application_image_reference='mutable:latest', application_image_revision='main',
                          deploy_ref='main', application_image_registry_secret_source='/fixture/pull.enc.json',
                          application_image_registry_age_key_file='/fixture/scoped.agekey')
-        result = run_plays([dict(variables=variables, tasks=[task])], extra_args=['--tags', 'deploy'])
-        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
-        self.assertIn('Require a CI digest and matching immutable source selection', result.stdout)
+        tags = ['deploy', 'webstack', 'ssl']
+        task = {'ansible.builtin.import_role': {'name': 'webstack'}, 'tags': tags}
+        for tag in tags:
+            with self.subTest(tag=tag):
+                result = run_plays([dict(variables=variables, tasks=[task])], extra_args=['--tags', tag])
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('Require a CI digest and matching immutable source selection', result.stdout)
 
     def test_ansible_rejects_mutable_or_mismatched_source_selections_before_pull(self):
         task = yaml.safe_load((ROLES / 'application_image/tasks/main.yml').read_text())[0]
@@ -172,7 +186,7 @@ class ApplicationArtifactTest(unittest.TestCase):
                 'nginx': dict(image='nginx:1.28.0-alpine', ports=['443:443'], networks=['app-network'])},
                 networks={'app-network': {'driver': 'bridge'}})
             path = root / 'docker-compose.yml'; path.write_text(yaml.safe_dump(config))
-            result = run_plays([dict(variables={'app_directory': directory, 'application_image_reference': IMAGE},
+            result = run_plays([dict(variables={'app_directory': directory, 'app_source_directory': directory, 'application_image_reference': IMAGE},
                                     tasks=[{'ansible.builtin.import_tasks': str(ROLES / 'webstack/tasks/image-compose.yml')}])])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             expected = copy.deepcopy(config)

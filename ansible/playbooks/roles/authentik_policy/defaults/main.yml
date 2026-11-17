@@ -1,0 +1,6 @@
+---
+authentik_capacity_path: /var/lib
+authentik_min_vcpus: 2
+authentik_min_memory_mb: 4096
+authentik_min_free_bytes: 21474836480
+authentik_min_free_inodes: 200000

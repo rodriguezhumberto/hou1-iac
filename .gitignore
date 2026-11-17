@@ -30,3 +30,5 @@ ansible/secrets/*.rendered.env
 # Python validation artifacts
 __pycache__/
 *.pyc
+.venv/
+.ruff_cache/

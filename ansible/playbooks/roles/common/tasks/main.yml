@@ -38,13 +38,10 @@
     state: restarted
   when: hou1_resolver_fallback.changed
 
-- name: Update and upgrade apt packages
-  apt:
-    update_cache: yes
-    upgrade: dist
-
 - name: Install required system packages
   apt:
+    update_cache: true
+    cache_valid_time: 3600
     name:
       - ufw
       - apt-transport-https

@@ -1,0 +1,86 @@
+{
+  "source": "Rendered by the original inline copy task at 48f1101; fixture values only.",
+  "common": {
+    "primary_domain": "site.example.invalid",
+    "secondary_domain": "extra.example.invalid",
+    "staff_domain": "staff.example.invalid",
+    "staff_cert_dir": "staff.example.invalid",
+    "public_site_origin": "https://site.example.invalid",
+    "netbird_ip": "100.90.0.10",
+    "public_hcaptcha_site_key": "fixture-hcaptcha-public",
+    "hcaptcha_secret_key": "fixture-hcaptcha-secret",
+    "VAPID_PUBLIC_KEY": "fixture-vapid-public",
+    "VAPID_PRIVATE_KEY": "fixture-vapid-private",
+    "VAPID_SUBJECT": "mailto:fixture@example.invalid",
+    "STAFF_PASSWORD": "fixture-staff-password",
+    "STAFF_SESSION_SECRET": "fixture-session-secret"
+  },
+  "cases": [
+    {
+      "name": "legacy-test-fallback-certificates",
+      "variables": {
+        "deploy_environment": "test",
+        "cms_environment": "test",
+        "ssl_domains": []
+      },
+      "expected": "# Network Setup\nHOU1_VPN_IP=100.90.0.10\nvpn_subnet=100.90.0.0/16\nstaff_vpn_subnet=100.90.0.0/16\n\n\n# Nginx Environment Mappings\nPRIMARY_CERT_DIR=test.site.example.invalid\nSECONDARY_CERT_DIR=test.site.example.invalid\nSTAFF_HOSTNAME=staff.example.invalid\nSTAFF_CERT_DIR=staff.example.invalid\nPRIMARY_HOSTNAMES=site.example.invalid www.site.example.invalid test.site.example.invalid\nSECONDARY_HOSTNAMES=extra.example.invalid www.extra.example.invalid test.extra.example.invalid\nPUBLIC_CANONICAL_HOSTNAME=site.example.invalid\nPUBLIC_CANONICAL_REDIRECT=false\nPUBLIC_SITE_ORIGIN=https://site.example.invalid\n\n# for hCaptcha\nPUBLIC_HCAPTCHA_SITE_KEY=fixture-hcaptcha-public\nHCAPTCHA_SECRET_KEY=fixture-hcaptcha-secret\n\n# Web Push\nPUBLIC_VAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PRIVATE_KEY=fixture-vapid-private\nVAPID_SUBJECT=mailto:fixture@example.invalid\n\n# Staff app authentication\nSTAFF_ENVIRONMENT=test\nSTAFF_PASSWORD=fixture-staff-password\nSTAFF_SESSION_SECRET=fixture-session-secret\n\n# Replacement CMS storage (test and production are host-isolated)\nCMS_ENVIRONMENT=test\nCMS_DATABASE_DIR=/var/data\nCMS_MEDIA_DIR=/var/data/media\nCMS_UPLOAD_MAX_BYTES=10485760\n"
+    },
+    {
+      "name": "production-oidc-explicit-routing",
+      "variables": {
+        "deploy_environment": "prod",
+        "cms_environment": "production",
+        "ssl_domains": [
+          {
+            "name": "site.example.invalid"
+          },
+          {
+            "name": "extra.example.invalid"
+          }
+        ],
+        "public_site_hostnames": [
+          "site.example.invalid",
+          "www.site.example.invalid"
+        ],
+        "secondary_site_hostnames": [
+          "extra.example.invalid"
+        ],
+        "webstack_public_canonical_redirect": true,
+        "staff_oidc_issuer": "https://auth.example.invalid/application/o/staff/",
+        "staff_oidc_client_id": "fixture-client",
+        "staff_oidc_client_secret": "fixture-oidc-secret",
+        "cms_upload_max_bytes": 12345
+      },
+      "expected": "# Network Setup\nHOU1_VPN_IP=100.90.0.10\nvpn_subnet=100.90.0.0/16\nstaff_vpn_subnet=100.90.0.0/16\n\n\n# Nginx Environment Mappings\nPRIMARY_CERT_DIR=site.example.invalid\nSECONDARY_CERT_DIR=extra.example.invalid\nSTAFF_HOSTNAME=staff.example.invalid\nSTAFF_CERT_DIR=staff.example.invalid\nPRIMARY_HOSTNAMES=site.example.invalid www.site.example.invalid\nSECONDARY_HOSTNAMES=extra.example.invalid\nPUBLIC_CANONICAL_HOSTNAME=site.example.invalid\nPUBLIC_CANONICAL_REDIRECT=true\nPUBLIC_SITE_ORIGIN=https://site.example.invalid\n\n# for hCaptcha\nPUBLIC_HCAPTCHA_SITE_KEY=fixture-hcaptcha-public\nHCAPTCHA_SECRET_KEY=fixture-hcaptcha-secret\n\n# Web Push\nPUBLIC_VAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PRIVATE_KEY=fixture-vapid-private\nVAPID_SUBJECT=mailto:fixture@example.invalid\n\n# Staff app authentication\nSTAFF_ENVIRONMENT=production\nSTAFF_PASSWORD=fixture-staff-password\nSTAFF_SESSION_SECRET=fixture-session-secret\nSTAFF_OIDC_ISSUER=https://auth.example.invalid/application/o/staff/\nSTAFF_OIDC_CLIENT_ID=fixture-client\nSTAFF_OIDC_CLIENT_SECRET=fixture-oidc-secret\nSTAFF_OIDC_REDIRECT_URI=https://staff.example.invalid/api/staff/oidc/callback\nSTAFF_OIDC_POST_LOGOUT_REDIRECT_URI=https://staff.example.invalid/staff/login\nSTAFF_OIDC_SCOPES=openid profile email groups\n\n# Replacement CMS storage (test and production are host-isolated)\nCMS_ENVIRONMENT=production\nCMS_DATABASE_DIR=/var/data\nCMS_MEDIA_DIR=/var/data/media\nCMS_UPLOAD_MAX_BYTES=12345\n"
+    },
+    {
+      "name": "production-primary-only",
+      "variables": {
+        "deploy_environment": "prod",
+        "cms_environment": "production",
+        "ssl_domains": [
+          {
+            "name": "site.example.invalid"
+          }
+        ],
+        "secondary_domain": "{{ undef() }}",
+        "webstack_secondary_site_enabled": false,
+        "webstack_public_canonical_redirect": true
+      },
+      "expected": "# Network Setup\nHOU1_VPN_IP=100.90.0.10\nvpn_subnet=100.90.0.0/16\nstaff_vpn_subnet=100.90.0.0/16\n\n\n# Nginx Environment Mappings\nPRIMARY_CERT_DIR=site.example.invalid\nSECONDARY_CERT_DIR=\nSTAFF_HOSTNAME=staff.example.invalid\nSTAFF_CERT_DIR=staff.example.invalid\nPRIMARY_HOSTNAMES=site.example.invalid www.site.example.invalid test.site.example.invalid\nSECONDARY_HOSTNAMES=\nPUBLIC_CANONICAL_HOSTNAME=site.example.invalid\nPUBLIC_CANONICAL_REDIRECT=true\nPUBLIC_SITE_ORIGIN=https://site.example.invalid\n\n# for hCaptcha\nPUBLIC_HCAPTCHA_SITE_KEY=fixture-hcaptcha-public\nHCAPTCHA_SECRET_KEY=fixture-hcaptcha-secret\n\n# Web Push\nPUBLIC_VAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PRIVATE_KEY=fixture-vapid-private\nVAPID_SUBJECT=mailto:fixture@example.invalid\n\n# Staff app authentication\nSTAFF_ENVIRONMENT=production\nSTAFF_PASSWORD=fixture-staff-password\nSTAFF_SESSION_SECRET=fixture-session-secret\n\n# Replacement CMS storage (test and production are host-isolated)\nCMS_ENVIRONMENT=production\nCMS_DATABASE_DIR=/var/data\nCMS_MEDIA_DIR=/var/data/media\nCMS_UPLOAD_MAX_BYTES=10485760\n"
+    },
+    {
+      "name": "test-primary-only-oidc",
+      "variables": {
+        "deploy_environment": "test",
+        "cms_environment": "test",
+        "ssl_domains": [],
+        "webstack_secondary_site_enabled": false,
+        "staff_oidc_issuer": "https://auth-test.example.invalid/",
+        "staff_oidc_client_id": "fixture-test-client",
+        "staff_oidc_client_secret": "fixture-test-oidc-secret"
+      },
+      "expected": "# Network Setup\nHOU1_VPN_IP=100.90.0.10\nvpn_subnet=100.90.0.0/16\nstaff_vpn_subnet=100.90.0.0/16\n\n\n# Nginx Environment Mappings\nPRIMARY_CERT_DIR=test.site.example.invalid\nSECONDARY_CERT_DIR=\nSTAFF_HOSTNAME=staff.example.invalid\nSTAFF_CERT_DIR=staff.example.invalid\nPRIMARY_HOSTNAMES=site.example.invalid www.site.example.invalid test.site.example.invalid\nSECONDARY_HOSTNAMES=\nPUBLIC_CANONICAL_HOSTNAME=site.example.invalid\nPUBLIC_CANONICAL_REDIRECT=false\nPUBLIC_SITE_ORIGIN=https://site.example.invalid\n\n# for hCaptcha\nPUBLIC_HCAPTCHA_SITE_KEY=fixture-hcaptcha-public\nHCAPTCHA_SECRET_KEY=fixture-hcaptcha-secret\n\n# Web Push\nPUBLIC_VAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PUBLIC_KEY=fixture-vapid-public\nVAPID_PRIVATE_KEY=fixture-vapid-private\nVAPID_SUBJECT=mailto:fixture@example.invalid\n\n# Staff app authentication\nSTAFF_ENVIRONMENT=test\nSTAFF_PASSWORD=fixture-staff-password\nSTAFF_SESSION_SECRET=fixture-session-secret\nSTAFF_OIDC_ISSUER=https://auth-test.example.invalid/\nSTAFF_OIDC_CLIENT_ID=fixture-test-client\nSTAFF_OIDC_CLIENT_SECRET=fixture-test-oidc-secret\nSTAFF_OIDC_REDIRECT_URI=https://staff.example.invalid/api/staff/oidc/callback\nSTAFF_OIDC_POST_LOGOUT_REDIRECT_URI=https://staff.example.invalid/staff/login\nSTAFF_OIDC_SCOPES=openid profile email groups\n\n# Replacement CMS storage (test and production are host-isolated)\nCMS_ENVIRONMENT=test\nCMS_DATABASE_DIR=/var/data\nCMS_MEDIA_DIR=/var/data/media\nCMS_UPLOAD_MAX_BYTES=10485760\n"
+    }
+  ]
+}

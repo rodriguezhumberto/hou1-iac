@@ -1,0 +1,43 @@
+---
+- name: Validate the Authentik Compose model before startup
+  ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml config
+  args:
+    chdir: "{{ authentik_project_root }}"
+  changed_when: false
+  no_log: true
+
+- name: Start Authentik only after PostgreSQL health becomes ready
+  community.docker.docker_compose_v2:
+    project_src: "{{ authentik_project_root }}"
+    project_name: "{{ authentik_compose_project }}"
+    files: [compose.yaml]
+    state: present
+    wait: true
+    wait_timeout: 900
+
+- name: Inspect the running Authentik project
+  ansible.builtin.command: docker compose -p "{{ authentik_compose_project }}" -f compose.yaml ps --format json
+  args:
+    chdir: "{{ authentik_project_root }}"
+  register: authentik_compose_ps
+  changed_when: false
+
+- name: Clear server template caches after changing the managed login extension
+  community.docker.docker_compose_v2:
+    project_src: "{{ authentik_project_root }}"
+    project_name: "{{ authentik_compose_project }}"
+    files: [compose.yaml]
+    services: [authentik-server]
+    state: restarted
+    wait: true
+    wait_timeout: 900
+  when: authentik_branding_template.changed | default(false) or authentik_branding_template_removed.changed | default(false)
+
+- name: Require healthy Authentik services and no public database ports
+  ansible.builtin.assert:
+    that:
+      - authentik_compose_ps.stdout is search('postgresql')
+      - authentik_compose_ps.stdout is search('authentik-server')
+      - authentik_compose_ps.stdout is search('authentik-worker')
+      - authentik_compose_ps.stdout is not search('0\.0\.0\.0:5432|:::5432')
+    fail_msg: Authentik Compose did not start healthy or PostgreSQL has a public listener.

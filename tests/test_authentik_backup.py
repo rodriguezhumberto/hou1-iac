@@ -8,7 +8,10 @@ import tarfile
 import tempfile
 import os
 
+import yaml
+
 from jinja2 import Environment
+from helpers import read_task_phases
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATES = ROOT / 'ansible/playbooks/roles/authentik/templates'
@@ -70,7 +73,7 @@ class AuthentikBackupTest(unittest.TestCase):
             self.assertIn(required, drill)
 
     def test_backup_roots_and_cron_are_separate(self):
-        tasks = (ROOT / 'ansible/playbooks/roles/authentik/tasks/main.yml').read_text()
+        tasks = yaml.safe_dump(read_task_phases('authentik'))
         self.assertIn('authentik_offhost_backup_root', tasks)
         self.assertIn('Schedule encrypted Authentik backups', tasks)
-        self.assertIn('authentik_backup_retention_days', (ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
+        self.assertIn('authentik_backup_retention_days', (ROOT / 'ansible/playbooks/roles/authentik/defaults/main.yml').read_text())

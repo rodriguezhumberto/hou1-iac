@@ -19,6 +19,21 @@ schema before deployment. It retains the matching source for Compose/Nginx and
 optional static content, replaces the build definition, then runs Compose with
 `--no-build`. `application-image.json` beside Compose records the result.
 
+## Source and runtime ownership
+
+`app_source_directory` defaults to the sibling `{{ app_directory }}-source`.
+Git updates only that checkout and refuses local source changes. `app_directory`
+keeps its existing Compose project, `.env`, database, certificates and mount paths.
+Ansible renders base Compose there and installs regular `nginx/` and
+`landing-page/` assets from the verified revision. `application-source.json`
+records the source path, revision and managed asset hashes, including removals.
+A private pending record makes interrupted asset installation retryable.
+
+Migration retains the old runtime checkout. It refuses local tracked changes
+except the previously generated Compose file; preserve operator edits before
+retrying. Later runs refuse edits to managed runtime assets. This keeps source
+updates from overwriting configuration or silently discarding local changes.
+
 ## Registry credentials
 
 Use dedicated `read:packages` access to the private package, with `GHCR_USERNAME`
@@ -51,6 +66,11 @@ rollback does not reverse data/schema changes. See [release policy](releases.md)
 ## Backup and recovery
 
 Capture verifies the stopped app's actual image against its receipt and source.
+Backup configuration discovers `application-source.json`, falling back to the
+legacy runtime Git checkout. `hou1_backup_app_source_directory` optionally pins
+an explicit checkout. Capture refuses a pending source installation.
+Recovery archives keep their existing format. Cold restore retains the legacy
+checkout layout and moves source on the next application reconciliation.
 The encrypted point includes that receipt; contradictions stop capture/recovery.
 It excludes registry credentials and the offline owner key. The manifest digest
 is portable; local Docker `image_id` values may differ across storage engines.

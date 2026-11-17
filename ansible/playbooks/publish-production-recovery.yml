@@ -18,8 +18,11 @@
           - inventory_hostname not in groups.get('test_env', [])
           - cms_environment == 'production'
           - authentik_environment == 'prod'
-          - node_bootstrap | bool
-          - ansible_host == prod_vps_public_ip
+          - host_recovery_resume | default(false) is boolean
+          - >-
+            (node_bootstrap | bool and ansible_host == prod_vps_public_ip) or
+            (host_recovery_resume | default(false) and not (node_bootstrap | bool) and
+             ansible_host == netbird_ip and ansible_user == new_user)
           - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
           - host_recovery_console_confirmed | default(false) | bool
           - host_recovery_access_reviewed | default(false) | bool
@@ -51,4 +54,4 @@
       ansible.builtin.include_tasks: roles/host_recovery/tasks/publish.yml
     - name: Record outstanding operational handoff gates
       ansible.builtin.debug:
-        msg: Restore publication completed. Reconnect HOU4, reapply TLS renewal access, monitoring and backups, verify owner login/VPN/SSH, and collect a fresh off-host recovery point before production approval.
+        msg: Restore publication completed. Verify HOU4 and renewal receiver membership; complete any omitted transport handoffs. Reapply TLS renewal access, monitoring and backups, verify owner login/VPN/SSH, and collect a fresh off-host recovery point before production approval.

@@ -8,28 +8,21 @@ cd ansible
 ansible-playbook playbooks/authentik-bootstrap.yml \
   -e target_hosts=hou1_test -e deploy_environment=test \
   -e authentik_age_key_file=/root/.config/sops/age/hou1-authentik-test.txt \
-  --ask-vault-pass
+  -e authentik_controller_age_key_file=/private/authentik-test.key
 ```
 
-The bootstrap utility uses the Authentik API and only reconciles the named
-groups, users, property mappings, providers, and applications in the selected
-manifest. It never deletes or rewrites unrelated identities. Re-running it is
-idempotent. `authentik_identity_profiles` in inventory defines the public issuer,
-management endpoint, subnet, callback/logout lists, and Compose selectors.
-Organization-specific client, application, group and scope-mapping names come
-from the matching SOPS-encrypted `identity-names-<environment>.enc.json` bundle. One shared manifest template consumes the selected profile; bootstrap
-and admission share its validator. The default profiles are:
+## Identity contract
 
-| environment | staff client/audience | NetBird client/audience |
-| --- | --- | --- |
-| test | From the encrypted naming bundle | `netbird-test` |
-| prod | From the encrypted naming bundle | `netbird-prod` |
+Bootstrap reconciles only manifest-owned groups, users, mappings, providers and
+applications; unrelated identities are preserved and reruns are idempotent.
+`authentik_identity_profiles` selects public endpoints, subnet, callbacks and
+Compose selectors. Private client, application, role-group and mapping names
+come from `identity-names-<environment>.enc.json`. Default NetBird clients are
+`netbird-test` and `netbird-prod`; staff client names come from that bundle.
 
-Override public deployment values in the inventory profile. Edit identity names
-only through SOPS; do not add them to inventory, examples or source code. Keep test/production clients, domains,
-certificates and SOPS secrets separate. The role checks that its Compose selector
-matches its deployment path. Client/provider/application identifiers use the
-configured client ID; other naming conventions are not enforced in Python.
+Override public values in inventory and edit private names through SOPS. Keep
+test and production clients, domains, certificates and secrets separate. The
+role checks that the selected Compose path matches its deployment.
 
 The `groups` scope mapping emits only the exact staff group names. The staff
 application and NetBird client each have a distinct audience and redirect
@@ -39,29 +32,28 @@ missing, unknown, duplicated, or malformed. Individual users are supplied
 through `authentik_staff_users` and are added to explicit role groups without
 using email as an identity key.
 
-Google, identity bootstrap, and branded login are enabled by default for both
+## Google login
+
+Google, identity bootstrap and branded login are enabled by default for both
 environments. To restore the previous login, rerun the Authentik playbook with
 `-e authentik_branding_enabled=false`; leave bootstrap enabled for restoration.
-The environment-specific SOPS bundle
-must contain `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and
+The environment-specific SOPS bundle must contain `GOOGLE_OAUTH_CLIENT_ID`, `GOOGLE_OAUTH_CLIENT_SECRET`, and
 `GOOGLE_ALLOWED_EMAILS` (an explicit lowercase address list). The selected manifest
 configures Google with S256 PKCE, gates both default source flows with the
 verified-email allowlist, enables the login button, and uses the normal internal
-user type for application access. This does not grant superuser or staff roles;
-the encrypted admission configuration still manages explicit roles after first
-login. Other login sources remain on the identification stage. This
-source bootstrap validates the environment's exact client IDs and callback/logout
-contract before API writes. Production uses its own Google OAuth client and
-secret; register `https://<profile-issuer-host>/source/oauth/callback/google/`
-as its Google authorized redirect URI. Do not reuse the rehearsal OAuth client.
+user type for application access. Role assignment is separate from admission;
+other login sources remain on the identification stage. Bootstrap validates
+client IDs and callbacks before API writes. Production uses its own Google
+OAuth client and secret; register `https://<profile-issuer-host>/source/oauth/callback/google/`
+as its Google authorized redirect URI.
 
 The source authentication flow uses `authentication: none` so a Google callback
 also works when the browser already has an Authentik session, including when
 returning to the applications overview after logout from another application.
 Bootstrap applies this setting only after both verified-email policy bindings
-are enabled, non-negated and fail closed in ALL mode. This flow setting does not
-grant application roles or bypass the account allowlist. Check the overview
-after a fresh login and again with an existing session when validating changes.
+are enabled, non-negated and fail closed in ALL mode. Check the applications
+overview after fresh login and with an existing session; the source allowlist
+and application role checks still apply.
 
 For production, select the production inventory and `deploy_environment=prod`,
 the production SOPS bundle and its scoped age identity. Confirm production
@@ -83,7 +75,7 @@ controller without connecting to that host:
 ansible-playbook -i ansible/inventory/inventory.yml \
   ansible/playbooks/export-identity-profile.yml \
   -e target_hosts=hou1_prod -e deploy_environment=prod \
-  -e identity_profile_output=/private/identity-prod.json --ask-vault-pass
+  -e identity_profile_output=/private/identity-prod.json
 ```
 
 The exported profile contains no organization-specific client or application name,
@@ -99,22 +91,19 @@ python3 scripts/rehearsal-netbird-admission.py \
   --config /private/admission-prod.enc.json --age-key-file /private/scoped-age-key
 ```
 
-The role decrypts the naming bundle on the managed host into memory, suppresses
-its output, and retains only ciphertext alongside the deployment for recovery.
-The controller command decrypts the same bundle in memory with its scoped age
-identity. Its `IDENTITY_NAMES` object contains:
+The role and admission command decrypt the naming bundle in controller memory
+with the scoped age identity. The role suppresses output and retains only
+ciphertext on HOU1 for recovery. Its `IDENTITY_NAMES` object contains:
 
 - `environment`, matching the selected profile.
 - `staff.client_id` and `staff.application_name`.
 - `role_groups.reader`, `role_groups.editor`, and `role_groups.admin`.
 - `scope_mapping_names.profile`, `.groups`, and `.audience`.
 
-The committed bundles preserve the existing identity names and are encrypted
-only to the owner's age recipient. A temporary deployment recipient must be
-granted access to copies of these bundles alongside the other deployment secrets.
-Missing or mismatched naming inputs fail closed; there is no plaintext default.
-Keep existing values during this cleanup: changing a client or group name is
-a separate identity migration requiring coordinated application configuration.
+Committed naming bundles authorize only the owner recipient. Grant temporary
+deployment access through encrypted copies as described in [SOPS/age](sops-age-secrets.md).
+Missing or mismatched names fail closed. Changing a client or group name requires
+a coordinated identity migration.
 
 The SOPS-encrypted admission configuration retains its environment and destination
 bindings. They must exactly match the independently exported profile; mismatches
@@ -149,18 +138,20 @@ replace only managed Authentik staff-role groups and add NetBird's `staff`
 auto-group. They preserve unrelated groups and the regular NetBird `user` role;
 staff-app administrators receive no network-administrator grant.
 
-New identities are counted as awaiting first login. Rerun after their first
-Google/NetBird login, then refresh the staff session and verify the intended
-role and VPN reachability. Production application admission permits active,
-allowlisted Google-source users only; the local emergency identity is preserved
-and has no rehearsal-fixture bypass, regardless of profile settings. Use the [offboarding command](operator-offboarding.md)
-to revoke an existing identity and its sessions/devices; changing an allowlist
+After a new user's first Google/NetBird login, rerun admission, refresh the staff
+session and verify the intended role and VPN reachability. Production admission
+permits active, allowlisted Google-source users only; the local emergency identity
+is preserved and has no rehearsal-fixture bypass. Use the
+[offboarding command](operator-offboarding.md) to revoke an existing identity and its sessions/devices; changing an allowlist
 alone does not revoke existing tokens or peers.
+
+## Emergency identity and cleanup
 
 `AUTHENTIK_EMERGENCY_PASSWORD`, when present in that SOPS bundle, initializes
 the local `akadmin` account on first boot. Hand it to the operator encrypted;
 bootstrap variables do not reset an existing database's password. Private
 identity manifests are excluded from Ansible output and removed after bootstrap,
 including command failure. Google allowlists remain in SOPS inputs and the
-running Authentik database. See the [fresh-host checklist](fresh-host-rehearsal.md)
-for input handoff, manual CMS seeding and outstanding restore evidence.
+running Authentik database. For a lost node, use [production recovery](production-host-recovery.md)
+rather than bootstrap; the [fresh-host journal](evidence/fresh-host-rehearsal.md) records
+earlier test preparation.

@@ -15,7 +15,7 @@ import tempfile
 import yaml
 
 from jinja2 import Environment
-from helpers import run_play
+from helpers import read_task_phases, run_play
 from identity_fixtures import identity_profile, identity_manifest, identity_names
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -264,7 +264,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
             **values, authentik_decrypted={'AUTHENTIK_EMERGENCY_PASSWORD': 'fixture-emergency'}))
 
     def test_failed_bootstrap_removes_private_manifest_without_logging_its_values(self):
-        task = next(task for task in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        task = next(task for task in read_task_phases('authentik')
                     if task['name'] == 'Apply private Authentik identity inputs and remove the runtime manifest')
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -440,7 +440,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age binaries required')
     def test_role_loads_private_names_without_plaintext_files_or_logged_values(self):
-        deployment = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text()) if 'block' in t)
+        deployment = next(t for t in read_task_phases('authentik') if 'block' in t)
         task = next(t for t in deployment['block'] if t['name'] == 'Load the encrypted organization naming contract for identity bootstrap')
         # The production role runs as root; these disposable fixtures use the
         # current test user while exercising the real copy/load/merge tasks.
@@ -469,7 +469,7 @@ class AuthentikBootstrapTest(unittest.TestCase):
                                  json.loads(encrypted.read_text())['IDENTITY_NAMES'])
 
     def test_role_uses_configured_project_and_rejects_a_different_compose_path(self):
-        tasks = yaml.safe_load((ROLE / 'tasks/main.yml').read_text())[:2]
+        tasks = read_task_phases('authentik')[:2]
         profile = identity_profile('prod')
         profile['compose_project'] = 'custom-identity'
         variables = dict(authentik_environment='prod', authentik_identity_profiles={'prod': profile},
@@ -481,8 +481,22 @@ class AuthentikBootstrapTest(unittest.TestCase):
         result = run_play(variables, tasks)
         self.assertNotEqual(result.returncode, 0)
 
+    def test_tagged_deployment_preserves_the_private_input_guard(self):
+        task = {'ansible.builtin.import_role': {'name': 'authentik'}, 'tags': ['authentik', 'deploy']}
+        variables = dict(authentik_environment='test', authentik_age_key_file='relative-key',
+                         authentik_secret_source='/fixture/private.enc.yaml',
+                         authentik_bootstrap_enabled=False, authentik_google_enabled=False,
+                         authentik_branding_enabled=False)
+        for tag in ('authentik', 'deploy'):
+            with self.subTest(tag=tag):
+                result = run_play(variables, [task], extra_args=['--tags', tag, '--diff', '-vv'])
+                self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+                self.assertIn('Validate Authentik environment and isolated roots', result.stdout)
+                self.assertIn('censored', result.stdout)
+                self.assertNotIn('/fixture/private.enc.yaml', result.stdout + result.stderr)
+
     def test_production_google_opt_in_requires_bootstrap(self):
-        task = next(t for t in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        task = next(t for t in read_task_phases('authentik')
                     if t['name'] == 'Validate Authentik environment and isolated roots')
         variables = dict(authentik_environment='prod', authentik_project_root='/opt/hou1-authentik/prod',
                          authentik_data_root='/var/lib/hou1-authentik/prod',
@@ -558,6 +572,6 @@ class AuthentikBootstrapTest(unittest.TestCase):
             bootstrap.validate_manifest(manifest, environment, identity_profile(environment))
 
     def test_bootstrap_is_disabled_for_base_compose_deployments(self):
-        tasks = (ROLE / 'tasks/main.yml').read_text()
+        tasks = yaml.safe_dump(read_task_phases('authentik'))
         self.assertIn('authentik_bootstrap_enabled | bool', tasks)
         self.assertIn('AUTHENTIK_BOOTSTRAP_TOKEN', tasks)

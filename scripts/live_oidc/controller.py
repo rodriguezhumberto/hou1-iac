@@ -2,7 +2,7 @@
 
 Private paths and hostnames deliberately bind this drill to the approved VPS
 fixture. Secrets are decrypted only into captured process input. Reports contain
-no credentials. See docs/live-security-tests.md before invoking mutations.
+no credentials. See docs/probes/live-security-tests.md before invoking mutations.
 """
 
 import json, subprocess, os, sys, uuid

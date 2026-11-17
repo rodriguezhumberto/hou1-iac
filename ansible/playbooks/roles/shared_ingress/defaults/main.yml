@@ -1,0 +1,3 @@
+---
+# Authentik may provision its isolated environment before publishing it.
+shared_ingress_additional_authentik_networks: []

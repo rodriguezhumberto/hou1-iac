@@ -1,5 +1,8 @@
 from pathlib import Path
 import unittest
+import yaml
+
+from helpers import read_task_phases
 
 ROOT = Path(__file__).resolve().parents[1]
 TEMPLATE = ROOT / 'ansible/playbooks/roles/authentik/templates/compose.yaml.j2'
@@ -24,6 +27,6 @@ class AuthentikComposeTest(unittest.TestCase):
             self.assertIn(required, ingress)
 
     def test_test_and_prod_state_are_variable_separated(self):
-        tasks = (ROOT / 'ansible/playbooks/roles/authentik/tasks/main.yml').read_text()
+        tasks = yaml.safe_dump(read_task_phases('authentik'))
         self.assertIn('authentik_environment in [\'test\', \'prod\']', tasks)
         self.assertIn('/var/lib/hou1-authentik/(test|prod)', tasks)

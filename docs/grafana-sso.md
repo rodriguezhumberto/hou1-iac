@@ -5,10 +5,8 @@ confidential OIDC client, signed group scope, access policy and three monitoring
 groups. Google remains the upstream login; Authentik controls monitoring access.
 Staff and VPN memberships do not grant Grafana access.
 
-The production owner confirmed Google login, logout and re-login. Live checks
-also confirm the administrator role, nonmember denial, local emergency access
-and zero-change reapplication. See the
-[redacted gate evidence](evidence/grafana-sso-2026-11-11.json).
+[Historical acceptance](evidence/grafana-sso-2026-11-11.json) records login/logout,
+roles, nonmember denial, emergency access and zero-change reapplication.
 
 Keep the complete contract in a separate SOPS/age JSON bundle:
 

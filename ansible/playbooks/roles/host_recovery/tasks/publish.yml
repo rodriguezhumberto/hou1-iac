@@ -1,9 +1,9 @@
 ---
-- name: Publish only the previously restored ingress and STUN ports
-  ansible.builtin.command:
-    argv: [python3, '/var/lib/hou1-host-recovery/{{ host_recovery_id }}/restore.py', publish]
-  no_log: true
-  changed_when: true
+- name: Validate optional recovery transports before opening ingress or retiring peers
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/transport-preflight.yml
+
+- name: Publish once or validate the retained successful publication checkpoint
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/publication-checkpoint.yml
 
 - name: Replace only the explicitly selected lost host peer
   delegate_to: localhost
@@ -14,8 +14,8 @@
       netbird_token_vault:
         path: '{{ netbird_token_vault_file }}'
         management_url: '{{ netbird_management_url }}'
-        vault_id: '{{ netbird_token_vault_id }}'
         age_key_file: '{{ netbird_token_age_key_file }}'
+        recovery_recipients: '{{ netbird_token_recovery_recipients }}'
       register: host_recovery_api_token
     - name: Require the existing token rather than creating a new account
       ansible.builtin.assert:
@@ -25,38 +25,20 @@
       vars:
         netbird_api_context_url: '{{ netbird_management_url }}'
         netbird_api_context_token: '{{ host_recovery_api_token.token }}'
-    - name: Read only the pinned lost HOU1 peer
-      ansible.builtin.uri:
-        url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'
-        headers: '{{ netbird_api_headers }}'
-        status_code: 200
-      register: host_recovery_old_peer
-    - name: Refuse another device or a connected peer
-      ansible.builtin.assert:
-        that:
-          - host_recovery_old_peer.json.id == host_recovery_lost_peer_id
-          - host_recovery_old_peer.json.ip == netbird_ip
-          - host_recovery_old_peer.json.name == host_recovery_lost_peer_name
-          - not (host_recovery_old_peer.json.connected | bool)
-        fail_msg: The selected peer is not the disconnected lost HOU1 identity.
-    - name: Pin exact managed monitoring and backup groups before retiring the peer
-      ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-groups-before.yml
-    - name: Preserve the verified source-group plan before irreversible retirement
-      ansible.builtin.copy:
-        dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/source-groups-before.json'
-        content: "{{ {'lost_peer_id': host_recovery_lost_peer_id, 'source_groups': host_recovery_source_groups} | to_nice_json }}\n"
-        mode: '0600'
-    - name: Retire that lost peer to release its declared address
-      ansible.builtin.uri:
-        url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'
-        headers: '{{ netbird_api_headers }}'
-        method: DELETE
-        status_code: 200
-      changed_when: true
+    - name: Retire only the pinned lost peer or resume its original handoff
+      ansible.builtin.include_tasks: roles/host_recovery/tasks/peer-retirement.yml
+
+- name: Verify saved replacement identity and address occupancy before enrollment
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/replacement-preflight.yml
+
+- name: Recheck pinned groups and policies before any initial or resumed enrollment
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/group-plan-preflight.yml
 
 - name: Enroll the replacement through the existing pinned client role
   ansible.builtin.include_role:
     name: netbird_client
+- name: Persist the exact verified replacement before binding its groups
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/replacement-receipt.yml
 - name: Reattach only the pinned lost peer's managed source groups
   delegate_to: localhost
   become: false
@@ -69,6 +51,8 @@
     name: netbird_dns
 - name: Refresh an explicitly configured dedicated controller VPN transport
   ansible.builtin.include_tasks: roles/host_recovery/tasks/refresh-management.yml
+- name: Refresh an explicitly configured companion through independent access
+  ansible.builtin.include_tasks: roles/host_recovery/tasks/refresh-companion.yml
 - name: Verify private SSH before retiring bootstrap access
   ansible.builtin.include_role:
     name: security

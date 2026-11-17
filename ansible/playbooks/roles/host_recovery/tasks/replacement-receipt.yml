@@ -1,0 +1,24 @@
+---
+- name: Require the observed replacement before persisting its identity
+  ansible.builtin.assert:
+    that:
+      - netbird_server_peer.id != host_recovery_lost_peer_id
+      - netbird_server_peer.ip == netbird_ip
+      - netbird_server_peer.name | length > 0
+      - netbird_server_peer.id is match('^[a-zA-Z0-9_-]+$')
+      - >-
+        not host_recovery_replacement or
+        host_recovery_replacement.peer == {'id': netbird_server_peer.id, 'name': netbird_server_peer.name, 'ip': netbird_server_peer.ip}
+  no_log: true
+
+- name: Pin the verified replacement before any recovery group reassignment
+  ansible.builtin.copy:
+    dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/replacement-peer.json'
+    content: >-
+      {{ {'plan': host_recovery_handoff, 'peer': {'id': netbird_server_peer.id,
+          'name': netbird_server_peer.name, 'ip': netbird_server_peer.ip}} | to_nice_json }}
+    mode: '0600'
+  delegate_to: localhost
+  become: false
+  no_log: true
+  when: not host_recovery_replacement_file.stat.exists

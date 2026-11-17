@@ -1,0 +1,33 @@
+---
+- name: Prepare shared ingress and the isolated Authentik network
+  ansible.builtin.import_role:
+    name: shared_ingress
+  vars:
+    shared_ingress_additional_authentik_networks: "{{ [authentik_ingress_network] }}"
+
+- name: Create persistent Authentik directories with restrictive ownership
+  ansible.builtin.file:
+    path: "{{ item.path }}"
+    state: directory
+    owner: "{{ item.owner }}"
+    group: "{{ item.group }}"
+    mode: '0750'
+  loop:
+    - {path: "{{ authentik_project_root }}", owner: root, group: root}
+    - {path: "{{ authentik_data_root }}", owner: root, group: root}
+    - {path: "{{ authentik_data_root }}/postgres", owner: "{{ authentik_postgres_uid }}", group: "{{ authentik_postgres_gid }}"}
+    - {path: "{{ authentik_data_root }}/media", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/templates", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/certs", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+    - {path: "{{ authentik_data_root }}/config", owner: "{{ authentik_container_uid }}", group: "{{ authentik_container_gid }}"}
+
+- name: Create local and off-host backup roots
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - "{{ authentik_backup_root }}"
+    - "{{ authentik_offhost_backup_root }}"

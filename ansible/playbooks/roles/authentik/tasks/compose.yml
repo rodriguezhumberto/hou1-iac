@@ -1,0 +1,11 @@
+---
+- name: Install or remove the managed login presentation
+  ansible.builtin.include_tasks: branding.yml
+
+- name: Render the pinned isolated Compose project
+  ansible.builtin.template:
+    src: compose.yaml.j2
+    dest: "{{ authentik_project_root }}/compose.yaml"
+    owner: root
+    group: root
+    mode: '0644'

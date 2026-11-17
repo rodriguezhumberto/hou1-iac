@@ -70,14 +70,18 @@ def archive_tree(output, directory, names):
             archive.add(Path(directory) / name, arcname=name)
 
 
-def application_receipt(root):
+def artifact_module():
     import importlib.util
     helper = Path(__file__).with_name('hou1-application-artifact.py')
     if not helper.exists():
         helper = Path(__file__).resolve().parents[2] / 'application_image/files/artifact.py'
     spec = importlib.util.spec_from_file_location('application_artifact', helper)
     artifact = importlib.util.module_from_spec(spec); spec.loader.exec_module(artifact)
-    return artifact.running(root)
+    return artifact
+
+
+def application_receipt(root, source_root=None):
+    return artifact_module().running(root, source_root)
 
 
 def snapshot(config, work):
@@ -93,7 +97,8 @@ def snapshot(config, work):
             shutil.copyfile(Path(auth['root']) / name, auth_work / name)
     cms = work / 'cms'; (cms / 'database').mkdir(parents=True)
     with frozen(app, WRITERS['app'], (intent, 'app')):
-        application_image = application_receipt(app['root'])
+        source_root = str(artifact_module().source_directory(app['root'], app.get('source_root')))
+        application_image = application_receipt(app['root'], source_root)
         database = Path(app['database']) / 'forms.db'
         with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as source:
             with closing(sqlite3.connect(cms / 'database/forms.db')) as target:
@@ -123,7 +128,7 @@ def snapshot(config, work):
         path = Path(name)
         if not path.is_file(): raise ValueError('Missing required host recovery input')
         shutil.copyfile(path, recovery / str(number))
-    revision = command(['git', '-C', app['root'], 'rev-parse', 'HEAD']).decode().strip()
+    revision = command(['git', '-C', source_root, 'rev-parse', 'HEAD']).decode().strip()
     metadata = {'schema': 1, 'environment': config['environment'],
         'staff_revision': revision, 'recovery_files': config['recovery_files'],
         'components': ['authentik', 'netbird', 'cms', 'app-config', 'host-recovery']}

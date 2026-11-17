@@ -6,7 +6,7 @@ With `hou1_backup_enabled: true`, the [unified backup protocol](hou4-backup-prot
 replaces the standalone Authentik cron. HOU4 collects the owner-encrypted recovery
 set with seven daily/four weekly retention. Use
 [production replacement recovery](production-host-recovery.md) for a lost node or
-the [test-only component drill](reproducible-recovery-drill.md) for isolated checks.
+the [test-only component drill](probes/reproducible-recovery-drill.md) for isolated checks.
 
 The authoritative database copy is a logical PostgreSQL dump. A live PGDATA
 copy is unsafe and is not part of either backup implementation. Keep signing

@@ -1,0 +1,60 @@
+---
+- name: Verify the CI-built application before modifying the deployment
+  ansible.builtin.include_role:
+    name: application_image
+    apply:
+      tags: [deploy, webstack, ssl]
+
+- name: Ensure the shared executable directory exists
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the source/runtime asset owner
+  ansible.builtin.copy:
+    src: install-source.py
+    dest: /usr/local/libexec/hou1-app-source.py
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Preserve local runtime changes before selecting new source
+  ansible.builtin.command:
+    argv: ['{{ ansible_python_interpreter }}', /usr/local/libexec/hou1-app-source.py,
+           --runtime, '{{ app_directory }}', --source, '{{ app_source_directory }}']
+  changed_when: false
+
+- name: Keep existing backup capture compatible with the source layout
+  ansible.builtin.include_role:
+    name: backup_source
+    tasks_from: source-layout
+    apply:
+      tags: [deploy, webstack, ssl]
+
+- name: Pull the verified source revision into its separate checkout
+  git:
+    repo: "{{ app_repo_pat }}"
+    dest: "{{ app_source_directory }}"
+    version: "{{ application_image_revision }}"
+    # A recovered checkout may retain a fetch rule for its old recovery branch.
+    refspec: "+{{ application_image_revision }}:refs/remotes/origin/hou1-deployment"
+    update: yes
+    force: no
+  no_log: true
+
+- name: Validate the selected website routing contract
+  ansible.builtin.import_tasks: website.yml
+
+- name: Install source-owned assets at the retained runtime paths
+  ansible.builtin.command:
+    argv: ['{{ ansible_python_interpreter }}', /usr/local/libexec/hou1-app-source.py,
+           --source, '{{ app_source_directory }}', --runtime, '{{ app_directory }}',
+           --revision, '{{ application_image_revision }}']
+  register: webstack_runtime_assets
+  changed_when: (webstack_runtime_assets.stdout | from_json).changed
+
+- name: Configure the verified application image without source builds
+  ansible.builtin.import_tasks: image-compose.yml

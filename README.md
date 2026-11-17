@@ -7,7 +7,10 @@ and systemd jobs run directly on the OS.
 
 The [docs index](docs/README.md) lists the guides. For routine changes, use the
 [production runbook](docs/production-oidc-runbook.md). To replace a lost host, follow
-[production recovery](docs/production-host-recovery.md).
+[production recovery](docs/production-host-recovery.md). For development commands
+(`make help`, `make check`), execution locations and configuration ownership,
+see the [development map](docs/development.md) and [contributor guide](CONTRIBUTING.md).
+Automated agent guidelines are in [AGENTS.md](AGENTS.md).
 
 ## Before running Ansible
 
@@ -17,9 +20,9 @@ the [Ansible dependencies](requirements-dev.txt) and
 credentials and SSH configuration outside Git.
 
 Use a private inventory with pinned SSH host keys for production; the example
-inventory disables strict checking. Secrets use SOPS/age, with some older inputs
-still in Ansible Vault. Add `--ask-vault-pass` when those files are loaded, and
-keep passwords and tokens out of command arguments.
+inventory disables strict checking. Secrets use controller-side SOPS/age.
+Select the environment's deployment identity and keep passwords and tokens out
+of command arguments.
 
 The examples below run from the repository root:
 
@@ -27,6 +30,7 @@ The examples below run from the repository root:
 export INVENTORY=/private/production/inventory.yml
 export INPUTS=/private/production/release-inputs.yml
 export ANSIBLE_CONFIG="$PWD/ansible/ansible.cfg"
+export SOPS_AGE_KEY_FILE=/private/production/inventory-prod.key
 export ANSIBLE_HOST_KEY_CHECKING=True
 ```
 
@@ -36,7 +40,7 @@ Connect the controller to NetBird, then run:
 
 ```bash
 ansible-playbook -i "$INVENTORY" ansible/playbooks/hou1.yml \
-  -e target_hosts=hou1_prod -e "@$INPUTS" --ask-vault-pass
+  -e target_hosts=hou1_prod -e "@$INPUTS"
 ```
 
 Use `--tags deploy` to update the app, `--tags ufw` to apply firewall/SSH settings,
@@ -46,6 +50,9 @@ image revision; it is not enough on its own. See [image inputs](docs/application
 `netbird-control-plane.yml` and `netbird-dns.yml` manage the control plane and DNS.
 Use `hou1.yml --tags netbird` to check and update client enrollment. These also
 run over the VPN.
+
+Routine reconciliation refreshes package metadata and installs required packages.
+Use [OS maintenance](docs/os-maintenance.md) for installed-package upgrades.
 
 ## New or replacement hosts
 

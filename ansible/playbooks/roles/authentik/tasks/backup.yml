@@ -1,0 +1,30 @@
+---
+- name: Retain environment ciphertext on the host for encrypted backups
+  ansible.builtin.copy:
+    src: "{{ authentik_secret_source }}"
+    dest: "{{ authentik_project_root }}/secrets.enc.yaml"
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Install encrypted Authentik backup and restore commands
+  ansible.builtin.template:
+    src: "{{ item.src }}"
+    dest: "{{ authentik_project_root }}/{{ item.dest }}"
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - {src: backup.sh.j2, dest: backup.sh}
+    - {src: restore.sh.j2, dest: restore.sh}
+    - {src: restore-drill.sh.j2, dest: restore-drill.sh}
+  no_log: true
+
+- name: Schedule encrypted Authentik backups with failure reporting
+  ansible.builtin.cron:
+    name: "HOU1 Authentik {{ authentik_environment }} encrypted backup"
+    minute: "{{ authentik_backup_schedule_minute }}"
+    hour: "{{ authentik_backup_schedule_hour }}"
+    job: "{{ authentik_project_root }}/backup.sh >> /var/log/hou1-authentik-backup-{{ authentik_environment }}.log 2>&1"
+  when: not (hou1_backup_enabled | default(false) | bool)

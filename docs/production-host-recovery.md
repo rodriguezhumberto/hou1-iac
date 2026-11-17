@@ -1,44 +1,24 @@
 # Production replacement-host recovery
 
-Follow-up to infrastructure issue #22. The production entry points share the
-restore engine with the rehearsal, but require an explicit production contract.
-[Live production evidence](evidence/production-host-recovery-2026-11-12.json)
-records a completed clean-OS restore and operational handoff with operator
-corrections. It does **not** establish uninterrupted end-to-end automation or
-authorize another wipe or website traffic cutover.
-[Offline fixture evidence](evidence/production-host-recovery-2026-11-11.json)
-records the implementation checks. [Production snapshot preparation](evidence/production-recovery-preflight-2026-11-11.json)
-records the saved source/image/certificate checks and the environment-specific
-geolocation correction; it does not prove a clean-host restore.
-Keep `restore-test-host.yml`, `publish-test-recovery.yml`
-and the component drill's test-only guards intact.
+The production entry points share the test restore engine but require an explicit
+production contract. Keep test-only restore, publication and component-drill guards
+intact. This procedure does not authorize a wipe or website traffic cutover.
 
 ## Latest live result
 
-The November 12 replacement restored production point
-`20261111T165321Z-8c6ba35719b2` in 542.335 seconds: 187 PostgreSQL tables,
-cold pulls of the pinned application image, and session revocation before
-writers. No application build, identity bootstrap or CMS seed ran. The owner
-confirmed Google, VPN, personal SSH, and staff/Grafana sign-in and sign-out.
-HOU1 recovered after reboot; seven monitoring targets, seven application
-containers, the synthetic staff login, backups and both TLS status jobs passed.
-The fresh owner-encrypted off-host point's size and checksum were verified;
-that new point was not decrypted by the controller.
+The [November 12 recovery](evidence/production-host-recovery-2026-11-12.json)
+completed a clean-OS restore and operational handoff with corrections. An
+uninterrupted run remains unproven: [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+The recorded run needed these manual corrections:
 
-Publication needed controller bootstrap/host-key corrections and a security-role
-resume. The existing renewal destination group needed its replacement HOU1
-member, and HOU4 NetBird needed an independent-access restart to discard the old
-HOU1 WireGuard key. Preserve these as operator handoff steps when repeating the
-procedure; a fully uninterrupted run remains unproven and is tracked in
-[infrastructure #78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+- Correct controller bootstrap/host-key settings and resume the security role.
+- Replace HOU1's membership in the renewal destination group.
+- Reconnect HOU4 through independent access to discard the old HOU1 WireGuard key.
 
-Temporary dashboard, public recovery SSH and administrative SSH/VPN grants were
-removed. Owner access and the separate scoped renewal peer remain. Both TLS
-status jobs succeeded after administrative peer removal. Updated controller
-recovery material was encrypted to the owner; replacement-controller recovery
-was not tested. The owner subsequently [verified authenticated decryption](evidence/owner-recovery-access-2026-11-12.json) of this updated copy locally; that check did not execute a replacement
-controller. The owner requested [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77)
-for that separate execution test. Deleting temporary keys does not rotate service credentials already read during deployment.
+[Owner-local authenticated decryption](evidence/owner-recovery-access-2026-11-12.json)
+verified the updated recovery materials, without executing a replacement controller.
+That execution test remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77).
+Exact refs, counts, timings, failures and cleanup are retained in the linked evidence.
 
 ## Before the replacement
 
@@ -54,7 +34,8 @@ NetBird control plane. HOU4 remains intact and will need VPN reconnection after
 the restored control plane starts. Preserve its SSH host key and the owner's
 personal SSH key. Never depend on the controller's VPN session for emergency
 access. A different replacement public IP also requires reviewed DNS changes;
-the playbooks do not change provider DNS or HOU4 automatically.
+the playbooks do not change provider DNS. HOU4 refresh requires the explicit
+independent-access configuration below.
 
 Prepare a fresh Debian 12 amd64 replacement with the existing capacity gates and
 empty Docker/container stores. Add **only its init inventory name** to a private
@@ -73,12 +54,14 @@ projects and networks, `cms_environment: production`,
 `application_image_registry_secret_source` and
 `application_image_registry_age_key_file` together.
 
-The common recovery inputs match [the clean-host workflow](clean-host-recovery.md):
+The common recovery inputs match [the clean-host workflow](probes/clean-host-recovery.md):
 `host_recovery_archive`, `host_recovery_manifest`, `host_recovery_identity`,
 `host_recovery_source_bundle`, `host_recovery_image_lock`, a private absolute
 `host_recovery_evidence_directory`, an unused `host_recovery_id`, and an actual
 `host_recovery_console_confirmed: true` for both nodes. The root is always
-`/var/lib/hou1-host-recovery/<id>`; failed/completed IDs cannot be resumed.
+`/var/lib/hou1-host-recovery/<id>`; a failed cold restore requires a fresh host
+and ID. Publication transport recovery can resume only after its successful
+checkpoint, as described below.
 
 Production also requires `host_recovery_request`. This example describes the
 schema; replace every example with the selected private inventory values:
@@ -177,15 +160,80 @@ that the pinned lost peer is disconnected and matches its saved name/address,
 then replaces only that peer. It preserves the exact existing managed metrics
 and backup group IDs/policies and binds only their new HOU1 member. Foreign
 members, resource grants or intervening policy changes stop the handoff. Private
-DNS starts before the dedicated controller reconnect command and VPN SSH
-verification. The existing security role verifies VPN access before retiring
-public bootstrap SSH. Failure latches diagnostics and stops restored ingress and
-writers; correct the code and use a fresh replacement rather than resuming.
+DNS starts before the dedicated controller reconnect command, optional HOU4
+refresh and VPN SSH verification. The existing security role verifies VPN access before retiring
+public bootstrap SSH. A restore/publication-engine error latches diagnostics and
+stops restored ingress and writers; use a fresh replacement after correction.
+Later peer, group or transport errors preserve their checkpoints for explicit
+publication resume.
+
+## Optional transport handoffs
+
+Keep these inputs in the private recovery inventory:
+
+```yaml
+# Existing credential-free command for one dedicated controller transport.
+# Omit it when no controller reconnect is needed.
+host_recovery_management_refresh_argv: [/private/bin/reconnect-dedicated-vpn]
+
+# Separate inventory alias with ansible_host set to this public IPv4.
+# Preserve HOU4's admin user/key/port and pin its host key in this file.
+host_recovery_companion:
+  inventory_host: hou4-recovery
+  public_ip: <HOU4 public IPv4>
+  known_hosts_file: /private/recovery/known_hosts
+
+# Reuse the exact hou1_tls_peer_config from tls-renewal-peer.yml.
+host_recovery_renewal_handoff: true
+host_recovery_renewal_peer_id: <existing dedicated renewal peer ID>
+```
+
+Each handoff is optional. Before publication, the companion check uses direct
+SSH with strict host-key checking, no proxy and no reused connection, and verifies
+its existing VPN address/management endpoint. After DNS/controller refresh it
+rechecks HOU4, restarts only its `netbird` service, and waits for the same address
+to reconnect. No peer identity or persistent monitoring/backup data is removed.
+The independent public SSH path must already work; this workflow does not open it.
+
+The renewal handoff pins the existing policy and exact source/receiver groups
+before retiring the lost peer. It swaps only HOU1's receiver membership, preserving
+other receivers and all policy/group IDs. Changed grants or members stop before
+reassignment. Repeating the scoped group-binding step accepts already-bound
+members without rewriting them. Publication resume uses the retained handoff
+plan; it never guesses a lost identity or deletes another peer.
+
+When either handoff is omitted, complete it manually through independent access.
+These choices avoid restarting an operator's VPN or inferring authorization from
+an environment name. Historical live evidence predates this automation.
+
+## Resume a published peer handoff
+
+For an interruption after successful ingress publication, keep the same recovery
+ID, inputs and controller evidence directory. Inspect the failure, then rerun the
+same publication playbook with `host_recovery_resume: true`. Initial runs keep
+that option `false`. A latched `first-error.json`, missing/foreign publication
+checkpoint or changed request still stops recovery; resume does not bypass the
+restore engine's failure protections.
+
+Before deletion, `peer-handoff.json` pins the lost ID/name/address, environment,
+management URL and exact group/policy plan. A missing old peer is accepted only
+with that plan. If enrollment was interrupted before its receipt, the declared
+address must be vacant or match the replacement host's observed local enrollment
+and endpoint. The existing client role then verifies enrollment. The private
+`replacement-peer.json` pins its exact ID/name/address before groups change.
+Conflicting occupants, receipt changes, group members or policies stop recovery.
+
+Before SSH cutover, resume through the original independent bootstrap path. After
+cutover, explicitly select `node_bootstrap: false`, `ansible_host: <HOU1 VPN IP>`
+and `ansible_user: <existing admin>` with the pinned replacement host key. Both
+paths retain the publication playbook's environment and single-host guards. A
+repeat verifies the same replacement and repairs the pinned groups, DNS and
+selected transports; it does not re-publish ports or delete an inferred peer.
 
 ## Operational handoff
 
-After publication, reconnect HOU4 through its independent access path. Reapply
-the selected production TLS renewal access and
+After publication, confirm HOU4 connectivity and the renewal receiver membership.
+Reapply the selected production TLS renewal access and
 schedule, VPN-only monitoring targets/probes, export-only backup transport and
 HOU4 collection configuration. Confirm the owner's Google sign-in, VPN and
 personal SSH key, deny-by-default admission/roles, public staff/management/metrics

@@ -1,0 +1,12 @@
+---
+- name: Validate the optional dedicated controller VPN reconnect command
+  ansible.builtin.assert:
+    that:
+      - cms_environment in ['test', 'production']
+      - inventory_hostname not in groups.get('prod_env' if cms_environment == 'test' else 'test_env', [])
+      - host_recovery_management_refresh_argv is sequence
+      - host_recovery_management_refresh_argv is not string
+      - host_recovery_management_refresh_argv | length > 0
+      - host_recovery_management_refresh_argv | reject('string') | list | length == 0
+    fail_msg: Supply credential-free argv for the dedicated transport in this recovery environment.
+  when: host_recovery_management_refresh_argv is defined

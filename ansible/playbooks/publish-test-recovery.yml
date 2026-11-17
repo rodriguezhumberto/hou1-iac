@@ -14,8 +14,11 @@
           - groups['isolated_test_vps'] | length == 1
           - inventory_hostname not in groups.get('prod_env', [])
           - cms_environment == 'test'
-          - node_bootstrap | bool
-          - ansible_host == test_vps_public_ip
+          - host_recovery_resume | default(false) is boolean
+          - >-
+            (node_bootstrap | bool and ansible_host == test_vps_public_ip) or
+            (host_recovery_resume | default(false) and not (node_bootstrap | bool) and
+             ansible_host == netbird_ip and ansible_user == new_user)
           - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
           - host_recovery_console_confirmed | bool
           - host_recovery_access_reviewed | default(false) | bool

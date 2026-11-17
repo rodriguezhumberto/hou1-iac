@@ -1,0 +1,4 @@
+---
+# Explicit additions to the generated application override. Managed mounts and
+# network fields remain owned by this role.
+app_compose_extensions: {}

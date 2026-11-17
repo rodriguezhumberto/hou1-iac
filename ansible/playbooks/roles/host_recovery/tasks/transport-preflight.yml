@@ -1,0 +1,21 @@
+---
+- name: Require an explicit boolean for optional renewal reassignment
+  ansible.builtin.assert:
+    that: host_recovery_renewal_handoff | default(false) is boolean
+
+- name: Validate the controller reconnect command before publication
+  ansible.builtin.include_tasks: management-refresh-preflight.yml
+
+- name: Validate the optional companion access contract before publication
+  when: host_recovery_companion is defined
+  block:
+    - name: Require a pinned independent HOU4 SSH destination
+      ansible.builtin.assert:
+        that:
+          - host_recovery_companion is mapping
+          - host_recovery_companion | host_recovery_companion_endpoint(hostvars, inventory_hostname, hou1_backup_receiver_ip)
+        fail_msg: Select HOU4's independent public SSH alias and its pinned known-hosts file.
+    - name: Verify independent access and the existing companion identity
+      ansible.builtin.include_tasks: companion-status.yml
+      vars:
+        host_recovery_companion_require_connected: false

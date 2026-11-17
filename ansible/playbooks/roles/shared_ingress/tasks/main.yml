@@ -1,0 +1,39 @@
+---
+- name: Create the shared ingress root
+  ansible.builtin.file:
+    path: "{{ netbird_control_plane_directory }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Create the shared ingress configuration directory
+  ansible.builtin.file:
+    path: "{{ netbird_control_plane_directory }}/ingress"
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Install the shared Nginx include file
+  ansible.builtin.copy:
+    dest: "{{ netbird_control_plane_directory }}/nginx-include.conf"
+    content: "include /etc/nginx/netbird/*.conf;\n"
+    owner: root
+    group: root
+    mode: '0644'
+
+- name: Create the dedicated NetBird ingress network before application startup
+  community.docker.docker_network:
+    name: "{{ netbird_ingress_network }}"
+    ipam_config:
+      - subnet: "{{ netbird_ingress_subnet }}"
+        iprange: "{{ netbird_ingress_dynamic_range }}"
+
+- name: Create the selected Authentik ingress networks
+  community.docker.docker_network:
+    name: "{{ item }}"
+    state: present
+  loop: >-
+    {{ (shared_ingress_additional_authentik_networks +
+        ([authentik_active_network] if authentik_enable_ingress_network | default(false) | bool else [])) | unique | list }}

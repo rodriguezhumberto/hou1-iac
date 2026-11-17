@@ -12,21 +12,17 @@ Current production evidence and remaining handoff limits:
 
 | Area | Accepted result / remaining limit |
 | --- | --- |
-| Application and access | Owner confirmed public content/images, canonical redirect, Google/VPN/personal SSH, staff/Grafana sign-in/out, dashboard data and Authentik overview. [Cutover evidence](evidence/website-data-migration-2026-11-12.json): 217/217 public checks over 30 minutes. |
-| Recovery | [Clean-OS production recovery](evidence/production-host-recovery-2026-11-12.json) and operational handoff passed with corrections. An uninterrupted run remains unproven: [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). |
-| Backup access | Owner [authenticated decryption](evidence/owner-recovery-access-2026-11-12.json) of the post-import backup and controller bundle locally, without uploading the key or writing plaintext. This did not execute another service restore. |
-| Monitoring and renewal | Private collection, reboot recovery, synthetic login, backups and TLS status passed. [Earlier alert-delivery evidence](evidence/production-operations-2026-11-11.json) includes owner-confirmed firing/resolution; that delivery drill was not repeated after replacement. |
-| Controller recovery | Scoped renewal jobs operate after temporary admin access retirement. Clean replacement-controller execution remains untested: [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
+| Application and access | [Website cutover](evidence/website-data-migration-2026-11-12.json): owner acceptance and public/private checks. |
+| Recovery | [Production restore/handoff](evidence/production-host-recovery-2026-11-12.json) completed with corrections; uninterrupted automation remains [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78). |
+| Backup access | [Owner-local decryption](evidence/owner-recovery-access-2026-11-12.json) passed; this did not execute another service restore. |
+| Monitoring and renewal | Collection, reboot, probes, backups and TLS status passed after replacement. [Alert delivery](evidence/production-operations-2026-11-11.json) was verified before replacement and not repeated afterward. |
+| Controller recovery | Scoped jobs work after admin access retirement; replacement-controller execution remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
 
 Secret consolidation remains [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
-Independent HOU4 outage monitoring is deliberately deferred. These accepted
-follow-ups do not reopen the completed rollout.
-
-The [tested production release](evidence/production-host-recovery-2026-11-12.json),
-[isolated recovery](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
-[OIDC acceptance](oidc-security-acceptance-2026-11-07.md) and
-[signing-key overlap](jwks-overlap-evidence-2026-11-07.md) retain exact refs and
-results. They do not select the next release. Keep test-only recovery guards intact.
+Independent HOU4 outage monitoring is deferred. Historical results retain exact
+refs and do not select the next release: [isolated recovery](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
+[OIDC acceptance](evidence/oidc-security-acceptance-2026-11-07.md) and
+[signing-key overlap](evidence/jwks-overlap-evidence-2026-11-07.md). Keep test-only guards intact.
 
 The legacy website remains stopped. Retain its node and encrypted copies.
 **Reconcile replacement writes before any traffic rollback.**
@@ -81,9 +77,8 @@ optional-site/redirect choices through [routing inputs](website-routing.md).
 Network groups, staff roles and monitoring roles are separate grants.
 
 Keep the owner age key offline. Use scoped job identities and temporary deployment
-grants; retire temporary access after verifying owner access. Supply
-`--ask-vault-pass` to commands below when the inventory loads legacy Vault files.
-SOPS/age has not yet replaced every Vault or host-side decryption path.
+grants; retire temporary access after verifying owner access. Use the
+[SOPS/age guide](sops-age-secrets.md) to select controller and component identities.
 
 ## Recovery point before a change
 
@@ -167,7 +162,7 @@ in later deployments to avoid recreating legacy backup cron jobs.
 
 Do not run the legacy `netbird-authentik-cutover.yml` as a routine production step:
 its direct-issuer template conflicts with the supported external-provider contract.
-See [the discrepancy](netbird-authentik-cutover.md). NetBird stays pinned at 0.82.0.
+See [the discrepancy](archive/netbird-authentik-cutover.md). NetBird stays pinned at 0.82.0.
 
 Stop on a failed prerequisite; preserve the first error and protected logs.
 Record explicitly authorized troubleshooting separately. Do not erase failure
@@ -193,7 +188,7 @@ staff APIs and public denial of SSH, staff, administration, PostgreSQL and metri
 HOU4 scrapes over VPN. Grafana SSO uses separate monitoring groups and should open
 **HOU1 Operations** with data. Verify sign-in/out and retained emergency login.
 Test Discord firing and resolution after receiver/routing changes. The
-[synthetic reader probe](staff-login-probe.md) tests local Authentik login, reader
+[synthetic reader probe](probes/staff-login-probe.md) tests local Authentik login, reader
 enforcement and logout; it does not test the human Google journey.
 
 | Signal | Operational threshold |
@@ -213,7 +208,7 @@ Tracking** pause resolved Private Relay interference. This does not establish
 that Grafana requires Private Relay to be disabled globally.
 
 [Renewal](controller-tls.md) runs through systemd on the controller, independently
-of this thread. Keep the separate scoped renewal peer; never use it for admin work.
+of an interactive session. Keep the scoped renewal peer separate from admin work.
 Inspect receipts, timer results, VPN/SSH, DNS permissions and served certificates
 on failure. Do not fabricate status metrics to clear alerts.
 

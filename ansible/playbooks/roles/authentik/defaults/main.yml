@@ -1,0 +1,29 @@
+---
+authentik_image: ghcr.io/goauthentik/server:2025.10.4
+authentik_postgres_image: postgres:16.6-alpine
+authentik_postgres_uid: 70
+authentik_postgres_gid: 70
+authentik_container_uid: 1000
+authentik_container_gid: 1000
+authentik_server_cpus: '1.00'
+authentik_worker_cpus: '1.00'
+authentik_postgres_cpus: '1.00'
+authentik_server_memory: 1536M
+authentik_worker_memory: 1024M
+authentik_postgres_memory: 1024M
+authentik_server_pids: 256
+authentik_worker_pids: 256
+authentik_postgres_pids: 128
+authentik_certbot_image: certbot/dns-cloudflare:v5.1.0
+authentik_ingress_directory: "{{ netbird_control_plane_directory }}/ingress"
+authentik_offhost_backup_root_base: /mnt/offhost-backups/hou1-authentik
+authentik_backup_retention_days: 30
+authentik_backup_schedule_minute: '40'
+authentik_backup_schedule_hour: '2'
+authentik_backup_age_recipient: ''
+authentik_bootstrap_enabled: true
+authentik_staff_users: []
+authentik_google_enabled: true
+# Set false to restore the previous login branding.
+authentik_branding_enabled: true
+authentik_identity_secret_source: "{{ playbook_dir }}/../secrets/identity-names-{{ authentik_environment }}.enc.json"

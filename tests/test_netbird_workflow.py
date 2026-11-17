@@ -9,7 +9,7 @@ import unittest
 
 import yaml
 
-from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
+from helpers import ROOT, ROLES, read_task_phases, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
@@ -130,16 +130,23 @@ class WorkflowTest(unittest.TestCase):
         bootstrap = yaml.safe_load((ROOT / 'ansible/playbooks/bootstrap-control-plane.yml').read_text())[0]
         roles = bootstrap['roles']
         web = next(role for role in roles if role['role'] == 'webstack')
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        tasks = read_task_phases('webstack')
         deploy = next(task for task in tasks if task['name'] == 'Deploy the verified application without building on the host')
         # Render the production command with a Compose fixture that records args.
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
             docker = root / 'docker'
-            docker.write_text('#!/bin/sh\nprintf "%s\\n" "$@" > "$COMPOSE_ARGUMENTS"\n')
+            docker.write_text('#!' + sys.executable + '\n' +
+                'import json, os, sys\nfrom pathlib import Path\n' +
+                'args = sys.argv[1:]\n' +
+                'if args[1] == "config": print(json.dumps({"services": {"nginx": {}, "astro-app": {}}}))\n' +
+                'elif args[1] == "up": Path(os.environ["COMPOSE_ARGUMENTS"]).write_text("\\n".join(args))\n')
             docker.chmod(0o755)
             for variables, expected_tail in [(web['vars'], 'nginx'), ({}, '120')]:
                 task = copy.deepcopy(deploy)
+                task['ansible.builtin.command'] = task['ansible.builtin.command'].replace(
+                    '/usr/local/libexec/hou1-compose-apply',
+                    sys.executable + ' ' + str(ROLES / 'compose_runtime/files/apply.py'))
                 task.update(environment={'PATH': directory + ':' + os.environ['PATH'],
                                          'COMPOSE_ARGUMENTS': str(root / 'args')})
                 result = run_play({**variables, 'app_directory': directory}, [task])

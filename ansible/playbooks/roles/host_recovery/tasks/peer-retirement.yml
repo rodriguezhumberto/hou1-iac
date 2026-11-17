@@ -1,0 +1,111 @@
+---
+- name: Inspect the controller's pinned handoff plan
+  ansible.builtin.stat:
+    path: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/peer-handoff.json'
+  register: host_recovery_handoff_file
+
+- name: Start with no inferred handoff plan
+  ansible.builtin.set_fact:
+    host_recovery_handoff: {}
+    host_recovery_handoff_scope:
+      version: 1
+      id: '{{ host_recovery_id }}'
+      inventory_host: '{{ inventory_hostname }}'
+      environment: '{{ cms_environment }}'
+      management_url: '{{ netbird_management_url }}'
+      lost_peer:
+        id: '{{ host_recovery_lost_peer_id }}'
+        name: '{{ host_recovery_lost_peer_name }}'
+        ip: '{{ netbird_ip }}'
+      renewal_enabled: '{{ host_recovery_renewal_handoff | default(false) }}'
+      renewal_config: '{{ hou1_tls_peer_config if host_recovery_renewal_handoff | default(false) else {} }}'
+      renewal_peer_id: '{{ host_recovery_renewal_peer_id if host_recovery_renewal_handoff | default(false) else "" }}'
+
+- name: Read a retained handoff without changing its selected identity or grants
+  when: host_recovery_handoff_file.stat.exists
+  block:
+    - name: Require a regular private handoff plan
+      ansible.builtin.assert:
+        that:
+          - host_recovery_handoff_file.stat.isreg
+          - not host_recovery_handoff_file.stat.islnk
+          - host_recovery_handoff_file.stat.mode == '0600'
+    - name: Read the pinned handoff
+      ansible.builtin.slurp:
+        src: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/peer-handoff.json'
+      register: host_recovery_handoff_contents
+    - name: Decode the original handoff plan
+      ansible.builtin.set_fact:
+        host_recovery_handoff: '{{ host_recovery_handoff_contents.content | b64decode | from_json }}'
+    - name: Refuse changed recovery identity, environment or renewal scope
+      ansible.builtin.assert:
+        that:
+          - host_recovery_handoff.scope == host_recovery_handoff_scope
+          - host_recovery_handoff.source_groups is sequence
+          - host_recovery_handoff.source_groups | length >= 2
+
+- name: Read only the pinned lost HOU1 peer
+  ansible.builtin.uri:
+    url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'
+    headers: '{{ netbird_api_headers }}'
+    status_code: [200, 404]
+  register: host_recovery_old_peer
+
+- name: Require the original plan before accepting an already-retired peer
+  ansible.builtin.assert:
+    that:
+      - host_recovery_old_peer.status == 200 or (host_recovery_resume | default(false) and host_recovery_handoff_file.stat.exists)
+    fail_msg: A missing lost peer without its original handoff plan cannot be replaced automatically.
+
+- name: Refuse another device or a connected peer
+  ansible.builtin.assert:
+    that:
+      - host_recovery_old_peer.json.id == host_recovery_lost_peer_id
+      - host_recovery_old_peer.json.ip == netbird_ip
+      - host_recovery_old_peer.json.name == host_recovery_lost_peer_name
+      - not (host_recovery_old_peer.json.connected | bool)
+    fail_msg: The selected peer is not the disconnected lost HOU1 identity.
+  when: host_recovery_old_peer.status == 200
+
+- name: Pin exact managed groups before the one permitted retirement
+  when: host_recovery_old_peer.status == 200
+  block:
+    - name: Pin exact managed monitoring, backup and optional renewal groups
+      ansible.builtin.include_tasks: peer-groups-before.yml
+    - name: Refuse intervening changes to an already-pinned group plan
+      ansible.builtin.assert:
+        that:
+          - host_recovery_handoff.source_groups == host_recovery_source_groups
+          - host_recovery_handoff.renewal_group == (host_recovery_renewal_group | default({}))
+      when: host_recovery_handoff_file.stat.exists
+    - name: Build the immutable handoff plan before peer deletion
+      ansible.builtin.set_fact:
+        host_recovery_handoff:
+          scope: '{{ host_recovery_handoff_scope }}'
+          source_groups: '{{ host_recovery_source_groups }}'
+          renewal_group: '{{ host_recovery_renewal_group | default({}) }}'
+      when: not host_recovery_handoff_file.stat.exists
+    - name: Preserve the existing source-group evidence format
+      ansible.builtin.copy:
+        dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/source-groups-before.json'
+        content: "{{ {'lost_peer_id': host_recovery_lost_peer_id, 'source_groups': host_recovery_source_groups} | to_nice_json }}\n"
+        mode: '0600'
+      when: not host_recovery_handoff_file.stat.exists
+    - name: Preserve the verified plan before irreversible retirement
+      ansible.builtin.copy:
+        dest: '{{ host_recovery_evidence_directory }}/{{ host_recovery_id }}/peer-handoff.json'
+        content: "{{ host_recovery_handoff | to_nice_json }}\n"
+        mode: '0600'
+      when: not host_recovery_handoff_file.stat.exists
+    - name: Retire that lost peer to release its declared address
+      ansible.builtin.uri:
+        url: '{{ netbird_api_url }}/api/peers/{{ host_recovery_lost_peer_id }}'
+        headers: '{{ netbird_api_headers }}'
+        method: DELETE
+        status_code: 200
+      changed_when: true
+
+- name: Retain only the original group plan for enrollment and reassignment
+  ansible.builtin.set_fact:
+    host_recovery_source_groups: '{{ host_recovery_handoff.source_groups }}'
+    host_recovery_renewal_group: '{{ host_recovery_handoff.renewal_group }}'

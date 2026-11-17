@@ -1,0 +1,5 @@
+# Syntax errors are always checked. Duplicate mappings can silently replace
+# Ansible inputs; defer formatting rules until their files are being changed.
+rules:
+  key-duplicates:
+    forbid-duplicated-merge-keys: true

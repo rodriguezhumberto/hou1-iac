@@ -1,0 +1,9 @@
+---
+- name: Require the declared Authentik attachment before publishing ingress
+  ansible.builtin.assert:
+    that:
+      - authentik_enable_ingress_network | default(false) | bool
+      - authentik_active_network == authentik_ingress_network
+    fail_msg: >-
+      Set authentik_enable_ingress_network to true and select this environment's
+      network with authentik_active_network before publishing Authentik.
