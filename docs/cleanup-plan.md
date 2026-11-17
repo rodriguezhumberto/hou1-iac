@@ -1,7 +1,7 @@
 # Deployment code cleanup
 
 Make HOU1 and HOU4 easier to navigate, change and validate before changing their
-deployment architecture. Work stays local on cleanup branches.
+deployment architecture. HOU1 can be pushed for PR review; HOU4 stays local.
 
 ## Initial cleanup order
 
@@ -31,7 +31,8 @@ independent owners can work in the same checkout.
   Python code only when its execution and delivery contracts are clear.
 - Document required inputs and owned resources for roles being changed.
 - Keep documentation short. Record consequential design choices with their reason.
-- Do not push, open PRs, deploy, decrypt production inputs or change live nodes.
+- Keep HOU4 local. HOU1 may be pushed for PR review; do not deploy, decrypt
+  production inputs or change live nodes.
 
 ## Validation
 
@@ -117,8 +118,9 @@ delivery contracts, and these changes do not yet establish a useful shared API.
 - HOU1 final `make check` passed all 25 playbook syntax checks, source syntax,
   lint and 333 tests, with one optional `dnsmasq` integration skip. Nginx, SOPS/age
   and branding fixtures ran; the separate browser check also passed.
-- Both repositories remain on local `cleanup/readable-deployments` branches.
-  No pushes, PRs, deployments, live-node access or production decryption occurred.
+- At the initial cleanup checkpoint, both repositories were on local
+  `cleanup/readable-deployments` branches. No pushes, PRs, deployments, live-node
+  access or production decryption had occurred.
 
 ## Reliability review
 
@@ -133,11 +135,10 @@ delivery contracts, and these changes do not yet establish a useful shared API.
 - Recovery fixtures cover deletion, enrollment, saved receipts and partial group
   assignment, plus repeated resumes and refusal of changed identities or grants.
 - Independent review found no remaining material issues. Runtime paths, archive
-  schemas and historical evidence remain compatible; changes are local only.
-- HOU1 validation covered all 377 current tests, with one optional DNS skip.
-  The broad run loaded two fixtures before their task paths were updated; both
-  modules passed against the final files. Three added resume cases also passed.
+  schemas and historical evidence remain compatible.
+- HOU1's full pre-PR `make check` passed syntax, lint and 377 tests, with one
+  optional DNS skip. The branded-login browser check also passed.
 - HOU4's full check passed 78 tests with 15 optional native-tool skips. Component
   tag repair coverage and final syntax/lint checks passed in both repositories.
 - Documentation links resolve and all 62 historical JSON evidence files are
-  unchanged. No pushes, deployments, live-node access or production decryption.
+  unchanged. No deployments, live-node access or production decryption.
