@@ -47,6 +47,15 @@ def read_task_phases(role):
     return tasks
 
 
+def fixture_inventory():
+    """Add disposable test aliases to the supported, otherwise empty test groups."""
+    inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
+    groups = inventory['all']['children']['test_env']['children']
+    groups['hou1_test_init']['hosts']['test_hou1_init'] = {'ansible_host': '{{ test_vps_public_ip }}'}
+    groups['hou1_test']['hosts']['test_hou1'] = {'ansible_host': '{{ netbird_ip }}'}
+    return inventory
+
+
 def run_plays(play_specs, extra_args=(), inventory_source=None):
     with tempfile.TemporaryDirectory() as directory:
         play = Path(directory) / 'play.yml'

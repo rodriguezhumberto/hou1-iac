@@ -21,6 +21,26 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 The [documentation index](README.md) identifies test-only tools and historical
 procedures. The legacy direct-issuer NetBird cutover is outside routine provisioning.
 
+## Environment targeting
+
+There are no current test servers; the former test deployment became production.
+The default `hou1_test_init` and `hou1_test` groups are empty. A future test host
+needs a new private inventory, separate addresses and independently verified SSH
+keys. Keep production hosts in `prod_env`; isolated rehearsal hosts may use the
+existing `isolated_test_vps` group instead of `test_env`.
+
+Managed-host entry points run `tasks/validate-target.yml` before connections or
+controller changes, including component-tag runs. It binds inventory membership
+to `cms_environment`, NetBird server group, identity profile and connection
+address. CMS uses `production`; Authentik and `deploy_environment` use `prod`.
+Production Authentik entry points require matching explicit identity inputs.
+Both repositories enable SSH host-key checking; verify keys before bootstrap or
+replacement, and retain them for public and VPN addresses.
+
+Direct SSH rehearsal scripts bypass these Ansible guards. Their old private
+aliases, fixture names and test labels do not establish current host identity.
+Rebind and review them before using a newly provisioned test environment.
+
 ## Execution locations
 
 - The controller runs Ansible, decrypts deployment inputs, validates release

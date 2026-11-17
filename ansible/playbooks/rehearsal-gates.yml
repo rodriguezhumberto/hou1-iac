@@ -3,5 +3,10 @@
   hosts: isolated_test_vps
   become: true
   gather_facts: false
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+
   roles:
     - rehearsal_gates

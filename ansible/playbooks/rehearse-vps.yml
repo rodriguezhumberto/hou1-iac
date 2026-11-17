@@ -2,12 +2,16 @@
 # Isolated replica only. The dedicated production control-plane guard is unchanged.
 - name: Bootstrap the isolated full-stack rehearsal VPS
   hosts: isolated_test_vps
+  gather_facts: false
   become: true
   module_defaults:
     ansible.builtin.uri:
       use_proxy: false
       follow_redirects: none
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Require a single explicit test host and isolated identity inputs
       ansible.builtin.assert:
         that:
@@ -26,6 +30,10 @@
           - not (rehearsal_controller_managed_tls | default(false) | bool) or ((rehearsal_host_age_key_source | default('') | length > 0) and rehearsal_host_age_key_source != rehearsal_controller_age_key_file)
           - not (rehearsal_controller_managed_tls | default(false) | bool) or authentik_secret_source != rehearsal_secret_source
         fail_msg: This entry point requires a complete isolated test run, never a production inventory or account.
+      tags: [always]
+
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
       tags: [always]
 
     - name: Prepare the administrative user and standard host dependencies

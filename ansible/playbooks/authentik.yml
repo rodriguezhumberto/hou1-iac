@@ -1,10 +1,19 @@
 ---
 - name: Deploy the isolated Authentik project
   hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
   become: true
   vars:
     authentik_environment: "{{ deploy_environment | default('test') }}"
     authentik_secret_source: "{{ playbook_dir }}/../secrets/authentik-{{ authentik_environment }}.enc.yaml"
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+
   roles:
     - role: authentik
       tags: [authentik, deploy]

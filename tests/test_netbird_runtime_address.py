@@ -6,7 +6,7 @@ import sys
 import tempfile
 import unittest
 
-from helpers import ROLES, ROOT, run_plays
+from helpers import fixture_inventory, ROLES, ROOT, run_plays
 
 import yaml
 
@@ -95,7 +95,7 @@ else:
                         self.assertEqual((fixture / 'ip.count').read_text(), '3')
 
     def test_environment_inventory_connects_using_declared_addresses(self):
-        inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
+        inventory = fixture_inventory()
         plays = []
         for environment in ('test', 'prod'):
             children = inventory['all']['children'][environment + '_env']['children']

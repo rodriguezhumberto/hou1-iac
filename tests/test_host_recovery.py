@@ -247,7 +247,8 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
     def test_live_inventory_and_missing_console_are_refused(self):
         plays = yaml.safe_load((FILES.parents[2] / 'restore-test-host.yml').read_text())
-        guard = plays[0]['pre_tasks'][0]
+        guard = next(task for task in plays[0]['pre_tasks'] if task.get('name') ==
+                     'Require the selected fresh Debian test host and independent HOU4 console')
         variables = dict(cms_environment='test', node_bootstrap=True, ansible_host='198.51.100.10',
                          test_vps_public_ip='198.51.100.10', ansible_facts={'distribution': 'Debian', 'distribution_major_version': '12', 'architecture': 'x86_64'},
                          host_recovery_console_confirmed=True, host_recovery_id='fixture-01',

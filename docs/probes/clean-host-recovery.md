@@ -18,6 +18,10 @@ continued-host repairs remain separate historical reports; see
 result does not establish an uninterrupted run. See the production recovery
 guide for the separate production acceptance requirements.
 
+No test hosts are currently available. Provision a new isolated fixture and
+review its inventory and identities before using this procedure; the former test
+server is production.
+
 ## Before wiping HOU1
 
 1. Confirm HOU4 provider-console login independently of NetBird. Restoring
@@ -58,7 +62,7 @@ workflow below while keeping the current nodes.
 
 ## Inputs
 
-Use the established full test inventory and its group defaults, with
+Use the new isolated test inventory and its group defaults, with
 `node_bootstrap: true`, `ansible_host: <HOU1 public IP>`, `cms_environment: test`,
 the existing isolated names/subnet and the verified SSH configuration. Add:
 

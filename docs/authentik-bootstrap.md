@@ -1,11 +1,14 @@
 # Authentik groups, claims, scopes, and isolated clients
 
+Test examples require a new isolated host and private inventory; no test server
+is currently available. See [environment targeting](development.md#environment-targeting).
+
 Run `playbooks/authentik-bootstrap.yml` only after the matching DNS/TLS ingress
 and SOPS/age secret workflow are ready:
 
 ```bash
 cd ansible
-ansible-playbook playbooks/authentik-bootstrap.yml \
+ansible-playbook -i /private/test/inventory.yml playbooks/authentik-bootstrap.yml \
   -e target_hosts=hou1_test -e deploy_environment=test \
   -e authentik_age_key_file=/root/.config/sops/age/hou1-authentik-test.txt \
   -e authentik_controller_age_key_file=/private/authentik-test.key
@@ -72,7 +75,7 @@ for deployment. This playbook selects one host's variables and writes on the
 controller without connecting to that host:
 
 ```bash
-ansible-playbook -i ansible/inventory/inventory.yml \
+ansible-playbook -i /private/production/inventory.yml \
   ansible/playbooks/export-identity-profile.yml \
   -e target_hosts=hou1_prod -e deploy_environment=prod \
   -e identity_profile_output=/private/identity-prod.json

@@ -1,14 +1,23 @@
 ---
 - name: Prepare HOU1 for restricted encrypted HOU4 backup collection
   hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
   become: true
   module_defaults:
     ansible.builtin.uri:
       use_proxy: false
       follow_redirects: none
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Validate established VPN management
       ansible.builtin.import_role:
         name: netbird_common
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+
   roles:
     - role: backup_source

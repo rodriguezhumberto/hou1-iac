@@ -1,13 +1,21 @@
 ---
 - name: Maintain installed operating-system packages
   hosts: '{{ target_hosts | default(''hou1_test'') }}'
+  gather_facts: false
   become: true
   pre_tasks:
-  - name: Validate established host management
-    ansible.builtin.import_role:
-      name: netbird_common
-    tags:
-    - always
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+    - name: Validate established host management
+      ansible.builtin.import_role:
+        name: netbird_common
+      tags:
+      - always
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+
   roles:
   - role: os_maintenance
     tags:

@@ -2,8 +2,15 @@
 # Replacement recovery only; never initialize a new identity database here.
 - name: Restore one explicitly selected fresh production replacement
   hosts: production_recovery
+  gather_facts: false
   become: true
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
     - name: Require the fresh production host and independent recovery access
       ansible.builtin.assert:
         that:

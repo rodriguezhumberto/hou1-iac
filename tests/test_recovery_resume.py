@@ -138,7 +138,8 @@ class RecoveryResumeTest(unittest.TestCase):
         inventory = {'all': {'children': {name: {'hosts': {'fixture': {}}} for name in
                      ['production_recovery', 'prod_env', 'hou1_prod_init']}}}
         play = yaml.safe_load((ROOT / 'ansible/playbooks/publish-production-recovery.yml').read_text())[0]
-        guard = play['pre_tasks'][0]
+        guard = next(task for task in play['pre_tasks'] if task.get('name') ==
+                     'Require the explicit production restore and reviewed access changes')
         base = dict(cms_environment='production', authentik_environment='prod', node_bootstrap=True,
                     ansible_host='198.51.100.10', prod_vps_public_ip='198.51.100.10', netbird_ip='100.90.0.10',
                     ansible_user='root', new_user='admin', host_recovery_id='fixture-01',

@@ -8,6 +8,9 @@
       use_proxy: false
       follow_redirects: none
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Require the explicit completed test restore and reviewed access changes
       ansible.builtin.assert:
         that:
@@ -31,6 +34,7 @@
     - name: Validate the existing test management configuration
       ansible.builtin.import_role:
         name: netbird_common
+      tags: [always]
   tasks:
     - name: Publish and restore management through shared recovery tasks
       ansible.builtin.include_tasks: roles/host_recovery/tasks/publish.yml

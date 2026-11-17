@@ -1,5 +1,8 @@
 # Isolated Authentik Compose deployment
 
+Test examples require a new isolated host and private inventory; no test server
+is currently available. See [environment targeting](development.md#environment-targeting).
+
 Each environment has a pinned Compose project. The default names are
 `hou1-authentik-test` and `hou1-authentik-prod`, selected by the identity profile;
 state lives under `/var/lib/hou1-authentik/{test,prod}`. PostgreSQL uses the private,
@@ -11,9 +14,9 @@ an environment explicitly:
 
 ```bash
 cd ansible
-ansible-playbook playbooks/authentik.yml \
+ansible-playbook -i /private/test/inventory.yml playbooks/authentik.yml \
   -e target_hosts=hou1_test -e deploy_environment=test
-ansible-playbook playbooks/authentik.yml \
+ansible-playbook -i /private/production/inventory.yml playbooks/authentik.yml \
   -e target_hosts=hou1_prod -e deploy_environment=prod
 ```
 

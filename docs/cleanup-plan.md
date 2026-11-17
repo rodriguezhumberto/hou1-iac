@@ -143,9 +143,35 @@ delivery contracts, and these changes do not yet establish a useful shared API.
 - Documentation links resolve and all 62 historical JSON evidence files are
   unchanged. No deployments, live-node access or production decryption.
 
+## Environment targeting review
+
+- Test group names and defaults remain supported, but their default host lists
+  are empty because the former test deployment is production.
+- Managed-host playbooks validate inventory environment, identity inputs and
+  connection address before fact gathering or controller changes. Shared guards
+  run under component tags; existing recovery gates remain in place.
+- HOU1 now checks SSH host keys, matching HOU4. New and replacement keys need
+  independent verification before they enter the selected known-hosts file.
+- Private inventories and encrypted endpoint values were not inspected. Direct
+  SSH rehearsal tools retain fixture-specific assumptions and need rebinding
+  before reuse; Ansible guards do not cover them. In particular,
+  [`live_oidc/controller.py`](../scripts/live_oidc/controller.py) uses a fixed SSH
+  alias, while [`rehearsal-staff-login-drill.py`](../scripts/rehearsal-staff-login-drill.py)
+  accepts a test label without validating the SSH destination. Give these tools
+  a shared destination/host-key check before the next live rehearsal.
+
+Validation: HOU1's full `make check` passed 382 tests without skips; HOU4's
+passed 82 tests with 14 optional native-tool skips. Final targeting modules passed
+six tests each, including tagged bootstrap rejection and HOU4 renewal suspension.
+Syntax, lint and documentation links passed; all 62 historical JSON evidence
+files are unchanged. No live-node access or production decryption occurred.
+
 ## Next: test-host acceptance
 
-Use the established test hosts first, with the existing environment and SSH guards.
+No test servers are currently available; the former test deployment is production.
+Provision a separate isolated environment before these acceptance steps. Populate
+new private inventories and verify their addresses and SSH identities; do not
+reuse the promoted server through an old test alias.
 Record the HOU1/HOU4 infrastructure refs, selected application image/revision and
 a verified recovery point using the [release record](production-oidc-runbook.md#release-record-and-access).
 

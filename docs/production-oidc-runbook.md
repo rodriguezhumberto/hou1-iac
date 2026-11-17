@@ -64,8 +64,9 @@ git rev-parse HEAD
 ```
 
 Require a private inventory with pinned ED25519 keys, `StrictHostKeyChecking=yes`,
-`IdentitiesOnly=yes` and explicit known-hosts files. The repository inventory's
-permissive SSH defaults are unsuitable for production. Retain its group layout:
+`IdentitiesOnly=yes` and explicit known-hosts files. Repository defaults also
+enforce host-key checking; private inventory must supply the verified identities.
+Retain the group layout:
 `prod_hou1` belongs to `hou1_prod`, `prod_env` and `netbird_control_plane`.
 Use VPN management after bootstrap and verify independent provider-console access
 to both nodes. SSH password policy does not disable console authentication.

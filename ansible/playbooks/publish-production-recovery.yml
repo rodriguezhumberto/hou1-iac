@@ -8,6 +8,9 @@
       use_proxy: false
       follow_redirects: none
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Require the explicit production restore and reviewed access changes
       ansible.builtin.assert:
         that:
@@ -37,6 +40,7 @@
     - name: Validate production host management configuration
       ansible.builtin.import_role:
         name: netbird_common
+      tags: [always]
     - name: Validate the selected production recovery contract
       ansible.builtin.include_tasks: roles/host_recovery/tasks/request.yml
     - name: Read the retained restore contract without printing it
