@@ -79,4 +79,5 @@ Deployment, reconciliation and reboot results are recorded in the
 [lab evidence](docs/evidence/isolated-lab-2026-11-17.md).
 That run required interventions and does not yet prove an unattended fresh install.
 See the [intervention audit](docs/deployment-interventions.md) and
-[deployment workflow](docs/deployment-workflow.md) for the remaining work.
+[deployment workflow](docs/deployment-workflow.md) for coordinated reconciliation
+and isolated controller transport, plus the remaining bootstrap work.

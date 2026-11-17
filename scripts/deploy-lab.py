@@ -86,8 +86,11 @@ def load_config(path):
         private_file(host['inventory'])
         require(isinstance(host['inputs'], list), 'Declare an ordered list of private extra-variable files')
         for source in host['inputs']:
-            private_file(source)
+            values = yaml.safe_load(private_file(source).read_text())
+            require(isinstance(values, dict) and all(isinstance(k, str) and not k.startswith('ansible_')
+                    for k in values), 'Keep Ansible connection and execution variables in inventory, not extra-vars')
         require(re.fullmatch(r'[a-zA-Z_][a-zA-Z0-9_-]*', host['target']) and
+                host['target'] != 'localhost' and
                 re.fullmatch(r'[a-z0-9][a-z0-9-]*', host['hostname']), 'Declare one inventory alias and expected hostname')
         address = ipaddress.ip_address(host['ssh_host_ip'])
         require(address in ipaddress.ip_network('100.91.0.0/16'), 'Use the test overlay, never bootstrap or production addresses')
@@ -247,19 +250,31 @@ class Workflow:
         for source in host['inputs']:
             argv += ['-e', '@' + source]
         fixed, user, port = self.transports[service]
-        overrides = {'target_hosts': host['target'], 'ansible_connection': 'local' if local else 'ssh',
-                     'ansible_ssh_executable': 'ssh', 'ansible_ssh_common_args': shlex.join(fixed[1:]),
-                     'ansible_ssh_extra_args': '', 'ansible_ssh_args': ''}
+        overrides = {'target_hosts': host['target']}
         if local:
-            overrides['ansible_become'] = False
+            overrides.update(ansible_connection='local', ansible_become=False)
         else:
-            # Preflight checked the original effective inputs. Keep Ansible's
-            # legacy aliases and private-key options from selecting a different
-            # transport when the public playbook is executed afterward.
-            overrides.update(ansible_host=host['ssh_host_ip'], ansible_ssh_host=host['ssh_host_ip'],
-                             ansible_user=user, ansible_ssh_user=user, ansible_port=port,
-                             ansible_ssh_port=port, ansible_private_key_file=fixed[-1],
-                             ansible_ssh_private_key_file=fixed[-1])
+            # Extra-vars also affect delegated tasks. Freeze the remote transport
+            # only on its inventory host and retain local controller execution.
+            frozen = {'ansible_connection': 'ssh', 'ansible_ssh_executable': 'ssh',
+                      'ansible_ssh_common_args': shlex.join(fixed[1:]),
+                      'ansible_ssh_extra_args': '', 'ansible_ssh_args': '',
+                      'ansible_host': host['ssh_host_ip'], 'ansible_ssh_host': host['ssh_host_ip'],
+                      'ansible_user': user, 'ansible_ssh_user': user, 'ansible_port': port,
+                      'ansible_ssh_port': port, 'ansible_private_key_file': fixed[-1],
+                      'ansible_ssh_private_key_file': fixed[-1]}
+            overlay = self.run / (log_name + '-transport.json')
+            # Use the last inventory's host_vars too: existing host_vars take
+            # precedence over host variables embedded in inventory itself.
+            variables = self.run / 'host_vars'
+            variables.mkdir(mode=0o700, exist_ok=True)
+            write_private(variables / (host['target'] + '.json'), json.dumps(frozen))
+            write_private(variables / 'localhost.json', json.dumps({
+                'ansible_connection': 'local', 'ansible_host': '127.0.0.1',
+                'ansible_ssh_host': '127.0.0.1',
+                'ansible_python_interpreter': str(Path(self.config['ansible_bin_directory']) / 'python')}))
+            write_private(overlay, json.dumps({'all': {'hosts': {host['target']: {}, 'localhost': {}}}}))
+            argv += ['-i', str(overlay)]
         argv += ['-e', json.dumps(overrides)]
         log = self.run / (log_name + '.log')
         descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)

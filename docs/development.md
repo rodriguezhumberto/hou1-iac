@@ -9,6 +9,7 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | --- | --- | --- |
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
 | Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
+| Use an existing isolated controller VPN | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
 | Upgrade installed OS packages | `ansible/playbooks/os-maintenance.yml` | [OS maintenance](os-maintenance.md) |
 | Configure identity | `ansible/playbooks/authentik.yml` | [Identity bootstrap](authentik-bootstrap.md) |

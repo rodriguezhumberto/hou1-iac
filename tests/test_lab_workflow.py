@@ -263,11 +263,50 @@ class LabWorkflowTest(unittest.TestCase):
         argv = json.loads(invocation.read_text())
         self.assertEqual(argv[argv.index('--limit') + 1], host['target'])
         extra = json.loads(argv[-1])
-        self.assertEqual(extra['ansible_host'], host['ssh_host_ip'])
-        self.assertEqual(extra['ansible_user'], 'fixture')
-        self.assertEqual(extra['ansible_ssh_private_key_file'], str(self.identity))
-        self.assertIn('StrictHostKeyChecking=yes', extra['ansible_ssh_common_args'])
+        self.assertEqual(extra, {'target_hosts': host['target']})
+        hosts = {name: json.loads((run / 'host_vars' / (name + '.json')).read_text())
+                 for name in (host['target'], 'localhost')}
+        self.assertEqual(hosts[host['target']]['ansible_host'], host['ssh_host_ip'])
+        self.assertEqual(hosts[host['target']]['ansible_user'], 'fixture')
+        self.assertEqual(hosts[host['target']]['ansible_ssh_private_key_file'], str(self.identity))
+        self.assertIn('StrictHostKeyChecking=yes', hosts[host['target']]['ansible_ssh_common_args'])
+        self.assertEqual(hosts['localhost']['ansible_connection'], 'local')
         self.assertNotIn('--tags', argv)
+
+    def test_frozen_transport_preserves_real_controller_delegation(self):
+        self.inventory('hou1', ansible_connection='unusable', ansible_ssh_host='100.91.0.99')
+        host = self.config['hosts']['hou1']
+        host_vars = Path(host['inventory']).parent / 'host_vars'
+        host_vars.mkdir()
+        (host_vars / (host['target'] + '.yml')).write_text(
+            'ansible_connection: unusable\nansible_ssh_host: 100.91.0.99\n')
+        output = self.root / 'controller-result.json'
+        play = Path(host['repository']) / 'ansible/playbooks/hou1.yml'
+        play.write_text(yaml.safe_dump([{'hosts': host['target'], 'gather_facts': False,
+            'tasks': [
+                {'ansible.builtin.assert': {'that': ["ansible_connection == 'ssh'",
+                    f'ansible_ssh_host == {host["ssh_host_ip"]!r}']}},
+                {'ansible.builtin.command': {'argv': [sys.executable, '-c',
+                    'import json,socket;print(json.dumps({"hostname":socket.gethostname()}))']},
+                 'delegate_to': 'localhost', 'register': 'controller'},
+                {'ansible.builtin.copy': {'content': '{{ controller.stdout }}', 'dest': str(output)},
+                 'delegate_to': 'localhost'}]}]))
+        subprocess.run(['git', '-C', host['repository'], 'add', '.'], check=True)
+        subprocess.run(['git', '-C', host['repository'], '-c', 'user.name=Fixture', '-c',
+            'user.email=fixture@example.invalid', 'commit', '-qm', 'delegation fixture'], check=True)
+        host['revision'] = subprocess.check_output(['git', '-C', host['repository'], 'rev-parse', 'HEAD'], text=True).strip()
+        run = self.root / 'delegation'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        runner.transports['hou1'] = workflow.transport(host)
+        runner.playbook('hou1', play, 'delegated')
+        import socket
+        self.assertEqual(json.loads(output.read_text())['hostname'], socket.gethostname())
+
+    def test_global_ansible_extra_vars_are_rejected_before_execution(self):
+        source = self.private('extra.yml', 'ansible_connection: ssh\n')
+        self.config['hosts']['hou1']['inputs'] = [str(source)]
+        with self.assertRaisesRegex(workflow.WorkflowError, 'in inventory'):
+            self.load()
 
     def test_repository_environment_replaces_ambient_plugin_and_secret_settings(self):
         with patch.dict(os.environ, {'ANSIBLE_LOG_PATH': '/unexpected/log', 'SOPS_AGE_KEY': 'not-the-selected-key'}):

@@ -13,7 +13,7 @@ install from the final revisions without corrective commands.
 | Inter-VM TCP resets | Proxmox Terraform, corrected by local provisioning agent | Declare/check network prerequisites before bootstrap |
 | Bootstrap name resolution | Private `configure-hosts.py` and `configure-local-dns.py` | Add an opt-in lab resolver owner; preserve unrelated host settings |
 | Container DNS blocked after UFW enabled | Private `allow-container-dns.py` | Derive narrow rules from declared Docker networks, not a captured subnet list |
-| Controller administrative VPN and resolver namespace | Private peer/enrollment/namespace helpers | Maintain a configurable administrative transport, separate from renewal jobs |
+| Controller administrative VPN and resolver namespace | `scripts/lab-network.py` owns command transport; enrollment remains private | Maintain peer creation/enrollment separately from renewal jobs |
 | Inventory assembly and bootstrap/managed selection | Private `assemble-inputs.py` and state JSON | Separate authoritative inputs from generated inventories; verify cutover before switching |
 | Lab secrets and age identities | Private preparation/import helpers; scoped encrypted bundles | Maintain retry-safe creation and recipient validation; never recreate identities on rerun |
 | Recovered DNS/registry capabilities and ACME contact | Private encrypted inputs; maintained consumers | Document required capabilities and validate access before bootstrap |
@@ -50,8 +50,9 @@ install from the final revisions without corrective commands.
 5. Fresh-host deployment from frozen inputs, then interrupted/dependency-failure
    acceptance. Run destructive drills separately from routine reconciliation.
 
-The [workflow](deployment-workflow.md) implements the first slice. Bootstrap,
-identity seeding, off-host backup and recovery acceptance remain separate work.
+The [workflow](deployment-workflow.md) implements the first slice and an isolated
+transport for an existing controller peer. Bootstrap, peer enrollment, identity
+seeding, off-host backup and recovery acceptance remain separate work.
 
 Local validation: 14 workflow/probe tests passed, including real Ansible/OpenSSH
 fixtures, plus repository syntax/lint and documentation links. The workflow has

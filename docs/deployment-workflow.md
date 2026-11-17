@@ -21,6 +21,8 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
   and compares the complete image reference with the effective deployment inputs.
 - Supply the existing private inventories and ordered extra-variable files.
   Inventories must select managed test hosts; default test groups remain empty.
+  Keep `ansible_*` execution variables in inventory, not extra-variable files;
+  global overrides also affect controller delegation.
 - Use verified ED25519 fingerprints, one explicit SSH `IdentityFile` per host,
   and the private SSH contract in [targeting](probes/rehearsal-targets.md).
   Direct VPN access is required; SSH proxy commands are not supported.
@@ -45,6 +47,28 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 ```
 
 Use the selected tooling Python when `VENV` is elsewhere.
+
+### Isolated controller transport
+
+On a Linux controller, `scripts/lab-network.py` runs a command through an already
+enrolled, dedicated test VPN container. Copy [the transport example](../examples/lab-network.json)
+outside Git and declare its container, image digest, peer state, management URL,
+overlay address and private resolver file. The resolver file accepts
+`nameserver ADDRESS` and `options timeout:N attempts:N` lines. Keep both files
+mode `0600` and peer state mode `0700`.
+
+```bash
+python3 scripts/lab-network.py --config /private/lab/network.json -- \
+  .venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json --phase preflight
+```
+
+The tool requires Docker access, an operator-owned `SSH_AUTH_SOCK`, noninteractive
+sudo, and Linux `unshare`, `nsenter`, `mount` and `setpriv`. It verifies the running
+container's image, isolation, state mount, connected management origin and overlay
+address, then rechecks them before entry. A private mount namespace supplies DNS;
+the command enters only the selected network namespace and runs as the operator
+without capabilities. Controller routes and resolver stay unchanged. It does not
+create, enroll or restart peers, modify firewall rules, or use renewal peers.
 
 `plan` is the default and makes no managed-host connections. It validates the
 local configuration and lists the sequence; it does not establish connectivity.
