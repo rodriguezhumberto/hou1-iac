@@ -169,10 +169,10 @@ are unchanged. No live-node access or production decryption occurred.
 
 ## Next: test-host acceptance
 
-No test servers are currently available; the former test deployment is production.
-Provision a separate isolated environment before these acceptance steps. Populate
-new private inventories and verify their addresses and SSH identities; do not
-reuse the promoted server through an old test alias.
+Separate HOU1/HOU4 test VMs are provisioned. The authorized lab deployment and
+current acceptance results are recorded in the
+[2026-11-17 lab evidence](evidence/isolated-lab-2026-11-17.md).
+Keep the following acceptance sequence for subsequent deployment changes.
 Record the HOU1/HOU4 infrastructure refs, selected application image/revision and
 a verified recovery point using the [release record](production-oidc-runbook.md#release-record-and-access).
 
@@ -189,6 +189,21 @@ a verified recovery point using the [release record](production-oidc-runbook.md#
    recover.
 6. Capture and verify a fresh encrypted backup using the separate source layout.
 
-Live deployment requires separate authorization. Clean-host recovery and peer
-replacement remain a later run with independent console access and the explicit
+Clean-host recovery and peer replacement remain a later run with independent
+console access and the explicit
 [recovery checkpoints](probes/clean-host-recovery.md#before-wiping-hou1).
+
+## Lab recovery findings
+
+- HOU1's VPN-bound Uptime Kuma can remain stopped after boot because Docker
+  starts it before the VPN address exists. A retryable boot unit now checks address
+  readiness before application activation. Docker and ingress remain independent
+  of the VPN to avoid a control-plane dependency cycle. A controlled reboot
+  recovered all eight containers without manual repair; the unit retried once.
+- Stopping shared ingress also disconnects administrative VPN access. Ingress
+  drills require a VM-local recovery timer and independent console access.
+
+The [lab evidence](evidence/isolated-lab-2026-11-17.md) distinguishes successful
+reconciliation, the initial boot failure and corrected reboot recovery. Google
+callback verification, off-host backup, clean-host restore and peer replacement
+remain separate acceptance checks.

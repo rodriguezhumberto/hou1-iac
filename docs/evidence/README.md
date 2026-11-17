@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Isolated HOU1/HOU4 lab | [Deployment and acceptance, 2026-11-17](isolated-lab-2026-11-17.md) |
 | Initial fixtures | [Homelab](homelab-test-evidence-2026-11-06.md), [VPS](vps-test-evidence-2026-11-06.md) |
 | OIDC security | [Initial checks](live-security-evidence-2026-11-06.md), [follow-up](live-security-followup-2026-11-07.md), [acceptance](oidc-security-acceptance-2026-11-07.md) |
 | JWKS cache overlap | [Measured limits](jwks-overlap-evidence-2026-11-07.md) |
