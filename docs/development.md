@@ -8,6 +8,7 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | Operation | Entry point | Current procedure |
 | --- | --- | --- |
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
+| Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
 | Upgrade installed OS packages | `ansible/playbooks/os-maintenance.yml` | [OS maintenance](os-maintenance.md) |
 | Configure identity | `ansible/playbooks/authentik.yml` | [Identity bootstrap](authentik-bootstrap.md) |
@@ -23,10 +24,11 @@ procedures. The legacy direct-issuer NetBird cutover is outside routine provisio
 
 ## Environment targeting
 
-There are no current test servers; the former test deployment became production.
-The default `hou1_test_init` and `hou1_test` groups are empty. A future test host
-needs a new private inventory, separate addresses and independently verified SSH
-keys. Keep production hosts in `prod_env`; isolated rehearsal hosts may use the
+The isolated HOU1/HOU4 lab uses a privately configured namespace, separate hosts
+and a separate NetBird account. See the [recorded deployment](evidence/isolated-lab-2026-11-17.md).
+The default `hou1_test_init` and `hou1_test` groups remain empty; select lab hosts
+through private inventories and independently verified SSH keys. The former test
+deployment is production. Keep production hosts in `prod_env`; rehearsal hosts may use the
 existing `isolated_test_vps` group instead of `test_env`.
 
 Managed-host entry points run `tasks/validate-target.yml` before connections or
@@ -75,3 +77,10 @@ Inventory overrides role defaults; private `-e @file` inputs override inventory.
 Keep shared paths and topology in inventory because recovery and standalone
 playbooks consume them without running the application roles.
 The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery access.
+
+## Reproducibility work
+
+The [intervention audit](deployment-interventions.md) assigns the lab's manual
+steps to code, private inputs or external prerequisites. The
+[deployment workflow](deployment-workflow.md) describes the supported automation
+and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.

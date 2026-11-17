@@ -1,7 +1,8 @@
 # SSH targets for rehearsal tools
 
-No test servers are currently available. Create new isolated targets and verify
-their SSH keys before using these tools. Old aliases do not establish identity.
+The current isolated lab is recorded in the
+[deployment evidence](../evidence/isolated-lab-2026-11-17.md). Select its private
+targets and verified SSH keys explicitly. Old aliases do not establish identity.
 
 `scripts/ssh_target.py` checks the resolved SSH address and ED25519 fingerprint
 locally before a connection. Test servers must use `100.91.0.0/16`; auxiliary

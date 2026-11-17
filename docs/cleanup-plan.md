@@ -207,3 +207,8 @@ The [lab evidence](evidence/isolated-lab-2026-11-17.md) distinguishes successful
 reconciliation, the initial boot failure and corrected reboot recovery. Google
 callback verification, off-host backup, clean-host restore and peer replacement
 remain separate acceptance checks.
+
+The [intervention audit](deployment-interventions.md) assigns the lab's corrective
+steps to maintained code, declared inputs or external prerequisites. The initial
+[managed lab workflow](deployment-workflow.md) adds ordered reconciliation and
+fresh target/access checks; fresh-bootstrap automation remains in that audit.

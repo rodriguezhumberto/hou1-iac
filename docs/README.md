@@ -29,6 +29,8 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 [identity bootstrap](authentik-bootstrap.md) and
 [NetBird compatibility](netbird-authentik-compatibility.md) describe supported contracts.
 The [cleanup plan](cleanup-plan.md) records development decisions and follow-up work.
+The [intervention audit](deployment-interventions.md) tracks reproducibility gaps;
+the [managed lab workflow](deployment-workflow.md) coordinates existing test hosts.
 
 ## Probes and drills
 

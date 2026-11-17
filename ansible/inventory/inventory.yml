@@ -1,7 +1,7 @@
 all:
   children:
     # TEST ENVIRONMENT
-    # No current test hosts. Populate these groups only in a new isolated inventory.
+    # Lab hosts are selected through private inventories; these defaults stay empty.
     test_env:
       children:
         hou1_test_init:

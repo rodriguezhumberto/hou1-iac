@@ -19,8 +19,8 @@ the [Ansible dependencies](requirements-dev.txt) and
 [collections](ansible/requirements.yml). Keep private inventory, release inputs,
 credentials and SSH configuration outside Git.
 
-Use a private inventory with pinned SSH host keys for production; the example
-inventory disables strict checking. Secrets use controller-side SOPS/age.
+Use a private inventory with independently pinned SSH host keys. Host-key checking
+is enabled in the repository configuration. Secrets use controller-side SOPS/age.
 Select the environment's deployment identity and keep passwords and tokens out
 of command arguments.
 
@@ -70,3 +70,13 @@ and backups. Verify provider-console access before restricting SSH.
 During initial SSH cutover, a 180-second fallback timer restores bootstrap access
 if the VPN probe fails. It is removed after success and is not an ongoing recovery
 path. See [NetBird operations](docs/netbird-operations.md).
+
+## Isolated lab
+
+The current HOU1/HOU4 lab uses a privately configured namespace and a separate VPN
+account. Default test groups stay empty; private inventories select the hosts.
+Deployment, reconciliation and reboot results are recorded in the
+[lab evidence](docs/evidence/isolated-lab-2026-11-17.md).
+That run required interventions and does not yet prove an unattended fresh install.
+See the [intervention audit](docs/deployment-interventions.md) and
+[deployment workflow](docs/deployment-workflow.md) for the remaining work.
