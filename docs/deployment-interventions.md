@@ -24,8 +24,8 @@ install from the final revisions without corrective commands.
 | Authentik backup self-check needed host decryption | Private recipient override and owner-encrypted host-key recovery copy | Validate recipient/recovery compatibility before enabling backup jobs |
 | Google callback not verified | External OAuth registration; login/branding disabled | Verify callback before enabling; preserve the approved allowlist |
 | Nginx-stop drill removed administrative VPN access | Console recovery; failed drill preserved | Require independent recovery access and a VM-local restart timer for ingress drills |
-| Runtime snapshots, login checks and reboot receipts | Private wrappers around maintained probes or direct commands | Maintain acceptance tooling with declared targets and distinct failure records |
-| Playbook invocation and logs | Private runner; initial managed workflow now in `scripts/deploy-lab.py` | Extend only after bootstrap prerequisites have owners |
+| Runtime snapshots, login checks and reboot receipts | Workflow owns container/source/TLS/HTTPS checks; login and reboot wrappers remain private | Maintain the remaining acceptance tools with declared targets and distinct failure records |
+| Playbook invocation and logs | `scripts/deploy-lab.py`; existing-host reconciliation and verification passed | Extend only after bootstrap prerequisites have owners |
 
 ## Ownership decisions
 
@@ -54,6 +54,8 @@ The [workflow](deployment-workflow.md) implements the first slice and an isolate
 transport for an existing controller peer. Bootstrap, peer enrollment, identity
 seeding, off-host backup and recovery acceptance remain separate work.
 
-Local validation: 14 workflow/probe tests passed, including real Ansible/OpenSSH
-fixtures, plus repository syntax/lint and documentation links. The workflow has
-not been executed against managed hosts.
+Local validation: 23 workflow/transport tests passed, including real
+Ansible/OpenSSH fixtures, plus syntax/lint and documentation links. Managed-host
+preflight, reconciliation and standalone verification passed on both lab hosts;
+the initial delegation failure and corrected retry are in the
+[lab evidence](evidence/isolated-lab-2026-11-17.md#managed-workflow-acceptance).

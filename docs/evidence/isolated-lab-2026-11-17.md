@@ -79,3 +79,26 @@ including native systemd validation and the disposable Docker fixture.
 
 Google login awaits callback registration verification. Unified off-host backup,
 clean-host restore and peer replacement were not exercised.
+
+## Managed workflow acceptance
+
+Ordered reconciliation passed with HOU1 `f6d349a` and HOU4 `782771f`.
+Standalone verification passed with HOU1 `d57c00a`, which adds safe private-YAML
+error handling. Both phases used private frozen inputs and the maintained
+`scripts/lab-network.py` transport. No corrective commands were needed during
+the successful reconciliation.
+
+- Both hosts passed fresh pinned SSH/sudo, hostname, overlay and targeting checks.
+- All eight HOU1 and four HOU4 containers were ready. Application image/source
+  and TLS verification passed; all three declared HTTPS status checks passed.
+- Standalone verification preserved the container IDs from reconciliation.
+- Live transport checks confirmed operator identity, dropped capabilities,
+  separate network/mount namespaces and unchanged controller resolver/routes
+  (route comparisons exclude expiring lifetime counters).
+
+The first reconciliation failed before host changes: global SSH overrides also
+affected delegated controller tasks. Host-scoped transport inputs fixed it;
+the failed receipt remains beside the successful retry under `workflow-runs/`.
+Local validation passed 23 workflow/transport tests, syntax/lint and documentation
+links. Fresh-bootstrap DNS/firewall ownership and input contracts precede ingress
+separation in the [intervention audit](../deployment-interventions.md).

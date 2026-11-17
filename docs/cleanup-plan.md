@@ -209,6 +209,8 @@ callback verification, off-host backup, clean-host restore and peer replacement
 remain separate acceptance checks.
 
 The [intervention audit](deployment-interventions.md) assigns the lab's corrective
-steps to maintained code, declared inputs or external prerequisites. The initial
-[managed lab workflow](deployment-workflow.md) adds ordered reconciliation and
-fresh target/access checks; fresh-bootstrap automation remains in that audit.
+steps to maintained code, declared inputs or external prerequisites. The
+[managed lab workflow](deployment-workflow.md) passed ordered reconciliation and
+standalone verification on both hosts using maintained controller transport.
+Next: declarative bootstrap DNS/firewall ownership and input contracts, followed
+by ingress separation.

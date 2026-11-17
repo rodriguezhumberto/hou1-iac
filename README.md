@@ -77,7 +77,9 @@ The current HOU1/HOU4 lab uses a privately configured namespace and a separate V
 account. Default test groups stay empty; private inventories select the hosts.
 Deployment, reconciliation and reboot results are recorded in the
 [lab evidence](docs/evidence/isolated-lab-2026-11-17.md).
-That run required interventions and does not yet prove an unattended fresh install.
+Existing-host reconciliation and standalone verification pass through the
+maintained workflow. The initial bootstrap required interventions; unattended
+fresh installation remains to be proved.
 See the [intervention audit](docs/deployment-interventions.md) and
 [deployment workflow](docs/deployment-workflow.md) for coordinated reconciliation
 and isolated controller transport, plus the remaining bootstrap work.
