@@ -12,6 +12,24 @@ ROLES = ROOT / 'ansible/playbooks/roles'
 DEFAULTS = yaml.safe_load((ROOT / 'ansible/inventory/group_vars/all/vars.yml').read_text())
 
 
+def read_task_phases(role):
+    """Read entry tasks and one level of bare static phase imports.
+
+    Nested imports and dynamic includes remain explicit, as do imports carrying
+    vars, conditions, tags or other task keywords that a fixture must preserve.
+    """
+    task_root = ROLES / role / 'tasks'
+    tasks = []
+    for task in yaml.safe_load((task_root / 'main.yml').read_text()):
+        source = task.get('ansible.builtin.import_tasks')
+        if (set(task) == {'name', 'ansible.builtin.import_tasks'}
+                and isinstance(source, str) and '{{' not in source):
+            tasks.extend(yaml.safe_load((task_root / source).read_text()))
+        else:
+            tasks.append(task)
+    return tasks
+
+
 def run_plays(play_specs, extra_args=(), inventory_source=None):
     with tempfile.TemporaryDirectory() as directory:
         play = Path(directory) / 'play.yml'

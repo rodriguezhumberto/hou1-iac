@@ -10,7 +10,7 @@ import unittest
 
 import yaml
 
-from helpers import ROOT, run_play
+from helpers import ROOT, read_task_phases, run_play
 
 
 class SopsAgeTest(unittest.TestCase):
@@ -40,8 +40,7 @@ class SopsAgeTest(unittest.TestCase):
 
     @unittest.skipUnless(shutil.which('sops') and shutil.which('age-keygen'), 'SOPS/age binaries required')
     def test_deployment_loads_on_controller_without_remote_access_or_logged_secrets(self):
-        deployment = next(task for task in yaml.safe_load(
-            (ROOT / 'ansible/playbooks/roles/authentik/tasks/main.yml').read_text()) if 'block' in task)
+        deployment = next(task for task in read_task_phases('authentik') if 'block' in task)
         load = deployment['block'][0]
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

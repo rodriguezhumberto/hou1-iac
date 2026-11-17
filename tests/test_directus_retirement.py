@@ -11,7 +11,7 @@ import unittest
 
 import yaml
 
-from helpers import ROLES, run_play
+from helpers import ROLES, read_task_phases, run_play
 
 
 DOCKER = '''#!/usr/bin/env python3
@@ -77,7 +77,7 @@ class RetirementTest(unittest.TestCase):
             self.container('astro', 'paws', self.app, 'astro-app'),
         ]
         self.state.write_text(json.dumps({'containers': self.containers}))
-        main = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        main = read_task_phases('webstack')
         self.remove = next(t for t in main if t['name'] == 'Remove archived Directus containers from this project')
 
     def container(self, name, project, directory, service='directus'):

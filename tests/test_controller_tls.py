@@ -16,7 +16,7 @@ from unittest.mock import patch
 
 import yaml
 from jinja2 import Environment, StrictUndefined
-from helpers import ROOT, ROLES, guard_play, run_plays
+from helpers import ROOT, ROLES, read_task_phases, guard_play, run_plays
 
 sys.path.insert(0,str(ROOT/'scripts'))
 import hou1_tls_material as material
@@ -321,7 +321,9 @@ class ControllerTlsTest(unittest.TestCase):
                                     'Preserve NetBird certificate renewal credentials for the app renewal job']}
         tasks=[]
         for role, selected in names.items():
-            tasks.extend(task for task in yaml.safe_load((ROLES/role/'tasks/main.yml').read_text()) if task.get('name') in selected)
+            source = (read_task_phases(role) if role in ('webstack', 'authentik')
+                      else yaml.safe_load((ROLES/role/'tasks/main.yml').read_text()))
+            tasks.extend(task for task in source if task.get('name') in selected)
         # Paths/credentials deliberately absent: every legacy task must skip before
         # templating or changing the host, rather than quietly rendering a token.
         result=run_plays([{'variables':{'cms_environment':'production','hou1_controller_managed_tls':True,

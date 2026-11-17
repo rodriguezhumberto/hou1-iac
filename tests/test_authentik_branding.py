@@ -9,7 +9,7 @@ import unittest
 import yaml
 from django.template import Context, Engine, Library
 
-from helpers import run_play
+from helpers import read_task_phases, run_play
 from identity_fixtures import identity_manifest, identity_names, identity_profile
 from test_authentik_bootstrap import FixtureAPI, bootstrap
 
@@ -243,7 +243,7 @@ class AuthentikBrandingTest(unittest.TestCase):
                 self.assertEqual(target.read_text(), 'Unrelated existing template')
 
     def test_branding_guard_requires_google_bootstrap_and_the_tested_version(self):
-        guard = next(task for task in yaml.safe_load((ROLE / 'tasks/main.yml').read_text())
+        guard = next(task for task in read_task_phases('authentik')
                      if task['name'] == 'Validate Authentik environment and isolated roots')
         variables = {'authentik_environment': 'test', 'authentik_project_root': '/opt/hou1-authentik/test',
                      'authentik_data_root': '/var/lib/hou1-authentik/test',

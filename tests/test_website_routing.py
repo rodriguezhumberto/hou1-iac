@@ -6,7 +6,7 @@ import subprocess
 import tempfile
 import unittest
 import yaml
-from helpers import ROOT, ROLES, guard_play, run_play, run_plays
+from helpers import ROOT, ROLES, read_task_phases, guard_play, run_play, run_plays
 
 spec = importlib.util.spec_from_file_location('sites', ROOT / 'ansible/playbooks/filter_plugins/webstack_sites.py')
 sites = importlib.util.module_from_spec(spec); spec.loader.exec_module(sites)
@@ -77,8 +77,9 @@ class WebsiteRoutingTest(unittest.TestCase):
                 self.assertNotIn('build', services['astro-app'])
 
     def test_runtime_rendering_requires_no_secondary_domain_or_certificate_when_disabled(self):
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        tasks = read_task_phases('webstack')
         task = next(task for task in tasks if task['name'] == 'Inject production .env file for Astro')
+        task['ansible.builtin.template']['src'] = str(ROLES / 'webstack/templates/app.env.j2')
         with tempfile.TemporaryDirectory() as directory:
             values = {**settings(), 'app_directory': directory, 'ssl_domains': [{'name': 'site.example.invalid'}],
                       'netbird_ip': '100.90.0.10', 'staff_cert_dir': 'site.example.invalid',
@@ -94,6 +95,28 @@ class WebsiteRoutingTest(unittest.TestCase):
             self.assertIn('PUBLIC_CANONICAL_HOSTNAME=site.example.invalid\n', text)
             self.assertIn('PUBLIC_CANONICAL_REDIRECT=true\n', text)
             self.assertNotIn('fixture-only-value', result.stdout + result.stderr)
+
+    def test_runtime_template_matches_original_inline_rendering(self):
+        fixture = json.loads((ROOT / 'tests/fixtures/app-env.json').read_text())
+        with tempfile.TemporaryDirectory() as directory:
+            plays = []
+            for case in fixture['cases']:
+                destination = Path(directory) / case['name']
+                destination.mkdir()
+                plays.append(dict(
+                    variables={**fixture['common'], **case['variables'], 'app_directory': str(destination)},
+                    tasks=[{'ansible.builtin.import_role': {'name': 'webstack', 'tasks_from': 'runtime'}}]))
+            result = run_plays(plays, extra_args=['--diff', '-vv'])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            for case in fixture['cases']:
+                with self.subTest(case=case['name']):
+                    path = Path(directory) / case['name'] / '.env'
+                    self.assertEqual(path.read_bytes(), case['expected'].encode())
+                    self.assertEqual(path.stat().st_mode & 0o777, 0o600)
+            self.assertNotIn('fixture-hcaptcha-secret', result.stdout + result.stderr)
+            self.assertNotIn('fixture-vapid-private', result.stdout + result.stderr)
+            self.assertNotIn('fixture-session-secret', result.stdout + result.stderr)
+            self.assertNotIn('fixture-oidc-secret', result.stdout + result.stderr)
 
 
 if __name__ == '__main__': unittest.main()

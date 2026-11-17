@@ -9,7 +9,7 @@ import unittest
 
 import yaml
 
-from helpers import ROOT, ROLES, guard_play, netbird_vars, run_play, run_plays
+from helpers import ROOT, ROLES, read_task_phases, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
@@ -130,7 +130,7 @@ class WorkflowTest(unittest.TestCase):
         bootstrap = yaml.safe_load((ROOT / 'ansible/playbooks/bootstrap-control-plane.yml').read_text())[0]
         roles = bootstrap['roles']
         web = next(role for role in roles if role['role'] == 'webstack')
-        tasks = yaml.safe_load((ROLES / 'webstack/tasks/main.yml').read_text())
+        tasks = read_task_phases('webstack')
         deploy = next(task for task in tasks if task['name'] == 'Deploy the verified application without building on the host')
         # Render the production command with a Compose fixture that records args.
         with tempfile.TemporaryDirectory() as directory:
