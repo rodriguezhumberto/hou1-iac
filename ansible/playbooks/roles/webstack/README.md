@@ -7,7 +7,8 @@ Deploys the verified application image and existing Nginx ingress through
 
 `main.yml` statically imports these phases so role tags and ordering carry through:
 
-1. `application.yml`: verify the artifact, update the separate source checkout,
+1. `application.yml`: verify the artifact, refresh a declared isolated source
+   bundle through `test_application_source`, update the separate source checkout,
    validate website routing, install managed assets and render base Compose.
 2. `storage.yml`: retain the database mount, prepare CMS media and install backup
    and restore commands, then optionally seed missing media.

@@ -99,21 +99,9 @@
         mode: '0600'
       no_log: true
 
-    - name: Transfer the immutable application source without GitHub credentials
-      ansible.builtin.copy:
-        src: "{{ rehearsal_staff_bundle }}"
-        dest: /opt/hou1-test-source/staff.bundle
-        mode: '0600'
-
-    - name: Materialize the local application Git remote from its bundle
-      ansible.builtin.command:
-        argv: [git, clone, --bare, /opt/hou1-test-source/staff.bundle, /opt/hou1-test-source/staff.git]
-        creates: /opt/hou1-test-source/staff.git/HEAD
-
-    - name: Refresh the rehearsal source ref from the transferred bundle
-      ansible.builtin.command:
-        argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, /opt/hou1-test-source/staff.bundle, "{{ rehearsal_staff_bundle_ref | default('refs/heads/main') }}:refs/heads/rehearsal"]
-      changed_when: false
+    - name: Prepare the declared isolated test application source
+      ansible.builtin.include_role:
+        name: test_application_source
 
     - name: Import fresh test certificate seeds only after materializing the app checkout
       when:

@@ -104,6 +104,12 @@ playbooks retain their component checks.
 1. HOU1 `hou1.yml`, followed by declared container/source/TLS checks.
 2. HOU4 `hou4.yml`, followed by declared container and HTTPS checks.
 
+For a declared isolated application bundle, HOU1 refreshes its fixed local Git
+remote before selecting the checkout. Bootstrap uses the same
+[source owner](../ansible/playbooks/roles/test_application_source/README.md).
+The imported branch must match the selected release commit; an explicit older
+release can also be selected for rollback.
+
 Each playbook uses its own repository configuration and the selected toolchain,
 collections and age identity. Host limits and frozen SSH settings apply to every
 invocation. Any failure stops the sequence. This is ordered reconciliation, not

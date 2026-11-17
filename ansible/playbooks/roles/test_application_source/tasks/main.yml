@@ -1,0 +1,73 @@
+---
+- name: Restrict source-bundle installation to the isolated test remote
+  ansible.builtin.assert:
+    that:
+      - cms_environment == 'test'
+      - "'test_env' in group_names"
+      - "'prod_env' not in group_names"
+      - netbird_subnet == '100.91.0.0/16'
+      - app_repo_pat == '/opt/hou1-test-source/staff.git'
+      - rehearsal_staff_bundle is string
+      - rehearsal_staff_bundle is match('^/')
+      - rehearsal_staff_ref is match('^[a-f0-9]{40}$')
+      - rehearsal_staff_bundle_ref is match('^refs/heads/[A-Za-z0-9_/-]+$')
+      - "'..' not in rehearsal_staff_bundle_ref"
+    fail_msg: Select an isolated test source bundle, branch and immutable revision.
+  no_log: true
+
+- name: Create the private test source directory
+  ansible.builtin.file:
+    path: /opt/hou1-test-source
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Transfer the selected test source bundle
+  ansible.builtin.copy:
+    src: '{{ rehearsal_staff_bundle }}'
+    dest: /opt/hou1-test-source/staff.bundle
+    owner: root
+    group: root
+    mode: '0600'
+  no_log: true
+
+- name: Initialize the local test source remote if missing
+  ansible.builtin.command:
+    argv: [git, init, --bare, /opt/hou1-test-source/staff.git]
+    creates: /opt/hou1-test-source/staff.git/HEAD
+
+- name: Import the selected bundle branch without publishing a deployment ref
+  ansible.builtin.command:
+    argv: [git, --git-dir=/opt/hou1-test-source/staff.git, fetch, --no-tags,
+           /opt/hou1-test-source/staff.bundle, '{{ rehearsal_staff_bundle_ref }}']
+  changed_when: false
+  no_log: true
+
+- name: Read the imported source revision
+  ansible.builtin.command:
+    argv: [git, --git-dir=/opt/hou1-test-source/staff.git, rev-parse, 'FETCH_HEAD^{commit}']
+  register: test_application_source_imported
+  changed_when: false
+  no_log: true
+
+- name: Refuse a bundle branch that differs from the selected release
+  ansible.builtin.assert:
+    that: test_application_source_imported.stdout == rehearsal_staff_ref
+    fail_msg: The test source bundle differs from the selected release revision.
+  no_log: true
+
+- name: Read the existing test deployment ref
+  ansible.builtin.command:
+    argv: [git, --git-dir=/opt/hou1-test-source/staff.git, rev-parse, --verify, refs/heads/rehearsal]
+  register: test_application_source_previous
+  changed_when: false
+  failed_when: test_application_source_previous.rc not in [0, 128]
+  no_log: true
+
+- name: Select the verified test deployment ref, including explicit rollback
+  ansible.builtin.command:
+    argv: [git, --git-dir=/opt/hou1-test-source/staff.git, update-ref,
+           refs/heads/rehearsal, '{{ rehearsal_staff_ref }}']
+  when: test_application_source_previous.stdout != rehearsal_staff_ref
+  no_log: true

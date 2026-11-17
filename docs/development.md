@@ -63,6 +63,8 @@ task phases, required inputs and owned resources.
 shared override; [shared ingress](../ansible/playbooks/roles/shared_ingress/README.md)
 prepares its networks and mounts; [activation](../ansible/playbooks/roles/compose_runtime/README.md)
 applies changed service inputs and retains failed attempts for retry.
+The [test source owner](../ansible/playbooks/roles/test_application_source/README.md)
+refreshes the isolated VM's local Git remote from the selected release bundle.
 
 ## Configuration sources and outputs
 
