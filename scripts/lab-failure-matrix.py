@@ -122,6 +122,14 @@ def compose_shell(project, action):
     return 'cd ' + shlex.quote(directory) + ' && ' + shlex.join(compose_command(project) + action)
 
 
+def privileged_compose_shell(project, action):
+    directory = project['directory']
+    require(isinstance(directory, str) and directory.startswith('/') and '..' not in Path(directory).parts,
+            'Compose directories must be absolute and local to the host')
+    return ('cd ' + shlex.quote(directory) + ' && sudo -n ' +
+            shlex.join(compose_command(project) + action))
+
+
 def probe_value(payload):
     """Return the sole Prometheus scalar, rejecting missing or ambiguous data."""
     try:
@@ -177,8 +185,8 @@ class Matrix:
 
     def stop(self, scenario):
         service = self.matrix[scenario]['service']
-        command = compose_shell(self.project(scenario), ['stop', '--timeout', '30', service])
-        self.remote(scenario, 'sudo -n sh -c ' + shlex.quote(command), timeout=120)
+        command = privileged_compose_shell(self.project(scenario), ['stop', '--timeout', '30', service])
+        self.remote(scenario, command, timeout=120)
 
     def restore(self, scenario):
         declaration = self.matrix[scenario]
@@ -195,8 +203,8 @@ class Matrix:
         elif scenario == 'monitoring':
             self.remote(scenario, 'sudo -n /usr/local/libexec/hou4-monitoring-apply', timeout=300)
         else:
-            command = compose_shell(project, ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', service])
-            self.remote(scenario, 'sudo -n sh -c ' + shlex.quote(command), timeout=180)
+            command = privileged_compose_shell(project, ['up', '-d', '--no-deps', '--wait', '--wait-timeout', '120', service])
+            self.remote(scenario, command, timeout=180)
 
     def verify_workflow(self):
         sanitized = self.run / 'workflow.json'
