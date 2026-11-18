@@ -52,6 +52,11 @@ class IndependentIngressTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 recovery.validate(changed)
 
+    def test_boot_unit_waits_for_the_selected_vpn_address(self):
+        service = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent.service.j2').read_text()
+        self.assertIn('--require-address {{ netbird_ip', service)
+        self.assertIn('--interface {{ netbird_interface', service)
+
 
 if __name__ == '__main__':
     unittest.main()
