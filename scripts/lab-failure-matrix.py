@@ -126,8 +126,8 @@ def privileged_compose_shell(project, action):
     directory = project['directory']
     require(isinstance(directory, str) and directory.startswith('/') and '..' not in Path(directory).parts,
             'Compose directories must be absolute and local to the host')
-    return ('cd ' + shlex.quote(directory) + ' && sudo -n ' +
-            shlex.join(compose_command(project) + action))
+    command = 'cd ' + shlex.quote(directory) + ' && ' + shlex.join(compose_command(project) + action)
+    return 'sudo -n sh -c ' + shlex.quote(command)
 
 
 def probe_value(payload):
