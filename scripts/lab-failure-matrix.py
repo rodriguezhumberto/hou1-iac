@@ -2,14 +2,15 @@
 """Run the non-destructive HOU1/HOU4 failure matrix on declared test hosts.
 
 The workflow file stays the source of host, release and transport inputs. A
-private ``failure_matrix`` section names the Compose service to interrupt for
-each scenario. Use ``scripts/lab-network.py`` around this command so all SSH
-and DNS access stays inside the dedicated test transport.
+separate private matrix file names the Compose service to interrupt for each
+scenario. Use ``scripts/lab-network.py`` around this command so all SSH and DNS
+access stays inside the dedicated test transport.
 """
 
 import argparse
 from datetime import datetime, timezone
 import fcntl
+import hashlib
 import importlib.util
 import json
 import os
@@ -51,22 +52,11 @@ def private_json(path):
     return source, value
 
 
-def load_config(path):
-    """Validate the normal workflow while keeping matrix declarations private."""
-    source, raw = private_json(path)
-    matrix = raw.pop('failure_matrix', None)
-    require(isinstance(matrix, dict), 'Declare a private failure_matrix section')
-    temporary = None
-    try:
-        descriptor, name = tempfile.mkstemp(prefix='.workflow-', dir=source.parent)
-        temporary = Path(name)
-        with os.fdopen(descriptor, 'w') as stream:
-            json.dump(raw, stream)
-        os.chmod(temporary, 0o600)
-        config = deploy_lab.load_config(temporary)
-    finally:
-        if temporary:
-            temporary.unlink(missing_ok=True)
+def load_config(path, matrix_path):
+    """Validate the normal workflow and a separate private matrix file."""
+    deploy_lab.private_file(path)
+    _, matrix = private_json(matrix_path)
+    config = deploy_lab.load_config(path)
     validate_matrix(config, matrix)
     return config, matrix
 
@@ -156,12 +146,17 @@ class Matrix:
         self.workflow = deploy_lab.Workflow(config, run)
         self.cleanup = []
         self.steps = []
+        self.metadata = {
+            'configuration_sha256': hashlib.sha256(
+                json.dumps(config, sort_keys=True).encode()).hexdigest(),
+            'revisions': {name: host['revision'] for name, host in config['hosts'].items()},
+        }
         self.save('running')
 
     def save(self, status):
         deploy_lab.write_private(self.run / 'matrix.json', json.dumps({
             'version': 1, 'environment': 'test', 'status': status,
-            'steps': self.steps}, indent=2) + '\n')
+            **self.metadata, 'steps': self.steps}, indent=2) + '\n')
 
     def record(self, name, status, **fields):
         item = {'step': name, 'status': status, **fields}
@@ -277,11 +272,12 @@ def plan(matrix):
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
+    parser.add_argument('--matrix', required=True, help='Private matrix declaration file')
     parser.add_argument('--apply', action='store_true', help='Apply the declared test-host interruptions')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
-        config, matrix = load_config(args.config)
+        config, matrix = load_config(args.config, args.matrix)
         if not args.apply:
             print(json.dumps(plan(matrix), indent=2))
             return 0

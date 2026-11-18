@@ -66,11 +66,13 @@ The non-destructive interruption matrix uses the same private workflow inputs
 and maintained reconciliation paths:
 
 ```bash
-.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json
-.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json --apply
+.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json \
+  --matrix /private/lab/failure-matrix.json
+.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json \
+  --matrix /private/lab/failure-matrix.json --apply
 ```
 
-The first command validates the private `failure_matrix` declarations and prints
+The first command validates the private matrix declarations and prints
 the scenarios. `--apply` stops one declared service at a time, reconciles it,
 checks recovery, and restores it in cleanup code. The dependency case runs only
 the HOU4 monitoring playbook while the HOU1 endpoint is unavailable, then checks
