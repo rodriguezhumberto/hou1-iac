@@ -3,6 +3,7 @@ import importlib.util
 import json
 import unittest
 import yaml
+from jinja2 import Environment
 
 from helpers import ROOT
 
@@ -57,6 +58,25 @@ class IndependentIngressTest(unittest.TestCase):
         service = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent.service.j2').read_text()
         self.assertIn('--require-address {{ netbird_ip', service)
         self.assertIn('--interface {{ netbird_interface', service)
+
+    def test_disabled_secondary_site_omits_invalid_template_mount(self):
+        source = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent-compose.yml.j2').read_text()
+        environment = Environment()
+        environment.filters['bool'] = bool
+        template = environment.from_string(source)
+        context = {
+            'application_image_compose': {'services': {'nginx': {'image': 'nginx:stable'}}},
+            'app_directory': '/opt/application',
+            'netbird_control_plane_directory': '/opt/netbird',
+            'netbird_ingress_proxy_ip': '172.30.80.2',
+            'netbird_ingress_network': 'netbird-ingress',
+            'shared_ingress_app_network': 'application',
+            'authentik_enable_ingress_network': False,
+        }
+        disabled = template.render(**context, webstack_secondary_site_enabled=False)
+        self.assertNotIn('secondary.conf.template:/etc/nginx/templates/secondary.conf.template', disabled)
+        enabled = template.render(**context, webstack_secondary_site_enabled=True)
+        self.assertIn('secondary.conf.template:/etc/nginx/templates/secondary.conf.template', enabled)
 
     def test_recovery_export_uses_a_real_final_newline(self):
         tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/shared_ingress/tasks/independent.yml').read_text())
