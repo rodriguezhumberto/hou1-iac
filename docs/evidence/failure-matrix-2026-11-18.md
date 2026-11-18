@@ -20,6 +20,6 @@ requirement, not a host recovery failure.
 All intentionally stopped services were restored and final HOU1 application and
 HOU4 monitoring readiness checks passed.
 
-The reboot observer should identify declared active services instead of counting
-every historical Compose container. That follow-up keeps retained rollback
-containers from producing a false failure.
+The reboot observer now counts only active containers and still rejects a missing
+or unexpected running service. Retained stopped rollback containers therefore do
+not produce a false failure.
