@@ -60,6 +60,25 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 
 Use the selected tooling Python when `VENV` is elsewhere.
 
+### Failure matrix
+
+The non-destructive interruption matrix uses the same private workflow inputs
+and maintained reconciliation paths:
+
+```bash
+.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json
+.venv/bin/python scripts/lab-failure-matrix.py --config /private/lab/workflow.json --apply
+```
+
+The first command validates the private `failure_matrix` declarations and prints
+the scenarios. `--apply` stops one declared service at a time, reconciles it,
+checks recovery, and restores it in cleanup code. The dependency case runs only
+the HOU4 monitoring playbook while the HOU1 endpoint is unavailable, then checks
+both HOU4 local readiness and the failed remote probe. Reboot remains a separate
+explicit drill because it interrupts the host. Run this command inside
+`scripts/lab-network.py`; it refuses non-test workflow inputs and writes private
+JSON evidence under the workflow run directory.
+
 ### Isolated controller transport
 
 On a Linux controller, `scripts/lab-network.py` runs a command through an already

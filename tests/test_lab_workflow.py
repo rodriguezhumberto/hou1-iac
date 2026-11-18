@@ -289,6 +289,22 @@ class LabWorkflowTest(unittest.TestCase):
         self.assertEqual(hosts['localhost']['ansible_connection'], 'local')
         self.assertNotIn('--tags', argv)
 
+    def test_public_playbook_can_select_a_tagged_recovery_phase(self):
+        binary = self.root / 'tagged-bin'; binary.mkdir()
+        invocation = self.root / 'tagged-invocation.json'
+        program = binary / 'ansible-playbook'
+        program.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                           f'Path({str(invocation)!r}).write_text(json.dumps(sys.argv[1:]))\n')
+        program.chmod(0o700)
+        self.config['ansible_bin_directory'] = str(binary)
+        run = self.root / 'tagged'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        host = self.config['hosts']['hou4']
+        runner.transports['hou4'] = workflow.transport(host)
+        runner.playbook('hou4', Path(host['repository']) / 'ansible/playbooks/hou4.yml',
+                        'monitoring', extra_args=['--tags', 'monitoring'])
+        self.assertEqual(json.loads(invocation.read_text())[-2:], ['--tags', 'monitoring'])
+
     def test_frozen_transport_preserves_real_controller_delegation(self):
         self.inventory('hou1', ansible_connection='unusable', ansible_ssh_host='100.91.0.99')
         host = self.config['hosts']['hou1']

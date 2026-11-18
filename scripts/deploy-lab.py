@@ -298,7 +298,7 @@ class Workflow:
         require(lab_contracts.fingerprints(self.capabilities) == self.capabilities,
                 'Referenced capability files changed during this attempt; rerun input checks')
 
-    def playbook(self, service, play, log_name, local=False):
+    def playbook(self, service, play, log_name, local=False, extra_args=()):
         host = self.config['hosts'][service]
         self.check_inputs()
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
@@ -332,7 +332,7 @@ class Workflow:
                 'ansible_python_interpreter': '{{ ansible_playbook_python }}'}))
             write_private(overlay, json.dumps({'all': {'hosts': {host['target']: {}, 'localhost': {}}}}))
             argv += ['-i', str(overlay)]
-        argv += ['-e', json.dumps(overrides)]
+        argv += ['-e', json.dumps(overrides), *extra_args]
         log = self.run / (log_name + '.log')
         descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w') as stream:
