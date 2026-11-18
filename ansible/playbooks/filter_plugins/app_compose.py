@@ -104,8 +104,16 @@ def compose_override(media_directory, ingress_directory, network, proxy_ip,
         'networks': {'netbird-ingress': {'external': True, 'name': network}},
     }
     if independent:
+        # Keep the legacy listener alive long enough for existing requests to
+        # finish when the independent listener takes its ports.  SIGQUIT is
+        # Nginx's graceful shutdown signal; Compose waits for this grace
+        # period before force-killing the container.
         desired['networks']['app-network'] = {'external': True, 'name': app_network}
-        desired['services']['nginx']['profiles'] = ['integrated-ingress-disabled']
+        desired['services']['nginx'].update({
+            'profiles': ['integrated-ingress-disabled'],
+            'stop_signal': 'SIGQUIT',
+            'stop_grace_period': '30s',
+        })
     if authentik_network:
         desired['services']['nginx']['networks']['authentik-ingress'] = {}
         desired['networks']['authentik-ingress'] = {'external': True, 'name': authentik_network}

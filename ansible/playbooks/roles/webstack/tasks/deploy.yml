@@ -37,7 +37,7 @@
 
 - name: Cut over to independent ingress after its backend is configured
   block:
-    - name: Stop the legacy application Nginx listener
+    - name: Drain the legacy application Nginx listener before cutover
       ansible.builtin.command:
         argv: '{{ shared_ingress_legacy_compose_argv + ["--profile", "integrated-ingress-disabled", "stop", "nginx"] }}'
       changed_when: false

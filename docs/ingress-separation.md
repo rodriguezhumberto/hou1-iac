@@ -38,8 +38,10 @@ migrate containers, routing, boot recovery or backups.
    backend networks explicitly and allow startup before application enrollment or
    readiness. Preserve the environment's existing network isolation.
 3. Validate the split Compose model and recovery manifest offline. During cutover,
-   stop the legacy listener, start and validate independent Nginx, and restore the
-   legacy listener automatically if activation fails.
+   drain the legacy listener with Nginx's graceful `SIGQUIT` and 30-second stop
+   grace, then start independent Nginx. Compose's healthcheck/`--wait` gate must
+   pass before the cutover succeeds; restore the legacy listener automatically if
+   activation fails. This does not change the application readiness endpoints.
 4. Record the old selectors and arm a VM-local rollback timer before production
    use. Run the listener transfer locally on HOU1 so losing controller SSH cannot
    interrupt it.
