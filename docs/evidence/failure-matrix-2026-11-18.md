@@ -26,3 +26,7 @@ test-observer false failure. The corrected observer was rerun successfully.
 The reboot observer now counts only active containers and still rejects a missing
 or unexpected running service. Retained stopped rollback containers therefore do
 not produce a false failure.
+
+The guarded failure-matrix runner then reproduced the application, monitoring
+and dependency scenarios in one test run. Its private receipt passed all three
+scenarios and the final two-host verification.

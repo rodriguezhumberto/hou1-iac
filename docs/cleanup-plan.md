@@ -233,6 +233,8 @@ identity endpoint is unavailable all passed. Backup interruption remains an
 offline-only check while the lab timer is disabled. Current-revision reboot
 checks recovered both hosts; the HOU1 observer now ignores its retained stopped
 rollback container rather than treating it as an active service.
+The guarded matrix runner now reproduces those interruptions and cleanup checks
+with private evidence and bounded verification retries.
 
 Next: [separate ingress](ingress-separation.md), preserving routing and cold
 recovery before live cutover. Fresh-host bootstrap, peer enrollment and destructive
