@@ -108,7 +108,7 @@
     owner: root
     group: root
     mode: '0600'
-    content: '{{ shared_ingress_recovery }}\n'
+    content: "{{ shared_ingress_recovery }}\n"
   no_log: true
 
 - name: Validate the independent recovery export before activation

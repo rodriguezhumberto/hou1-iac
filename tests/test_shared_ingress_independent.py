@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import unittest
+import yaml
 
 from helpers import ROOT
 
@@ -56,6 +57,13 @@ class IndependentIngressTest(unittest.TestCase):
         service = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent.service.j2').read_text()
         self.assertIn('--require-address {{ netbird_ip', service)
         self.assertIn('--interface {{ netbird_interface', service)
+
+    def test_recovery_export_uses_a_real_final_newline(self):
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/shared_ingress/tasks/independent.yml').read_text())
+        copy_task = next(task for task in tasks if task['name'] == 'Record the compatible independent recovery export')
+        content = copy_task['ansible.builtin.copy']['content']
+        self.assertTrue(content.endswith('\n'))
+        self.assertFalse(content.endswith('\\n'))
 
 
 if __name__ == '__main__':
