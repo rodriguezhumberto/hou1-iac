@@ -18,6 +18,7 @@ import shlex
 import subprocess
 import sys
 import tempfile
+import time
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -212,10 +213,14 @@ class Matrix:
         if value.get('version') == 2:
             value.pop('application', None)
         deploy_lab.write_private(sanitized, json.dumps(value))
-        result = subprocess.run([sys.executable, str(DEPLOY), '--config', str(sanitized), '--phase', 'verify'],
-                                capture_output=True, text=True, timeout=900)
-        if result.returncode:
-            raise MatrixError('Managed workflow verification failed')
+        command = [sys.executable, str(DEPLOY), '--config', str(sanitized), '--phase', 'verify']
+        for attempt, delay in enumerate((0, 10, 20)):
+            if delay:
+                time.sleep(delay)
+            result = subprocess.run(command, capture_output=True, text=True, timeout=900)
+            if result.returncode == 0:
+                return
+        raise MatrixError('Managed workflow verification failed after bounded retries')
 
     def verify_hou4_advisory(self):
         host = self.config['hosts']['hou4']
