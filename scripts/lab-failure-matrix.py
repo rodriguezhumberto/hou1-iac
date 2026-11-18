@@ -260,7 +260,8 @@ class Matrix:
                           lambda: self.restore('application'), self.verify_workflow)
             self.scenario('monitoring',
                           lambda: self.restore('monitoring'), self.verify_workflow)
-            self.scenario('dependency', self.verify_hou4_advisory, self.verify_workflow)
+            self.scenario('dependency', self.verify_hou4_advisory, lambda: None)
+            self.verify_workflow()
             self.record('final', 'passed')
             self.save('passed')
         except BaseException:
