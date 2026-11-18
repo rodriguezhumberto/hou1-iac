@@ -7,7 +7,7 @@ StartLimitIntervalSec=0
 [Service]
 Type=oneshot
 RemainAfterExit=true
-ExecStart=/usr/local/libexec/hou1-compose-apply {{ shared_ingress_directory | to_json | replace('%', '%%') | replace('$', '$$') }} --project {{ shared_ingress_project | to_json | replace('%', '%%') | replace('$', '$$') }} --file docker-compose.yml --validate-nginx
+ExecStart=/usr/local/libexec/hou1-compose-apply {{ shared_ingress_directory | to_json | replace('%', '%%') | replace('$', '$$') }} --project {{ shared_ingress_project | to_json | replace('%', '%%') | replace('$', '$$') }} --file docker-compose.yml --validate-nginx --require-address {{ netbird_ip | to_json | replace('%', '%%') | replace('$', '$$') }} --interface {{ netbird_interface | to_json | replace('%', '%%') | replace('$', '$$') }}
 TimeoutStartSec=900
 Restart=on-failure
 RestartSec=10
