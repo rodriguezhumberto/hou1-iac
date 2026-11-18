@@ -12,7 +12,9 @@ services:
       PUBLIC_CANONICAL_HOSTNAME: '${PUBLIC_CANONICAL_HOSTNAME:-_}'
       PUBLIC_CANONICAL_REDIRECT: '${PUBLIC_CANONICAL_REDIRECT:-false}'
     volumes:
+{% if webstack_secondary_site_enabled | default(true) | bool %}
       - '{{ app_directory }}/nginx/secondary.conf.template:/etc/nginx/templates/secondary.conf.template:ro'
+{% endif %}
       - '{{ app_directory }}/nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro'
       - '{{ app_directory }}/nginx-logs:/var/log/nginx'
       - '{{ app_directory }}/certbot/conf:/etc/letsencrypt:ro'
