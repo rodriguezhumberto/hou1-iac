@@ -37,25 +37,32 @@
 
 - name: Cut over to independent ingress after its backend is configured
   block:
-    - name: Stop the legacy application Nginx listener
+    - name: Run the host-local listener transfer with rollback
       ansible.builtin.command:
-        argv: '{{ shared_ingress_legacy_compose_argv + ["--profile", "integrated-ingress-disabled", "stop", "nginx"] }}'
-      changed_when: false
-
-    - name: Activate and validate independent ingress
-      ansible.builtin.command: >-
-        /usr/local/libexec/hou1-compose-apply {{ shared_ingress_directory | quote }}
-        --project {{ shared_ingress_project | quote }} --file docker-compose.yml --validate-nginx
-      register: shared_ingress_activation
-      changed_when: (shared_ingress_activation.stdout | from_json).changed
+        argv:
+          - systemd-run
+          - --quiet
+          - --wait
+          - --collect
+          - --service-type=oneshot
+          - /usr/local/libexec/hou1-ingress-cutover
+          - --legacy-directory
+          - '{{ shared_ingress_legacy_compose_directory }}'
+          - --legacy-project
+          - '{{ shared_ingress_legacy_compose_project }}'
+          - --legacy-file
+          - '{{ shared_ingress_legacy_compose_file }}'
+          - --independent-directory
+          - '{{ shared_ingress_directory }}'
+          - --independent-project
+          - '{{ shared_ingress_project }}'
+          - --independent-file
+          - docker-compose.yml
+      changed_when: true
   rescue:
-    - name: Restore the legacy application Nginx listener after failed cutover
-      ansible.builtin.command:
-        argv: '{{ shared_ingress_legacy_compose_argv + ["--profile", "integrated-ingress-disabled", "up", "-d", "--no-deps", "nginx"] }}'
-      changed_when: false
-    - name: Abort after restoring the legacy ingress
+    - name: Abort after the host-local cutover restored the legacy listener
       ansible.builtin.fail:
-        msg: Independent ingress activation failed; the legacy application listener was restored.
+        msg: Independent ingress activation failed; the host-local helper restored the legacy listener.
   when:
     - shared_ingress_independent | default(false) | bool
     - not (webstack_bootstrap_ingress_only | default(false) | bool)

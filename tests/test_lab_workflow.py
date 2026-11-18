@@ -374,9 +374,18 @@ elif name=='python3': print('PRIVATE_TLS_DIAGNOSTIC')
 elif 'exec' in args:
  print(state.get('ready_body','{"ok":true}')+'\\n'+str(state.get('ready_status',200)),end=''); sys.exit(state.get('ready_exit',0))
 elif '--services' in args: print('astro-app')
+elif '--format' in args and 'config' in args:
+ service={'stop_grace_period':state.get('stop_grace','30s')}
+ if not state.get('no_healthcheck'):
+  service['healthcheck']={'test':['CMD','curl','--fail','http://localhost:4321'+state.get('health_path','/api/ready.json')]}
+ print(json.dumps({'services':{'astro-app':service}}))
 elif 'ps' in args: print('fixture-id')
 elif '.Config.Image' in ' '.join(args): print(json.dumps(state.get('image','fixture@sha256:'+'2'*64)))
-else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':state.get('health','healthy'),'Log':['PRIVATE_HEALTH_DIAGNOSTIC']}}))
+else:
+ state_info={'Running':state.get('running',True)}
+ if not state.get('health_missing'):
+  state_info['Health']={'Status':state.get('health','healthy'),'Log':['PRIVATE_HEALTH_DIAGNOSTIC']}
+ print(json.dumps(state_info))
 ''')
         binary.chmod(0o700)
         for name in ('ip', 'git', 'docker', 'python3', 'sshd', 'ss', 'systemctl'):
@@ -418,7 +427,10 @@ else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':s
         self.assertEqual(good.returncode, 0, good.stderr)
         self.assertTrue(json.loads(good.stdout)['application_ready'])
         for state in [{'ready_body': '{"ok":false}'}, {'ready_body': '{"ok":1}'},
-                      {'ready_body': 'PRIVATE_READINESS_ERROR'}, {'ready_exit': 22}, {'ready_status': 302}]:
+                      {'ready_body': 'PRIVATE_READINESS_ERROR'}, {'ready_exit': 22}, {'ready_status': 302},
+                      {'health_path': '/api/health.json'}, {'health_path': '/api/ready.json.bad'},
+                      {'stop_grace': '10s'},
+                      {'no_healthcheck': True}, {'health_missing': True}]:
             with self.subTest(state=state):
                 result = self.probe(**state)
                 self.assertEqual(result.returncode, 1)

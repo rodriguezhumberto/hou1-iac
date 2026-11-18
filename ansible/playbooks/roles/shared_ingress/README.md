@@ -32,6 +32,9 @@ separate project. Application routing still belongs to the selected source.
 `shared_ingress_independent: true` enables the migration slice. It renders a
 separate project under `shared_ingress_directory`, attaches it to the external
 backend network, installs a strict recovery validator and writes `recovery.json`.
-Webstack cuts over the listener only after the application project is ready; a
-failed independent activation starts the legacy listener again. The default
-remains combined.
+The legacy Nginx service receives `SIGQUIT` and a 30-second Compose stop grace so
+in-flight connections can drain before its ports are released. The independent
+service has an Nginx configuration healthcheck; the existing Compose `--wait`
+activation gate must pass before cutover succeeds. The listener transfer runs in a host-local systemd scope so a controller
+connection loss does not stop the sequence. The helper stops the independent
+listener before restoring legacy on failure. The default remains combined.

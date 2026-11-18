@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import unittest
+from unittest.mock import patch
 import yaml
 from jinja2 import Environment
 
@@ -16,12 +17,18 @@ RECOVERY_SPEC = importlib.util.spec_from_file_location(
     'ingress_recovery', ROOT / 'ansible/playbooks/roles/shared_ingress/files/validate-recovery.py')
 recovery = importlib.util.module_from_spec(RECOVERY_SPEC)
 RECOVERY_SPEC.loader.exec_module(recovery)
+CUTOVER_SPEC = importlib.util.spec_from_file_location(
+    'ingress_cutover', ROOT / 'ansible/playbooks/roles/shared_ingress/files/cutover.py')
+cutover = importlib.util.module_from_spec(CUTOVER_SPEC)
+CUTOVER_SPEC.loader.exec_module(cutover)
 
 
 class IndependentIngressTest(unittest.TestCase):
     def test_default_compose_remains_combined(self):
         result = app_compose.compose_override('/data', '/ingress', 'netbird', '172.20.0.5')
         self.assertNotIn('profiles', result['services']['nginx'])
+        self.assertNotIn('stop_signal', result['services']['nginx'])
+        self.assertNotIn('stop_grace_period', result['services']['nginx'])
         self.assertEqual(result['networks']['netbird-ingress']['name'], 'netbird')
         self.assertNotIn('app-network', result['networks'])
 
@@ -29,6 +36,8 @@ class IndependentIngressTest(unittest.TestCase):
         result = app_compose.compose_override('/data', '/ingress', 'netbird', '172.20.0.5',
                                               independent=True, app_network='hou1-application')
         self.assertEqual(result['services']['nginx']['profiles'], ['integrated-ingress-disabled'])
+        self.assertEqual(result['services']['nginx']['stop_signal'], 'SIGQUIT')
+        self.assertEqual(result['services']['nginx']['stop_grace_period'], '30s')
         self.assertEqual(result['networks']['app-network'],
                          {'external': True, 'name': 'hou1-application'})
         self.assertEqual(result['networks']['netbird-ingress']['name'], 'netbird')
@@ -59,6 +68,53 @@ class IndependentIngressTest(unittest.TestCase):
         self.assertIn('--require-address {{ netbird_ip', service)
         self.assertIn('--interface {{ netbird_interface', service)
 
+    def test_independent_listener_has_graceful_stop_and_compose_readiness_gate(self):
+        source = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent-compose.yml.j2').read_text()
+        environment = Environment()
+        environment.filters['bool'] = bool
+        rendered = environment.from_string(source).render(
+            application_image_compose={'services': {'nginx': {'image': 'nginx:stable'}}},
+            app_directory='/opt/application', netbird_control_plane_directory='/opt/netbird',
+            netbird_ingress_proxy_ip='172.30.80.2', netbird_ingress_network='netbird-ingress',
+            shared_ingress_app_network='application', authentik_enable_ingress_network=False,
+            webstack_secondary_site_enabled=False)
+        service = yaml.safe_load(rendered)['services']['nginx']
+        self.assertEqual(service['stop_signal'], 'SIGQUIT')
+        self.assertEqual(service['stop_grace_period'], '30s')
+        self.assertEqual(service['healthcheck'], {
+            'test': ['CMD', 'nginx', '-t'], 'interval': '5s', 'timeout': '3s',
+            'retries': 12, 'start_period': '5s'})
+
+    def test_cutover_runs_as_one_host_local_systemd_operation(self):
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/webstack/tasks/deploy.yml').read_text())
+        cutover_task = next(task for task in tasks if 'block' in task and task.get('when'))
+        command = cutover_task['block'][0]['ansible.builtin.command']['argv']
+        self.assertEqual(command[:6], ['systemd-run', '--quiet', '--wait', '--collect',
+                                       '--service-type=oneshot',
+                                       '/usr/local/libexec/hou1-ingress-cutover'])
+        self.assertIn('host-local helper restored', cutover_task['rescue'][0]['ansible.builtin.fail']['msg'])
+
+    def test_host_local_cutover_resolves_relative_compose_files_from_project(self):
+        command = cutover.compose('/opt/ingress', 'ingress', 'docker-compose.yml')
+        self.assertEqual(command[-2:], ['--file', '/opt/ingress/docker-compose.yml'])
+
+    def test_host_local_cutover_stops_independent_before_legacy_restore(self):
+        args = type('Args', (), {
+            'legacy_directory': '/opt/application', 'legacy_project': '', 'legacy_file': '',
+            'independent_directory': '/opt/application-ingress',
+            'independent_project': 'hou1-ingress', 'independent_file': 'docker-compose.yml'})()
+        calls = []
+        def record(command):
+            calls.append(command)
+            if command[0] == '/usr/local/libexec/hou1-compose-apply':
+                raise RuntimeError('activation failed')
+        with patch.object(cutover, 'run', side_effect=record), self.assertRaises(RuntimeError):
+            cutover.cutover(args)
+        self.assertEqual([call[-2:] for call in calls], [
+            ['stop', 'nginx'], ['/opt/application-ingress/docker-compose.yml', '--validate-nginx'],
+            ['stop', 'nginx'], ['--no-deps', 'nginx']])
+        self.assertLess(calls.index(calls[2]), calls.index(calls[3]))
+
     def test_disabled_secondary_site_omits_invalid_template_mount(self):
         source = (ROOT / 'ansible/playbooks/roles/shared_ingress/templates/independent-compose.yml.j2').read_text()
         environment = Environment()
@@ -77,6 +133,11 @@ class IndependentIngressTest(unittest.TestCase):
         self.assertNotIn('secondary.conf.template:/etc/nginx/templates/secondary.conf.template', disabled)
         enabled = template.render(**context, webstack_secondary_site_enabled=True)
         self.assertIn('secondary.conf.template:/etc/nginx/templates/secondary.conf.template', enabled)
+
+    def test_independent_role_installs_host_local_cutover_helper(self):
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/shared_ingress/tasks/independent.yml').read_text())
+        task = next(task for task in tasks if task['name'] == 'Install the host-local ingress cutover helper')
+        self.assertEqual(task['ansible.builtin.copy']['dest'], '/usr/local/libexec/hou1-ingress-cutover')
 
     def test_recovery_export_uses_a_real_final_newline(self):
         tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/shared_ingress/tasks/independent.yml').read_text())
