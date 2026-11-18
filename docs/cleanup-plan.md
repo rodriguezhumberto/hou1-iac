@@ -226,6 +226,14 @@ the new managed profiles; SSH configuration stayed with the existing security
 roles. Reviewed private overrides remain explicit; repository shared variables
 are referenced rather than copied. See [inventory generation](lab-inventory.md).
 
+The service interruption and dependency-outage matrix is recorded in the
+[2026-11-18 failure evidence](evidence/failure-matrix-2026-11-18.md). HOU1
+service repair, HOU4 local monitoring repair and HOU4 operation while an HOU1
+identity endpoint is unavailable all passed. Backup interruption remains an
+offline-only check while the lab timer is disabled. Current-revision reboot
+checks recovered both hosts; the HOU1 observer needs to ignore its retained
+stopped rollback container rather than treating it as an active service.
+
 Next: [separate ingress](ingress-separation.md), preserving routing and cold
 recovery before live cutover. Fresh-host bootstrap, peer enrollment and destructive
 recovery acceptance remain separate work.
