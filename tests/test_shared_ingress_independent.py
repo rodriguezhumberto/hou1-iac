@@ -94,6 +94,10 @@ class IndependentIngressTest(unittest.TestCase):
                                        '/usr/local/libexec/hou1-ingress-cutover'])
         self.assertIn('host-local helper restored', cutover_task['rescue'][0]['ansible.builtin.fail']['msg'])
 
+    def test_host_local_cutover_resolves_relative_compose_files_from_project(self):
+        command = cutover.compose('/opt/ingress', 'ingress', 'docker-compose.yml')
+        self.assertEqual(command[-2:], ['--file', '/opt/ingress/docker-compose.yml'])
+
     def test_host_local_cutover_stops_independent_before_legacy_restore(self):
         args = type('Args', (), {
             'legacy_directory': '/opt/application', 'legacy_project': '', 'legacy_file': '',
@@ -107,7 +111,7 @@ class IndependentIngressTest(unittest.TestCase):
         with patch.object(cutover, 'run', side_effect=record), self.assertRaises(RuntimeError):
             cutover.cutover(args)
         self.assertEqual([call[-2:] for call in calls], [
-            ['stop', 'nginx'], ['docker-compose.yml', '--validate-nginx'],
+            ['stop', 'nginx'], ['/opt/application-ingress/docker-compose.yml', '--validate-nginx'],
             ['stop', 'nginx'], ['--no-deps', 'nginx']])
         self.assertLess(calls.index(calls[2]), calls.index(calls[3]))
 

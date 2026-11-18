@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Transfer the host listener between Compose projects as one local operation."""
 import argparse
+import os
 import subprocess
 
 
@@ -9,7 +10,8 @@ def compose(directory, project='', compose_file=''):
     if project:
         command += ['--project-name', project]
     if compose_file:
-        command += ['--file', compose_file]
+        command += ['--file', compose_file if os.path.isabs(compose_file) else
+                    os.path.join(directory, compose_file)]
     return command
 
 
@@ -24,7 +26,8 @@ def cutover(args):
     try:
         run(legacy + ['--profile', 'integrated-ingress-disabled', 'stop', 'nginx'])
         run(['/usr/local/libexec/hou1-compose-apply', args.independent_directory,
-             '--project', args.independent_project, '--file', args.independent_file,
+             '--project', args.independent_project, '--file',
+             os.path.join(args.independent_directory, args.independent_file),
              '--validate-nginx'])
     except Exception:
         # Release 443 before restoring the legacy listener.  This is also safe
