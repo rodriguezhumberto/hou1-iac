@@ -40,6 +40,11 @@ Deployment verification validates declared capabilities and checks readiness;
 older releases retain their existing checks. See the
 [validation record](evidence/application-lifecycle-2026-11-17.md).
 
+For a declared runtime contract, the maintained deployment probe also checks
+the resolved Compose readiness healthcheck and stop grace before probing each
+running application container. A release without the declaration keeps the
+legacy container checks.
+
 ## Deployment boundary
 
 Test-host deployment is authorized for this work. Keep production, unrelated

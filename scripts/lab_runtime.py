@@ -3,6 +3,7 @@
 import json
 from pathlib import Path
 import platform
+import re
 import subprocess
 import sys
 import urllib.error
@@ -34,6 +35,51 @@ def runtime_contract(content):
     return declared
 
 
+def _compose_seconds(value):
+    """Parse the duration forms emitted by ``docker compose config``."""
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, (int, float)):
+        return float(value)
+    if not isinstance(value, str):
+        return None
+    match = re.fullmatch(r'([0-9]+(?:\.[0-9]+)?)(us|ms|s|m|h)', value.strip())
+    if not match:
+        return None
+    amount, unit = float(match[1]), match[2]
+    return amount * {'us': 1 / 1_000_000, 'ms': 1 / 1_000, 's': 1,
+                     'm': 60, 'h': 3600}[unit]
+
+
+def _healthcheck_command(value):
+    if isinstance(value, list) and value:
+        return ' '.join(str(item) for item in value)
+    if isinstance(value, str):
+        return value
+    return ''
+
+
+def validate_compose_runtime(document, runtime):
+    """Require the resolved application service to publish the declared contract."""
+    service = document.get('services', {}).get('astro-app')
+    if not isinstance(service, dict):
+        raise ValueError('Application service missing')
+    healthcheck = service.get('healthcheck')
+    if not isinstance(healthcheck, dict) or healthcheck.get('disable') is True:
+        raise ValueError('Application readiness healthcheck missing')
+    command = _healthcheck_command(healthcheck.get('test'))
+    endpoint = 'http://localhost:4321' + runtime['readiness_path']
+    alternate = 'http://127.0.0.1:4321' + runtime['readiness_path']
+    endpoint_pattern = re.compile(
+        rf'(?<![A-Za-z0-9._-])(?:{re.escape(endpoint)}|{re.escape(alternate)})'
+        r'(?![A-Za-z0-9._/?=&%-])')
+    if not endpoint_pattern.search(command):
+        raise ValueError('Application healthcheck does not use readiness')
+    grace = _compose_seconds(service.get('stop_grace_period'))
+    if grace is None or grace != runtime['stop_grace_seconds']:
+        raise ValueError('Application stop grace differs')
+
+
 class NoRedirect(urllib.request.HTTPRedirectHandler):
     def redirect_request(self, req, fp, code, msg, headers, newurl):
         return None
@@ -46,6 +92,9 @@ def check_project(project, application, runtime=None):
     if project.get('file'):
         command += ['--file', str(Path(project['directory']) / project['file'])]
     declared = output(command + ['config', '--services']).split()
+    if runtime and 'astro-app' in declared:
+        compose = json.loads(output(command + ['config', '--format', 'json']))
+        validate_compose_runtime(compose, runtime)
     services = project.get('services', declared)
     if not services or any(service not in declared for service in services):
         raise ValueError('Empty project')
@@ -59,8 +108,13 @@ def check_project(project, application, runtime=None):
         # return only IDs after checking the selected status fields.
         states = [json.loads(line) for line in output(
             ['docker', 'inspect', '--format', '{{json .State}}', *ids]).splitlines()]
+        required_health = bool(runtime and application and service == 'astro-app')
         if len(states) != len(ids) or any(
-                not state['Running'] or state.get('Health', {}).get('Status', 'healthy') != 'healthy'
+                not state['Running']
+                or (required_health and (not isinstance(state.get('Health'), dict)
+                                         or state['Health'].get('Status') != 'healthy'))
+                or (not required_health and state.get('Health') is not None
+                    and state.get('Health', {}).get('Status', 'healthy') != 'healthy')
                 for state in states):
             raise ValueError('Unready service')
         containers[project['directory'] + ':' + service] = ids
@@ -130,7 +184,7 @@ def probe(contract):
                 ['git', '-C', contract['source'], 'status', '--porcelain']).strip():
             raise ValueError('Application source differs')
         manifest = Path(contract['source']) / 'runtime-contract.json'
-        if manifest.is_symlink():
+        if manifest.is_symlink() or (manifest.exists() and not manifest.is_file()):
             raise ValueError('Application runtime contract must be a regular file')
         runtime = runtime_contract(manifest.read_text() if manifest.exists() else None)
         report.update(application_revision=revision, source_clean=True)
