@@ -74,6 +74,14 @@
     group: root
     mode: '0755'
 
+- name: Install the host-local ingress cutover helper
+  ansible.builtin.copy:
+    src: cutover.py
+    dest: /usr/local/libexec/hou1-ingress-cutover
+    owner: root
+    group: root
+    mode: '0755'
+
 - name: Build the compatible independent recovery export
   ansible.builtin.set_fact:
     shared_ingress_recovery: >-
