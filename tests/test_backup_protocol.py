@@ -1,4 +1,5 @@
 """Consistent snapshots, offline age recovery, restart safety and narrow transport policies."""
+from contextlib import closing
 import importlib.util
 import io
 import json
@@ -108,6 +109,54 @@ class BackupProtocolTest(unittest.TestCase):
             for env,changes in [('production',{}),('test',{'size':manifest['size']+1}),('test',{'sha256':'0'*64})]:
                 metadata.write_text(json.dumps({**manifest,**changes}))
                 with self.assertRaises(ValueError):recovery.verify(archive,metadata,key,root/'failed',env)
+
+    @unittest.skipUnless(shutil.which('age'), 'age required')
+    def test_snapshot_includes_committed_wal_from_read_only_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config, key = self.fixture(root)
+            database = Path(config['app']['database']) / 'forms.db'
+            # A stopped WAL writer can leave committed rows outside the main file.
+            # The service sandbox permits reading these files, but no shm creation.
+            with closing(sqlite3.connect(root / 'live.db')) as live:
+                live.execute('PRAGMA journal_mode=WAL')
+                live.execute('PRAGMA wal_autocheckpoint=0')
+                live.execute('CREATE TABLE fixture (value text)')
+                live.execute("INSERT INTO fixture VALUES ('committed-in-wal')")
+                live.commit()
+                for suffix in ('', '-wal'):
+                    shutil.copyfile(root / ('live.db' + suffix), Path(str(database) + suffix))
+            originals = {p.name: p.read_bytes() for p in database.parent.iterdir()}
+            for path in database.parent.iterdir():
+                path.chmod(0o400)
+            database.parent.chmod(0o500)
+            def command(argv, output=None, timeout=300):
+                if 'ps' in argv:
+                    return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
+                if 'pg_dump' in argv:
+                    output.write(b'CREATE TABLE restored (value text);')
+                if argv[0] == 'git':
+                    return b'a' * 40
+                return b''
+            try:
+                with patch.object(source, 'command', side_effect=command), \
+                        patch.object(source, 'application_receipt', return_value=None):
+                    source.prepare(config)
+                stream = io.BytesIO()
+                reader.serve(config, stream)
+                stream.seek(0)
+                manifest = root / 'manifest.json'
+                manifest.write_bytes(stream.readline())
+                archive = root / 'recovery.age'
+                archive.write_bytes(stream.read())
+                recovery.verify(archive, manifest, key, root / 'restored', 'test')
+                with closing(sqlite3.connect(root / 'restored/cms/database/forms.db')) as restored:
+                    self.assertEqual(restored.execute('SELECT value FROM fixture').fetchall(),
+                                     [('committed-in-wal',)])
+                self.assertEqual({p.name: p.read_bytes() for p in database.parent.iterdir()}, originals)
+                self.assertFalse(list((root / 'work').glob('.snapshot-*')))
+            finally:
+                database.parent.chmod(0o700)
 
     def test_failed_preparation_preserves_previous_completed_ciphertext(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -252,6 +301,42 @@ class BackupProtocolTest(unittest.TestCase):
                 execute.assert_not_called()
         with patch.dict(os.environ,{'SSH_ORIGINAL_COMMAND':'export-v1'}),patch.object(gateway.sys,'argv',['gateway']),patch.object(gateway.os,'execv') as execute:
             gateway.main();self.assertEqual(execute.call_args.args[1],['sudo','-n','/usr/local/libexec/hou1-backup-export'])
+
+    def test_initial_capture_retries_failure_and_then_preserves_success(self):
+        import yaml
+        from helpers import run_plays
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/backup_source/tasks/recovery.yml').read_text())
+        first = next(i for i, task in enumerate(tasks)
+                     if task['name'] == 'Check whether the restored host has an initial recovery point')
+        plays = []
+        with tempfile.TemporaryDirectory() as directory:
+            for case, status, expected in [
+                    ('absent', None, 1), ('failed-first', {'last_run_success': 0, 'last_success': 0}, 1),
+                    ('successful', {'last_run_success': 1, 'last_success': 1234}, 0),
+                    ('failed-later', {'last_run_success': 0, 'last_success': 1234}, 0)]:
+                root = Path(directory) / case
+                root.mkdir()
+                record, calls = root / 'last-export.json', root / 'calls'
+                if status is not None:
+                    record.write_text(json.dumps(status))
+                selected = yaml.safe_load(yaml.safe_dump(tasks[first:]).replace(
+                    '/var/lib/hou1-backup/last-export.json', str(record)))
+                # Execute real stat/slurp/when behavior, replacing only the host service.
+                for task in selected:
+                    if 'ansible.builtin.systemd_service' in task:
+                        del task['ansible.builtin.systemd_service']
+                        task['ansible.builtin.command'] = {'argv': [
+                            '/usr/bin/python3', '-c',
+                            'import json; from pathlib import Path; '
+                            f'Path({str(record)!r}).write_text(json.dumps({{"last_success": 1234}})); '
+                            f'Path({str(calls)!r}).open("a").write("capture ")']}
+                # The same inputs must retry a failed first attempt once, then be a no-op.
+                checks = [{'ansible.builtin.assert': {'that':
+                    f"lookup('ansible.builtin.file', '{calls}', errors='ignore') | default('', true) "
+                    f"| split | length == {expected}"}}]
+                plays.append({'tasks': selected + selected + checks})
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_source_input_guards_run_before_policy_or_filesystem_changes(self):
         import yaml

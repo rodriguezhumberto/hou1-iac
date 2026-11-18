@@ -38,6 +38,9 @@ live PGDATA is never copied. NetBird's integrated relay also stops temporarily,
 so capture is a local systemd job independent of SSH. Ingress and the host VPN
 client remain running. These are consistent component snapshots, not a distributed
 transaction; schedule identity/policy edits outside the capture window.
+SQLite and its recovery journals are copied while the application is stopped,
+then opened in private staging. This preserves committed WAL data while keeping
+the live database directory read-only to the capture service.
 
 Before each stop, a root-only fsynced `restart-intent.json` records the fixed
 writer group. Normal cleanup, `ExecStopPost` and the enabled boot recovery service
@@ -45,6 +48,8 @@ restart interrupted writers. SIGKILL or power loss cannot run Python cleanup;
 boot recovery handles recorded intent. Invalid intent or failed restart remains
 for investigation. A failed attempt removes partial files and preserves the
 previous `ready.export` and last-success timestamp.
+A failed first capture is retried by the next backup playbook run. An existing
+successful point does not trigger another capture during unchanged deployment.
 
 HOU1 encrypts to `hou1_backup_recipient`; neither VPS receives the owner's private
 key. HOU4's locally generated transport key cannot decrypt backups. Its source-bound

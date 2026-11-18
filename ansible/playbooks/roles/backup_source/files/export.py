@@ -84,6 +84,24 @@ def application_receipt(root, source_root=None):
     return artifact_module().running(root, source_root)
 
 
+def snapshot_sqlite(database, destination):
+    """Read a frozen database and its journals without writing to the source."""
+    # SQLite may need a writable shm file even for mode=ro on a WAL database.
+    # Rebuild it only in private staging; immutable=1 would ignore committed WAL.
+    with tempfile.TemporaryDirectory(prefix='.sqlite-', dir=destination.parent) as directory:
+        staged = Path(directory) / database.name
+        for suffix in ('', '-wal', '-journal'):
+            original = Path(str(database) + suffix)
+            if not suffix or original.exists():
+                shutil.copyfile(original, Path(str(staged) + suffix))
+        with closing(sqlite3.connect(staged)) as source:
+            with closing(sqlite3.connect(destination)) as target:
+                source.backup(target)
+                if (target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]
+                        or target.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 0):
+                    raise RuntimeError('Invalid SQLite snapshot')
+
+
 def snapshot(config, work):
     auth, app, netbird = (config[key] for key in ('authentik', 'app', 'netbird'))
     auth_work = work / 'authentik'; auth_work.mkdir()
@@ -100,12 +118,7 @@ def snapshot(config, work):
         source_root = str(artifact_module().source_directory(app['root'], app.get('source_root')))
         application_image = application_receipt(app['root'], source_root)
         database = Path(app['database']) / 'forms.db'
-        with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as source:
-            with closing(sqlite3.connect(cms / 'database/forms.db')) as target:
-                source.backup(target)
-                if (target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]
-                        or target.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 0):
-                    raise RuntimeError('Invalid SQLite snapshot')
+        snapshot_sqlite(database, cms / 'database/forms.db')
         shutil.copytree(app['media'], cms / 'media', symlinks=True)
         # Save runtime configuration and TLS, never the live database or plaintext backup directory.
         files = ['.env', 'docker-compose.yml', 'docker-compose.override.yml', 'certbot/conf']
