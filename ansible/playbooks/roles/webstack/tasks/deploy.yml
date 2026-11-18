@@ -29,10 +29,36 @@
   # Public bootstrap needs Nginx and its dependencies before NetBird exists.
   # Defer services that bind the NetBird IP until enrollment completes.
   ansible.builtin.command: >-
-    /usr/local/libexec/hou1-compose-apply {{ app_directory | quote }} --validate-nginx
+    /usr/local/libexec/hou1-compose-apply {{ app_directory | quote }}
+    {{ '--services astro-app uptime-kuma' if shared_ingress_independent | default(false) | bool and not (webstack_bootstrap_ingress_only | default(false) | bool) else '--validate-nginx' }}
     {{ '--services nginx' if webstack_bootstrap_ingress_only | default(false) | bool else '' }}
   register: webstack_activation
   changed_when: (webstack_activation.stdout | from_json).changed
+
+- name: Cut over to independent ingress after its backend is configured
+  block:
+    - name: Stop the legacy application Nginx listener
+      ansible.builtin.command:
+        argv: '{{ shared_ingress_legacy_compose_argv + ["--profile", "integrated-ingress-disabled", "stop", "nginx"] }}'
+      changed_when: false
+
+    - name: Activate and validate independent ingress
+      ansible.builtin.command: >-
+        /usr/local/libexec/hou1-compose-apply {{ shared_ingress_directory | quote }}
+        --project {{ shared_ingress_project | quote }} --file docker-compose.yml --validate-nginx
+      register: shared_ingress_activation
+      changed_when: (shared_ingress_activation.stdout | from_json).changed
+  rescue:
+    - name: Restore the legacy application Nginx listener after failed cutover
+      ansible.builtin.command:
+        argv: '{{ shared_ingress_legacy_compose_argv + ["--profile", "integrated-ingress-disabled", "up", "-d", "--no-deps", "nginx"] }}'
+      changed_when: false
+    - name: Abort after restoring the legacy ingress
+      ansible.builtin.fail:
+        msg: Independent ingress activation failed; the legacy application listener was restored.
+  when:
+    - shared_ingress_independent | default(false) | bool
+    - not (webstack_bootstrap_ingress_only | default(false) | bool)
 
 - name: Verify controller certificates after repairing application services
   ansible.builtin.include_role:

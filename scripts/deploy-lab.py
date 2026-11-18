@@ -105,7 +105,7 @@ def load_config(path):
         require(address in ipaddress.ip_network('100.91.0.0/16'), 'Use the test overlay, never bootstrap or production addresses')
         require(isinstance(host['compose'], list) and bool(host['compose']), 'Declare the Compose projects to verify')
         for project in host['compose']:
-            require(set(project) <= {'directory', 'project', 'file'} and 'directory' in project,
+            require(set(project) <= {'directory', 'project', 'file', 'services'} and 'directory' in project,
                     'Use declared Compose directories with optional project/file selection')
             require(re.fullmatch(r'/[A-Za-z0-9_./-]+', project['directory']) and
                     '..' not in Path(project['directory']).parts, 'Use absolute runtime directories')
@@ -113,6 +113,12 @@ def load_config(path):
                 require(re.fullmatch(r'[a-z0-9][a-z0-9_-]*', project['project']), 'Invalid Compose project name')
             if 'file' in project:
                 require(re.fullmatch(r'[A-Za-z0-9_.-]+\.ya?ml', project['file']), 'Use a Compose filename within its directory')
+            if 'services' in project:
+                require(isinstance(project['services'], list) and bool(project['services']) and
+                        all(isinstance(service, str) and re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', service)
+                            for service in project['services']) and
+                        len(set(project['services'])) == len(project['services']),
+                        'Declare unique Compose services when selecting a project subset')
     require(Path(config['hosts']['hou1']['repository']).resolve() == ROOT,
             'Run the workflow from the selected HOU1 checkout')
     for field in ('repository', 'inventory', 'target', 'hostname', 'ssh_host_ip'):

@@ -81,7 +81,8 @@ def _merge(base, additions, path=''):
 
 
 def compose_override(media_directory, ingress_directory, network, proxy_ip,
-                     authentik_network=None, extensions=None):
+                     authentik_network=None, extensions=None, independent=False,
+                     app_network='app-network'):
     extensions = extensions if extensions is not None else {}
     if not isinstance(extensions, dict):
         raise AnsibleFilterError('app_compose_extensions must be a mapping')
@@ -102,6 +103,9 @@ def compose_override(media_directory, ingress_directory, network, proxy_ip,
         },
         'networks': {'netbird-ingress': {'external': True, 'name': network}},
     }
+    if independent:
+        desired['networks']['app-network'] = {'external': True, 'name': app_network}
+        desired['services']['nginx']['profiles'] = ['integrated-ingress-disabled']
     if authentik_network:
         desired['services']['nginx']['networks']['authentik-ingress'] = {}
         desired['networks']['authentik-ingress'] = {'external': True, 'name': authentik_network}

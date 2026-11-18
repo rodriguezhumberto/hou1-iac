@@ -1,0 +1,132 @@
+---
+- name: Validate independent ingress migration inputs
+  ansible.builtin.assert:
+    that:
+      - shared_ingress_directory is string
+      - shared_ingress_directory is match('^/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$')
+      - shared_ingress_directory != app_directory
+      - shared_ingress_legacy_compose_directory == app_directory
+      - shared_ingress_project is match('^[a-z0-9][a-z0-9_-]*$')
+      - shared_ingress_app_network is match('^[a-z0-9][a-z0-9_-]*$')
+      - shared_ingress_legacy_compose_directory is match('^/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*$')
+      - shared_ingress_legacy_compose_project is match('^$|^[a-z0-9][a-z0-9_-]*$')
+      - shared_ingress_legacy_compose_file is match('^$|^[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml$')
+    fail_msg: Select a separate ingress directory, project and backend network.
+
+- name: Build the fixed legacy Compose selector for rollback
+  ansible.builtin.set_fact:
+    shared_ingress_legacy_compose_argv: >-
+      {{ ['docker', 'compose', '--project-directory', shared_ingress_legacy_compose_directory] +
+         (['--project-name', shared_ingress_legacy_compose_project] if shared_ingress_legacy_compose_project else []) +
+         (['--file', shared_ingress_legacy_compose_directory ~ '/' ~ shared_ingress_legacy_compose_file]
+          if shared_ingress_legacy_compose_file else []) }}
+
+- name: Read the deployed application Compose model for independent ingress
+  ansible.builtin.command:
+    argv: [docker, compose, --project-directory, '{{ app_directory }}', config, --format, json]
+  register: shared_ingress_application_model
+  changed_when: false
+  no_log: true
+  when: application_image_compose is not defined
+
+- name: Store the deployed application Compose model
+  ansible.builtin.set_fact:
+    application_image_compose: '{{ shared_ingress_application_model.stdout | from_json }}'
+  when: application_image_compose is not defined
+  no_log: true
+
+- name: Require an application Nginx service for independent ingress
+  ansible.builtin.assert:
+    that:
+      - application_image_compose.services.nginx is mapping
+      - application_image_compose.services.nginx.image is string
+      - application_image_compose.services.nginx.ports is defined
+    fail_msg: The selected application Compose model has no supported Nginx service.
+  no_log: true
+
+- name: Create the independent ingress directory
+  ansible.builtin.file:
+    path: '{{ shared_ingress_directory }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Create the shared application backend network
+  community.docker.docker_network:
+    name: '{{ shared_ingress_app_network }}'
+    state: present
+
+- name: Render the independent ingress Compose project
+  ansible.builtin.template:
+    src: independent-compose.yml.j2
+    dest: '{{ shared_ingress_directory }}/docker-compose.yml'
+    owner: root
+    group: root
+    mode: '0644'
+  no_log: true
+
+- name: Install the independent ingress recovery validator
+  ansible.builtin.copy:
+    src: validate-recovery.py
+    dest: /usr/local/libexec/hou1-ingress-recovery-verify
+    owner: root
+    group: root
+    mode: '0755'
+
+- name: Build the compatible independent recovery export
+  ansible.builtin.set_fact:
+    shared_ingress_recovery: >-
+      {{ {
+        'schema': 1,
+        'mode': 'independent',
+        'application_directory': app_directory,
+        'application_project': {
+          'directory': shared_ingress_legacy_compose_directory,
+          'project': shared_ingress_legacy_compose_project,
+          'file': shared_ingress_legacy_compose_file
+        },
+        'ingress_project': {
+          'directory': shared_ingress_directory,
+          'project': shared_ingress_project,
+          'file': 'docker-compose.yml'
+        },
+        'backend_network': shared_ingress_app_network,
+        'listener_service': 'nginx',
+        'rollback': {
+          'stop_independent': ['docker', 'compose', '--project-directory', shared_ingress_directory]
+            + (['--project-name', shared_ingress_project] if shared_ingress_project else [])
+            + ['--file', shared_ingress_directory ~ '/docker-compose.yml', 'stop', 'nginx'],
+          'start_legacy': shared_ingress_legacy_compose_argv
+            + ['--profile', 'integrated-ingress-disabled', 'up', '-d', '--no-deps', 'nginx']
+        }
+      } | to_nice_json }}
+
+- name: Record the compatible independent recovery export
+  ansible.builtin.copy:
+    dest: '{{ shared_ingress_directory }}/recovery.json'
+    owner: root
+    group: root
+    mode: '0600'
+    content: '{{ shared_ingress_recovery }}\n'
+  no_log: true
+
+- name: Validate the independent recovery export before activation
+  ansible.builtin.command:
+    argv: [/usr/local/libexec/hou1-ingress-recovery-verify, '{{ shared_ingress_directory }}/recovery.json']
+  changed_when: false
+
+- name: Install independent ingress boot recovery
+  ansible.builtin.template:
+    src: independent.service.j2
+    dest: /etc/systemd/system/hou1-ingress.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: shared_ingress_service
+
+- name: Enable independent ingress recovery
+  ansible.builtin.systemd_service:
+    name: hou1-ingress
+    daemon_reload: '{{ shared_ingress_service.changed }}'
+    enabled: true

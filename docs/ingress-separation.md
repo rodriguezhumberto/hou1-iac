@@ -11,10 +11,10 @@ TLS, identity/VPN ingress operations and monitoring share the validated
 `shared_ingress_compose_file` inputs. The [owning role](../ansible/playbooks/roles/shared_ingress/README.md#compose-selection)
 keeps compatible defaults for older inventories and TLS receiver configurations.
 
-Application branch `cleanup/ingress-backend-readiness` prepares dynamic backend
-discovery and removes the health dependency. Both disposable Nginx fixtures pass;
-deployment needs a CI image receipt and source bundle containing that change.
-Listener transfer and compatible recovery export remain to be implemented.
+The application release provides dynamic backend discovery and readiness without
+making Nginx wait for application startup. The infrastructure migration is
+feature gated: `shared_ingress_independent: false` keeps the combined project;
+`true` renders a separate Nginx project, backend network and recovery manifest.
 
 ## Prerequisites
 
@@ -23,10 +23,9 @@ Listener transfer and compatible recovery export remain to be implemented.
 - Publish an immutable application release whose Nginx template resolves its
   backend through Docker DNS at runtime. Remove Nginx's application-health startup
   dependency. Test absent, late and replaced backends without reloading ingress.
-- Preserve cold recovery. Current recovery expects Nginx, the application and
-  Uptime Kuma in one saved project, with the existing network and port contracts.
-  A split runtime must export a compatible combined recovery configuration before
-  it can replace that layout. Keep the recovery validator strict.
+- Preserve cold recovery. The split manifest records both Compose selectors,
+  the backend network and exact stop/start rollback commands. The installed
+  recovery validator rejects edits or incomplete selectors before activation.
 
 The selector is a preparation step; selecting another directory alone does not
 migrate containers, routing, boot recovery or backups.
@@ -38,12 +37,12 @@ migrate containers, routing, boot recovery or backups.
 2. Give shared ingress its own Compose project and Docker-only boot unit. Own its
    backend networks explicitly and allow startup before application enrollment or
    readiness. Preserve the environment's existing network isolation.
-3. Prepare the new configuration and validate it without claiming the active
-   listener ports or fixed proxy address. Test compatible backup export and cold
-   recovery locally before enabling migration.
-4. Record the old files and selectors, and arm a VM-local rollback timer. Run the
-   listener transfer locally on HOU1 so losing controller SSH cannot interrupt it.
-   Rollback must restore the previous container, configuration and selectors.
+3. Validate the split Compose model and recovery manifest offline. During cutover,
+   stop the legacy listener, start and validate independent Nginx, and restore the
+   legacy listener automatically if activation fails.
+4. Record the old selectors and arm a VM-local rollback timer before production
+   use. Run the listener transfer locally on HOU1 so losing controller SSH cannot
+   interrupt it.
 5. Verify fresh VPN SSH, TLS renewal, identity/control-plane endpoints, application
    routing and monitoring. Only then disarm rollback. Keep independent Proxmox
    console or guest-agent access available throughout.

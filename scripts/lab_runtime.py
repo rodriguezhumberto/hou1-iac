@@ -45,8 +45,9 @@ def check_project(project, application, runtime=None):
         command += ['--project-name', project['project']]
     if project.get('file'):
         command += ['--file', str(Path(project['directory']) / project['file'])]
-    services = output(command + ['config', '--services']).split()
-    if not services:
+    declared = output(command + ['config', '--services']).split()
+    services = project.get('services', declared)
+    if not services or any(service not in declared for service in services):
         raise ValueError('Empty project')
     containers = {}
     application_found = False

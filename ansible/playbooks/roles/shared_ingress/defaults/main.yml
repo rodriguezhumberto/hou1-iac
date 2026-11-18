@@ -5,3 +5,13 @@ shared_ingress_additional_authentik_networks: []
 shared_ingress_compose_directory: '{{ app_directory }}'
 shared_ingress_compose_project: ''
 shared_ingress_compose_file: ''
+# Independent ingress keeps the previous application selector for rollback.
+shared_ingress_legacy_compose_directory: '{{ app_directory }}'
+shared_ingress_legacy_compose_project: ''
+shared_ingress_legacy_compose_file: ''
+# Independent ingress is an explicit migration switch. The compatible default
+# keeps the current combined application project until recovery is accepted.
+shared_ingress_independent: false
+shared_ingress_directory: '{{ app_directory }}-ingress'
+shared_ingress_project: 'hou1-ingress'
+shared_ingress_app_network: 'hou1-application'

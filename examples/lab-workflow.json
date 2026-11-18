@@ -26,7 +26,8 @@
       "ssh_host_ip": "100.91.0.10",
       "ssh_fingerprint": "SHA256:<verified HOU1 fingerprint>",
       "compose": [
-        {"directory": "/opt/application-test"},
+        {"directory": "/opt/application-test", "services": ["astro-app", "uptime-kuma"]},
+        {"directory": "/opt/application-test-ingress", "project": "application-test-ingress", "file": "docker-compose.yml", "services": ["nginx"]},
         {"directory": "/opt/hou1-authentik/test", "project": "hou1-authentik-test", "file": "compose.yaml"},
         {"directory": "/opt/hou1-netbird", "project": "hou1-netbird-test", "file": "compose.yaml"}
       ]

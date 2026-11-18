@@ -24,6 +24,11 @@ Deploys the verified application image and existing Nginx ingress through
 exists. Docker starts ingress independently so NetBird can reconnect first. The
 unit has no stop action; stopping it does not remove shared ingress or VPN access.
 
+When `shared_ingress_independent` is enabled, `shared_ingress` owns a separate
+Compose project and `hou1-ingress.service`. The application project starts only
+the backend and data services; the ingress project owns listener ports and its
+network attachments.
+
 ## Inputs and ownership
 
 Inputs come from `ansible/inventory/group_vars/all/vars.yml`, environment

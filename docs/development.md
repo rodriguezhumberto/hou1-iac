@@ -91,6 +91,7 @@ steps to code, private inputs or external prerequisites. The
 [deployment workflow](deployment-workflow.md) describes the supported automation
 and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.
 The [ingress migration sequence](ingress-separation.md) records the routing,
-TLS/monitoring and recovery dependencies that must be handled before cutover.
+TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
+`shared_ingress_independent`; the combined project remains the default.
 The [application lifecycle plan](application-lifecycle-plan.md) defines portable
 health, storage-recovery and shutdown behavior before further orchestration work.

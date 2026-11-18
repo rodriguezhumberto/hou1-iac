@@ -86,4 +86,6 @@ and isolated controller transport, plus the remaining bootstrap work.
 Version 2 adds [controller-only input checks](docs/lab-inputs.md) before host access.
 [Generated inventories](docs/lab-inventory.md) preserve declared overrides and
 verify managed SSH before selection. The [ingress migration sequence](docs/ingress-separation.md)
-records the routing and recovery prerequisites for separating shared Nginx.
+records the routing and recovery prerequisites for separating shared Nginx. The
+migration is feature gated; the combined application project remains the default
+until isolated listener cutover and rollback pass in the lab.

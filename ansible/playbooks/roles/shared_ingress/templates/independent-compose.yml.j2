@@ -1,0 +1,42 @@
+services:
+  nginx:
+    image: '{{ application_image_compose.services.nginx.image }}'
+    restart: unless-stopped
+    ports:
+      - '80:80'
+      - '443:443'
+    env_file:
+      - '{{ app_directory }}/.env'
+    environment:
+      NGINX_ENVSUBST_FILTER: '^(HOU1_VPN_IP|PRIMARY_CERT_DIR|SECONDARY_CERT_DIR|vpn_subnet|STAFF_HOSTNAME|STAFF_CERT_DIR|staff_vpn_subnet|PRIMARY_HOSTNAMES|SECONDARY_HOSTNAMES|PUBLIC_CANONICAL_HOSTNAME|PUBLIC_CANONICAL_REDIRECT)$'
+      PUBLIC_CANONICAL_HOSTNAME: '${PUBLIC_CANONICAL_HOSTNAME:-_}'
+      PUBLIC_CANONICAL_REDIRECT: '${PUBLIC_CANONICAL_REDIRECT:-false}'
+    volumes:
+      - '{{ app_directory }}/nginx/secondary.conf.template:/etc/nginx/templates/secondary.conf.template:ro'
+      - '{{ app_directory }}/nginx/nginx.conf.template:/etc/nginx/templates/default.conf.template:ro'
+      - '{{ app_directory }}/nginx-logs:/var/log/nginx'
+      - '{{ app_directory }}/certbot/conf:/etc/letsencrypt:ro'
+      - '{{ app_directory }}/certbot/www:/var/www/certbot:ro'
+      - '{{ app_directory }}/landing-page:/usr/share/nginx/html/landing:ro'
+      - '{{ netbird_control_plane_directory }}/nginx-include.conf:/etc/nginx/conf.d/netbird.conf:ro'
+      - '{{ netbird_control_plane_directory }}/ingress:/etc/nginx/netbird:ro'
+    networks:
+      application:
+        aliases: [astro-app]
+      netbird-ingress:
+        ipv4_address: '{{ netbird_ingress_proxy_ip }}'
+{% if authentik_enable_ingress_network | default(false) | bool %}
+      authentik-ingress: {}
+{% endif %}
+networks:
+  application:
+    external: true
+    name: '{{ shared_ingress_app_network }}'
+  netbird-ingress:
+    external: true
+    name: '{{ netbird_ingress_network }}'
+{% if authentik_enable_ingress_network | default(false) | bool %}
+  authentik-ingress:
+    external: true
+    name: '{{ authentik_active_network }}'
+{% endif %}

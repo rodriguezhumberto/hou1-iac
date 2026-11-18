@@ -107,6 +107,14 @@ class LabWorkflowTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(workflow.WorkflowError):
                 self.load()
 
+    def test_schema_rejects_ambiguous_compose_service_selection(self):
+        original = copy.deepcopy(self.config)
+        for services in ([], ['astro-app', 'astro-app'], ['bad service'], 'astro-app'):
+            self.config = copy.deepcopy(original)
+            self.config['hosts']['hou1']['compose'][0]['services'] = services
+            with self.subTest(services=services), self.assertRaises(workflow.WorkflowError):
+                self.load()
+
     def test_checkout_and_input_drift_are_detected(self):
         host = self.config['hosts']['hou1']
         workflow.check_revision(host)
@@ -393,6 +401,14 @@ else: print(json.dumps({'Running':state.get('running',True),'Health':{'Status':s
                 self.assertEqual(json.loads(result.stdout), {'failed': True})
         self.assertFalse(any(set(json.loads(line)) & {'up', 'down', 'start', 'stop', 'rm'}
                              for line in self.calls.read_text().splitlines()))
+
+    def test_runtime_verifies_only_declared_services_in_each_project(self):
+        self.contract['compose'] = [{'directory': '/fixture', 'services': ['astro-app']}]
+        self.assertEqual(self.probe().returncode, 0)
+        self.contract['compose'][0]['services'] = ['nginx']
+        result = self.probe()
+        self.assertEqual(result.returncode, 1)
+        self.assertEqual(json.loads(result.stdout), {'failed': True})
 
     def test_declared_readiness_is_required_even_when_container_health_is_good(self):
         manifest = {'schema': 1, 'liveness_path': '/api/health.json',

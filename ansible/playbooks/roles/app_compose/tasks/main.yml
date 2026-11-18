@@ -72,5 +72,6 @@
       {{ cms_media_directory | app_compose_override(netbird_control_plane_directory,
          netbird_ingress_network, netbird_ingress_proxy_ip,
          authentik_active_network if authentik_enable_ingress_network | default(false) | bool else none,
-         app_compose_extensions) }}
+         app_compose_extensions, shared_ingress_independent | default(false) | bool,
+         shared_ingress_app_network | default('app-network')) }}
   register: app_compose_render

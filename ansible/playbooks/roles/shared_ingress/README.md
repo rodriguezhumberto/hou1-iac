@@ -26,7 +26,12 @@ optional YAML basename, then builds fixed Compose arguments. Authentik, NetBird,
 TLS reloads and Nginx metrics use this selection. Older TLS receiver files without
 `ingress_compose` retain their application-project selection.
 
-This prepares consumer interfaces; it does not move Nginx or generate a separate
-project. Application routing still belongs to the selected source, and cold
-recovery still expects the combined application/Nginx layout. Those contracts
-and rollback coverage must be handled before enabling independent ingress.
+This prepares consumer interfaces; the default does not move Nginx or generate a
+separate project. Application routing still belongs to the selected source.
+
+`shared_ingress_independent: true` enables the migration slice. It renders a
+separate project under `shared_ingress_directory`, attaches it to the external
+backend network, installs a strict recovery validator and writes `recovery.json`.
+Webstack cuts over the listener only after the application project is ready; a
+failed independent activation starts the legacy listener again. The default
+remains combined.
