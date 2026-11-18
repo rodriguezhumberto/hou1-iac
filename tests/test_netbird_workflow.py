@@ -9,7 +9,7 @@ import unittest
 
 import yaml
 
-from helpers import ROOT, ROLES, read_task_phases, guard_play, netbird_vars, run_play, run_plays
+from helpers import fixture_inventory, ROOT, ROLES, read_task_phases, guard_play, netbird_vars, run_play, run_plays
 
 
 class WorkflowTest(unittest.TestCase):
@@ -96,7 +96,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(remove['when'], 'not ssh_vpn_unit_before_stat.stat.exists')
 
     def test_only_initialization_can_use_public_addresses(self):
-        inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
+        inventory = fixture_inventory()
         tasks = [{'ansible.builtin.import_role': {'name': 'netbird_common'}}]
         guard = 'Require public initialization targets or NetBird management'
         plays = []
@@ -117,7 +117,7 @@ class WorkflowTest(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_tagged_initialization_is_rejected(self):
-        inventory = yaml.safe_load((ROOT / 'ansible/inventory/inventory.yml').read_text())
+        inventory = fixture_inventory()
         result = run_play({**netbird_vars(), 'node_bootstrap': True,
                            'test_vps_public_ip': '203.0.113.10',
                            'ansible_host': '203.0.113.10'}, [

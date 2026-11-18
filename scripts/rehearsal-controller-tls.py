@@ -11,6 +11,8 @@ import subprocess
 import tarfile
 import tempfile
 
+from ssh_target import pinned_ssh, read_config
+
 
 def run(argv, data=None):
     return subprocess.run(argv, input=data, capture_output=True)
@@ -22,10 +24,10 @@ def main():
     p.add_argument("--renew", action="store_true")
     a = p.parse_args()
     config_path = Path(a.config)
-    c = json.loads(config_path.read_text())
+    c = read_config(config_path)
     root = config_path.parent
     assert c["environment"] == "test" and root.stat().st_mode & 0o077 == 0
-    ssh = c["ssh"]
+    ssh = pinned_ssh(c)
     remote = c["certificate_directory"]
     assert remote == "/opt/pearlandpaws-test/certbot/conf"
     original = run(ssh + ["sudo -n tar -czf - -C " + remote + " ."])

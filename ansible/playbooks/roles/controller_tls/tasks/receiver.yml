@@ -1,4 +1,9 @@
 ---
+- name: Select shared ingress for certificate validation and reload
+  ansible.builtin.import_role:
+    name: shared_ingress
+    tasks_from: selector
+
 - name: Create root-only receiver state and configuration
   ansible.builtin.file:
     path: '{{ item }}'
@@ -19,7 +24,7 @@
 - name: Configure the fixed environment certificate allowlist
   ansible.builtin.copy:
     dest: /etc/hou1-tls/receiver.json
-    content: "{{ {'environment': cms_environment, 'app_directory': app_directory, 'certificate_directory': app_directory ~ '/certbot/conf', 'lineages': hou1_tls_lineages} | to_nice_json }}"
+    content: "{{ {'environment': cms_environment, 'app_directory': app_directory, 'certificate_directory': app_directory ~ '/certbot/conf', 'lineages': hou1_tls_lineages, 'ingress_compose': shared_ingress_compose_selector} | to_nice_json }}"
     owner: root
     group: root
     mode: '0600'

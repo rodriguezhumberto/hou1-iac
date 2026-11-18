@@ -1,0 +1,55 @@
+{
+  "version": 2,
+  "environment": "test",
+  "namespace": "lab-test.example.invalid",
+  "management_url": "https://netbird-test.lab-test.example.invalid",
+  "release": {
+    "receipt": "/private/lab/release/image-release.json",
+    "source_bundle": "/private/lab/release/source.bundle",
+    "bundle_ref": "refs/heads/lab",
+    "authorization_file": "astro-app/src/lib/staffAuthorization.js"
+  },
+  "ansible_bin_directory": "/private/lab/tools/bin",
+  "collections_path": "/private/lab/collections",
+  "age_key_file": "/private/lab/deployment.agekey",
+  "run_directory": "/private/lab/runs",
+  "hosts": {
+    "hou1": {
+      "repository": "/path/to/hou1-iac",
+      "revision": "3333333333333333333333333333333333333333",
+      "inventory": "/private/lab/hou1/inventory.yml",
+      "inputs": ["/private/lab/hou1/release-inputs.yml"],
+      "capabilities": [],
+      "target": "hou1_lab",
+      "hostname": "hou1-test",
+      "ssh": ["ssh", "-F", "/private/lab/ssh_config", "hou1-lab"],
+      "ssh_host_ip": "100.91.0.10",
+      "ssh_fingerprint": "SHA256:<verified HOU1 fingerprint>",
+      "compose": [
+        {"directory": "/opt/application-test", "services": ["astro-app", "uptime-kuma"]},
+        {"directory": "/opt/application-test-ingress", "project": "application-test-ingress", "file": "docker-compose.yml", "services": ["nginx"]},
+        {"directory": "/opt/hou1-authentik/test", "project": "hou1-authentik-test", "file": "compose.yaml"},
+        {"directory": "/opt/hou1-netbird", "project": "hou1-netbird-test", "file": "compose.yaml"}
+      ]
+    },
+    "hou4": {
+      "repository": "/path/to/hou4-iac",
+      "revision": "4444444444444444444444444444444444444444",
+      "inventory": "/private/lab/hou4/inventory.yml",
+      "inputs": ["/private/lab/hou4/release-inputs.yml"],
+      "capabilities": ["/private/lab/hou4/runtime.enc.yaml"],
+      "target": "hou4_lab",
+      "hostname": "hou4-test",
+      "ssh": ["ssh", "-F", "/private/lab/ssh_config", "hou4-lab"],
+      "ssh_host_ip": "100.91.0.21",
+      "ssh_fingerprint": "SHA256:<verified HOU4 fingerprint>",
+      "compose": [{"directory": "/etc/hou4-compose", "project": "hou4-monitoring", "file": "compose.yml"}]
+    }
+  },
+  "https_checks": [
+    {"url": "https://auth-test.lab-test.example.invalid/-/health/ready/", "status": 200},
+    {"url": "https://netbird-test.lab-test.example.invalid/api/instance", "status": 200},
+    {"url": "https://staff-test.lab-test.example.invalid/api/staff/cms/pets", "status": 403},
+    {"url": "https://test.lab-test.example.invalid/api/ready.json", "status": 200}
+  ]
+}

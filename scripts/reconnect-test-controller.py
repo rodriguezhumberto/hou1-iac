@@ -2,10 +2,11 @@
 """Reconnect only the disposable test VPN container, preserving split DNS."""
 import argparse
 import json
-import re
 import shlex
 import subprocess
 import time
+
+from ssh_target import pinned_ssh, read_config
 
 CONTAINER = 'hou1-vps-admin-test'
 REMOTE = r'''
@@ -96,12 +97,15 @@ if __name__ == '__main__':
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--ssh-host', required=True)
+    parser.add_argument('--ssh-host', help='Optional alias; must match the declared peer')
+    parser.add_argument('--config', required=True, help='Private test targets JSON with a peer destination')
     args = parser.parse_args()
-    assert re.fullmatch(r'[A-Za-z0-9_.@:-]+', args.ssh_host) and not args.ssh_host.startswith('-')
+    config = read_config(args.config)
+    transport = pinned_ssh(config['peer'], peer=True)
+    if args.ssh_host is not None and args.ssh_host != config['peer']['ssh'][-1]:
+        raise ValueError('SSH alias differs from the declared test peer')
     def remote(argv):
-        return subprocess.run(['ssh','-o','BatchMode=yes','-o','ConnectTimeout=10',args.ssh_host,
-                               shlex.join(argv)],capture_output=True,text=True,check=True,timeout=30).stdout
+        return subprocess.run([*transport, shlex.join(argv)],capture_output=True,text=True,check=True,timeout=30).stdout
     def configure(operation):
         return json.loads(remote(['docker','exec','-i',CONTAINER,'python3','-c',REMOTE,operation]))
     configure('prepare')

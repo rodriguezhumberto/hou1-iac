@@ -8,6 +8,11 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | Operation | Entry point | Current procedure |
 | --- | --- | --- |
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
+| Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
+| Check lab release, identity and backup inputs locally | `scripts/deploy-lab.py --phase inputs` | [Input contracts](lab-inputs.md) |
+| Generate private inventories and verify managed access | `scripts/prepare-lab.py` | [Inventory generation](lab-inventory.md) |
+| Use an existing isolated controller VPN | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
+| Prepare isolated host/container DNS | `ansible/playbooks/lab-dns.yml` | [Lab DNS](lab-dns.md) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
 | Upgrade installed OS packages | `ansible/playbooks/os-maintenance.yml` | [OS maintenance](os-maintenance.md) |
 | Configure identity | `ansible/playbooks/authentik.yml` | [Identity bootstrap](authentik-bootstrap.md) |
@@ -20,6 +25,27 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 
 The [documentation index](README.md) identifies test-only tools and historical
 procedures. The legacy direct-issuer NetBird cutover is outside routine provisioning.
+
+## Environment targeting
+
+The isolated HOU1/HOU4 lab uses a privately configured namespace, separate hosts
+and a separate NetBird account. See the [recorded deployment](evidence/isolated-lab-2026-11-17.md).
+The default `hou1_test_init` and `hou1_test` groups remain empty; select lab hosts
+through private inventories and independently verified SSH keys. The former test
+deployment is production. Keep production hosts in `prod_env`; rehearsal hosts may use the
+existing `isolated_test_vps` group instead of `test_env`.
+
+Managed-host entry points run `tasks/validate-target.yml` before connections or
+controller changes, including component-tag runs. It binds inventory membership
+to `cms_environment`, NetBird server group, identity profile and connection
+address. CMS uses `production`; Authentik and `deploy_environment` use `prod`.
+Production Authentik entry points require matching explicit identity inputs.
+Both repositories enable SSH host-key checking; verify keys before bootstrap or
+replacement, and retain them for public and VPN addresses.
+
+Direct SSH tools use [explicit address and host-key checks](probes/rehearsal-targets.md)
+through `scripts/ssh_target.py`. Old fixture domains, containers and paths still
+need review before use with a newly provisioned test environment.
 
 ## Execution locations
 
@@ -37,6 +63,8 @@ task phases, required inputs and owned resources.
 shared override; [shared ingress](../ansible/playbooks/roles/shared_ingress/README.md)
 prepares its networks and mounts; [activation](../ansible/playbooks/roles/compose_runtime/README.md)
 applies changed service inputs and retains failed attempts for retry.
+The [test source owner](../ansible/playbooks/roles/test_application_source/README.md)
+refreshes the isolated VM's local Git remote from the selected release bundle.
 
 ## Configuration sources and outputs
 
@@ -55,3 +83,15 @@ Inventory overrides role defaults; private `-e @file` inputs override inventory.
 Keep shared paths and topology in inventory because recovery and standalone
 playbooks consume them without running the application roles.
 The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery access.
+
+## Reproducibility work
+
+The [intervention audit](deployment-interventions.md) assigns the lab's manual
+steps to code, private inputs or external prerequisites. The
+[deployment workflow](deployment-workflow.md) describes the supported automation
+and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.
+The [ingress migration sequence](ingress-separation.md) records the routing,
+TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
+`shared_ingress_independent`; the combined project remains the default.
+The [application lifecycle plan](application-lifecycle-plan.md) defines portable
+health, storage-recovery and shutdown behavior before further orchestration work.

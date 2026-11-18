@@ -1,0 +1,15 @@
+{
+  "version": 1,
+  "environment": "test",
+  "container": "lab-admin-vpn",
+  "image": "netbirdio/netbird@sha256:1111111111111111111111111111111111111111111111111111111111111111",
+  "state_directory": "/private/lab/controller-peer",
+  "resolver_file": "/private/lab/resolv.conf",
+  "management_url": "https://netbird-test.lab-test.example.invalid",
+  "address": "100.91.50.10",
+  "hosts": {
+    "auth-test.lab-test.example.invalid": "192.168.50.11",
+    "netbird-test.lab-test.example.invalid": "192.168.50.11",
+    "staff-test.lab-test.example.invalid": "192.168.50.11"
+  }
+}

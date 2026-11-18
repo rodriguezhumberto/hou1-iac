@@ -1,0 +1,27 @@
+---
+- name: Configure opt-in isolated lab DNS and its Docker consumers
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Validate inventory targeting before connecting
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+    - name: Require an explicit resolver operation
+      ansible.builtin.assert:
+        that: lab_dns_state in ['present', 'absent']
+      tags: [always]
+    - name: Validate isolated resolver inputs before connecting
+      ansible.builtin.import_role:
+        name: lab_dns
+        tasks_from: guard
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+  roles:
+    - role: lab_dns
+      when: lab_dns_state == 'present'
+    - role: docker
+    - role: lab_dns
+      when: lab_dns_state == 'absent'

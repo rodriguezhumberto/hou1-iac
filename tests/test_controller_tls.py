@@ -113,6 +113,97 @@ class ControllerTlsTest(unittest.TestCase):
             self.assertTrue((folder/'privkey.pem').is_symlink())
             self.assertFalse(list(Path(directory).rglob('.tls-*')))
 
+    def test_bootstrap_retry_before_ingress_is_complete_does_not_change_certificates(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=self.config(Path(directory))
+            receiver.install(c,self.bundles[0],bootstrap=True)
+            folder=Path(c['certificate_directory'])/'live/auth.example.invalid'
+            before={p.name:p.read_bytes() for p in folder.iterdir()}
+            # The first deployment can stop after certificate import but before
+            # Compose creates Nginx. Repeating identical inputs must resume it.
+            with patch.object(receiver,'nginx',side_effect=RuntimeError('ingress absent')) as nginx:
+                result=receiver.install(c,self.bundles[0],bootstrap=True)
+                self.assertFalse(result['changed'])
+                self.assertTrue(result['bootstrap_only'])
+                self.assertFalse(result['verified_served_certificate'])
+                nginx.assert_not_called()
+                # Changed certificates and a regular managed import still
+                # require the live validation path, even with missing ingress.
+                for bundle,bootstrap in ((self.bundles[1],True),(self.bundles[0],False)):
+                    with self.assertRaisesRegex(RuntimeError,'ingress absent'):
+                        receiver.install(c,bundle,bootstrap=bootstrap)
+            self.assertEqual({p.name:p.read_bytes() for p in folder.iterdir()},before)
+
+    def test_import_requests_bootstrap_only_for_explicit_bootstrap_inventory(self):
+        tasks=yaml.safe_load((ROLES/'controller_tls/tasks/main.yml').read_text())
+        task=next(t for t in tasks if t.get('register')=='hou1_tls_import')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);helper=root/'receiver.py';record=root/'arguments.json'
+            helper.write_text('import json,sys\nfrom pathlib import Path\n'
+                             f'Path({str(record)!r}).write_text(json.dumps(sys.argv[1:]))\n'
+                             'print(json.dumps({"changed":False}))\n')
+            task['ansible.builtin.command']['argv']=task['ansible.builtin.command']['argv'].replace(
+                '/usr/local/libexec/hou1-tls-receive',str(helper))
+            for bootstrap,prepare in ((False,False),(True,False),(False,True),(True,True)):
+                result=run_plays([guard_play({'node_bootstrap':bootstrap,'hou1_tls_prepare_only':prepare,
+                    'hou1_tls_decrypted':{'stdout':'{}'}},[task])])
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                expected=(['--bootstrap'] if bootstrap else [])+(['--prepare'] if prepare else [])
+                self.assertEqual(json.loads(record.read_text()),expected)
+
+    def test_preparation_defers_unchanged_runtime_checks_until_after_service_repair(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=self.config(Path(directory))
+            receiver.install(c,self.bundles[0],bootstrap=True)
+            folder=Path(c['certificate_directory'])/'live/auth.example.invalid'
+            before={p.name:p.read_bytes() for p in folder.iterdir()}
+            with patch.object(receiver,'nginx',side_effect=RuntimeError('backend stopped')) as nginx,patch.object(receiver,'served') as served:
+                result=receiver.install(c,self.bundles[0],prepare=True)
+                self.assertFalse(result['changed'])
+                self.assertFalse(result['verified_served_certificate'])
+                nginx.assert_not_called();served.assert_not_called()
+                with self.assertRaisesRegex(RuntimeError,'backend stopped'):
+                    receiver.verify_installed(c)
+                # Preparation cannot bypass runtime validation for a rotation.
+                with self.assertRaisesRegex(RuntimeError,'backend stopped'):
+                    receiver.install(c,self.bundles[1],prepare=True)
+            self.assertEqual({p.name:p.read_bytes() for p in folder.iterdir()},before)
+            with patch.object(receiver,'nginx') as nginx,patch.object(receiver,'served') as served:
+                self.assertTrue(receiver.verify_installed(c)['verified_served_certificate'])
+                nginx.assert_called_once_with(c,'-t');served.assert_called_once()
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served',side_effect=ValueError('wrong served certificate')),patch.object(receiver.time,'sleep'):
+                with self.assertRaisesRegex(ValueError,'wrong served certificate'):
+                    receiver.verify_installed(c)
+
+    def test_webstack_and_full_rehearsal_verify_certificates_after_activation(self):
+        deploy=yaml.safe_load((ROLES/'webstack/tasks/deploy.yml').read_text())
+        activation=next(i for i,t in enumerate(deploy) if t.get('register')=='webstack_activation')
+        verify=next(i for i,t in enumerate(deploy) if t.get('ansible.builtin.include_role',{}).get('tasks_from')=='verify')
+        self.assertLess(activation,verify)
+        self.assertIn('not (webstack_bootstrap_ingress_only | default(false) | bool)',deploy[verify]['when'])
+        rehearsal=yaml.safe_load((ROOT/'ansible/playbooks/rehearse-vps.yml').read_text())[0]
+        self.assertEqual(rehearsal['post_tasks'][-1]['ansible.builtin.include_role'],
+                         {'name':'controller_tls','tasks_from':'verify'})
+
+    def test_tagged_webstack_runs_final_tls_verification_after_bootstrap(self):
+        tasks=yaml.safe_load((ROLES/'webstack/tasks/deploy.yml').read_text())
+        include=next(t for t in tasks if t.get('ansible.builtin.include_role',{}).get('tasks_from')=='verify')
+        with tempfile.TemporaryDirectory() as directory:
+            root=Path(directory);role=root/'controller_tls';(role/'tasks').mkdir(parents=True)
+            record=root/'verified';helper=root/'verify.py'
+            helper.write_text('from pathlib import Path\n'+f'Path({str(record)!r}).touch()\n')
+            verification=yaml.safe_load((ROLES/'controller_tls/tasks/verify.yml').read_text())
+            verification[0]['ansible.builtin.command']['argv']=[sys.executable,str(helper)]
+            (role/'tasks/verify.yml').write_text(yaml.safe_dump(verification))
+            include['ansible.builtin.include_role']['name']=str(role)
+            include['tags']=['webstack']
+            for ingress_only in (False,True):
+                record.unlink(missing_ok=True)
+                result=run_plays([guard_play({'hou1_controller_managed_tls':True,
+                    'webstack_bootstrap_ingress_only':ingress_only},[include])],extra_args=('--tags','webstack'))
+                self.assertEqual(result.returncode,0,result.stdout+result.stderr)
+                self.assertEqual(record.exists(),not ingress_only)
+
     def test_native_served_certificate_verifies_trust_hostname_and_fingerprint(self):
         listener=socket.socket();listener.bind(('127.0.0.1',0));listener.listen(1);listener.settimeout(5)
         server_context=ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
@@ -161,7 +252,8 @@ class ControllerTlsTest(unittest.TestCase):
             for action,tail in [('deploy-v1',[]),('status-v1',['--metrics'])]:
                 with patch.dict(os.environ,SSH_ORIGINAL_COMMAND=action),patch.object(gateway.os,'execv') as execute:
                     gateway.main();execute.assert_called_once_with('/usr/bin/sudo',['sudo','-n','/usr/local/libexec/hou1-tls-receive',*tail])
-            for action in ('bash','deploy-v1 --bootstrap','status-v1; id','','sudo -n /bin/sh'):
+            for action in ('bash','deploy-v1 --bootstrap','deploy-v1 --prepare','deploy-v1 --verify',
+                           'status-v1; id','','sudo -n /bin/sh'):
                 with patch.dict(os.environ,SSH_ORIGINAL_COMMAND=action),patch.object(gateway.os,'execv') as execute:
                     with self.assertRaises(PermissionError):gateway.main()
                     execute.assert_not_called()

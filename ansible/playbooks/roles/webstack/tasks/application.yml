@@ -5,6 +5,11 @@
     apply:
       tags: [deploy, webstack, ssl]
 
+- name: Refresh the declared isolated test source before selecting its checkout
+  ansible.builtin.include_role:
+    name: test_application_source
+  when: rehearsal_staff_bundle | default('') | length > 0
+
 - name: Ensure the shared executable directory exists
   ansible.builtin.file:
     path: /usr/local/libexec

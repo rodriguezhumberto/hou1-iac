@@ -9,6 +9,8 @@ remain private. This command is specific to the approved private test inventory.
 import argparse, json, os, subprocess, yaml, shlex
 from pathlib import Path
 
+from ssh_target import pinned_ssh, read_config
+
 parser = argparse.ArgumentParser(description=__doc__)
 parser.add_argument("--controller-dir", required=True)
 args = parser.parse_args()
@@ -21,6 +23,10 @@ assert (
     and target["ansible_host"] == "100.91.0.10"
     and target["primary_domain"] == "vps-test.pearlandpaws.com"
 )
+transport = read_config(root / "targets.json")
+if transport['ssh_host_ip'] != target['ansible_host']:
+    raise ValueError('Secret preparation target differs from the inventory address')
+ssh = pinned_ssh(transport)
 gate = root / "gates"
 gate.mkdir(mode=0o700, exist_ok=True)
 key = gate / "host-age.key"
@@ -75,7 +81,6 @@ r = subprocess.run(
 cipher = gate / "authentik-host.enc.yaml"
 cipher.write_text(r.stdout)
 cipher.chmod(0o600)
-ssh = ["ssh", "-F", str(root / "ssh_config"), "hou1-vps-test"]
 projects = subprocess.run(
     ssh
     + [

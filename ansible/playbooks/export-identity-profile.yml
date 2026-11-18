@@ -3,6 +3,11 @@
   hosts: "{{ target_hosts | default('hou1_test') }}"
   gather_facts: false
   become: false
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+
   tasks:
     - name: Require an explicit environment and a single inventory host
       ansible.builtin.assert:

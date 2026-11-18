@@ -71,11 +71,19 @@ under `no_log`; no age identity or DNS credential is copied to HOU1.
    Ansible inputs. Once the app runtime directory exists, `webstack` imports the
    encrypted bundle before requiring its certificates. An entirely empty certificate set
    can be imported before Nginx or NetBird exists, over the bootstrap access path.
+   While `node_bootstrap` is true, retries also accept identical installed
+   material so an interrupted deployment can finish configuring ingress.
    It does not count as a verified renewal. On a running host, import validates
    Nginx, reloads only changed material, verifies served certificates and restores
    the prior files on failure. Successful import removes legacy host DNS files,
    the old renewal script and its cron entry. Authentik and NetBird use the same
    controller mode and do not request host-side DNS credentials.
+   For unchanged material, application deployment defers runtime TLS checks until
+   Compose has repaired its services: Nginx cannot resolve a stopped backend's
+   Docker DNS name. The deployment then verifies installed and served certificates.
+   Certificate rotations retain validation before writes and automatic rollback.
+   The internal `hou1_tls_prepare_only` flag is set by `webstack`; standalone
+   certificate imports retain immediate runtime verification.
 3. Once private management works, configure the renewal account through an
    administrative Ansible run:
 

@@ -1,8 +1,12 @@
 ---
 - name: Install NetBird and Authentik break-glass recovery
   hosts: netbird_control_plane
+  gather_facts: false
   become: true
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Validate NetBird management
       ansible.builtin.import_role:
         name: netbird_common
@@ -10,6 +14,10 @@
     - name: Require the dedicated production target before host changes
       ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/target.yml
       tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+
   tasks:
     - name: Install break-glass recovery command
       ansible.builtin.import_tasks: roles/netbird_control_plane/tasks/break-glass.yml

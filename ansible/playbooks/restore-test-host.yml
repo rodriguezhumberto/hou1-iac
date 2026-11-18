@@ -2,8 +2,15 @@
 # Replacement-host recovery only. Never run the fresh identity bootstrap here.
 - name: Refuse replacement recovery on an existing installation
   hosts: isolated_test_vps
+  gather_facts: false
   become: true
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
     - name: Require the selected fresh Debian test host and independent HOU4 console
       ansible.builtin.assert:
         that:
@@ -62,5 +69,10 @@
   hosts: isolated_test_vps
   become: true
   gather_facts: false
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+
   roles:
     - host_recovery

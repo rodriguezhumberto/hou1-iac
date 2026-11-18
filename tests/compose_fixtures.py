@@ -17,7 +17,8 @@ def local_tasks(role, filename='main.yml'):
                             task.get('ansible.builtin.include_role', {})).get('name')
         if included in {'app_compose', 'shared_ingress'}:
             # Expand the real role tasks; only fixture paths/ownership change.
-            tasks.extend(local_tasks(included))
+            specification = task.get('ansible.builtin.import_role', task.get('ansible.builtin.include_role'))
+            tasks.extend(local_tasks(included, specification.get('tasks_from', 'main') + '.yml'))
             continue
         for action in ('ansible.builtin.template', 'ansible.builtin.copy', 'ansible.builtin.file'):
             arguments = task.get(action)

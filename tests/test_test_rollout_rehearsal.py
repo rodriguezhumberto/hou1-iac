@@ -76,7 +76,8 @@ class TestRolloutRehearsal(unittest.TestCase):
 
     def test_fresh_vps_entrypoint_rejects_production_and_mutable_source(self):
         playbook = yaml.safe_load((ROOT / 'ansible/playbooks/rehearse-vps.yml').read_text())[0]
-        guard = playbook['pre_tasks'][0]
+        guard = next(task for task in playbook['pre_tasks'] if task.get('name') ==
+                     'Require a single explicit test host and isolated identity inputs')
         inventory = {'all': {'children': {'isolated_test_vps': {'hosts': {'fixture': {}}}}}}
         base = dict(ansible_host='203.0.113.20', test_vps_public_ip='203.0.113.20',
                     cms_environment='test', node_bootstrap=True,
@@ -92,7 +93,8 @@ class TestRolloutRehearsal(unittest.TestCase):
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
     def test_seed_guard_refuses_production_private_access_and_controller_key(self):
-        task = yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-seeds.yml').read_text())[0]['pre_tasks'][0]
+        task = next(task for task in yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-seeds.yml').read_text())[0]['pre_tasks']
+                    if task.get('name') == 'Require the public bootstrap fixture and a separate host recovery identity')
         inventory = {'all': {'children': {'isolated_test_vps': {'hosts': {'fixture': {}}}}}}
         base = dict(cms_environment='test', node_bootstrap=True, ansible_host='203.0.113.20',
                     test_vps_public_ip='203.0.113.20', netbird_domain='netbird-test.example.invalid',

@@ -4,5 +4,10 @@
   become: true
   gather_facts: false
   serial: 1
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+
   roles:
     - role: recovery_drill

@@ -1,0 +1,12 @@
+---
+- name: Validate explicitly managed lab DNS
+  ansible.builtin.import_tasks: validate.yml
+  when: lab_dns_state != 'unmanaged'
+
+- name: Configure the isolated lab resolver
+  ansible.builtin.include_tasks: present.yml
+  when: lab_dns_state == 'present'
+
+- name: Remove the isolated lab resolver
+  ansible.builtin.include_tasks: absent.yml
+  when: lab_dns_state == 'absent'

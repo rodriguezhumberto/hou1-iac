@@ -30,3 +30,11 @@
     name: docker
     enabled: yes
     state: started
+
+- name: Manage opted-in lab Docker DNS without replacing other daemon settings
+  ansible.builtin.include_tasks: dns.yml
+  when: lab_dns_state | default('unmanaged') != 'unmanaged'
+
+- name: Prepare opted-in lab container DNS rules
+  ansible.builtin.import_role:
+    name: lab_dns_containers

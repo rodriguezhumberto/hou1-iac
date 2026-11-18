@@ -18,6 +18,10 @@ continued-host repairs remain separate historical reports; see
 result does not establish an uninterrupted run. See the production recovery
 guide for the separate production acceptance requirements.
 
+No test hosts are currently available. Provision a new isolated fixture and
+review its inventory and identities before using this procedure; the former test
+server is production.
+
 ## Before wiping HOU1
 
 1. Confirm HOU4 provider-console login independently of NetBird. Restoring
@@ -58,7 +62,7 @@ workflow below while keeping the current nodes.
 
 ## Inputs
 
-Use the established full test inventory and its group defaults, with
+Use the new isolated test inventory and its group defaults, with
 `node_bootstrap: true`, `ansible_host: <HOU1 public IP>`, `cms_environment: test`,
 the existing isolated names/subnet and the verified SSH configuration. Add:
 
@@ -173,8 +177,9 @@ A successfully published handoff can use the same guarded
 path; a failed cold restore still requires a fresh host and recovery ID.
 
 For this rehearsal's bare `hou1-vps-admin-test` container, use
-`[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --ssh-host,
-dev@192.168.0.151]` as the refresh argv. The helper restores public DNS before
+`[python3, /absolute/checkout/scripts/reconnect-test-controller.py, --config,
+/private/lab/targets.json]` as the refresh argv. Declare and verify its peer in
+the [target config](rehearsal-targets.md). The helper restores public DNS before
 reconnecting, verifies the declared private records through NetBird DNS, then
 pins those records in a managed hosts block while retaining public resolution
 for Authentik. This avoids musl racing public DNS fallbacks against private

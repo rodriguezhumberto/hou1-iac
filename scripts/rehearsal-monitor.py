@@ -21,6 +21,8 @@ import tempfile
 import urllib.request
 import urllib.parse
 
+from ssh_target import monitor_transports, read_config
+
 
 def atomic(path, data):
     with tempfile.NamedTemporaryFile(dir=path.parent, mode="w", delete=False) as f:
@@ -71,6 +73,8 @@ def run_command(argv, data=None, timeout=90, env=None):
 
 
 def probe(config):
+    # Reject all destinations before HTTP requests, decryption or probe commands.
+    server_ssh, peer_ssh, staff_command = monitor_transports(config)
     checks = {}
     if config.get("production_dns_names"):
         covered = True
@@ -110,7 +114,7 @@ def probe(config):
             checks[name] = {"ok": False}
     try:
         r = run_command(
-            config["ssh"]
+            server_ssh
             + [
                 "sudo -n /usr/local/sbin/hou1-test-probe /etc/hou1-test-gates/probe.json"
             ],
@@ -125,11 +129,7 @@ def probe(config):
         checks["host_reachable"] = {"ok": False}
     try:
         r = run_command(
-            [
-                "ssh",
-                "dev@192.168.0.151",
-                "docker exec hou1-vps-admin-test netbird status --json",
-            ],
+            [*peer_ssh, "docker exec hou1-vps-admin-test netbird status --json"],
             timeout=25,
         )
         st = json.loads(r.stdout)
@@ -159,7 +159,7 @@ def probe(config):
                 for key in ("TEST_ADMIN_PASSWORD", "TEST_READER_PASSWORD")
             }
         )
-        r = run_command(config["staff_probe_command"], data=payload, timeout=90)
+        r = run_command(staff_command, data=payload, timeout=90)
         checks["staff_oidc_login"] = {"ok": r.returncode == 0}
     except Exception:
         checks["staff_oidc_login"] = {"ok": False}
@@ -264,7 +264,7 @@ def main():
     p.add_argument("--receive", action="store_true")
     a = p.parse_args()
     config_path = Path(a.config)
-    config = json.loads(config_path.read_text())
+    config = read_config(config_path)
     root = config_path.parent
     assert root.stat().st_mode & 0o077 == 0 and config["environment"] == "test"
     url = urllib.parse.urlsplit(config["alert_url"])

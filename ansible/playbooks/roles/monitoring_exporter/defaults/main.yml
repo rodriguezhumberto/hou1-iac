@@ -18,7 +18,10 @@ hou1_monitoring_containers:
     directory: '{{ authentik_project_root_base }}/{{ hou1_monitoring_identity_profile }}'
     service: authentik-worker
   staff-app: {directory: '{{ app_directory }}', service: astro-app}
-  nginx: {directory: '{{ app_directory }}', service: nginx}
+  nginx: >-
+    {{ {'directory': shared_ingress_compose_directory, 'service': 'nginx'} |
+       combine({'project': shared_ingress_compose_project} if shared_ingress_compose_project else {}) |
+       combine({'file': shared_ingress_compose_file} if shared_ingress_compose_file else {}) }}
   netbird: {directory: '{{ netbird_control_plane_directory }}', service: netbird-server}
   netbird-dashboard: {directory: '{{ netbird_control_plane_directory }}', service: dashboard}
 hou1_monitoring_backup_directory: '{{ authentik_backup_root_base }}/{{ hou1_monitoring_identity_profile }}'

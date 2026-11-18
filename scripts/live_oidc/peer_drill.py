@@ -38,7 +38,7 @@ def nb(path, method="GET", body=None):
 
 def peer(command):
     r = subprocess.run(
-        ["ssh", "dev@192.168.0.151", "docker exec hou1-vps-security-cli " + command],
+        [*PEER_SSH, "docker exec hou1-vps-security-cli " + command],
         capture_output=True,
         text=True,
     )

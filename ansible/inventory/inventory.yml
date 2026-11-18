@@ -1,25 +1,22 @@
 all:
   children:
     # TEST ENVIRONMENT
+    # Lab hosts are selected through private inventories; these defaults stay empty.
     test_env:
       children:
         hou1_test_init:
-          hosts:
-            test_hou1_init:
-              ansible_host: "{{ test_vps_public_ip }}"
+          hosts: {}
           vars:
             node_bootstrap: true
             ansible_user: debian
-            ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=yes"
         
         hou1_test:
-          hosts:
-            test_hou1:
-              ansible_host: "{{ netbird_ip }}"
+          hosts: {}
           vars:
             ansible_user: "{{ new_user}}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
-            ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=yes"
 
     # PRODUCTION ENVIRONMENT
     prod_env:
@@ -33,7 +30,7 @@ all:
             ansible_user: root
             # -e "manual_root_password=your_pass" when running init
             ansible_ssh_pass: "{{ manual_root_password | default(omit) }}"
-            ansible_ssh_common_args: "-o StrictHostKeyChecking=no -o UserKnownHostsFile=/dev/null"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=yes"
         
         hou1_prod:
           hosts:
@@ -42,7 +39,7 @@ all:
           vars:
             ansible_user: "{{ new_user }}"
             ansible_ssh_private_key_file: "~/.ssh/id_ed25519"
-            ansible_ssh_common_args: "-o StrictHostKeyChecking=no"
+            ansible_ssh_common_args: "-o StrictHostKeyChecking=yes"
 
     # Same production host and encrypted prod_env variables; no duplicate identity.
     # Used only by the dedicated control-plane playbook.

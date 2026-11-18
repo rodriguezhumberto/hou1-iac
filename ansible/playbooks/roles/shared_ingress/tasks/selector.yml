@@ -1,0 +1,23 @@
+---
+- name: Validate the fixed shared ingress Compose selector
+  ansible.builtin.assert:
+    that:
+      - shared_ingress_compose_directory is string
+      - shared_ingress_compose_directory is match('^/[A-Za-z0-9_-]+(/[A-Za-z0-9_-]+)*\Z')
+      - shared_ingress_compose_project is string
+      - shared_ingress_compose_project == '' or shared_ingress_compose_project is match('^[a-z0-9][a-z0-9_-]*\Z')
+      - shared_ingress_compose_file is string
+      - shared_ingress_compose_file == '' or shared_ingress_compose_file is match('^[A-Za-z0-9][A-Za-z0-9_.-]*\.ya?ml\Z')
+    fail_msg: Select a fixed absolute ingress directory, optional Compose project and optional YAML basename.
+
+- name: Select shared ingress commands without accepting executable input
+  ansible.builtin.set_fact:
+    shared_ingress_compose_selector:
+      directory: '{{ shared_ingress_compose_directory }}'
+      project: '{{ shared_ingress_compose_project }}'
+      file: '{{ shared_ingress_compose_file }}'
+    shared_ingress_compose_argv: >-
+      {{ ['docker', 'compose', '--project-directory', shared_ingress_compose_directory] +
+         (['--project-name', shared_ingress_compose_project] if shared_ingress_compose_project else []) +
+         (['--file', shared_ingress_compose_directory ~ '/' ~ shared_ingress_compose_file]
+          if shared_ingress_compose_file else []) }}

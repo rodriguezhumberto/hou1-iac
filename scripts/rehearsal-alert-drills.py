@@ -10,6 +10,8 @@ import subprocess
 import time
 import urllib.request
 
+from ssh_target import monitor_transports, read_config
+
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("--config", required=True)
 p.add_argument(
@@ -19,8 +21,8 @@ p.add_argument(
 )
 a = p.parse_args()
 config_path = Path(a.config)
-config = json.loads(config_path.read_text())
-assert config["environment"] == "test"
+config = read_config(config_path)
+ssh, _, _ = monitor_transports(config)
 root = config_path.parent
 spec = importlib.util.spec_from_file_location(
     "monitor", Path(__file__).with_name("rehearsal-monitor.py")
@@ -43,7 +45,7 @@ report = (
 
 def remote(command, timeout=25):
     return subprocess.run(
-        config["ssh"] + [command], capture_output=True, text=True, timeout=timeout
+        ssh + [command], capture_output=True, text=True, timeout=timeout
     )
 
 

@@ -1,0 +1,52 @@
+---
+- name: Validate lab DNS inputs before changing Docker configuration
+  ansible.builtin.import_tasks: ../../lab_dns/tasks/guard.yml
+
+- name: Require the host-local resolver before configuring Docker consumers
+  ansible.builtin.command: systemctl is-active hou-lab-dns
+  changed_when: false
+  when: lab_dns_state == 'present'
+
+- name: Verify the selected LAN DNS listener before configuring Docker consumers
+  ansible.builtin.wait_for:
+    host: '{{ lab_dns_desired.address }}'
+    port: 53
+    timeout: 10
+  when: lab_dns_state == 'present'
+
+- name: Create the Docker daemon configuration directory
+  ansible.builtin.file:
+    path: /etc/docker
+    state: directory
+    mode: '0755'
+
+- name: Create the local program directory
+  ansible.builtin.file:
+    path: /usr/local/libexec
+    state: directory
+    mode: '0755'
+
+- name: Install the Docker DNS configuration owner
+  ansible.builtin.copy:
+    src: dns.py
+    dest: /usr/local/libexec/hou1-docker-dns
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Apply only the declared Docker DNS setting
+  ansible.builtin.command:
+    argv: [/usr/local/libexec/hou1-docker-dns]
+    stdin: '{{ {"state": lab_dns_state, "servers": [lab_dns_desired.address]} | to_json }}'
+  register: docker_dns_result
+  changed_when: (docker_dns_result.stdout | from_json).changed
+
+- name: Complete a changed or interrupted Docker DNS activation
+  ansible.builtin.systemd_service:
+    name: docker
+    state: restarted
+  when: (docker_dns_result.stdout | from_json).restart_pending
+
+- name: Record the completed Docker DNS activation
+  ansible.builtin.command: /usr/local/libexec/hou1-docker-dns --ack
+  changed_when: false

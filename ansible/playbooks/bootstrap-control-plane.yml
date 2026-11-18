@@ -2,12 +2,16 @@
 # First production provisioning only. Join the controller to NetBird before hou1.yml.
 - name: Bootstrap production ingress and NetBird over the public IP
   hosts: hou1_prod_init
+  gather_facts: false
   become: true
   module_defaults:
     ansible.builtin.uri:
       use_proxy: false
       follow_redirects: none
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Require a complete public-IP bootstrap
       ansible.builtin.assert:
         that:
@@ -21,6 +25,10 @@
       ansible.builtin.import_role:
         name: netbird_common
       tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
+
   roles:
     - role: common
     - role: docker

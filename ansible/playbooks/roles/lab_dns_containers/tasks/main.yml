@@ -1,0 +1,49 @@
+---
+- name: Configure container DNS access only for an explicitly managed lab
+  when: lab_dns_state | default('unmanaged') != 'unmanaged'
+  block:
+    - name: Validate the isolated lab boundary before installing container access
+      ansible.builtin.import_tasks: ../../lab_dns/tasks/guard.yml
+
+    - name: Validate declared Docker network names
+      ansible.builtin.assert:
+        that:
+          - lab_dns_container_networks is sequence and lab_dns_container_networks is not string
+          - lab_dns_container_networks | unique | length == lab_dns_container_networks | length
+          - lab_dns_container_networks | select('match', '^[a-zA-Z0-9][a-zA-Z0-9_.-]*$') | list | length == lab_dns_container_networks | length
+          - lab_dns_state != 'present' or lab_dns_container_networks | length > 0
+        fail_msg: Declare the Docker networks allowed to use this lab resolver.
+
+    - name: Create the local program directory
+      ansible.builtin.file:
+        path: /usr/local/libexec
+        state: directory
+        mode: '0755'
+
+    - name: Install the narrow container DNS firewall reconciler
+      ansible.builtin.copy:
+        src: firewall.py
+        dest: /usr/local/libexec/hou-lab-dns-firewall
+        owner: root
+        group: root
+        mode: '0700'
+
+    - name: Write private container DNS policy
+      ansible.builtin.copy:
+        dest: /etc/hou-lab-dns-firewall.json
+        content: '{{ {"version": 1, "state": lab_dns_state, "address": lab_dns_desired.address, "networks": lab_dns_container_networks} | to_nice_json }}'
+        owner: root
+        group: root
+        mode: '0600'
+      no_log: true
+
+    - name: Reconcile current and retired container DNS allowances
+      ansible.builtin.command: /usr/local/libexec/hou-lab-dns-firewall
+      register: lab_dns_firewall_result
+      changed_when: (lab_dns_firewall_result.stdout | from_json).changed
+
+    - name: Remove the policy after removing its managed rules
+      ansible.builtin.file:
+        path: /etc/hou-lab-dns-firewall.json
+        state: absent
+      when: lab_dns_state == 'absent'

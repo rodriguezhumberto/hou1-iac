@@ -12,6 +12,11 @@ neither restore nor rollback success. Its report now labels these limits.
 
 ## Fixture and execution
 
+Configure [explicit SSH destinations and fingerprints](rehearsal-targets.md)
+for both the server and probe host. The controller adapter validates both before
+decrypting credentials or executing remote commands. Fixed fixture names below
+still need review for a newly provisioned lab.
+
 The controller adapter in `scripts/live_oidc/controller.py` deliberately pins
 the approved test DNS names, private SSH configuration, isolated homelab Docker
 peer and SOPS/age paths. It captures secret-bearing subprocess output and passes

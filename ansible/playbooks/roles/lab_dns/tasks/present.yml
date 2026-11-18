@@ -1,0 +1,112 @@
+---
+- name: Install the host-local resolver and its validators
+  ansible.builtin.apt:
+    name: [dnsmasq-base, dnsutils, ufw]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+
+- name: Render validated private DNS records
+  ansible.builtin.template:
+    src: dnsmasq.conf.j2
+    dest: /etc/hou-lab-dns.conf
+    owner: root
+    group: root
+    mode: '0600'
+    validate: /usr/sbin/dnsmasq --test --conf-file=%s
+  register: lab_dns_config
+  no_log: true
+
+- name: Install the lab resolver service
+  ansible.builtin.template:
+    src: hou-lab-dns.service.j2
+    dest: /etc/systemd/system/hou-lab-dns.service
+    owner: root
+    group: root
+    mode: '0644'
+  register: lab_dns_unit
+
+- name: Apply resolver configuration before changing host DNS
+  ansible.builtin.systemd_service:
+    name: hou-lab-dns
+    daemon_reload: '{{ lab_dns_unit.changed }}'
+    enabled: true
+    state: "{{ 'restarted' if lab_dns_config.changed or lab_dns_unit.changed else 'started' }}"
+
+- name: Verify every private record directly over UDP and TCP
+  ansible.builtin.command:
+    argv: "{{ ['dig', '@127.0.0.1', item.0.name, 'A', '+short', '+time=2', '+tries=1'] + (['+tcp'] if item.1 == 'tcp' else []) }}"
+  loop: "{{ lab_dns_desired.records | product(['udp', 'tcp']) | list }}"
+  register: lab_dns_query
+  changed_when: false
+  failed_when: lab_dns_query.rc != 0 or lab_dns_query.stdout | trim != item.0.address
+  no_log: true
+
+- name: Verify independent public recursion before switching the host
+  ansible.builtin.command:
+    argv: [dig, '@127.0.0.1', '{{ lab_dns_public_probe }}', A, '+short', '+time=3', '+tries=1']
+  register: lab_dns_public_query
+  changed_when: false
+  failed_when: lab_dns_public_query.rc != 0 or lab_dns_public_query.stdout | trim | length == 0
+
+- name: Create the systemd resolver drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/resolved.conf.d
+    state: directory
+    mode: '0755'
+
+- name: Use the verified local resolver for the selected namespace
+  ansible.builtin.template:
+    src: resolved.conf.j2
+    dest: /etc/systemd/resolved.conf.d/90-hou-lab-dns.conf
+    owner: root
+    group: root
+    mode: '0644'
+  register: lab_dns_resolved
+  no_log: true
+
+- name: Apply the selected host resolver
+  ansible.builtin.systemd_service:
+    name: systemd-resolved
+    state: restarted
+  when: lab_dns_resolved.changed
+
+- name: Remove only the old managed bootstrap hosts block
+  ansible.builtin.blockinfile:
+    path: /etc/hosts
+    marker: '# {mark} hou-lab bootstrap'
+    state: absent
+
+- name: Inspect the old lab-only cloud-init hosts override
+  ansible.builtin.stat:
+    path: /etc/cloud/cloud.cfg.d/99-hou-lab-hosts.cfg
+  register: lab_dns_cloud_hosts
+
+- name: Read the old lab-only hosts override
+  ansible.builtin.slurp:
+    src: /etc/cloud/cloud.cfg.d/99-hou-lab-hosts.cfg
+  register: lab_dns_cloud_hosts_content
+  when: lab_dns_cloud_hosts.stat.exists
+
+- name: Preserve unexpected settings in the old lab override
+  ansible.builtin.assert:
+    that: >-
+      (lab_dns_cloud_hosts_content.content | b64decode | trim) == 'manage_etc_hosts: false'
+    fail_msg: The old lab cloud-init file has additional settings; migrate those before removing it.
+  when: lab_dns_cloud_hosts.stat.exists
+
+- name: Remove the superseded lab hosts override
+  ansible.builtin.file:
+    path: /etc/cloud/cloud.cfg.d/99-hou-lab-hosts.cfg
+    state: absent
+
+- name: Verify normal host resolution after removing legacy pins
+  ansible.builtin.command:
+    argv: [getent, ahostsv4, '{{ item.name }}']
+  loop: '{{ lab_dns_desired.records }}'
+  register: lab_dns_host_query
+  changed_when: false
+  failed_when: >-
+    lab_dns_host_query.rc != 0 or
+    (lab_dns_host_query.stdout_lines | map('split') | map('first') | unique | list) != [item.address]
+  no_log: true

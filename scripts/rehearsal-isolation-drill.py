@@ -11,12 +11,14 @@ import json
 from pathlib import Path
 import subprocess
 
+from ssh_target import pinned_ssh, read_config
+
 p = argparse.ArgumentParser(description=__doc__)
 p.add_argument("--config", required=True)
 a = p.parse_args()
 path = Path(a.config)
-c = json.loads(path.read_text())
-assert c["environment"] == "test"
+c = read_config(path)
+ssh = pinned_ssh(c)
 remote = r'''
 import json,subprocess,socket,sys
 c=json.load(sys.stdin)
@@ -68,7 +70,7 @@ for container in c['containers']:
 print(json.dumps({'environment':'test','host_ipv4_targets':sum(':' not in t for t in c['targets']),'host_ipv6_targets':sum(':' in t for t in c['targets']),'host_targets_denied':True,'host_deny_counter_increase':after['host_output']-before['host_output'],'unapproved_host_egress_denied':True,'workloads':reports,'ipv6_forwarding':subprocess.run(['sysctl','-n','net.ipv6.conf.all.forwarding'],capture_output=True,text=True,check=True).stdout.strip()}))
 '''
 r = subprocess.run(
-    c["ssh"] + ["sudo -n python3 -c " + __import__("shlex").quote(remote)],
+    ssh + ["sudo -n python3 -c " + __import__("shlex").quote(remote)],
     input=json.dumps(
         {
             "targets": c["isolation_probe_targets"],

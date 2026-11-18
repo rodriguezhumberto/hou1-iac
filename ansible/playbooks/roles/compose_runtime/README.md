@@ -2,6 +2,8 @@
 
 Installs `/usr/local/libexec/hou1-compose-apply`. Callers supply the existing
 project directory, optional project/file/service selection and Nginx validation.
+`--require-address` with `--interface` refuses activation before that IPv4 address
+exists on the selected interface. The webstack boot unit retries this check.
 
 Ordinary Compose reconciliation repairs missing or stopped services. Changed
 service definitions, networks and read-only file inputs recreate their existing

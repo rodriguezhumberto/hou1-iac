@@ -1,0 +1,8 @@
+---
+# Explicit opt-in; ordinary production and managed-host runs do not change DNS.
+lab_dns_state: unmanaged
+lab_dns_namespace: ''
+lab_dns_listen_address: ''
+lab_dns_records: []
+lab_dns_upstreams: [1.1.1.1, 9.9.9.9]
+lab_dns_public_probe: deb.debian.org

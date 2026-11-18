@@ -177,7 +177,8 @@ class ProductionRecoveryTest(unittest.TestCase):
 
     def test_production_inventory_guard_requires_independent_console_and_registry_access(self):
         play = yaml.safe_load((ROOT / 'ansible/playbooks/restore-production-host.yml').read_text())[0]
-        guard = play['pre_tasks'][0]
+        guard = next(task for task in play['pre_tasks'] if task.get('name') ==
+                     'Require the fresh production host and independent recovery access')
         variables = dict(cms_environment='production', authentik_environment='prod', netbird_server_group='prod-servers',
                          netbird_subnet='100.90.0.0/16', node_bootstrap=True, ansible_host='198.51.100.10',
                          prod_vps_public_ip='198.51.100.10', host_recovery_id='fixture-01', host_recovery_request=request(),

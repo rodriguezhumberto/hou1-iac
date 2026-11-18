@@ -6,6 +6,20 @@
   changed_when: false
   no_log: true
 
+- name: Prepare opted-in lab DNS access before starting Authentik
+  ansible.builtin.command:
+    argv:
+      - /usr/local/libexec/hou-lab-dns-firewall
+      - --compose-directory
+      - '{{ authentik_project_root }}'
+      - --project
+      - '{{ authentik_compose_project }}'
+      - --file
+      - compose.yaml
+  when: lab_dns_state | default('unmanaged') == 'present'
+  register: authentik_lab_dns
+  changed_when: (authentik_lab_dns.stdout | from_json).changed
+
 - name: Start Authentik only after PostgreSQL health becomes ready
   community.docker.docker_compose_v2:
     project_src: "{{ authentik_project_root }}"

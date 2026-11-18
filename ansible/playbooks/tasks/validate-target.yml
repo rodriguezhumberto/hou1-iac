@@ -1,0 +1,44 @@
+---
+- name: Require one unambiguous inventory environment before connecting
+  ansible.builtin.assert:
+    that:
+      - >-
+        (inventory_hostname in groups.get('test_env', []) or inventory_hostname in groups.get('isolated_test_vps', [])) !=
+        (inventory_hostname in groups.get('prod_env', []))
+      - >-
+        not (inventory_hostname in groups.get('test_env', []) or inventory_hostname in groups.get('isolated_test_vps', [])) or
+        inventory_hostname not in (groups.get('hou1_prod', []) + groups.get('hou1_prod_init', []))
+      - >-
+        not (inventory_hostname in groups.get('prod_env', [])) or
+        inventory_hostname not in (groups.get('hou1_test', []) + groups.get('hou1_test_init', []))
+    fail_msg: Select a host in exactly one inventory environment; test and production targets must be separate.
+
+- name: Bind deployment inputs to the inventory environment
+  ansible.builtin.assert:
+    that:
+      - cms_environment == ('production' if inventory_hostname in groups.get('prod_env', []) else 'test')
+      - netbird_server_group == ('prod-servers' if inventory_hostname in groups.get('prod_env', []) else 'test-servers')
+      - authentik_environment is not defined or authentik_environment == ('prod' if inventory_hostname in groups.get('prod_env', []) else 'test')
+      - deploy_environment is not defined or deploy_environment == ('prod' if inventory_hostname in groups.get('prod_env', []) else 'test')
+    fail_msg: Environment and identity inputs must match inventory membership, including component-tag runs.
+
+- name: Validate the connection address before gathering facts or changing controller state
+  ansible.builtin.assert:
+    that:
+      - >-
+        (node_bootstrap | bool and
+         inventory_hostname in (groups.get('hou1_test_init', []) + groups.get('hou1_prod_init', []) + groups.get('isolated_test_vps', [])) and
+         ansible_host == (prod_vps_public_ip if inventory_hostname in groups.get('prod_env', []) else test_vps_public_ip)) or
+        (not (node_bootstrap | bool) and ansible_host == netbird_ip)
+      - >-
+        (inventory_hostname in groups.get('prod_env', [])) or
+        ansible_host not in [prod_vps_public_ip | default(''), prod_netbird_ip | default('')]
+    fail_msg: Use the declared public init address for bootstrap or the private NetBird address afterward; test targets cannot use declared production addresses.
+
+- name: Require a complete bootstrap before component runs
+  ansible.builtin.assert:
+    that:
+      - ansible_run_tags | list == ['all']
+      - ansible_skip_tags | length == 0
+    fail_msg: Bootstrap requires a complete untagged run before component reconciliation.
+  when: node_bootstrap | bool

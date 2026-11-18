@@ -143,9 +143,36 @@ delivery contracts, and these changes do not yet establish a useful shared API.
 - Documentation links resolve and all 62 historical JSON evidence files are
   unchanged. No deployments, live-node access or production decryption.
 
+## Environment targeting review
+
+- Test group names and defaults remain supported, but their default host lists
+  are empty because the former test deployment is production.
+- Managed-host playbooks validate inventory environment, identity inputs and
+  connection address before fact gathering or controller changes. Shared guards
+  run under component tags; existing recovery gates remain in place.
+- HOU1 now checks SSH host keys, matching HOU4. New and replacement keys need
+  independent verification before they enter the selected known-hosts file.
+- Direct-SSH rehearsal tools now share explicit address and ED25519 fingerprint
+  checks before remote commands or decryption. Monitor drills validate both the
+  server and auxiliary probe host; installed programs include the same helper.
+  Admission binds SSH to its independently selected inventory profile before
+  decrypting the NetBird token. See the [target contract](probes/rehearsal-targets.md).
+- Private inventories and encrypted endpoint values were not inspected. Fixed
+  fixture domains, containers and paths need review for the new lab.
+
+Validation: the Ansible audit's full checks passed 382 HOU1 tests without skips
+and 82 HOU4 tests with 14 optional native-tool skips. The subsequent SSH changes
+passed 58 affected tests without skips, plus syntax and lint. Coverage includes
+retargeted aliases, host-key changes, tagged bootstrap rejection and HOU4 renewal
+suspension. Documentation links pass and all 62 historical JSON evidence files
+are unchanged. No live-node access or production decryption occurred.
+
 ## Next: test-host acceptance
 
-Use the established test hosts first, with the existing environment and SSH guards.
+Separate HOU1/HOU4 test VMs are provisioned. The authorized lab deployment and
+current acceptance results are recorded in the
+[2026-11-17 lab evidence](evidence/isolated-lab-2026-11-17.md).
+Keep the following acceptance sequence for subsequent deployment changes.
 Record the HOU1/HOU4 infrastructure refs, selected application image/revision and
 a verified recovery point using the [release record](production-oidc-runbook.md#release-record-and-access).
 
@@ -162,6 +189,43 @@ a verified recovery point using the [release record](production-oidc-runbook.md#
    recover.
 6. Capture and verify a fresh encrypted backup using the separate source layout.
 
-Live deployment requires separate authorization. Clean-host recovery and peer
-replacement remain a later run with independent console access and the explicit
+Clean-host recovery and peer replacement remain a later run with independent
+console access and the explicit
 [recovery checkpoints](probes/clean-host-recovery.md#before-wiping-hou1).
+
+## Lab recovery findings
+
+- HOU1's VPN-bound Uptime Kuma can remain stopped after boot because Docker
+  starts it before the VPN address exists. A retryable boot unit now checks address
+  readiness before application activation. Docker and ingress remain independent
+  of the VPN to avoid a control-plane dependency cycle. A controlled reboot
+  recovered all eight containers without manual repair; the unit retried once.
+- Stopping shared ingress also disconnects administrative VPN access. Ingress
+  drills require a VM-local recovery timer and independent console access.
+
+The [lab evidence](evidence/isolated-lab-2026-11-17.md) distinguishes successful
+reconciliation, the initial boot failure and corrected reboot recovery. Google
+callback verification, off-host backup, clean-host restore and peer replacement
+remain separate acceptance checks.
+
+The [intervention audit](deployment-interventions.md) assigns the lab's corrective
+steps to maintained code, declared inputs or external prerequisites. The
+[managed lab workflow](deployment-workflow.md) passed ordered reconciliation and
+standalone verification on both hosts using maintained controller transport.
+Opt-in lab DNS/firewall ownership is implemented. Adoption, unchanged repeat and
+standalone verification passed on both hosts; container IDs, DNS files, network
+allocations and owned firewall rules stayed stable. Controller hostname pins now
+apply inside the wrapper's private mount view without changing global files.
+Version 2 adds [input contracts](lab-inputs.md): release receipt/bundle checks,
+identity-role/client checks and backup key/endpoint checks before host access.
+Both repositories' refs, inventories and referenced capabilities are rechecked
+before later commands. Version 1 remains compatible with its original contracts.
+Generated inventory adoption preserved all 163 evaluated variables and test-group
+membership across both hosts. Fresh VPN handoff checks passed before selecting
+the new managed profiles; SSH configuration stayed with the existing security
+roles. Reviewed private overrides remain explicit; repository shared variables
+are referenced rather than copied. See [inventory generation](lab-inventory.md).
+
+Next: [separate ingress](ingress-separation.md), preserving routing and cold
+recovery before live cutover. Fresh-host bootstrap, peer enrollment and destructive
+recovery acceptance remain separate work.

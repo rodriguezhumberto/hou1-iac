@@ -221,22 +221,22 @@
 
 - name: Apply the Nginx network and mounts without rebuilding application services
   community.docker.docker_compose_v2:
-    project_src: "{{ app_directory }}"
+    project_src: '{{ shared_ingress_compose_directory }}'
+    project_name: '{{ shared_ingress_compose_project if shared_ingress_compose_project else omit }}'
+    files: '{{ [shared_ingress_compose_file] if shared_ingress_compose_file else omit }}'
     services: [nginx]
     dependencies: false
     state: present
     recreate: auto
 
 - name: Validate the active Nginx configuration before reload
-  ansible.builtin.command: docker compose exec -T nginx nginx -t
-  args:
-    chdir: "{{ app_directory }}"
+  ansible.builtin.command:
+    argv: "{{ shared_ingress_compose_argv + ['exec', '-T', 'nginx', 'nginx', '-t'] }}"
   changed_when: false
 
 - name: Reload Nginx to pick up directory-mounted ingress changes
-  ansible.builtin.command: docker compose exec -T nginx nginx -s reload
-  args:
-    chdir: "{{ app_directory }}"
+  ansible.builtin.command:
+    argv: "{{ shared_ingress_compose_argv + ['exec', '-T', 'nginx', 'nginx', '-s', 'reload'] }}"
   changed_when: false
 
 - name: Verify the public HTTPS management endpoint

@@ -1,6 +1,7 @@
 ---
 - name: Rebuild HOU1 Infrastructure
   hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
   become: yes
   module_defaults:
     ansible.builtin.uri:
@@ -8,17 +9,37 @@
       follow_redirects: none
 
   pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
     - name: Validate host configuration for every run, including tagged runs
       ansible.builtin.import_role:
         name: netbird_common
       tags: [always]
+    - name: Validate opted-in lab DNS before connecting
+      ansible.builtin.import_role:
+        name: lab_dns
+        tasks_from: guard
+      when: lab_dns_state | default('unmanaged') != 'unmanaged'
+      tags: [always]
+    - name: Gather host facts after validating the target
+      ansible.builtin.setup:
+      tags: [always]
 
   roles:
+    - role: lab_dns
+      when: lab_dns_state != 'absent'
+      tags: [init, common, lab-dns]
+
     - role: common
       tags: ['init', 'common']
       
     - role: docker
       tags: ['docker']
+
+    - role: lab_dns
+      when: lab_dns_state == 'absent'
+      tags: [lab-dns]
 
     - role: netbird_client
       tags: ['netbird', 'network', 'security', 'ufw', 'ssh']

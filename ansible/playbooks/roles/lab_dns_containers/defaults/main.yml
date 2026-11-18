@@ -1,0 +1,3 @@
+---
+# Declare network names, never captured Docker subnet allocations.
+lab_dns_container_networks: []
