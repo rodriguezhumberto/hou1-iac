@@ -10,9 +10,12 @@ import runpy
 import stat
 import subprocess
 import tempfile
+import time
 
 LAB_DNS_POLICY = Path('/etc/hou-lab-dns-firewall.json')
 LAB_DNS_HELPER = '/usr/local/libexec/hou-lab-dns-firewall'
+ACTIVATION_ATTEMPTS = 3
+ACTIVATION_BACKOFF_SECONDS = (1, 2)
 
 
 def run(argv, directory):
@@ -58,9 +61,21 @@ def atomic_state(path, services):
         Path(name).unlink(missing_ok=True)
 
 
-def container_ids(command, directory, services):
-    return {name: run(command + ['ps', '--quiet', name], directory).decode().strip()
+def container_ids(command, directory, services, all_containers=False):
+    listing = ['ps', *(['--all'] if all_containers else []), '--quiet']
+    return {name: run(command + listing + [name], directory).decode().strip()
             for name in services}
+
+
+def run_activation(argv, directory):
+    """Retry only Compose activation, where Docker startup races are transient."""
+    for attempt in range(ACTIVATION_ATTEMPTS):
+        try:
+            return run(argv, directory)
+        except (subprocess.CalledProcessError, subprocess.TimeoutExpired):
+            if attempt + 1 == ACTIVATION_ATTEMPTS:
+                raise
+            time.sleep(ACTIVATION_BACKOFF_SECONDS[attempt])
 
 
 def require_address(address, interface):
@@ -84,19 +99,20 @@ def reconcile(directory, command, selected=None, validate_nginx=False, dependenc
     previous = json.loads(state_path.read_text()) if state_path.exists() else {}
     applied = previous.get('services', {}) if previous.get('version') == 1 else {}
     before = container_ids(command, directory, services)
+    existing = container_ids(command, directory, services, all_containers=True)
     if LAB_DNS_POLICY.exists():
         runpy.run_path(LAB_DNS_HELPER)['prepare_compose'](
             directory, command, document, selected, run)
     # Replace existing consumers first: waiting on their old unhealthy startup
     # configuration would prevent a repaired input from ever being activated.
-    changed = [name for name in services if current[name] != applied.get(name) and before[name]]
+    changed = [name for name in services if current[name] != applied.get(name) and existing[name]]
     if changed:
-        run(command + ['up', '-d', '--no-build', '--no-deps', '--force-recreate',
-                       '--wait', '--wait-timeout', '120', *changed], directory)
+        run_activation(command + ['up', '-d', '--no-build', '--no-deps', '--force-recreate',
+                                  '--wait', '--wait-timeout', '120', *changed], directory)
     up = command + ['up', '-d', '--no-build', '--wait', '--wait-timeout', '120']
     if not dependencies:
         up.append('--no-deps')
-    run(up + (selected or []), directory)
+    run_activation(up + (selected or []), directory)
     after = container_ids(command, directory, services)
     if validate_nginx:
         run(command + ['exec', '-T', 'nginx', 'nginx', '-t'], directory)

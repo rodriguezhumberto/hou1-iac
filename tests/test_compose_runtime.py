@@ -39,6 +39,7 @@ class ComposeRuntimeTest(unittest.TestCase):
             'astro-app': {'image': 'app@sha256:pinned'},
             'uptime-kuma': {'image': 'uptime:pinned'}}}
         self.ids = {name: 'old-' + name for name in self.document['services']}
+        self.stopped = {}
         self.commands = []
         self.failure = None
         self.compose_replaces = []
@@ -57,6 +58,8 @@ class ComposeRuntimeTest(unittest.TestCase):
             return json.dumps(self.document).encode()
         if args[:2] == ['ps', '--quiet']:
             return self.ids.get(args[-1], '').encode()
+        if args[:3] == ['ps', '--all', '--quiet']:
+            return (self.ids.get(args[-1]) or self.stopped.get(args[-1], '')).encode()
         if args[0] == 'up':
             self.counter += 1
             selected = args[args.index('120') + 1:]
@@ -131,6 +134,29 @@ class ComposeRuntimeTest(unittest.TestCase):
         self.assertIn('--force-recreate', ups[0])
         self.assertNotIn('--force-recreate', ups[1])
 
+    def test_changed_input_recreates_stopped_existing_container(self):
+        self.reconcile()
+        self.stopped['nginx'] = self.ids.pop('nginx')
+        self.template.write_text('repaired stopped input')
+        self.commands.clear()
+        self.reconcile()
+        self.assertEqual(self.forced(), [['nginx']])
+        self.assertTrue(self.ids['nginx'])
+
+    def test_activation_retries_with_bounded_backoff(self):
+        attempts = []
+
+        def flaky(command, directory):
+            attempts.append(command)
+            if len(attempts) < 3:
+                raise subprocess.CalledProcessError(1, command)
+            return b'ok'
+
+        with patch.object(runtime, 'run', side_effect=flaky), patch.object(runtime.time, 'sleep') as pause:
+            self.assertEqual(runtime.run_activation(['docker', 'compose', 'up'], self.root), b'ok')
+        self.assertEqual(len(attempts), 3)
+        self.assertEqual([call.args[0] for call in pause.call_args_list], [1, 2])
+
     def test_failed_lab_dns_preparation_blocks_activation_and_preserves_applied_inputs(self):
         self.reconcile()
         previous = self.state()
@@ -179,12 +205,13 @@ class ComposeRuntimeTest(unittest.TestCase):
         self.reconcile()
         old = self.state()
         self.template.write_text('new template')
-        for failure in (lambda args: 'config' in args, lambda args: '--force-recreate' in args,
-                        lambda args: 'exec' in args):
-            self.failure = failure
-            with self.assertRaises(subprocess.CalledProcessError):
-                self.reconcile()
-            self.assertEqual(self.state(), old)
+        with patch.object(runtime.time, 'sleep'):
+            for failure in (lambda args: 'config' in args, lambda args: '--force-recreate' in args,
+                            lambda args: 'exec' in args):
+                self.failure = failure
+                with self.assertRaises(subprocess.CalledProcessError):
+                    self.reconcile()
+                self.assertEqual(self.state(), old)
         self.failure = None
         self.commands.clear()
         self.reconcile()
