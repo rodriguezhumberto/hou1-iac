@@ -96,7 +96,10 @@ class CaptureGuard:
         self.stopped.set()
         if self.keepalive_thread is not None:
             self.keepalive_thread.join(timeout=1)
-        self.process.stdin.close()
+        try:
+            self.process.stdin.close()
+        except BrokenPipeError:
+            pass
         if not self.admitted and self.process.poll() is None:
             self.process.terminate()
         try:

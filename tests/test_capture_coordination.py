@@ -229,6 +229,18 @@ export.run()
         with self.operation.exclusive(timeout=0):
             pass
 
+    def test_disconnected_pipe_cleanup_preserves_the_original_failure(self):
+        with self.assertRaisesRegex(ValueError, 'original guard failure'):
+            with self.guard() as guard:
+                guard.process.kill()
+                guard.process.wait()
+                guard.process.stdin.write(b'pending')
+                raise ValueError('original guard failure')
+        self.assertTrue(guard.process.stdin.closed)
+        self.assertTrue(guard.process.stdout.closed)
+        with self.operation.exclusive(timeout=0):
+            pass
+
     def test_symlink_lock_is_rejected(self):
         target = self.root / 'target'; target.write_text('preserve')
         self.lock.symlink_to(target)
