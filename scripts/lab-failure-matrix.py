@@ -180,6 +180,7 @@ class Matrix:
         return result.stdout if capture else None
 
     def stop(self, scenario):
+        self.workflow.check_inputs()
         service = self.matrix[scenario]['service']
         command = privileged_compose_shell(self.project(scenario), ['stop', '--timeout', '30', service])
         self.remote(scenario, command, timeout=120)
@@ -251,13 +252,19 @@ class Matrix:
         try:
             self.verify_workflow()
             self.record('baseline', 'passed')
-            self.scenario('application',
-                          lambda: self.restore('application'), self.verify_workflow)
-            self.scenario('monitoring',
-                          lambda: self.restore('monitoring'), self.verify_workflow)
-            self.scenario('dependency', self.verify_hou4_advisory, lambda: None)
-            self.verify_workflow()
-            self.record('final', 'passed')
+            # Baseline verification validated both targets and input contracts.
+            # Keep its source capture out of the intentional service outages too.
+            self.workflow.transports['hou1'] = deploy_lab.transport(self.config['hosts']['hou1'])
+            with self.workflow.capture_guard():
+                self.record('capture-admission', 'passed')
+                self.scenario('application',
+                              lambda: self.restore('application'), self.verify_workflow)
+                self.scenario('monitoring',
+                              lambda: self.restore('monitoring'), self.verify_workflow)
+                self.scenario('dependency', self.verify_hou4_advisory, lambda: None)
+                self.verify_workflow()
+                self.workflow.check_inputs()
+                self.record('final', 'passed')
             self.save('passed')
         except BaseException:
             self.save('failed')
@@ -291,7 +298,7 @@ def main(argv=None):
     except MatrixError as error:
         print(str(error), file=sys.stderr)
         return 1
-    except (OSError, KeyError, TypeError, json.JSONDecodeError, subprocess.SubprocessError):
+    except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
         print('Failure matrix stopped; inspect the private run directory', file=sys.stderr)
         return 1
     return 0

@@ -1,7 +1,7 @@
 """Local Ansible/OpenSSH fixtures and read-only probe tests; no managed hosts."""
 
 import copy
-from contextlib import redirect_stderr
+from contextlib import nullcontext, redirect_stderr
 import importlib.util
 import io
 import json
@@ -224,18 +224,21 @@ class LabWorkflowTest(unittest.TestCase):
             deploy.assert_not_called()
         first = self.root / 'first'; first.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, first)
-        with patch.object(runner, 'preflight'), patch.object(runner, 'probe'), patch.object(
+        with patch.object(runner, 'capture_guard', return_value=nullcontext()), \
+                patch.object(runner, 'preflight'), patch.object(runner, 'probe'), patch.object(
                 runner, 'playbook', side_effect=workflow.WorkflowError('fixture failed')) as deploy:
             with self.assertRaises(workflow.WorkflowError): runner.execute('reconcile')
             self.assertEqual(deploy.call_count, 1)
         receipt = json.loads((first / 'receipt.json').read_text())
         self.assertEqual(receipt['status'], 'failed')
-        self.assertEqual([r['step'] for r in receipt['steps']], ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile'])
+        self.assertEqual([r['step'] for r in receipt['steps']],
+                         ['hou1-preflight', 'hou4-preflight', 'capture-admission', 'hou1-reconcile'])
         self.assertEqual(receipt['steps'][-1]['status'], 'failed')
         self.assertEqual((first / 'receipt.json').stat().st_mode & 0o777, 0o600)
         retry = self.root / 'retry'; retry.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, retry)
-        with patch.object(runner, 'preflight') as preflight, patch.object(runner, 'probe'), patch.object(runner, 'playbook'):
+        with patch.object(runner, 'capture_guard', return_value=nullcontext()), \
+                patch.object(runner, 'preflight') as preflight, patch.object(runner, 'probe'), patch.object(runner, 'playbook'):
             runner.execute('reconcile')
             self.assertEqual([c.args[0] for c in preflight.call_args_list], ['hou1', 'hou4'])
         self.assertEqual(json.loads((retry / 'receipt.json').read_text())['status'], 'passed')

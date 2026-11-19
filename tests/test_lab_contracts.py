@@ -251,7 +251,9 @@ class LabContractsTest(unittest.TestCase):
                     if service == 'hou4': path.write_text(before + '\n# changed after validation\n')
                 original = runner.playbook
                 try:
-                    with patch.object(runner, 'probe', side_effect=probe), \
+                    from contextlib import nullcontext
+                    with patch.object(runner, 'capture_guard', return_value=nullcontext()), \
+                            patch.object(runner, 'probe', side_effect=probe), \
                             patch.object(runner, 'playbook', wraps=original) as playbook:
                         with self.assertRaises(workflow.WorkflowError): runner.execute('reconcile')
                     remote = [call for call in playbook.call_args_list if not call.kwargs.get('local')]
@@ -272,11 +274,20 @@ class LabContractsTest(unittest.TestCase):
             events.append('deploy-' + service)
         def probe(service, verify=True):
             events.append(('verify-' if verify else 'access-') + service)
-        with patch.object(runner, 'validate_contracts', side_effect=checked), \
+        from contextlib import contextmanager
+        @contextmanager
+        def guard():
+            events.append('admit')
+            try:
+                yield
+            finally:
+                events.append('release')
+        with patch.object(runner, 'capture_guard', side_effect=guard), \
+                patch.object(runner, 'validate_contracts', side_effect=checked), \
                 patch.object(runner, 'playbook', side_effect=playbook), patch.object(runner, 'probe', side_effect=probe):
             runner.execute('reconcile')
-        self.assertEqual(events, ['contracts', 'access-hou1', 'access-hou4',
-                                 'deploy-hou1', 'verify-hou1', 'deploy-hou4', 'verify-hou4'])
+        self.assertEqual(events, ['contracts', 'admit', 'access-hou1', 'access-hou4',
+                                 'deploy-hou1', 'verify-hou1', 'deploy-hou4', 'verify-hou4', 'release'])
 
     def test_version_two_production_membership_fails_before_contract_or_host_access(self):
         self.inventories()
@@ -290,6 +301,21 @@ class LabContractsTest(unittest.TestCase):
                 patch.object(runner, 'validate_contracts') as validate:
             with self.assertRaises(workflow.WorkflowError): runner.execute('reconcile')
         probe.assert_not_called(); validate.assert_not_called()
+
+    def test_capture_admission_failure_stops_before_remote_preflight_or_deployment(self):
+        self.inventories()
+        runner = self.runner('capture-busy')
+        original = runner.playbook
+        with patch.object(runner, 'capture_guard', side_effect=ValueError('Capture still owns host')), \
+                patch.object(runner, 'probe') as probe, \
+                patch.object(runner, 'playbook', wraps=original) as playbook:
+            with self.assertRaises(ValueError):
+                runner.execute('reconcile')
+        probe.assert_not_called()
+        self.assertTrue(all(call.kwargs.get('local') for call in playbook.call_args_list))
+        receipt = json.loads((runner.run / 'receipt.json').read_text())
+        self.assertEqual(receipt['status'], 'failed')
+        self.assertEqual(receipt['steps'][-1], {'step': 'capture-admission', 'status': 'failed'})
 
     def test_version_two_derives_release_and_refuses_duplicate_selection(self):
         self.inventories()

@@ -1,9 +1,10 @@
 """Offline checks for the guarded lab failure-matrix runner."""
 
 import importlib.util
+from contextlib import contextmanager
 from pathlib import Path
 import unittest
-from unittest.mock import Mock
+from unittest.mock import Mock, patch
 
 from helpers import ROOT
 
@@ -74,6 +75,46 @@ class FailureMatrixTest(unittest.TestCase):
         runner.stop.assert_called_once_with('application')
         runner.restore.assert_called_once_with('application')
         self.assertEqual(runner.cleanup, [])
+
+    def test_host_lock_spans_every_interruption_and_final_verification(self):
+        runner = object.__new__(matrix.Matrix)
+        runner.config = config()
+        runner.workflow = Mock(transports={})
+        events = []
+        @contextmanager
+        def guard():
+            events.append('admit')
+            try:
+                yield
+            finally:
+                events.append('release')
+        runner.workflow.capture_guard = guard
+        runner.verify_workflow = lambda: events.append('verify')
+        runner.record = Mock()
+        runner.restore = Mock()
+        runner.verify_hou4_advisory = Mock()
+        runner.scenario = lambda name, *_: events.append(name)
+        runner.save = Mock()
+        with patch.object(matrix.deploy_lab, 'transport', return_value=('pinned',)):
+            runner.run_all()
+        self.assertEqual(events, ['verify', 'admit', 'application', 'monitoring',
+                                  'dependency', 'verify', 'release'])
+        runner.save.assert_called_once_with('passed')
+
+    def test_failed_admission_never_starts_an_interruption(self):
+        runner = object.__new__(matrix.Matrix)
+        runner.config = config()
+        runner.workflow = Mock(transports={})
+        runner.workflow.capture_guard.side_effect = ValueError('Capture owns host')
+        runner.verify_workflow = Mock()
+        runner.record = Mock()
+        runner.scenario = Mock()
+        runner.save = Mock()
+        with patch.object(matrix.deploy_lab, 'transport', return_value=('pinned',)):
+            with self.assertRaises(ValueError):
+                runner.run_all()
+        runner.scenario.assert_not_called()
+        runner.save.assert_called_once_with('failed')
 
 
 if __name__ == '__main__':

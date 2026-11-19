@@ -1,7 +1,6 @@
 #!/usr/bin/python3
 """Prepare one encrypted recovery point with durable interrupted-writer recovery."""
 from contextlib import contextmanager, closing
-import fcntl
 import hashlib
 import json
 import os
@@ -251,17 +250,20 @@ def prepare(config):
         staged.unlink(missing_ok=True)
 
 
-def main():
-    if os.geteuid() != 0 or sys.argv[1:] not in ([], ['--recover']):
-        raise PermissionError('Fixed root preparation or recovery only')
-    os.umask(0o077)
-    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
-        signal.signal(sig, lambda *_: (_ for _ in ()).throw(InterruptedError()))
-    with open('/run/lock/hou1-backup-export.lock', 'w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+def run(recovery_only=False):
+    import importlib.util
+    helper = Path(__file__).with_name('operation_lock.py')
+    if not helper.exists():
+        helper = Path(__file__).with_name('hou1-backup-operation-lock.py')
+    spec = importlib.util.spec_from_file_location('backup_operation_lock', helper)
+    operation_lock = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(operation_lock)
+    # Recovery retains its immediate failure when another operation owns the lock.
+    timeout = 0 if recovery_only else operation_lock.WAIT_SECONDS
+    with operation_lock.exclusive(timeout=timeout):
         config = json.loads(CONFIG.read_text())
         recover(config)
-        if sys.argv[1:] == ['--recover']: return
+        if recovery_only: return
         # A hard kill cannot report failure; record the attempt before stopping writers.
         status(config['work_root'], False)
         try:
@@ -270,6 +272,15 @@ def main():
         except Exception:
             status(config['work_root'], False)
             raise
+
+
+def main():
+    if os.geteuid() != 0 or sys.argv[1:] not in ([], ['--recover']):
+        raise PermissionError('Fixed root preparation or recovery only')
+    os.umask(0o077)
+    for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
+        signal.signal(sig, lambda *_: (_ for _ in ()).throw(InterruptedError()))
+    run(recovery_only=sys.argv[1:] == ['--recover'])
 
 
 if __name__ == '__main__':

@@ -2,6 +2,7 @@
 """Coordinate reconciliation of two existing, explicitly selected test hosts."""
 
 import argparse
+from contextlib import contextmanager, ExitStack
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -11,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -20,6 +22,7 @@ import yaml
 
 import lab_runtime
 import lab_contracts
+from lab_capture_guard import CaptureGuard, PROGRAM as CAPTURE_GUARD_PROGRAM
 from ssh_target import pinned_ssh, private_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -260,6 +263,7 @@ class Workflow:
                 + [p for host in config['hosts'].values() for p in host['capabilities']])
         self.phase = None
         self.status = 'running'
+        self.capture = None
 
     def step(self, name, operation):
         record = {'step': name, 'status': 'running'}
@@ -291,6 +295,8 @@ class Workflow:
         temporary.replace(path)
 
     def check_inputs(self):
+        if self.capture is not None:
+            self.capture.check()
         for service, host in self.config['hosts'].items():
             check_revision(host)
             require(input_fingerprints(host) == self.inputs[service],
@@ -336,8 +342,9 @@ class Workflow:
         log = self.run / (log_name + '.log')
         descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w') as stream:
-            result = subprocess.run(argv, cwd=host['repository'], env=environment(self.config, host),
-                                    stdout=stream, stderr=subprocess.STDOUT)
+            run = self.capture.run if self.capture is not None and not local else subprocess.run
+            result = run(argv, cwd=host['repository'], env=environment(self.config, host),
+                         stdout=stream, stderr=subprocess.STDOUT)
         require(result.returncode == 0, f'{log_name} failed; see the private run log')
 
     def prepare_inputs(self, service):
@@ -388,28 +395,47 @@ class Workflow:
         path = self.run / (service + suffix)
         write_private(path, json.dumps(report, indent=2) + '\n')
 
+    @contextmanager
+    def capture_guard(self):
+        self.check_inputs()
+        host = self.config['hosts']['hou1']
+        fixed, _, _ = self.transports['hou1']
+        require(transport(host) == self.transports['hou1'], 'SSH settings changed before capture admission')
+        command = [*fixed, '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
+                   host['ssh_host_ip'], shlex.join(['sudo', '-n', 'python3', '-u', '-c',
+                                                  CAPTURE_GUARD_PROGRAM, '--hold'])]
+        with CaptureGuard(command, self.run / 'capture-admission.log') as guard:
+            self.capture = guard
+            try:
+                yield
+            finally:
+                self.capture = None
+
     def execute(self, phase):
         self.phase = phase
         if self.config['version'] == 2:
             for service in SERVICES:
                 self.step(service + '-inputs', lambda s=service: self.prepare_inputs(s))
             self.step('input-contracts', self.validate_contracts)
-            if phase != 'inputs':
-                for service in SERVICES:
-                    self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
         else:
             require(phase != 'inputs', 'The inputs phase requires a version 2 workflow')
             for service in SERVICES:
                 self.step(service + '-preflight', lambda s=service: self.preflight(s))
-        if phase == 'handoff':
-            for service in SERVICES:
-                self.step(service + '-handoff', lambda s=service: self.probe(s, verify=False, handoff=True))
-        if phase not in ('preflight', 'inputs', 'handoff'):
-            for service in SERVICES:
-                if phase == 'reconcile':
-                    play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
-                    self.step(service + '-reconcile', lambda s=service, p=play: self.playbook(s, p, s + '-reconcile'))
-                self.step(service + '-verify', lambda s=service: self.probe(s))
+        with ExitStack() as stack:
+            if phase == 'reconcile':
+                self.step('capture-admission', lambda: stack.enter_context(self.capture_guard()))
+            if self.config['version'] == 2 and phase != 'inputs':
+                for service in SERVICES:
+                    self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
+            if phase == 'handoff':
+                for service in SERVICES:
+                    self.step(service + '-handoff', lambda s=service: self.probe(s, verify=False, handoff=True))
+            if phase not in ('preflight', 'inputs', 'handoff'):
+                for service in SERVICES:
+                    if phase == 'reconcile':
+                        play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
+                        self.step(service + '-reconcile', lambda s=service, p=play: self.playbook(s, p, s + '-reconcile'))
+                    self.step(service + '-verify', lambda s=service: self.probe(s))
         self.status = 'passed'
         self.save()
 
@@ -424,8 +450,10 @@ def main(argv=None):
         config = load_config(args.config)
         if args.phase == 'plan':
             inputs = ['hou1-inputs', 'hou4-inputs', 'input-contracts'] if config['version'] == 2 else []
+            access = ['hou1-preflight', 'hou4-preflight']
+            admission = ['capture-admission']
             print(json.dumps({'scope': 'managed test hosts; no bootstrap',
-                              'sequence': inputs + ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile',
+                              'sequence': inputs + (admission + access if inputs else access + admission) + ['hou1-reconcile',
                                            'hou1-verify', 'hou4-reconcile', 'hou4-verify']}, indent=2))
             return 0
         with (Path(config['run_directory']) / '.workflow.lock').open('a') as lock:
@@ -447,4 +475,5 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     raise SystemExit(main())

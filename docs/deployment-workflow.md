@@ -143,6 +143,29 @@ playbooks retain their component checks.
 1. HOU1 `hou1.yml`, followed by declared container/source/TLS checks.
 2. HOU4 `hou4.yml`, followed by declared container and HTTPS checks.
 
+### Capture coordination
+
+`reconcile` holds HOU1's `/run/lock/hou1-backup-export.lock` across both hosts
+and their final checks. Version 2 validates local inputs before admission and
+checks live access afterward. Version 1 keeps its original access checks before
+admission. Another controller using the same host lock also waits.
+
+The dedicated pinned SSH connection holds the lock until EOF. Interrupted writer
+intent refuses deployment so existing backup recovery can run first. Losing the
+guard cancels active local Ansible work and stops later steps; existing playbook
+recovery and reconciliation still handle interrupted remote operations.
+
+Capture and deployment each wait at most fifteen minutes for admission. Capture's
+systemd budget includes that wait plus its original capture budget. Admission
+failure changes no writers or previous recovery point. Inspect the service result
+for a capture admission timeout; its previous successful export status is preserved.
+
+Apply the established source's `backups.yml` once to upgrade its helper and service
+budget. Routine HOU1 reconciliation then maintains the helper. The failure matrix
+uses the same lock across its interruptions. Direct Ansible commands, read-only
+workflow phases, TLS jobs and reboot observers do not acquire this guard; schedule
+those operations separately from capture when they need uninterrupted VPN access.
+
 For a declared isolated application bundle, HOU1 refreshes its fixed local Git
 remote before selecting the checkout. Bootstrap uses the same
 [source owner](../ansible/playbooks/roles/test_application_source/README.md).

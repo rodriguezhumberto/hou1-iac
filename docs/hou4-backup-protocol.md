@@ -51,6 +51,13 @@ previous `ready.export` and last-success timestamp.
 A failed first capture is retried by the next backup playbook run. An existing
 successful point does not trigger another capture during unchanged deployment.
 
+The [managed workflow and failure matrix](deployment-workflow.md#capture-coordination)
+share the capture lock. Preparation waits up to fifteen minutes before reading
+configuration or touching writers; its service budget includes that wait. Admission
+timeout preserves the previous point and export status; inspect the systemd result.
+The fixed recovery helper keeps its nonblocking lock behavior. Lock files are
+never removed, so contenders keep using the same inode.
+
 HOU1 encrypts to `hou1_backup_recipient`; neither VPS receives the owner's private
 key. HOU4's locally generated transport key cannot decrypt backups. Its source-bound
 SSH grant permits only `export-v1`, with no shell, PTY or forwarding. The fixed
