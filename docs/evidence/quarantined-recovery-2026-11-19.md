@@ -43,3 +43,10 @@ firewall intentionally remains unchanged; its exception for the new VM is deferr
 
 Private inputs, failed observations and receipts are retained under
 `/home/dev/.ssh/hou-lab/replacement-recovery/20261119T064742Z/`.
+
+## Subsequent original-lab verification
+
+The user confirmed hypervisor OOM killed the original HOU1 VM. After stopping
+the recovery VM and restarting HOU1, the [follow-up checks](oom-recovery-2026-11-19.md)
+passed with the independently verified new SSH key. The copied VM stayed off;
+the earlier connectivity failure and observer results remain separate evidence.

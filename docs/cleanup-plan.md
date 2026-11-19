@@ -267,5 +267,8 @@ session cleanup and network isolation. It does not replace the fresh-VM wipe
 checkpoint. A [dedicated replacement VM](evidence/quarantined-recovery-2026-11-19.md)
 then passed fresh restore, recovered-identity/OIDC checks and reboot in quarantine.
 It remains unpublished; HOU4 connectivity to it is explicitly deferred.
-Before peer handoff, verify the original lab's power/network state and review the
-firewall, endpoint and identity transition with the existing recovery checkpoints.
+The [original-lab follow-up](evidence/oom-recovery-2026-11-19.md) accepted recovery
+after hypervisor OOM and a separately verified cloud-init SSH-key change. Before
+further provisioning edits, stabilize cloud-init instance metadata and review
+hypervisor memory capacity. Peer handoff still needs the firewall, endpoint and
+identity transition reviewed with the existing recovery checkpoints.
