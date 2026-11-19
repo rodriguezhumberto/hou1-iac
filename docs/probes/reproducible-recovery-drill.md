@@ -8,7 +8,7 @@ and application builds described below apply only to legacy source-built points.
 preparation, restore, identity, application and cleanup phases.
 
 This restores the combined HOU4 recovery archive into seven private containers
-on an isolated test HOU1. No test host is currently available. It requires a running test stack, its matching source
+on an isolated test HOU1. It requires a running test stack, its matching source
 checkout, cached base images, Git, OpenSSL and Docker Compose. It does not
 replace the primary services, change their databases, expose ports, enroll VPN
 peers or change DNS. Clean-OS recovery and production traffic cutover remain

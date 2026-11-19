@@ -18,9 +18,8 @@ continued-host repairs remain separate historical reports; see
 result does not establish an uninterrupted run. See the production recovery
 guide for the separate production acceptance requirements.
 
-No test hosts are currently available. Provision a new isolated fixture and
-review its inventory and identities before using this procedure; the former test
-server is production.
+Use an isolated replacement VM with reviewed inventory and identities. The
+current lab's backup verification does not release the wipe checkpoint below.
 
 ## Before wiping HOU1
 

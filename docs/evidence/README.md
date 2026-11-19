@@ -7,6 +7,8 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Lab backup capture and collection | [Acceptance and unchanged repeat, 2026-11-18](backup-acceptance-2026-11-18.md) |
+| Service interruption and dependency failure | [Failure matrix, 2026-11-18](failure-matrix-2026-11-18.md) |
 | Application lifecycle | [Local fixtures and legacy lab compatibility, 2026-11-17](application-lifecycle-2026-11-17.md) |
 | Isolated HOU1/HOU4 lab | [Deployment and acceptance, 2026-11-17](isolated-lab-2026-11-17.md) |
 | Initial fixtures | [Homelab](homelab-test-evidence-2026-11-06.md), [VPS](vps-test-evidence-2026-11-06.md) |

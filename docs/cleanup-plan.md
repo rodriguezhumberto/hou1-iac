@@ -206,7 +206,7 @@ console access and the explicit
 The [lab evidence](evidence/isolated-lab-2026-11-17.md) distinguishes successful
 reconciliation, the initial boot failure and corrected reboot recovery. Google
 callback verification, off-host backup, clean-host restore and peer replacement
-remain separate acceptance checks.
+were outside that run.
 
 The [intervention audit](deployment-interventions.md) assigns the lab's corrective
 steps to maintained code, declared inputs or external prerequisites. The
@@ -230,12 +230,19 @@ The service interruption and dependency-outage matrix is recorded in the
 [2026-11-18 failure evidence](evidence/failure-matrix-2026-11-18.md). HOU1
 service repair, HOU4 local monitoring repair and HOU4 operation while an HOU1
 identity endpoint is unavailable all passed. Backup interruption remains an
-offline-only check while the lab timer is disabled. Current-revision reboot
+offline-only check; the lab timer was disabled for that run. Current-revision reboot
 checks recovered both hosts; the HOU1 observer now ignores its retained stopped
 rollback container rather than treating it as an active service.
 The guarded matrix runner now reproduces those interruptions and cleanup checks
 with private evidence and bounded verification retries.
 
-Next: [separate ingress](ingress-separation.md), preserving routing and cold
-recovery before live cutover. Fresh-host bootstrap, peer enrollment and destructive
-recovery acceptance remain separate work.
+The [backup acceptance run](evidence/backup-acceptance-2026-11-18.md) verified
+encrypted HOU1 capture, HOU4 collection and offline decryption/integrity. It
+corrected SQLite capture under read-only service restrictions and retry of a
+failed first capture. A full unchanged-input repeat preserved all twelve
+container IDs and the recovery point; the source backup playbook repeated with
+zero changes. Backup timers, restricted transport and monitoring checks passed.
+
+Next: fresh-host bootstrap from frozen inputs. Use empty isolated VMs and retain
+the current lab recovery point. Live transfer interruption, clean-host restore
+and peer replacement are separate acceptance runs with their existing checkpoints.
