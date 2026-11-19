@@ -257,5 +257,9 @@ the same guard. See [coordination acceptance](evidence/capture-coordination-2026
 
 Direct Ansible commands, TLS jobs and reboot observers remain outside this guard.
 Extend coordination to other entry points before claiming concurrent operation
-there. Next acceptance: live backup-transfer interruption, then clean-host restore
-and peer replacement with their existing checkpoints.
+there. The [live transfer drill](evidence/backup-transfer-2026-11-19.md) now passed
+alone and in the complete matrix, including automatic retry and offline recovery
+checks. Its first combined attempt exposed delayed companion access after capture;
+bounded read-only admission fixed that without replaying service-start requests.
+Next acceptance: clean-host restore, then peer replacement with their existing
+checkpoints.

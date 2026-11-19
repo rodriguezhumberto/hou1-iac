@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Live backup transport interruption | [Retry and offline verification, 2026-11-19](backup-transfer-2026-11-19.md) |
 | Scheduled capture and deployment | [Coordination acceptance, 2026-11-19](capture-coordination-2026-11-19.md) |
 | Fresh HOU1/HOU4 bootstrap | [Rebuild and acceptance, 2026-11-19](lab-bootstrap-2026-11-19.md) |
 | Lab backup capture and collection | [Acceptance and unchanged repeat, 2026-11-18](backup-acceptance-2026-11-18.md) |

@@ -155,9 +155,11 @@ failure-matrix acceptance and fresh offline verification. Standalone operations
 remain outside that guard; capture still pauses its writers.
 
 [Capture/interruption evidence](evidence/hou1-backup-interruption-2026-11-08.json)
-records writer SIGTERM/SIGKILL and reboot recovery. Receiver process-kill/retry
-checks were local; a live interrupted HOU4 transfer and provider-level power cut
-were not tested. [Original component restore](evidence/hou1-recovery-restore-2026-11-08.json),
+records writer SIGTERM/SIGKILL and reboot recovery. The
+[live transfer drill](evidence/backup-transfer-2026-11-19.md) subsequently passed
+SSH-child interruption, automatic retry, prior-point preservation and offline
+verification. Receiver-process termination remains a local fixture; a provider-level
+power cut was not tested. [Original component restore](evidence/hou1-recovery-restore-2026-11-08.json),
 [later clean test restore](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
 [production recovery](evidence/production-host-recovery-2026-11-12.json) and
 [owner decryption](evidence/owner-recovery-access-2026-11-12.json) are separate
