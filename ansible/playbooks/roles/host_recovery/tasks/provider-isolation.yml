@@ -1,0 +1,21 @@
+---
+- name: Validate the retained isolation contract
+  ansible.builtin.assert:
+    that: host_recovery_isolation_request | host_recovery_isolation_contract in ['host', 'provider']
+  no_log: true
+
+- name: Bind a provider boundary to the replacement LAN interface
+  when: host_recovery_isolation_request.isolation_mode | default('host') == 'provider'
+  block:
+    - name: Read the replacement default network interface
+      ansible.builtin.setup:
+        gather_subset: ['!all', '!min', network]
+        filter: ansible_default_ipv4
+    - name: Require the independently verified provider boundary for this replacement
+      ansible.builtin.assert:
+        that:
+          - >-
+            host_recovery_isolation_request |
+            host_recovery_isolation_contract(test_vps_public_ip, ansible_facts.default_ipv4.macaddress) == 'provider'
+          - ansible_facts.default_ipv4.address == host_recovery_isolation_request.provider_isolation.address
+      no_log: true

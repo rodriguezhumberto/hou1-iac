@@ -287,3 +287,10 @@ HOU1's existing LAN address after fencing the original VM. Controller reconnect
 now uses the existing private transport config and preserves its container,
 namespace and saved enrollment. Offline guards and read-only controller preflight
 passed; live reconnect and independent companion recovery remain handoff checks.
+
+Test recovery can now retain provider-owned isolation instead of installing the
+legacy host gate. Its explicit applied-policy assertion is bound to the actual
+replacement LAN address/MAC and retained policy digest; publication/resume refuse
+ownership changes. Existing host recovery and production behavior remain the
+default. This avoids two owners for the lab boundary. Provider reachability must
+include the dedicated controller as well as the companion before interruption.

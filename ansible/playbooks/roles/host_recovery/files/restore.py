@@ -16,12 +16,14 @@ RECOVERY_BASE = Path('/var/lib/hou1-host-recovery')
 APP = AUTH = AUTH_DATA = VPN = MEDIA = None
 PROJECTS = {}
 
+spec = importlib.util.spec_from_file_location('host_recovery_contract', Path(__file__).resolve().with_name('contract.py'))
+contract = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(contract)
+
 
 def configure(cfg):
     global APP, AUTH, AUTH_DATA, VPN, MEDIA, PROJECTS
-    spec = importlib.util.spec_from_file_location('host_recovery_contract', Path(__file__).resolve().with_name('contract.py'))
-    contract = importlib.util.module_from_spec(spec)
-    spec.loader.exec_module(contract)
+    contract.isolation(cfg)
     deployment = contract.layout(cfg)
     paths = deployment['paths']
     APP, AUTH, AUTH_DATA, VPN = [Path(paths[key]) for key in ('app', 'auth', 'auth_data', 'netbird')]
@@ -243,11 +245,16 @@ def install(cfg):
     run('ufw', 'default', 'allow', 'outgoing')
     run('ufw', 'allow', 'from', cfg['bootstrap_cidr'], 'to', 'any', 'port', '22', 'proto', 'tcp')
     run('ufw', '--force', 'enable')
-    if cfg['environment'] == 'test' and not cfg.get('quarantine', False):
+    apply_test_isolation(cfg)
+    return configs
+
+
+def apply_test_isolation(cfg):
+    mode = contract.isolation(cfg)
+    if cfg['environment'] == 'test' and not cfg.get('quarantine', False) and mode == 'host':
         isolation = {key: cfg[key] for key in ['environment', 'deny_cidrs', 'test_addresses', 'allow_local_cidrs', 'allow_update_cidrs']}
         (ROOT / 'isolation.json').write_text(json.dumps(isolation) + '\n')
         run('python3', str(ROOT / 'isolation.py'), str(ROOT / 'isolation.json'))
-    return configs
 
 
 def verify_quarantine(cfg):

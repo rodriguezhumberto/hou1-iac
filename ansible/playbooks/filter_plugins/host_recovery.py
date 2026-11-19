@@ -6,6 +6,17 @@ from pathlib import Path
 from ansible.errors import AnsibleFilterError
 
 
+def isolation_contract(request, address=None, mac=None):
+    spec = importlib.util.spec_from_file_location('recovery_isolation_contract',
+        Path(__file__).resolve().parents[1] / 'roles/host_recovery/files/contract.py')
+    contract = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(contract)
+    try:
+        return contract.isolation(request, address, mac)
+    except (KeyError, TypeError, ValueError) as error:
+        raise AnsibleFilterError(str(error)) from error
+
+
 def renewal_plan(groups, peers, policies, config, environment, server_ip, lost_id, source_id, allow_unbound=False):
     # Reuse the provisioning contract so recovery cannot introduce broader grants.
     spec = importlib.util.spec_from_file_location(
@@ -74,4 +85,5 @@ def companion_endpoint(config, inventory, current_host, companion_ip):
 class FilterModule:
     def filters(self):
         return {'host_recovery_renewal_plan': renewal_plan,
+                'host_recovery_isolation_contract': isolation_contract,
                 'host_recovery_companion_endpoint': companion_endpoint}

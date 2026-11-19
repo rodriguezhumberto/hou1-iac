@@ -33,8 +33,9 @@ For a separate fresh VM while HOU1 remains active, set
 `host_recovery_quarantine: true` and bind its private bootstrap inventory to that
 VM's distinct LAN address. The controller source must remain one explicit `/32`;
 test restores accept a public or RFC1918 source; production requires a public
-source. Normal test restore still requires its production-deny and test-address
-inputs. Run `restore-test-host.yml` with
+source. Normal test restore requires its production-deny and test-address inputs,
+or the explicit test-only [provider isolation contract](../../ansible/playbooks/roles/host_recovery/README.md).
+Run `restore-test-host.yml` with
 frozen point/source/image inputs and independent recovery access confirmed.
 
 Quarantine creates every restored Docker network as internal, declares published

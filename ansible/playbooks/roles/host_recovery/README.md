@@ -20,8 +20,19 @@ Optional inputs belong in private recovery inventory:
 
 The role owns recovery staging and evidence under its selected recovery ID.
 Test restores accept one public or RFC1918 controller `/32`; production retains
-its public-source requirement. Normal test restore requires explicit isolation
-inputs even when bootstrap uses the LAN.
+its public-source requirement. `host_recovery_isolation_mode` defaults to `host`,
+preserving the existing test isolation inputs and final rehearsal gates.
+
+For a LAN lab with independently enforced isolation, explicit `provider` mode
+requires `host_recovery_provider_isolation`: the target `address`, lowercase
+`mac`, `policy_sha256` and boolean `verified`. Set `verified: true` only after the
+provider policy is applied and independently checked for that address/MAC.
+This is an operator assertion, not guest-side verification of provider rules.
+Restore and publication bind the receipt to the actual LAN interface; resume
+requires the same receipt and owner. Provider mode is test-only, rejects legacy
+host-isolation inputs and leaves provider rules and legacy rehearsal probes
+unmanaged. Reconcile monitoring through its normal entry point afterward.
+
 `host_recovery_quarantine: true` is test-only. It restores a separate empty VM
 on Docker-internal networks, binds ingress/STUN to loopback, and resolves saved
 service names to the restored proxy inside those networks. It refuses publication

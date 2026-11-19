@@ -112,6 +112,7 @@ class RecoveryResumeTest(unittest.TestCase):
             cms_environment='test', netbird_ip='100.91.0.10', netbird_subnet='100.91.0.0/16',
             hou1_backup_receiver_ip='100.91.0.22', netbird_management_url='https://vpn.example.invalid')
         checkpoint = (TASKS / 'publication-checkpoint.yml').read_text().replace('/var/lib/hou1-host-recovery', str(root / 'host'))
+        checkpoint = checkpoint.replace('provider-isolation.yml', str(TASKS / 'provider-isolation.yml'))
         (root / 'publication-checkpoint.yml').write_text(checkpoint)
         preflight = yaml.safe_load((TASKS / 'replacement-preflight.yml').read_text())
         local = next(task for task in preflight if 'ansible.builtin.command' in task)

@@ -28,6 +28,9 @@ network changes.
 3. Freeze the infrastructure revisions, image lock/source bundle, encrypted
    capabilities and a final verified off-host point. Record authorization drift
    and pin the original HOU1 peer's ID/name/address from that point.
+   Use the [provider isolation contract](../../ansible/playbooks/roles/host_recovery/README.md)
+   for this lab. Freeze the independently checked applied-policy record, bind its
+   digest to the replacement LAN address/MAC, and retain that owner through resume.
 4. Preserve the quarantine evidence, verified restore inputs and original HOU1
    boot disk for rollback. A quarantined copy cannot be promoted by changing an inventory
    flag. A new normal restore requires an empty replacement and unused recovery
@@ -39,8 +42,8 @@ network changes.
    control plane may own the service endpoint or VPN identity. Record the final
    point's age and any writes between capture and fencing.
 2. Prepare the empty replacement with the selected LAN binding and a newly
-   verified SSH key. Set `host_recovery_quarantine: false`, retain the explicit
-   test isolation inputs and run `restore-test-host.yml` once.
+   verified SSH key. Set `host_recovery_quarantine: false`, select the verified
+   provider boundary and run `restore-test-host.yml` once.
 3. Verify recovered credentials, readiness and access changes while listeners
    remain on loopback. Then select the reviewed access assertion and run
    `publish-test-recovery.yml`, using only the pinned disconnected lost peer.

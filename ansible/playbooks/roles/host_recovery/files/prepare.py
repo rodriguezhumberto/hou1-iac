@@ -33,6 +33,7 @@ REPOSITORIES = {'postgresql': 'postgres', 'authentik-server': 'ghcr.io/goauthent
 
 def validate(request, metadata, lock, app, netbird):
     contract.layout(request)
+    isolation = contract.isolation(request)
     production = request['environment'] == 'production'
     quarantine = request.get('quarantine', False)
     if type(quarantine) is not bool or (quarantine and request['environment'] != 'test'):
@@ -94,7 +95,7 @@ def validate(request, metadata, lock, app, netbird):
     # Production retains its saved updater setting and normal outbound policy.
     if not production and netbird['server'].get('disableGeoliteUpdate') is not True:
         raise ValueError('Require offline geolocation startup for test recovery')
-    if not production and not quarantine and (not request['deny_cidrs'] or not request['test_addresses']):
+    if not production and not quarantine and isolation == 'host' and (not request['deny_cidrs'] or not request['test_addresses']):
         raise ValueError('Require the existing production isolation inputs')
     for key in ['deny_cidrs', 'allow_local_cidrs', 'allow_update_cidrs']:
         for value in request.get(key, []):
@@ -285,7 +286,7 @@ def prepare(request, payload, source_bundle, image_lock, output):
         shutil.copyfile(HERE / 'restore.py', output / 'restore.py')
         shutil.copyfile(HERE / 'contract.py', output / 'contract.py')
         shutil.copyfile(ROLES / 'application_image/files/artifact.py', output / 'artifact.py')
-        if request['environment'] == 'test':
+        if request['environment'] == 'test' and contract.isolation(request) == 'host':
             shutil.copyfile(ROLES / 'rehearsal_gates/files/isolation.py', output / 'isolation.py')
         with tarfile.open(output / 'bundle.tar', 'w') as archive:
             archive.add(payload, arcname='payload')

@@ -236,6 +236,9 @@ class ProductionRecoveryTest(unittest.TestCase):
                          staff_domain='staff.example.invalid', public_site_origin=cfg['origins']['public'],
                          netbird_management_url=cfg['origins']['netbird'])
         tasks = yaml.safe_load((ROLES / 'host_recovery/tasks/request.yml').read_text())
+        for task in tasks:
+            if task.get('ansible.builtin.include_tasks') == 'provider-isolation.yml':
+                task['ansible.builtin.include_tasks'] = str(ROLES / 'host_recovery/tasks/provider-isolation.yml')
         guard = tasks[-1]
         scenarios = [{}, {'app_directory': '/opt/wrong-environment'}, {'public_site_origin': 'https://wrong.example.invalid'},
                      {'deploy_ref': 'b' * 40}]
