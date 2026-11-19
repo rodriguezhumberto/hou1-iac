@@ -90,8 +90,9 @@ The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery a
 The [intervention audit](deployment-interventions.md) assigns the lab's manual
 steps to code, private inputs or external prerequisites. The
 [deployment workflow](deployment-workflow.md) describes the supported automation.
-The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap,
-repeat checks and the remaining backup/deployment scheduling gap.
+The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap
+and repeat checks. [Capture coordination](evidence/capture-coordination-2026-11-19.md)
+records the subsequent deployment/backup exclusion and controller-loss checks.
 Keep reusable logic in Git and private values outside it.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies. Independent ingress is opt-in through

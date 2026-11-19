@@ -249,9 +249,13 @@ bug; the corrected run started again from clean disks. The
 [rebuild evidence](evidence/lab-bootstrap-2026-11-19.md) separates those attempts,
 unchanged replay and recovery checks.
 
-Next: coordinate scheduled backup capture with deployment. Capture briefly stops
-the VPN and interrupted a concurrent source transfer; automatic recovery and a
-same-input workflow retry passed. Add a shared exclusion mechanism and overlap
-tests rather than treating SSH retries as coordination. Live transfer interruption,
-clean-host restore and peer replacement remain separate acceptance runs with
-their existing checkpoints.
+Capture and managed deployment now share the host capture lock across both hosts
+and final checks. Two live overlaps completed without interruption, preserved all
+twelve container IDs and produced a new recovery point after admission released.
+Bounded controller keepalives prevent an abandoned hold; the failure matrix uses
+the same guard. See [coordination acceptance](evidence/capture-coordination-2026-11-19.md).
+
+Direct Ansible commands, TLS jobs and reboot observers remain outside this guard.
+Extend coordination to other entry points before claiming concurrent operation
+there. Next acceptance: live backup-transfer interruption, then clean-host restore
+and peer replacement with their existing checkpoints.

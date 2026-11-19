@@ -29,7 +29,7 @@ were closed and preserves its failed attempts separately.
 | Nginx-stop drill removed administrative VPN access | Console recovery; failed drill preserved | Require independent recovery access and a VM-local restart timer for ingress drills |
 | Runtime snapshots, login checks and reboot receipts | Workflow owns container/source/TLS/HTTPS checks; login and reboot wrappers remain private | Maintain the remaining acceptance tools with declared targets and distinct failure records |
 | Playbook invocation and logs | `scripts/deploy-lab.py`; existing-host reconciliation and verification passed | Extend only after bootstrap prerequisites have owners |
-| Scheduled capture interrupted deployment SSH | Capture briefly stops VPN writers; automatic recovery and same-input deployment retry passed | Coordinate capture/deployment with shared exclusion and overlap tests |
+| Scheduled capture interrupted deployment SSH | Managed workflow and failure matrix share the capture lock; two live overlaps and bounded controller-loss checks passed | Direct Ansible/TLS/reboot paths remain outside the guard; preserve writer recovery |
 
 ## Ownership decisions
 

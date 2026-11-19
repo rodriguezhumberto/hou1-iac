@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Scheduled capture and deployment | [Coordination acceptance, 2026-11-19](capture-coordination-2026-11-19.md) |
 | Fresh HOU1/HOU4 bootstrap | [Rebuild and acceptance, 2026-11-19](lab-bootstrap-2026-11-19.md) |
 | Lab backup capture and collection | [Acceptance and unchanged repeat, 2026-11-18](backup-acceptance-2026-11-18.md) |
 | Service interruption and dependency failure | [Failure matrix, 2026-11-18](failure-matrix-2026-11-18.md) |

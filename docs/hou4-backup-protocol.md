@@ -149,6 +149,11 @@ credential. Follow their explicit review/publication and owner-access gates.
 
 ## Evidence and open limits
 
+[Capture/deployment coordination](evidence/capture-coordination-2026-11-19.md)
+records queued capture during both-host reconciliation, bounded guard release,
+failure-matrix acceptance and fresh offline verification. Standalone operations
+remain outside that guard; capture still pauses its writers.
+
 [Capture/interruption evidence](evidence/hou1-backup-interruption-2026-11-08.json)
 records writer SIGTERM/SIGKILL and reboot recovery. Receiver process-kill/retry
 checks were local; a live interrupted HOU4 transfer and provider-level power cut

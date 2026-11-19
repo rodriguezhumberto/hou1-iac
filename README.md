@@ -77,8 +77,8 @@ The current HOU1/HOU4 lab uses a privately configured namespace and a separate V
 account. Default test groups stay empty; private inventories select the hosts.
 Fresh-host bootstrap and unchanged reconciliation passed from frozen inputs;
 see the [rebuild evidence](docs/evidence/lab-bootstrap-2026-11-19.md).
-Scheduled backup capture can still interrupt a concurrent deployment by briefly
-stopping the VPN. Coordinating those operations is the next reliability fix.
+The managed workflow and failure matrix now serialize capture with deployment;
+see the [coordination acceptance](docs/evidence/capture-coordination-2026-11-19.md).
 See the [intervention audit](docs/deployment-interventions.md) and
 [deployment workflow](docs/deployment-workflow.md) for coordinated reconciliation
 and isolated controller transport. The [bootstrap procedure](docs/probes/lab-bootstrap.md)

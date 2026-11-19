@@ -64,7 +64,9 @@ Run standalone readiness verification, the maintained failure matrix and explici
 reboot observers. Record backup decryption/integrity separately from a live
 database or identity-service restore.
 
-Scheduled capture briefly stops VPN writers. Deployment and capture do not yet
-share an exclusion mechanism; an overlap can disconnect deployment SSH. Record
-that failure separately, wait for automatic service recovery and retry unchanged
-inputs. See the [rebuild evidence](../evidence/lab-bootstrap-2026-11-19.md).
+Scheduled capture briefly stops VPN writers. The managed workflow and failure
+matrix now share its host lock; upgrade an established source through `backups.yml`
+before concurrent acceptance. Direct commands remain outside that admission path.
+The [rebuild evidence](../evidence/lab-bootstrap-2026-11-19.md) preserves the earlier
+collision; [coordination acceptance](../evidence/capture-coordination-2026-11-19.md)
+records the corrected overlap and controller-loss checks.

@@ -158,8 +158,9 @@ run first. Losing the guard cancels active local Ansible work and stops later
 steps; existing playbook
 recovery and reconciliation still handle interrupted remote operations.
 
-Capture and deployment each wait at most fifteen minutes for admission. Capture's
-systemd budget includes that wait plus its original capture budget. Admission
+Host lock admission waits at most fifteen minutes; the controller allows another
+thirty seconds for connection overhead. Capture's systemd budget includes the
+lock wait plus its original capture budget. Admission
 failure changes no writers or previous recovery point. Inspect the service result
 for a capture admission timeout; its previous successful export status is preserved.
 
