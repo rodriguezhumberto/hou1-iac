@@ -264,5 +264,8 @@ bounded read-only admission fixed that without replaying service-start requests.
 The [disposable restore gate](evidence/clean-restore-2026-11-19.md) then imported
 PostgreSQL into an empty database and checked recovered SQLite/NetBird state,
 session cleanup and network isolation. It does not replace the fresh-VM wipe
-checkpoint. Next acceptance: a dedicated replacement VM, then peer replacement
-with its existing checkpoints.
+checkpoint. A [dedicated replacement VM](evidence/quarantined-recovery-2026-11-19.md)
+then passed fresh restore, recovered-identity/OIDC checks and reboot in quarantine.
+It remains unpublished; HOU4 connectivity to it is explicitly deferred.
+Before peer handoff, verify the original lab's power/network state and review the
+firewall, endpoint and identity transition with the existing recovery checkpoints.

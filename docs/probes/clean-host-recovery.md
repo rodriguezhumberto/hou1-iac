@@ -22,6 +22,9 @@ Use an isolated replacement VM with reviewed inventory and identities. The
 [disposable restore gate](../evidence/clean-restore-2026-11-19.md) verifies the
 point and PostgreSQL import without changing either current VM; it does not
 release the fresh-VM wipe checkpoint below.
+The later [quarantined VM run](../evidence/quarantined-recovery-2026-11-19.md)
+accepted cold startup and local application/identity behavior on a separate VM,
+with peer handoff and companion transport deliberately deferred.
 
 ## Before wiping HOU1
 
@@ -31,8 +34,10 @@ VM's distinct LAN address. The controller source must remain one explicit `/32`;
 LAN sources are accepted only in this test mode. Run `restore-test-host.yml` with
 frozen point/source/image inputs and independent recovery access confirmed.
 
-Quarantine creates every restored Docker network as internal, uses loopback-only
-listeners and validates the actual running network/port bindings. Saved issuers
+Quarantine creates every restored Docker network as internal, declares published
+ports on loopback and validates actual running network/port bindings. Docker
+internal networks may not provide host-loopback forwarding; use the declared
+private bridge proxy address for local probes. Saved issuers
 resolve to the restored proxy inside Docker. Publication is refused; do not run
 the peer handoff against the active HOU1. HOU4 connectivity/firewall exceptions
 are unnecessary for local recovery checks and remain a separate decision.

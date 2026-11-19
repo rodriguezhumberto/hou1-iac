@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Fresh replacement VM | [Quarantined restore and reboot, 2026-11-19](quarantined-recovery-2026-11-19.md) |
 | Live backup transport interruption | [Retry and offline verification, 2026-11-19](backup-transfer-2026-11-19.md) |
 | Clean restore gate | [Disposable PostgreSQL and artifact restore, 2026-11-19](clean-restore-2026-11-19.md) |
 | Scheduled capture and deployment | [Coordination acceptance, 2026-11-19](capture-coordination-2026-11-19.md) |
