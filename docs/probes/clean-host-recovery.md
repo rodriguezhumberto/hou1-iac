@@ -19,7 +19,9 @@ result does not establish an uninterrupted run. See the production recovery
 guide for the separate production acceptance requirements.
 
 Use an isolated replacement VM with reviewed inventory and identities. The
-current lab's backup verification does not release the wipe checkpoint below.
+[disposable restore gate](../evidence/clean-restore-2026-11-19.md) verifies the
+point and PostgreSQL import without changing either current VM; it does not
+release the fresh-VM wipe checkpoint below.
 
 ## Before wiping HOU1
 

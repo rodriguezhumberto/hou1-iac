@@ -261,5 +261,8 @@ there. The [live transfer drill](evidence/backup-transfer-2026-11-19.md) now pas
 alone and in the complete matrix, including automatic retry and offline recovery
 checks. Its first combined attempt exposed delayed companion access after capture;
 bounded read-only admission fixed that without replaying service-start requests.
-Next acceptance: clean-host restore, then peer replacement with their existing
-checkpoints.
+The [disposable restore gate](evidence/clean-restore-2026-11-19.md) then imported
+PostgreSQL into an empty database and checked recovered SQLite/NetBird state,
+session cleanup and network isolation. It does not replace the fresh-VM wipe
+checkpoint. Next acceptance: a dedicated replacement VM, then peer replacement
+with its existing checkpoints.
