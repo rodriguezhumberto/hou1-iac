@@ -353,7 +353,8 @@ class HostRecoveryRuntimeTest(unittest.TestCase):
             run.assert_not_called(); dc.assert_not_called()
 
     def test_quarantine_verifies_actual_networks_and_loopback_bindings(self):
-        container = {'HostConfig': {'NetworkMode': 'net', 'Privileged': False,
+        container = {'State': {'Running': True, 'Health': {'Status': 'healthy'}},
+                     'HostConfig': {'NetworkMode': 'net', 'Privileged': False,
                         'PortBindings': {'443/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '443'}]}},
                      'NetworkSettings': {'Networks': {'net': {'NetworkID': 'netid'}}}}
         projects = {'app': ('app', Path('/fixture/app'))}
@@ -371,6 +372,13 @@ class HostRecoveryRuntimeTest(unittest.TestCase):
             with patch.object(restore, 'run', return_value=json.dumps([container]).encode()):
                 with self.assertRaisesRegex(ValueError, 'loopback'):
                     restore.verify_quarantine({'quarantine': True})
+            container['HostConfig']['PortBindings']['443/tcp'][0]['HostIp'] = '127.0.0.1'
+            for state in [{'Running': False}, {'Running': True, 'Health': {'Status': 'unhealthy'}},
+                          {'Running': True, 'Health': {'Status': 'starting'}}]:
+                container['State'] = state
+                with self.subTest(state=state), patch.object(restore, 'run', return_value=json.dumps([container]).encode()):
+                    with self.assertRaisesRegex(ValueError, 'not ready'):
+                        restore.verify_quarantine({'quarantine': True})
     def setUp(self):
         restore.configure(inputs())
 

@@ -261,6 +261,9 @@ def verify_quarantine(cfg):
     containers = json.loads(run('docker', 'inspect', *sorted(ids)))
     network_ids = set()
     for item in containers:
+        state = item['State']
+        if not state['Running'] or state.get('Health', {}).get('Status', 'healthy') != 'healthy':
+            raise ValueError('Quarantined recovery service is not ready')
         if item['HostConfig']['NetworkMode'] == 'host' or item['HostConfig']['Privileged']:
             raise ValueError('Quarantine cannot use host networking or privileges')
         for bindings in (item['HostConfig']['PortBindings'] or {}).values():
