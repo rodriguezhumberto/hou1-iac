@@ -1,0 +1,56 @@
+---
+- name: Restrict explicit credential seeding to the isolated test inventory
+  ansible.builtin.assert:
+    that:
+      - inventory_hostname in groups.get('test_env', [])
+      - inventory_hostname not in groups.get('prod_env', [])
+      - cms_environment == 'test'
+      - authentik_environment == 'test'
+      - authentik_test_seed_source is match('^/')
+  tags: [always]
+
+- name: Seed only declared internal test users
+  no_log: true
+  block:
+    - name: Load the scoped test-identity ciphertext on the controller
+      community.sops.load_vars:
+        file: '{{ authentik_test_seed_source }}'
+        name: authentik_test_seed
+        age_keyfile: '{{ authentik_controller_age_key_file | default(omit) }}'
+    - name: Require a nonempty subset of the declared staff identities
+      ansible.builtin.assert:
+        that:
+          - authentik_test_seed.keys() | list == ['TEST_IDENTITIES']
+          - authentik_test_seed.TEST_IDENTITIES is sequence
+          - authentik_test_seed.TEST_IDENTITIES | length > 0
+          - >-
+            authentik_test_seed.TEST_IDENTITIES | map(attribute='username') | difference(
+              authentik_staff_users | map(attribute='username') | list) | length == 0
+    - name: Reconcile passwords through the running test identity service
+      ansible.builtin.command:
+        argv:
+          - docker
+          - compose
+          - -p
+          - '{{ authentik_identity_profiles[authentik_environment].compose_project }}'
+          - -f
+          - '{{ authentik_identity_profiles[authentik_environment].compose_file }}'
+          - exec
+          - -T
+          - authentik-server
+          - ak
+          - shell
+          - -c
+          - |
+            {{ lookup('ansible.builtin.file', role_path ~ '/files/seed-test-users.py') }}
+            main()
+        stdin: '{{ authentik_test_seed.TEST_IDENTITIES | to_json }}'
+      register: authentik_test_seed_result
+      changed_when: >-
+        (authentik_test_seed_result.stdout_lines | select('match', '^LAB_TEST_IDENTITIES=') |
+        map('regex_replace', '^LAB_TEST_IDENTITIES=', '') | last | from_json).changed
+  always:
+    - name: Discard decrypted test identities from later tasks
+      ansible.builtin.set_fact:
+        authentik_test_seed: {}
+        authentik_test_seed_result: {}

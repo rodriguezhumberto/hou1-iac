@@ -1,5 +1,8 @@
 # Lab input contracts
 
+Optional `authentik_test_seed_source` ciphertext is fingerprinted when declared.
+Only the explicit test-only `rehearsal-identities.yml` playbook decrypts it.
+
 Version 2 of the [managed workflow](deployment-workflow.md) checks the release,
 identity and backup inputs before managed-host commands. Version 1 retains its
 original checks for compatibility. Use version 2 for new runs.

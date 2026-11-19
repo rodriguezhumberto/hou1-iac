@@ -19,6 +19,7 @@ GHCR_IMAGE = (r'ghcr\.io/[a-z0-9]+(?:[._-][a-z0-9]+)*'
 ROLES = Path(__file__).resolve().parents[1] / 'ansible/playbooks/roles'
 CAPABILITY_VARIABLES = {
     'hou1': ('authentik_secret_source', 'authentik_identity_secret_source',
+             'authentik_test_seed_source',
              'authentik_controller_age_key_file', 'rehearsal_secret_source',
              'rehearsal_host_age_key_source', 'application_image_registry_secret_source',
              'application_image_registry_age_key_file', 'hou1_tls_bundle_source',

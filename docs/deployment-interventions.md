@@ -21,7 +21,7 @@ install from the final revisions without corrective commands.
 | VM source mirror stayed on its bootstrap bundle | `test_application_source` now owns bundle import for bootstrap and webstack updates; checks the commit before selecting the ref | Retain mismatch, repeat and explicit rollback coverage |
 | Application role claims differed from lab IdP groups | Version 2 compares selected source groups, encrypted identity names, OIDC inputs and user grants | Maintain identity provisioning and optional test seeding separately |
 | Empty `prod-servers` group required in lab account | Private input override for current policy planner | Make required policy groups explicit; the name does not authorize production peers |
-| Synthetic passwords applied after identity provisioning | Private host-local Authentik adapter | Maintain an optional test-identity seed path; keep credentials out of arguments |
+| Synthetic passwords applied after identity provisioning | Explicit test-only `rehearsal-identities.yml`; scoped ciphertext and stdin-only credentials | Verify fresh bootstrap and no-op; users, roles and VPN grants remain owned by their existing components |
 | Authentik backup self-check needed host decryption | Version 2 proves the legacy recipient/self-check key pair; unified mode checks endpoint/key bindings; owner-encrypted recovery copy retained | Verify installed identities, offline recovery and actual backup collection |
 | Google callback not verified | External OAuth registration; login/branding disabled | Verify callback before enabling; preserve the approved allowlist |
 | Nginx-stop drill removed administrative VPN access | Console recovery; failed drill preserved | Require independent recovery access and a VM-local restart timer for ingress drills |

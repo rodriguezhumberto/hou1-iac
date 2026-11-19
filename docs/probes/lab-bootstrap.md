@@ -38,6 +38,11 @@ Run each playbook in full, with the selected inventory alias and declared inputs
    enrollment receipt and bind the managed transport to its verified address.
 4. HOU1: run `hou1.yml` over the new VPN path. Verify fresh private SSH before
    retiring bootstrap access.
+   If internal test passwords are required, explicitly run
+   `rehearsal-identities.yml` with `authentik_test_seed_source` pointing to scoped
+   SOPS ciphertext. Its `TEST_IDENTITIES` list contains username/password records
+   for a subset of `authentik_staff_users`. It changes existing non-superusers'
+   passwords only when needed; it does not create users or change access grants.
 5. Rebuild HOU4. Run its `rehearsal-prepare.yml`, `lab-dns.yml` and `hou4.yml`
    through the enrolled controller transport. HOU4 preparation establishes the
    resolver stub only on an unconfigured test host.
