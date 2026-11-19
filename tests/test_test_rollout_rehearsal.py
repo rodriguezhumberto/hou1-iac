@@ -34,6 +34,24 @@ def args(**overrides):
 
 
 class TestRolloutRehearsal(unittest.TestCase):
+    def test_fresh_preparation_adopts_opted_in_dns_before_docker(self):
+        play = yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-prepare.yml').read_text())[0]
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / 'resolver-ready'
+            tasks = []
+            for entry in play['roles']:
+                role = entry if isinstance(entry, str) else entry['role']
+                if role == 'lab_dns':
+                    tasks.append({'ansible.builtin.file': {'path': str(ready), 'state': 'touch'},
+                                  'when': entry['when']})
+                if role == 'docker':
+                    # Docker's DNS owner refuses activation without an active resolver.
+                    tasks.append({'ansible.builtin.command': {'argv': [sys.executable, '-c',
+                        f'from pathlib import Path;assert Path({str(ready)!r}).exists()']}})
+            result = run_plays([{'variables': {'lab_dns_state': 'present'}, 'tasks': tasks}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(ready.exists())
+
     def test_external_provider_uses_the_deployed_identity_and_preserves_foreign_issuers(self):
         posts = []
         class Handler(BaseHTTPRequestHandler):

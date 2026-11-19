@@ -30,7 +30,8 @@ through [bootstrap transport](../deployment-workflow.md#isolated-controller-tran
 Run each playbook in full, with the selected inventory alias and declared inputs.
 
 1. HOU1: `rehearsal-prepare.yml`, then `lab-dns.yml`. Preparation waits for provider
-   initialization; DNS adoption configures the host resolver and Docker consumers.
+   initialization and starts opted-in lab DNS before installing Docker with its
+   declared DNS consumers. The DNS entry point then verifies the complete setup.
 2. HOU1: `rehearsal-seeds.yml`, then `rehearse-vps.yml`. Seed only host-encrypted
    certificates/geolocation files. The selected release supplies the application;
    identity/VPN roles create fresh state and persist the new API credential.
