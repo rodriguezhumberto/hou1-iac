@@ -139,9 +139,9 @@ def hosts_view(original, config):
     return base + ('\n' if base and not base.endswith('\n') else '') + '# Process-local lab names\n' + suffix
 
 
-def inspect_peer(config):
+def inspect_container(config, timeout=15):
     data, = json.loads(subprocess.check_output(['docker', 'inspect', config['container']],
-                                              stderr=subprocess.DEVNULL, timeout=15))
+                                              stderr=subprocess.DEVNULL, timeout=timeout))
     require(data['Name'] == '/' + config['container'] and data['State']['Running']
             and data['State']['Pid'] > 1 and data['Config']['Image'] == config['image'],
             'The declared dedicated VPN container is not running at its pinned image')
@@ -151,13 +151,23 @@ def inspect_peer(config):
     require([(m['Source'], m['Destination'], m['RW']) for m in data['Mounts']] ==
             [(config['state_directory'], '/var/lib/netbird', True)],
             'The VPN container must mount only its dedicated peer state')
-    status = json.loads(subprocess.check_output(['docker', 'exec', config['container'],
-        'netbird', 'status', '--json'], stderr=subprocess.DEVNULL, timeout=20))
-    require(management_origin(status['management']['url']) == management_origin(config['management_url'])
-            and status['management']['connected'] and
-            str(ipaddress.ip_interface(status['netbirdIp']).ip) == config['address'],
-            'The VPN container is not connected to the declared test account and address')
     return {'id': data['Id'], 'pid': data['State']['Pid']}
+
+
+def peer_connected(config, timeout=20):
+    status = json.loads(subprocess.check_output(['docker', 'exec', config['container'],
+        'netbird', 'status', '--json'], stderr=subprocess.DEVNULL, timeout=timeout))
+    require(management_origin(status['management']['url']) == management_origin(config['management_url'])
+            and type(status['management']['connected']) is bool and
+            str(ipaddress.ip_interface(status['netbirdIp']).ip) == config['address'],
+            'The VPN container differs from the declared test account or address')
+    return status['management']['connected']
+
+
+def inspect_peer(config):
+    peer = inspect_container(config)
+    require(peer_connected(config), 'The VPN container is not connected to the declared test account and address')
+    return peer
 
 
 def resolver_hash(config):

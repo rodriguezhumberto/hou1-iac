@@ -282,5 +282,8 @@ The [lab handoff plan](probes/lab-peer-handoff.md) now separates endpoint choice
 independent transport preparation, fresh normal restore, publication and rollback.
 Quarantined publication is rejected before failure cleanup; test recovery accepts
 one RFC1918 controller `/32` while retaining normal isolation inputs. Production's
-public-source requirement remains unchanged. Endpoint selection and validation of
-the current controller reconnect path precede any handoff.
+public-source requirement remains unchanged. The selected handoff preserves
+HOU1's existing LAN address after fencing the original VM. Controller reconnect
+now uses the existing private transport config and preserves its container,
+namespace and saved enrollment. Offline guards and read-only controller preflight
+passed; live reconnect and independent companion recovery remain handoff checks.

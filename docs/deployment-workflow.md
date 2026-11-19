@@ -129,6 +129,17 @@ create, enroll or restart peers, modify firewall rules, or use renewal peers.
 The bootstrap transport needs the same namespace/sudo tools and SSH agent, but
 does not inspect Docker or enter a VPN namespace.
 
+For recovery, `scripts/reconnect-lab-controller.py --config /private/lab/network.json`
+validates the same VPN configuration without changing it. `--apply` reconnects
+only that controller using saved enrollment; it preserves the container and
+network namespace. The complete operation has a ninety-second budget, stops on
+identity/configuration changes and withholds command output. It does not verify
+DNS, application readiness or companion access; use the normal workflow afterward.
+Run it on the controller, outside a VPN-dependent SSH session. A recovery inventory
+may select its absolute Python/script/config paths plus `--apply` through
+`host_recovery_management_refresh_argv`. The older `reconnect-test-controller.py`
+remains available for its historical fixed fixture.
+
 `plan` is the default and makes no managed-host connections. It validates the
 local configuration and lists the sequence; it does not establish connectivity.
 Version 2 `inputs` checks both inventories and release/identity/backup contracts

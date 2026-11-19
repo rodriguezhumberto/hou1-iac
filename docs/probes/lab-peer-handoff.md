@@ -5,31 +5,31 @@ Keep HOU4 data, peer identity and production configuration intact.
 
 ## Endpoint decision
 
-Prefer transferring the existing HOU1 LAN address to the replacement after
-fencing the old VM. This preserves the endpoint and existing companion firewall
-rules, matching the supported same-address recovery workflow. The topology
-selection is pending; no address or firewall change is implied by this plan.
+The selected plan transfers the existing HOU1 LAN address to the replacement
+after fencing the old VM. This preserves the endpoint and existing companion
+firewall rules, matching the supported same-address recovery workflow. Keep the
+replacement's distinct-address companion firewall exception deferred.
 
-Using the replacement's distinct address instead requires reviewed provisioning
-rules and updates to each affected controller pin, lab DNS forwarder and service
-endpoint. Keep that companion firewall exception deferred until separately
-selected. Preserve the original peer paths during preparation.
+The provisioning project owns address assignment, source-address filtering and
+VM autostart. Prepare its exact per-VM changes before interruption; apply them
+only after the old VM is fenced. Selecting this plan does not execute VM or
+network changes.
 
 ## Prepare before interruption
 
 1. Bind the selected endpoint, replacement NIC and verified SSH key in the
    provisioning project and private inventories. Confirm independent console or
    guest-agent recovery for both HOU1 and HOU4.
-2. Validate a credential-free reconnect command for the current dedicated test
-   controller. The historical `reconnect-test-controller.py` targets an older
-   fixed fixture; it is unsuitable for the current lab. Select independent HOU4
-   refresh through a working pinned SSH transport or provider console; its VPN
-   connection cannot serve as its own recovery path.
+2. Validate the current dedicated controller with `reconnect-lab-controller.py`
+   using its existing private transport config. Select its `--apply` argv for
+   recovery as described in the [workflow](../deployment-workflow.md#isolated-controller-transport).
+   Select independent HOU4 refresh through working pinned SSH or the provider
+   console; its VPN connection cannot serve as its own recovery path.
 3. Freeze the infrastructure revisions, image lock/source bundle, encrypted
    capabilities and a final verified off-host point. Record authorization drift
    and pin the original HOU1 peer's ID/name/address from that point.
-4. Preserve the current quarantine evidence and both boot disks needed for
-   rollback. A quarantined copy cannot be promoted by changing an inventory
+4. Preserve the quarantine evidence, verified restore inputs and original HOU1
+   boot disk for rollback. A quarantined copy cannot be promoted by changing an inventory
    flag. A new normal restore requires an empty replacement and unused recovery
    and evidence IDs; rebuilding it is a separate destructive step.
 
