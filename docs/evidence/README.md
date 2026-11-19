@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Reduced-memory lab | [Concurrent guests, backup and reboot checks, 2026-11-19](reduced-memory-2026-11-19.md) |
 | Original lab after hypervisor OOM | [Access, key-pin and backup recovery, 2026-11-19](oom-recovery-2026-11-19.md) |
 | Fresh replacement VM | [Quarantined restore and reboot, 2026-11-19](quarantined-recovery-2026-11-19.md) |
 | Live backup transport interruption | [Retry and offline verification, 2026-11-19](backup-transfer-2026-11-19.md) |

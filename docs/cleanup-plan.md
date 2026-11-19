@@ -270,5 +270,10 @@ It remains unpublished; HOU4 connectivity to it is explicitly deferred.
 The [original-lab follow-up](evidence/oom-recovery-2026-11-19.md) accepted recovery
 after hypervisor OOM and a separately verified cloud-init SSH-key change. Before
 further provisioning edits, stabilize cloud-init instance metadata and review
-hypervisor memory capacity. Peer handoff still needs the firewall, endpoint and
-identity transition reviewed with the existing recovery checkpoints.
+hypervisor memory capacity. The user subsequently reported stable cloud-init
+metadata. Both HOU1 VMs then passed [reduced-memory checks](evidence/reduced-memory-2026-11-19.md)
+with persistent boot identities, reconciliation, backup retry, login and reboot
+recovery. The measured 5–6 GiB configuration supports this lab workload; physical
+host capacity remains a provisioning concern. Peer handoff still needs the
+firewall, endpoint and identity transition reviewed with the existing recovery
+checkpoints.
