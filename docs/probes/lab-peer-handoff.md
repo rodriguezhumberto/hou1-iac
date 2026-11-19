@@ -41,16 +41,24 @@ network changes.
 1. Fence the original HOU1 VM and prevent automatic restart. Only one restored
    control plane may own the service endpoint or VPN identity. Record the final
    point's age and any writes between capture and fencing.
-2. Prepare the empty replacement with the selected LAN binding and a newly
+2. Stop the replacement and independently verify it is stopped before applying
+   provider firewall changes. Regenerate its full address/firewall plan with
+   the desired state still stopped; cross-root Terraform plans do not enforce
+   ordering. Keep the original VM's fence in its active provisioning inputs.
+3. Prepare the empty replacement with the selected LAN binding and a newly
    verified SSH key. Set `host_recovery_quarantine: false`, select the verified
-   provider boundary and run `restore-test-host.yml` once.
-3. Verify recovered credentials, readiness and access changes while listeners
+   provider boundary and run `restore-test-host.yml` once. Address/firewall
+   reconciliation preserves the existing disk and does not satisfy the empty-OS
+   requirement. Review the reinstall separately; verify the new config drive and
+   effective guest address before accepting its identity. Recheck firewall rules
+   before connected boot if reinstall replaces provider resources.
+4. Verify recovered credentials, readiness and access changes while listeners
    remain on loopback. Then select the reviewed access assertion and run
    `publish-test-recovery.yml`, using only the pinned disconnected lost peer.
-4. Refresh the dedicated controller and retained companion, verify private SSH,
+5. Refresh the dedicated controller and retained companion, verify private SSH,
    and reconcile monitoring, backup and renewal through their existing entry
    points. Update the backup source SSH pin through its owning role.
-5. Require login/denial checks, real peer transport, a fresh verified off-host
+6. Require login/denial checks, real peer transport, a fresh verified off-host
    point, alert delivery/recovery, reboot recovery and unchanged reconciliation.
    Preserve failed observations separately from later repairs.
 
