@@ -15,6 +15,8 @@ an established VPN inventory. Required inputs and recovery boundaries are in the
 - `tasks/recovery.yml` installs systemd units and seeds an initial recovery point
   only when no earlier capture succeeded.
 
+The controller sends ten-second keepalives; a minute of silence releases an
+abandoned hold without waiting for the operating system's TCP timeout.
 Capture waits at most fifteen minutes for the host lock. Recovery stays
 nonblocking; deployment refuses outstanding writer intent. Keep the lock inode,
 installed paths, export format and offline-key boundary stable.

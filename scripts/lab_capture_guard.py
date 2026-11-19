@@ -5,11 +5,13 @@ from pathlib import Path
 import selectors
 import signal
 import subprocess
+import threading
 import time
 
 PROGRAM = (Path(__file__).resolve().parents[1] /
            'ansible/playbooks/roles/backup_source/files/operation_lock.py').read_text()
 WAIT_SECONDS = 900
+KEEPALIVE_SECONDS = 10
 
 
 class CaptureGuard:
@@ -17,6 +19,9 @@ class CaptureGuard:
         self.command, self.log, self.timeout = command, log, timeout
         self.process = None
         self.admitted = False
+        self.stopped = threading.Event()
+        self.keepalive_thread = None
+        self.keepalive_failed = False
 
     def __enter__(self):
         deadline = time.monotonic() + self.timeout
@@ -31,6 +36,8 @@ class CaptureGuard:
                         events = selector.select(max(0, deadline - time.monotonic()))
                     if events and self.process.stdout.readline() == b'ready\n':
                         self.admitted = True
+                        self.keepalive_thread = threading.Thread(target=self.keepalive, daemon=True)
+                        self.keepalive_thread.start()
                         self.check()
                         return self
                     self.close()
@@ -44,8 +51,18 @@ class CaptureGuard:
             raise
 
     def check(self):
-        if self.process.poll() is not None:
+        if self.keepalive_failed or self.process.poll() is not None:
             raise ValueError('Host capture lock connection was lost')
+
+    def keepalive(self):
+        try:
+            while not self.stopped.is_set():
+                self.process.stdin.write(b'.')
+                self.process.stdin.flush()
+                if self.stopped.wait(KEEPALIVE_SECONDS):
+                    return
+        except (OSError, ValueError):
+            self.keepalive_failed = True
 
     def run(self, command, **kwargs):
         """Stop active controller work if its lock connection disappears."""
@@ -75,6 +92,9 @@ class CaptureGuard:
     def close(self):
         if self.process is None:
             return
+        self.stopped.set()
+        if self.keepalive_thread is not None:
+            self.keepalive_thread.join(timeout=1)
         self.process.stdin.close()
         if not self.admitted and self.process.poll() is None:
             self.process.terminate()

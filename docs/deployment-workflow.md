@@ -150,7 +150,10 @@ and their final checks. Version 2 validates local inputs before admission and
 checks live access afterward. Version 1 keeps its original access checks before
 admission. Another controller using the same host lock also waits.
 
-The dedicated pinned SSH connection holds the lock until EOF. Interrupted writer
+The dedicated pinned SSH connection holds the lock until EOF. The controller
+sends a keepalive every ten seconds; the host releases after a minute of silence.
+SSH liveness checks detect a broken connection within about 45 seconds.
+Interrupted writer
 intent refuses deployment so existing backup recovery can run first. Losing the
 guard cancels active local Ansible work and stops later steps; existing playbook
 recovery and reconciliation still handle interrupted remote operations.

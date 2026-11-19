@@ -12,6 +12,7 @@ import time
 
 LOCK_PATH = Path('/run/lock/hou1-backup-export.lock')
 WAIT_SECONDS = 900
+HOLD_IDLE_SECONDS = 60
 INTENT_PATH = Path('/var/lib/hou1-backup/restart-intent.json')
 
 
@@ -43,8 +44,15 @@ def hold():
         if INTENT_PATH.exists():
             raise RuntimeError('Interrupted writers require backup recovery')
         print('ready', flush=True)
-        # SSH EOF also releases the lock after controller exit or interruption.
-        sys.stdin.buffer.read(1)
+        # EOF releases immediately; silence also bounds a lost network's lease.
+        while True:
+            if not select.select([sys.stdin.buffer], [], [], HOLD_IDLE_SECONDS)[0]:
+                raise TimeoutError('Controller capture guard stopped responding')
+            message = sys.stdin.buffer.read(1)
+            if not message:
+                return
+            if message != b'.':
+                raise ValueError('Invalid capture guard keepalive')
 
 
 if __name__ == '__main__':

@@ -10,11 +10,13 @@ import tempfile
 import threading
 import time
 import unittest
+from unittest.mock import patch
 
 from helpers import ROOT
 
 sys.path.insert(0, str(ROOT / 'scripts'))
 from lab_capture_guard import CaptureGuard
+import lab_capture_guard
 
 FILES = ROOT / 'ansible/playbooks/roles/backup_source/files'
 
@@ -164,6 +166,27 @@ export.run()
             self.assertEqual(holder.stdout.read(), b'')
         with self.operation.exclusive(timeout=0):
             pass
+
+    def test_host_releases_abandoned_lease_even_when_stdin_remains_open(self):
+        path = self.root / 'operation_lock.py'
+        path.write_text(path.read_text().replace('HOLD_IDLE_SECONDS = 60', 'HOLD_IDLE_SECONDS = 0.3'))
+        holder = self.start(self.hold[-1])
+        self.assertEqual(self.line(holder), b'ready\n')
+        self.assertNotEqual(holder.wait(timeout=5), 0)
+        self.assertFalse(holder.stdin.closed)
+        with self.operation.exclusive(timeout=0):
+            pass
+
+    def test_controller_keepalive_preserves_a_healthy_lease(self):
+        path = self.root / 'operation_lock.py'
+        path.write_text(path.read_text().replace('HOLD_IDLE_SECONDS = 60', 'HOLD_IDLE_SECONDS = 0.5'))
+        with patch.object(lab_capture_guard, 'KEEPALIVE_SECONDS', 0.05):
+            with self.guard() as guard:
+                time.sleep(1)
+                guard.check()
+                with self.assertRaises(TimeoutError):
+                    with self.operation.exclusive(timeout=0):
+                        self.fail('Capture entered while healthy controller held admission')
 
     def test_lost_holder_stops_active_controller_work(self):
         marker = self.root / 'child-running'
