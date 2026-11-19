@@ -125,9 +125,11 @@ class BackupControllerTest(unittest.TestCase):
         scenario.capture = lambda: events.append('capture')
         scenario.interrupt = lambda: events.append('interrupt')
         scenario.verify_offline = lambda: events.append('offline')
+        scenario.wait_access = lambda role: events.append('access-' + role)
         workflow.probe = lambda role: events.append(role)
         scenario.execute()
-        self.assertEqual(events, ['capture', 'admit', 'interrupt', 'offline', 'hou1', 'hou4', 'release'])
+        self.assertEqual(events, ['capture', 'admit', 'access-hou1', 'access-hou4',
+                                  'interrupt', 'offline', 'hou1', 'hou4', 'release'])
         self.assertEqual(workflow.status, 'passed')
 
     def test_identity_drift_stops_before_transport(self):
@@ -160,3 +162,30 @@ class BackupControllerTest(unittest.TestCase):
             with self.assertRaisesRegex(ValueError, 'verification failed'):
                 scenario.verify_offline()
         self.assertFalse(plaintext.exists())
+
+    def test_companion_access_waits_after_source_capture_without_replaying_mutations(self):
+        scenario = self.scenario
+        scenario.prefix = Mock(return_value=['ssh', 'fixture'])
+        scenario.remote = Mock(side_effect=[ConnectionError('VPN reconnecting'), {'private_access': True}])
+        with patch.object(controller.time, 'sleep') as pause:
+            scenario.wait_access('hou4')
+        self.assertEqual(scenario.remote.call_args_list,
+                         [unittest.mock.call('hou4', 'access', timeout=30)] * 2)
+        pause.assert_called_once_with(3)
+        self.assertEqual(scenario.prefix.call_count, 2)
+
+    def test_access_wait_is_bounded_and_input_drift_is_not_retried(self):
+        scenario = self.scenario
+        scenario.prefix = Mock(return_value=['ssh', 'fixture'])
+        scenario.remote = Mock(side_effect=ConnectionError('Still unreachable'))
+        with patch.object(controller.time, 'monotonic', side_effect=[0, 0, 181]), \
+                patch.object(controller.time, 'sleep') as pause:
+            with self.assertRaises(ConnectionError):
+                scenario.wait_access('hou4')
+        pause.assert_not_called()
+        scenario.remote.reset_mock()
+        scenario.prefix.side_effect = ValueError('Input drift')
+        with patch.object(controller.time, 'sleep') as pause:
+            with self.assertRaisesRegex(ValueError, 'Input drift'):
+                scenario.wait_access('hou4')
+        scenario.remote.assert_not_called(); pause.assert_not_called()

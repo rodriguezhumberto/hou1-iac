@@ -212,6 +212,8 @@ def run(contract):
     require(any(item.get('local') == str(address) for link in addresses for item in link.get('addr_info', [])),
             'The declared test overlay address is absent')
     action = contract['operation']
+    if action == 'access':
+        return {'private_access': True}
     if contract['role'] == 'hou1':
         require(action in ('source-state', 'capture'), 'Unsupported source operation')
         state = source_state()

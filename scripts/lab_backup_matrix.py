@@ -46,7 +46,7 @@ class BackupScenario:
         require(current == self.workflow.transports[role], 'Backup SSH settings changed during this attempt')
         return [*current[0], host['ssh_host_ip']]
 
-    def remote(self, role, operation, expected=None):
+    def remote(self, role, operation, expected=None, timeout=None):
         host = self.config['hosts'][role]
         contract = {'environment': 'test', 'role': role, 'hostname': host['hostname'],
                     'address': host['ssh_host_ip'], 'interface': self.workflow.selections[role]['interface'],
@@ -58,7 +58,8 @@ class BackupScenario:
         self.calls += 1
         stem = self.run / f'{self.calls:03d}-{role}-{operation}'
         result = subprocess.run(command, input=json.dumps(contract), capture_output=True,
-                                text=True, timeout=420 if operation == 'interrupt' else 45)
+                                text=True, timeout=timeout if timeout is not None else
+                                (420 if operation == 'interrupt' else 45))
         deploy.write_private(stem.with_suffix('.json'), result.stdout)
         deploy.write_private(stem.with_suffix('.stderr'), result.stderr)
         if result.returncode == 255:
@@ -102,6 +103,24 @@ class BackupScenario:
                 'Source recovery point changed before transfer admission')
         result = self.remote('hou4', 'interrupt', expected=self.point)
         deploy.write_private(self.run / 'interruption.json', json.dumps(result, indent=2) + '\n')
+
+    def wait_access(self, role):
+        """A completed source snapshot can precede companion VPN reconnection."""
+        deadline = time.monotonic() + 180
+        while True:
+            self.prefix(role)  # Fail immediately on input, identity or guard drift.
+            remaining = deadline - time.monotonic()
+            if remaining <= 0:
+                raise TimeoutError('Private backup access did not recover')
+            try:
+                report = self.remote(role, 'access', timeout=min(30, remaining))
+                require(report.get('private_access') is True, 'Private backup admission did not pass')
+                return
+            except (ConnectionError, subprocess.TimeoutExpired):
+                remaining = deadline - time.monotonic()
+                if remaining <= 0:
+                    raise
+                time.sleep(min(3, remaining))
 
     def verify_offline(self):
         require(re.fullmatch(r'[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}', self.point['id']), 'Invalid recovery point identifier')
@@ -147,6 +166,8 @@ class BackupScenario:
             # Capture must run outside the guard that would otherwise block it.
             w.step('fresh-local-capture', self.capture)
             with w.capture_guard():
+                for role in deploy.SERVICES:
+                    w.step(role + '-private-access', lambda role=role: self.wait_access(role))
                 w.step('interrupt-and-retry-transfer', self.interrupt)
                 w.step('offline-decryption-and-integrity', self.verify_offline)
                 for role in deploy.SERVICES:

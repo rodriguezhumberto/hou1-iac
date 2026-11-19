@@ -23,7 +23,8 @@ The scenario:
 
 1. Validates both inputs and retained ciphertext, then requests a fresh local
    source capture outside the deployment guard. Capture briefly pauses writers.
-2. Holds capture admission during collection. A host-local observer kills only
+2. Holds capture admission and waits for both private SSH paths after source
+   capture, then starts collection once. A host-local observer kills only
    the collector's pinned SSH child after partial bytes arrive. PID identity is
    checked and signalled through a pidfd; administrative SSH remains untouched.
 3. Checks the prior point's bytes and metadata at the interruption boundary.
