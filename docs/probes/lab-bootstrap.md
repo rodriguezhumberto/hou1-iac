@@ -63,3 +63,8 @@ fresh-host claim requires a clean attempt from its declared inputs.
 Run standalone readiness verification, the maintained failure matrix and explicit
 reboot observers. Record backup decryption/integrity separately from a live
 database or identity-service restore.
+
+Scheduled capture briefly stops VPN writers. Deployment and capture do not yet
+share an exclusion mechanism; an overlap can disconnect deployment SSH. Record
+that failure separately, wait for automatic service recovery and retry unchanged
+inputs. See the [rebuild evidence](../evidence/lab-bootstrap-2026-11-19.md).

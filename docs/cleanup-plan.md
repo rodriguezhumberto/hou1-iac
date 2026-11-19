@@ -31,8 +31,8 @@ independent owners can work in the same checkout.
   Python code only when its execution and delivery contracts are clear.
 - Document required inputs and owned resources for roles being changed.
 - Keep documentation short. Record consequential design choices with their reason.
-- Keep HOU4 local. HOU1 may be pushed for PR review; do not deploy, decrypt
-  production inputs or change live nodes.
+- Keep HOU4 local. Separate code changes from deployment; acceptance runs use
+  explicitly authorized test hosts and inputs.
 
 ## Validation
 
@@ -243,6 +243,15 @@ failed first capture. A full unchanged-input repeat preserved all twelve
 container IDs and the recovery point; the source backup playbook repeated with
 zero changes. Backup timers, restricted transport and monitoring checks passed.
 
-Next: fresh-host bootstrap from frozen inputs. Use empty isolated VMs and retain
-the current lab recovery point. Live transfer interruption, clean-host restore
-and peer replacement are separate acceptance runs with their existing checkpoints.
+Fresh-host bootstrap from frozen inputs passed on both rebuilt VMs at HOU1
+`0bfc7b5` and HOU4 `6acf783`. The first preparation attempt exposed a DNS ordering
+bug; the corrected run started again from clean disks. The
+[rebuild evidence](evidence/lab-bootstrap-2026-11-19.md) separates those attempts,
+unchanged replay and recovery checks.
+
+Next: coordinate scheduled backup capture with deployment. Capture briefly stops
+the VPN and interrupted a concurrent source transfer; automatic recovery and a
+same-input workflow retry passed. Add a shared exclusion mechanism and overlap
+tests rather than treating SSH retries as coordination. Live transfer interruption,
+clean-host restore and peer replacement remain separate acceptance runs with
+their existing checkpoints.

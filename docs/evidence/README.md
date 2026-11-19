@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Fresh HOU1/HOU4 bootstrap | [Rebuild and acceptance, 2026-11-19](lab-bootstrap-2026-11-19.md) |
 | Lab backup capture and collection | [Acceptance and unchanged repeat, 2026-11-18](backup-acceptance-2026-11-18.md) |
 | Service interruption and dependency failure | [Failure matrix, 2026-11-18](failure-matrix-2026-11-18.md) |
 | Application lifecycle | [Local fixtures and legacy lab compatibility, 2026-11-17](application-lifecycle-2026-11-17.md) |

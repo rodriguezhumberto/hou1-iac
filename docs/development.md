@@ -11,7 +11,8 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
 | Check lab release, identity and backup inputs locally | `scripts/deploy-lab.py --phase inputs` | [Input contracts](lab-inputs.md) |
 | Generate private inventories and verify managed access | `scripts/prepare-lab.py` | [Inventory generation](lab-inventory.md) |
-| Use an existing isolated controller VPN | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
+| Bootstrap empty isolated VMs from frozen inputs | Existing rehearsal and host playbooks | [Fresh lab bootstrap](probes/lab-bootstrap.md) |
+| Run commands through isolated bootstrap or VPN transport | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
 | Prepare isolated host/container DNS | `ansible/playbooks/lab-dns.yml` | [Lab DNS](lab-dns.md) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
 | Upgrade installed OS packages | `ansible/playbooks/os-maintenance.yml` | [OS maintenance](os-maintenance.md) |
@@ -88,8 +89,10 @@ The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery a
 
 The [intervention audit](deployment-interventions.md) assigns the lab's manual
 steps to code, private inputs or external prerequisites. The
-[deployment workflow](deployment-workflow.md) describes the supported automation
-and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.
+[deployment workflow](deployment-workflow.md) describes the supported automation.
+The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap,
+repeat checks and the remaining backup/deployment scheduling gap.
+Keep reusable logic in Git and private values outside it.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
 `shared_ingress_independent`; the combined project remains the default.
