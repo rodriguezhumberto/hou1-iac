@@ -178,9 +178,13 @@ def install(cfg):
             command += ['--build-arg', key]
         run(*command, str(APP), env={**os.environ, **{key: env.get(key, '') for key in keys}}, timeout=1200)
     # Runtime secret files never enter the application build context.
-    for name in ['.env', 'docker-compose.override.yml']:
+    for name in ['.env']:
         shutil.copyfile(payload / 'app-config' / name, APP / name)
         (APP / name).chmod(0o600)
+    override = ROOT / 'app.override.json'
+    shutil.copyfile(override if override.exists() else payload / 'app-config/docker-compose.override.yml',
+                    APP / 'docker-compose.override.yml')
+    (APP / 'docker-compose.override.yml').chmod(0o600)
     if receipt is not None:
         (APP / 'application-image.json').write_text(json.dumps(receipt, indent=2) + '\n')
         (APP / 'application-image.json').chmod(0o644)
@@ -228,18 +232,47 @@ def install(cfg):
         shutil.copyfile(ROOT / name, VPN / 'ingress' / name)
     (VPN / 'nginx-include.conf').write_text('include /etc/nginx/netbird/*.conf;\n')
     networks = cfg['deployment']['networks']
-    run('docker', 'network', 'create', networks['auth'])
-    run('docker', 'network', 'create', '--subnet', networks['subnet'], '--ip-range', networks['dynamic_range'], networks['netbird'])
+    internal = ['--internal'] if cfg.get('quarantine', False) else []
+    run('docker', 'network', 'create', *internal, networks['auth'])
+    run('docker', 'network', 'create', *internal, '--subnet', networks['subnet'], '--ip-range', networks['dynamic_range'], networks['netbird'])
+    app_network = configs['app'].get('networks', {}).get('app-network', {})
+    if app_network.get('external'):
+        run('docker', 'network', 'create', *internal, app_network['name'])
     run('ufw', '--force', 'reset')
     run('ufw', 'default', 'deny', 'incoming')
     run('ufw', 'default', 'allow', 'outgoing')
     run('ufw', 'allow', 'from', cfg['bootstrap_cidr'], 'to', 'any', 'port', '22', 'proto', 'tcp')
     run('ufw', '--force', 'enable')
-    if cfg['environment'] == 'test':
+    if cfg['environment'] == 'test' and not cfg.get('quarantine', False):
         isolation = {key: cfg[key] for key in ['environment', 'deny_cidrs', 'test_addresses', 'allow_local_cidrs', 'allow_update_cidrs']}
         (ROOT / 'isolation.json').write_text(json.dumps(isolation) + '\n')
         run('python3', str(ROOT / 'isolation.py'), str(ROOT / 'isolation.json'))
     return configs
+
+
+def verify_quarantine(cfg):
+    if not cfg.get('quarantine', False):
+        return
+    ids = set()
+    for project in PROJECTS:
+        ids.update(dc(project, 'ps', '--all', '--quiet').decode().split())
+    if not ids:
+        raise ValueError('No quarantined recovery services')
+    containers = json.loads(run('docker', 'inspect', *sorted(ids)))
+    network_ids = set()
+    for item in containers:
+        if item['HostConfig']['NetworkMode'] == 'host' or item['HostConfig']['Privileged']:
+            raise ValueError('Quarantine cannot use host networking or privileges')
+        for bindings in (item['HostConfig']['PortBindings'] or {}).values():
+            if any(binding['HostIp'] != '127.0.0.1' for binding in bindings):
+                raise ValueError('Quarantined ports must stay on loopback')
+        attached = item['NetworkSettings']['Networks']
+        if not attached:
+            raise ValueError('Quarantined service has no declared network')
+        network_ids.update(value['NetworkID'] for value in attached.values())
+    networks = json.loads(run('docker', 'network', 'inspect', *sorted(network_ids)))
+    if any(not item['Internal'] or not set(item.get('Containers', {})).issubset(ids) for item in networks):
+        raise ValueError('Recovery network is external or shared with another workload')
 
 
 def restore(cfg):
@@ -263,11 +296,13 @@ def restore(cfg):
     dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server', 'dashboard')
     dc('app', 'up', '-d', '--pull', 'never', '--wait', '--wait-timeout', '180', 'astro-app', 'nginx')
     dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
+    verify_quarantine(cfg)
     report = dict(passed=True, environment=cfg['environment'], staff_revision=cfg['staff_revision'], postgres_tables=tables,
                   sessions_revoked_before_writers=True, identity_bootstrap_run=False, cms_seed_run=False,
                   netbird_connection_flags_reset_before_server=True,
                   netbird_stale_connections_cleared=stale_connections,
                   cold_registry_pulls=True, cold_application_build='application_image' not in cfg,
+                  quarantine=cfg.get('quarantine', False),
                   application_image=cfg.get('application_image'), ports_bound_to_loopback=True,
                   restore_seconds=round(time.monotonic() - started, 3),
                   next='Reconcile access changes, explicitly publish, replace only the lost HOU1 peer, then finalize VPN/security/monitoring/backups')
@@ -282,6 +317,8 @@ def restore(cfg):
 
 
 def publish(cfg):
+    if cfg.get('quarantine', False):
+        raise ValueError('Quarantined replacement cannot be published; use a separate reviewed handoff')
     report = json.loads((ROOT / 'restore-report.json').read_text())
     if (not report['passed'] or (cfg['environment'] == 'production' and
             (report.get('environment') != 'production' or report.get('staff_revision') != cfg['staff_revision']

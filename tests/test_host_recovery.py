@@ -130,6 +130,80 @@ class HostRecoveryPreparationTest(unittest.TestCase):
                 prepare.validate(cfg, metadata, images, app, candidate)
         self.assertEqual(prepare.validate(cfg, metadata, images, app, vpn)['netbird'], cfg['origins']['netbird'])
 
+    def test_quarantine_accepts_a_lan_bootstrap_source_only_for_test(self):
+        cfg, metadata, images, app, vpn = self.values()
+        local = {**cfg, 'quarantine': True, 'bootstrap_cidr': '192.168.50.20/32',
+                 'deny_cidrs': [], 'test_addresses': []}
+        self.assertEqual(prepare.validate(local, metadata, images, app, vpn), cfg['origins'])
+        for change in ({'quarantine': False}, {'quarantine': 'true'}, {'environment': 'production'},
+                       {'bootstrap_cidr': '192.168.50.0/24'}, {'bootstrap_cidr': '127.0.0.1/32'}):
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                prepare.validate({**local, **change}, metadata, images, app, vpn)
+
+    def test_standard_host_runtime_identity_must_match_the_saved_path(self):
+        cfg, metadata, images, app, vpn = self.values()
+        cfg['runtime_age_path'] = '/root/.config/sops/age/keys.txt'
+        with self.assertRaisesRegex(ValueError, 'host-only runtime key'):
+            prepare.validate(cfg, metadata, images, app, vpn)
+        metadata['recovery_files'] = [cfg['runtime_age_path']]
+        self.assertEqual(prepare.validate(cfg, metadata, images, app, vpn), cfg['origins'])
+
+    def modern_ingress(self, cfg, payload):
+        application = cfg['deployment']['projects']['app'] + '-application'
+        webfile = payload / 'app-config/docker-compose.yml'
+        web = yaml.safe_load(webfile.read_text())
+        web['networks'] = {'app-network': {'driver': 'bridge'}}
+        for service in web['services'].values():
+            service['networks'] = ['app-network']
+        webfile.write_text(yaml.safe_dump(web))
+        networks = cfg['deployment']['networks']
+        override = {'networks': {'app-network': {'external': True, 'name': application},
+                    'authentik-ingress': {'external': True, 'name': networks['auth']},
+                    'netbird-ingress': {'external': True, 'name': networks['netbird']}},
+                    'services': {'nginx': {'profiles': ['integrated-ingress-disabled'],
+                        'stop_signal': 'SIGQUIT', 'stop_grace_period': '30s',
+                        'networks': {'app-network': {}, 'authentik-ingress': {},
+                                     'netbird-ingress': {'ipv4_address': networks['proxy_ip']}}}}}
+        (payload / 'app-config/docker-compose.override.yml').write_text(yaml.safe_dump(override))
+        return override
+
+    def test_saved_independent_ingress_reactivates_only_the_cold_listener(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); cfg, payload, bundle, images = self.fixture(root)
+            override = self.modern_ingress(cfg, payload)
+            original = (payload / 'app-config/docker-compose.override.yml').read_bytes()
+            prepare.prepare(cfg, payload, bundle, images, root / 'prepared')
+            restored = json.loads((root / 'prepared/app.override.json').read_text())
+            self.assertNotIn('profiles', restored['services']['nginx'])
+            self.assertEqual(restored['services']['nginx']['stop_signal'], 'SIGQUIT')
+            web = json.loads((root / 'prepared/app.compose.json').read_text())
+            self.assertEqual(web['networks']['app-network'], override['networks']['app-network'])
+            self.assertEqual((payload / 'app-config/docker-compose.override.yml').read_bytes(), original)
+            for key, value in [('profiles', ['unexpected']), ('stop_signal', 'SIGKILL'),
+                               ('stop_grace_period', '1s')]:
+                override['services']['nginx'][key] = value
+                (payload / 'app-config/docker-compose.override.yml').write_text(yaml.safe_dump(override))
+                with self.subTest(key=key), self.assertRaises(ValueError):
+                    prepare.prepare(cfg, payload, bundle, images, root / ('reject-' + key))
+                override = self.modern_ingress(cfg, payload)
+
+    def test_quarantined_render_is_internal_and_keeps_local_issuer_resolution(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); cfg, payload, bundle, images = self.fixture(root)
+            self.modern_ingress(cfg, payload)
+            cfg.update(quarantine=True, bootstrap_cidr='192.168.50.20/32', deny_cidrs=[], test_addresses=[])
+            prepare.prepare(cfg, payload, bundle, images, root / 'prepared')
+            for name in ['auth.compose.json', 'netbird.compose.json', 'app.compose.json', 'app.override.json']:
+                config = json.loads((root / 'prepared' / name).read_text())
+                for network in config.get('networks', {}).values():
+                    if not network.get('external'):
+                        self.assertTrue(network['internal'])
+            override = json.loads((root / 'prepared/app.override.json').read_text())
+            for options in override['services']['nginx']['networks'].values():
+                self.assertEqual(options['aliases'], sorted(cfg['hostnames']))
+            with tarfile.open(root / 'prepared/bundle.tar') as archive:
+                self.assertIn('app.override.json', archive.getnames())
+
     def fixture(self, root):
         payload = drill_tests.RecoveryPreparationTest().fixture(root / 'payload')
         cfg, metadata, images, app, vpn = self.values()
@@ -272,6 +346,31 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
 
 class HostRecoveryRuntimeTest(unittest.TestCase):
+    def test_quarantined_copy_refuses_publication_before_reading_or_mutating_state(self):
+        with patch.object(restore, 'run') as run, patch.object(restore, 'dc') as dc:
+            with self.assertRaisesRegex(ValueError, 'cannot be published'):
+                restore.publish({'quarantine': True})
+            run.assert_not_called(); dc.assert_not_called()
+
+    def test_quarantine_verifies_actual_networks_and_loopback_bindings(self):
+        container = {'HostConfig': {'NetworkMode': 'net', 'Privileged': False,
+                        'PortBindings': {'443/tcp': [{'HostIp': '127.0.0.1', 'HostPort': '443'}]}},
+                     'NetworkSettings': {'Networks': {'net': {'NetworkID': 'netid'}}}}
+        projects = {'app': ('app', Path('/fixture/app'))}
+        networks = [{'Internal': True, 'Containers': {'containerid': {}}}]
+        with patch.object(restore, 'PROJECTS', projects), patch.object(restore, 'dc', return_value=b'containerid\n'):
+            with patch.object(restore, 'run', side_effect=[json.dumps([container]).encode(), json.dumps(networks).encode()]):
+                restore.verify_quarantine({'quarantine': True})
+            for bad in [{'Internal': False, 'Containers': {'containerid': {}}},
+                        {'Internal': True, 'Containers': {'other-container': {}}}]:
+                with self.subTest(network=bad), patch.object(restore, 'run', side_effect=[
+                        json.dumps([container]).encode(), json.dumps([bad]).encode()]):
+                    with self.assertRaises(ValueError):
+                        restore.verify_quarantine({'quarantine': True})
+            container['HostConfig']['PortBindings']['443/tcp'][0]['HostIp'] = '0.0.0.0'
+            with patch.object(restore, 'run', return_value=json.dumps([container]).encode()):
+                with self.assertRaisesRegex(ValueError, 'loopback'):
+                    restore.verify_quarantine({'quarantine': True})
     def setUp(self):
         restore.configure(inputs())
 

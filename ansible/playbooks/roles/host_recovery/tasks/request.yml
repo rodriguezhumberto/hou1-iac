@@ -7,6 +7,7 @@
     host_recovery_request:
       id: '{{ host_recovery_id }}'
       environment: test
+      quarantine: '{{ host_recovery_quarantine | bool }}'
       staff_revision: '{{ rehearsal_staff_ref }}'
       test_suffix: '{{ primary_domain }}'
       netbird_subnet: '{{ netbird_subnet }}'
@@ -47,6 +48,9 @@
     that:
       - host_recovery_request.id == host_recovery_id
       - host_recovery_request.environment == cms_environment
+      - host_recovery_quarantine is boolean
+      - host_recovery_request.quarantine | default(false) == host_recovery_quarantine
+      - not host_recovery_quarantine or cms_environment == 'test'
       - host_recovery_request.netbird_subnet == netbird_subnet
       - host_recovery_request.server_ip == netbird_ip
       - host_recovery_request.runtime_age_path == authentik_age_key_file

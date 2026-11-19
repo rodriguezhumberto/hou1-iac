@@ -19,6 +19,13 @@ Optional inputs belong in private recovery inventory:
   HOU1 in the exact renewal receiver group while preserving other receivers.
 
 The role owns recovery staging and evidence under its selected recovery ID.
+`host_recovery_quarantine: true` is test-only. It restores a separate empty VM
+on Docker-internal networks, binds ingress/STUN to loopback, and resolves saved
+service names to the restored proxy inside those networks. It refuses publication;
+no controller/companion refresh or peer replacement runs. The recorded source
+configuration remains intact; cold recovery renders the combined ingress listener
+even when its saved override disabled that listener after ingress separation.
+
 Optional transport refresh preserves identities and persistent data. Group binding
 accepts completed/partial assignments. `host_recovery_resume` (default `false`)
 requires the successful publication checkpoint and original private handoff plan;

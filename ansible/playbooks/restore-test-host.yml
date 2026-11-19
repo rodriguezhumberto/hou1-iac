@@ -24,7 +24,8 @@
           - ansible_facts.architecture == 'x86_64'
           - host_recovery_console_confirmed | default(false) | bool
           - host_recovery_id is match('^[a-z0-9][a-z0-9-]{5,39}$')
-          - app_directory == '/opt/pearlandpaws-test'
+          - app_directory is match('^/opt/[a-zA-Z0-9_-]+$')
+          - "'test' in (app_directory | basename)"
           - authentik_environment == 'test'
           - netbird_version == '0.82.0'
           - not ansible_check_mode
@@ -54,11 +55,11 @@
                 path = Path(value)
                 assert not path.exists() and not path.is_symlink(), 'Existing recovery destination'
                 assert not any(parent.is_symlink() for parent in path.parents), 'Symlink destination'
-          - /opt/pearlandpaws-test
-          - /opt/hou1-authentik/test
-          - /opt/hou1-netbird
-          - /var/lib/hou1-authentik/test
-          - /var/lib/pearlandpaws/test
+          - '{{ app_directory }}'
+          - '{{ authentik_project_root_base }}/{{ authentik_environment }}'
+          - '{{ netbird_control_plane_directory }}'
+          - '{{ authentik_data_root_base }}/{{ authentik_environment }}'
+          - '{{ cms_data_directory }}'
           - '/var/lib/hou1-host-recovery/{{ host_recovery_id }}'
       changed_when: false
 

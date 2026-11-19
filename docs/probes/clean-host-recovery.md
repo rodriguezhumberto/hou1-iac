@@ -25,6 +25,21 @@ release the fresh-VM wipe checkpoint below.
 
 ## Before wiping HOU1
 
+For a separate fresh VM while HOU1 remains active, set
+`host_recovery_quarantine: true` and bind its private bootstrap inventory to that
+VM's distinct LAN address. The controller source must remain one explicit `/32`;
+LAN sources are accepted only in this test mode. Run `restore-test-host.yml` with
+frozen point/source/image inputs and independent recovery access confirmed.
+
+Quarantine creates every restored Docker network as internal, uses loopback-only
+listeners and validates the actual running network/port bindings. Saved issuers
+resolve to the restored proxy inside Docker. Publication is refused; do not run
+the peer handoff against the active HOU1. HOU4 connectivity/firewall exceptions
+are unnecessary for local recovery checks and remain a separate decision.
+
+The following wipe/publication checkpoints apply to replacement of the active
+host, not to an unpublished quarantined copy.
+
 1. Confirm HOU4 provider-console login independently of NetBird. Restoring
    NetBird's database and keys should reconnect existing peers, but that is a
    recovery check, not a substitute for console access. Leave alerts enabled.
