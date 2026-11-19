@@ -22,14 +22,17 @@ import tempfile
 import time
 
 
+
 ROOT = Path(__file__).resolve().parents[1]
 DEPLOY = ROOT / 'scripts' / 'deploy-lab.py'
 sys.path.insert(0, str(ROOT / 'scripts'))
+import lab_backup_matrix
 SPEC = importlib.util.spec_from_file_location('deploy_lab', DEPLOY)
 deploy_lab = importlib.util.module_from_spec(SPEC)
 SPEC.loader.exec_module(deploy_lab)
 
-SCENARIOS = ('application', 'monitoring', 'dependency')
+SERVICE_SCENARIOS = ('application', 'monitoring', 'dependency')
+SCENARIOS = (*SERVICE_SCENARIOS, 'backup')
 SERVICE_NAME = r'[a-zA-Z0-9][a-zA-Z0-9_.-]*'
 
 
@@ -62,10 +65,10 @@ def load_config(path, matrix_path):
 
 
 def validate_matrix(config, matrix):
-    require(set(matrix) == set(SCENARIOS),
-            'Declare application, monitoring and dependency matrix scenarios')
+    require(set(SERVICE_SCENARIOS) <= set(matrix) <= set(SCENARIOS),
+            'Declare application, monitoring and dependency, with optional backup')
     expected_hosts = {'application': 'hou1', 'monitoring': 'hou4', 'dependency': 'hou1'}
-    for name in SCENARIOS:
+    for name in SERVICE_SCENARIOS:
         value = matrix[name]
         require(isinstance(value, dict) and
                 set(value) >= {'host', 'compose_index', 'service'},
@@ -94,6 +97,13 @@ def validate_matrix(config, matrix):
             'The readiness port is invalid')
     require(isinstance(readiness['path'], str) and readiness['path'].startswith('/')
             and '\n' not in readiness['path'], 'The readiness path is invalid')
+    if 'backup' in matrix:
+        backup = matrix['backup']
+        require(config.get('version') == 2, 'Backup interruption requires version 2 input contracts')
+        require(isinstance(backup, dict) and set(backup) == {'host', 'recovery_identity'}
+                and backup['host'] == 'hou4' and isinstance(backup['recovery_identity'], str),
+                'Declare the backup receiver and controller-only recovery identity')
+        deploy_lab.private_file(backup['recovery_identity'])
 
 
 def compose_command(project):
@@ -146,17 +156,19 @@ class Matrix:
         self.workflow = deploy_lab.Workflow(config, run)
         self.cleanup = []
         self.steps = []
+        self.scenarios = [name for name in SCENARIOS if name in matrix]
         self.metadata = {
             'configuration_sha256': hashlib.sha256(
                 json.dumps(config, sort_keys=True).encode()).hexdigest(),
             'revisions': {name: host['revision'] for name, host in config['hosts'].items()},
+            'matrix_sha256': hashlib.sha256(json.dumps(matrix, sort_keys=True).encode()).hexdigest(),
         }
         self.save('running')
 
     def save(self, status):
         deploy_lab.write_private(self.run / 'matrix.json', json.dumps({
             'version': 1, 'environment': 'test', 'status': status,
-            **self.metadata, 'steps': self.steps}, indent=2) + '\n')
+            **self.metadata, 'scenarios': self.scenarios, 'steps': self.steps}, indent=2) + '\n')
 
     def record(self, name, status, **fields):
         item = {'step': name, 'status': status, **fields}
@@ -248,32 +260,47 @@ class Matrix:
                 self.cleanup.remove(name)
         self.record(name, 'passed')
 
-    def run_all(self):
+    def run_all(self, scenarios=None):
+        scenarios = tuple(name for name in SCENARIOS if name in self.matrix) if scenarios is None else scenarios
+        self.scenarios = list(scenarios)
         try:
             self.verify_workflow()
             self.record('baseline', 'passed')
             # Baseline verification validated both targets and input contracts.
             # Keep its source capture out of the intentional service outages too.
-            self.workflow.transports['hou1'] = deploy_lab.transport(self.config['hosts']['hou1'])
-            with self.workflow.capture_guard():
-                self.record('capture-admission', 'passed')
-                self.scenario('application',
-                              lambda: self.restore('application'), self.verify_workflow)
-                self.scenario('monitoring',
-                              lambda: self.restore('monitoring'), self.verify_workflow)
-                self.scenario('dependency', self.verify_hou4_advisory, lambda: None)
-                self.verify_workflow()
-                self.workflow.check_inputs()
-                self.record('final', 'passed')
+            services = [name for name in scenarios if name in SERVICE_SCENARIOS]
+            if services:
+                self.workflow.transports['hou1'] = deploy_lab.transport(self.config['hosts']['hou1'])
+                with self.workflow.capture_guard():
+                    self.record('capture-admission', 'passed')
+                    actions = {
+                        'application': (lambda: self.restore('application'), self.verify_workflow),
+                        'monitoring': (lambda: self.restore('monitoring'), self.verify_workflow),
+                        'dependency': (self.verify_hou4_advisory, lambda: None),
+                    }
+                    for name in services:
+                        self.scenario(name, *actions[name])
+                    self.verify_workflow()
+                    self.workflow.check_inputs()
+            if 'backup' in scenarios:
+                self.record('backup', 'running')
+                try:
+                    lab_backup_matrix.BackupScenario(self.config, self.matrix['backup'], self.run / 'backup').execute()
+                except BaseException:
+                    self.record('backup', 'failed')
+                    raise
+                self.record('backup', 'passed')
+            self.record('final', 'passed')
             self.save('passed')
         except BaseException:
             self.save('failed')
             raise
 
 
-def plan(matrix):
+def plan(matrix, scenarios=None):
     return {'scope': 'declared test hosts; non-destructive service interruptions',
-            'scenarios': list(SCENARIOS), 'reboot': 'separate opt-in drill'}
+            'scenarios': list(scenarios or [name for name in SCENARIOS if name in matrix]),
+            'reboot': 'separate opt-in drill'}
 
 
 def main(argv=None):
@@ -281,12 +308,17 @@ def main(argv=None):
     parser.add_argument('--config', required=True)
     parser.add_argument('--matrix', required=True, help='Private matrix declaration file')
     parser.add_argument('--apply', action='store_true', help='Apply the declared test-host interruptions')
+    parser.add_argument('--scenario', action='append', choices=SCENARIOS,
+                        help='Run only the selected declared scenario; repeat to select several')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
         config, matrix = load_config(args.config, args.matrix)
+        selected = tuple(args.scenario or [name for name in SCENARIOS if name in matrix])
+        require(len(selected) == len(set(selected)) and all(name in matrix for name in selected),
+                'Select each declared scenario at most once')
         if not args.apply:
-            print(json.dumps(plan(matrix), indent=2))
+            print(json.dumps(plan(matrix, selected), indent=2))
             return 0
         root = Path(config['run_directory'])
         with (root / '.failure-matrix.lock').open('a') as lock:
@@ -294,7 +326,7 @@ def main(argv=None):
             run = Path(tempfile.mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-'), dir=root))
             os.chmod(run, 0o700)
             print('Private run directory: ' + str(run), flush=True)
-            Matrix(config, matrix, run).run_all()
+            Matrix(config, matrix, run).run_all(selected)
     except MatrixError as error:
         print(str(error), file=sys.stderr)
         return 1

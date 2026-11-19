@@ -19,6 +19,7 @@ The controller needs Git, SOPS, age and OpenSSH, plus the tools from `make setup
 | Source bundle, branch ref and authorization module | Workflow `release`; effective source inputs must match |
 | Identity names and client/group identifiers | Existing scoped SOPS bundle; never move names into tracked examples |
 | Credentials and age identities | Existing scoped private files; the workflow does not create or rotate them |
+| Optional backup matrix `recovery_identity` | Controller-only offline age key; the drill fingerprints it and checks HOU1's recipient before capture |
 
 Preserve Ansible precedence. Existing copied inventory values remain explicit
 overrides until reviewed; deleting them automatically could change deployment.

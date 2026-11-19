@@ -3,6 +3,7 @@
 import importlib.util
 from contextlib import contextmanager
 from pathlib import Path
+import tempfile
 import unittest
 from unittest.mock import Mock, patch
 
@@ -79,6 +80,7 @@ class FailureMatrixTest(unittest.TestCase):
     def test_host_lock_spans_every_interruption_and_final_verification(self):
         runner = object.__new__(matrix.Matrix)
         runner.config = config()
+        runner.matrix = declarations()
         runner.workflow = Mock(transports={})
         events = []
         @contextmanager
@@ -104,6 +106,7 @@ class FailureMatrixTest(unittest.TestCase):
     def test_failed_admission_never_starts_an_interruption(self):
         runner = object.__new__(matrix.Matrix)
         runner.config = config()
+        runner.matrix = declarations()
         runner.workflow = Mock(transports={})
         runner.workflow.capture_guard.side_effect = ValueError('Capture owns host')
         runner.verify_workflow = Mock()
@@ -115,6 +118,36 @@ class FailureMatrixTest(unittest.TestCase):
                 runner.run_all()
         runner.scenario.assert_not_called()
         runner.save.assert_called_once_with('failed')
+
+    def test_backup_opt_in_requires_version_two_receiver_and_private_controller_identity(self):
+        with tempfile.TemporaryDirectory() as folder:
+            identity = Path(folder) / 'recovery.agekey'; identity.write_text('fixture identity'); identity.chmod(0o600)
+            declared = declarations()
+            declared['backup'] = {'host': 'hou4', 'recovery_identity': str(identity)}
+            inputs = {**config(), 'version': 2}
+            matrix.validate_matrix(inputs, declared)
+            self.assertEqual(matrix.plan(declared)['scenarios'], ['application', 'monitoring', 'dependency', 'backup'])
+            for change in ({'host': 'hou1'}, {'command': 'arbitrary'}, {'recovery_identity': None}):
+                invalid = {**declared, 'backup': {**declared['backup'], **change}}
+                with self.subTest(change=change), self.assertRaises(ValueError):
+                    matrix.validate_matrix(inputs, invalid)
+            with self.assertRaises(ValueError):
+                matrix.validate_matrix({**inputs, 'version': 1}, declared)
+            identity.chmod(0o644)
+            with self.assertRaises(ValueError):
+                matrix.validate_matrix(inputs, declared)
+
+    def test_backup_only_does_not_hold_the_outer_capture_guard(self):
+        runner = object.__new__(matrix.Matrix)
+        runner.config = config(); runner.matrix = declarations()
+        runner.matrix['backup'] = {'host': 'hou4', 'recovery_identity': '/private/recovery.agekey'}
+        runner.run = Path('/private/run'); runner.workflow = Mock()
+        runner.verify_workflow = Mock(); runner.record = Mock(); runner.save = Mock()
+        with patch.object(matrix.lab_backup_matrix, 'BackupScenario') as backup:
+            runner.run_all(('backup',))
+        runner.workflow.capture_guard.assert_not_called()
+        backup.return_value.execute.assert_called_once_with()
+        runner.save.assert_called_once_with('passed')
 
 
 if __name__ == '__main__':

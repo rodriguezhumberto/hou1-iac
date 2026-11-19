@@ -83,6 +83,11 @@ explicit drill because it interrupts the host. Run this command inside
 `scripts/lab-network.py`; it refuses non-test workflow inputs and writes private
 JSON evidence under the workflow run directory.
 
+The optional [backup scenario](probes/backup-transfer.md) creates a fresh recovery
+point, interrupts its live transfer and requires the collector's bounded retry
+and controller-side offline verification. `--scenario backup` selects that case;
+without selection flags the runner executes every declared scenario.
+
 ### Isolated controller transport
 
 Before VPN enrollment, use [the bootstrap transport](../examples/lab-bootstrap-network.json)
