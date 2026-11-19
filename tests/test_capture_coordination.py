@@ -177,6 +177,23 @@ export.run()
         with self.operation.exclusive(timeout=0):
             pass
 
+    def test_transport_retry_starts_a_fresh_keepalive(self):
+        path = self.root / 'operation_lock.py'
+        path.write_text(path.read_text().replace('HOLD_IDLE_SECONDS = 60', 'HOLD_IDLE_SECONDS = 1.0'))
+        attempted = self.root / 'first-ssh-attempt'
+        program = ("import sys\nfrom pathlib import Path\n"
+                   f"attempted = Path({str(attempted)!r})\n"
+                   "if not attempted.exists():\n    attempted.touch()\n    sys.exit(255)\n"
+                   + self.hold[-1])
+        with patch.object(lab_capture_guard, 'KEEPALIVE_SECONDS', 0.05):
+            with CaptureGuard([sys.executable, '-u', '-c', program],
+                              self.root / 'retry-admission.log', timeout=8) as guard:
+                time.sleep(1.2)
+                guard.check()
+        self.assertTrue(attempted.exists())
+        with self.operation.exclusive(timeout=0):
+            pass
+
     def test_controller_keepalive_preserves_a_healthy_lease(self):
         path = self.root / 'operation_lock.py'
         path.write_text(path.read_text().replace('HOLD_IDLE_SECONDS = 60', 'HOLD_IDLE_SECONDS = 0.5'))

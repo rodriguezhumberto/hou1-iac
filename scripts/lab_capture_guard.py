@@ -29,6 +29,7 @@ class CaptureGuard:
             descriptor = os.open(self.log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
             with os.fdopen(descriptor, 'wb') as diagnostics:
                 while True:
+                    self.stopped.clear()
                     self.process = subprocess.Popen(self.command, stdin=subprocess.PIPE,
                         stdout=subprocess.PIPE, stderr=diagnostics)
                     with selectors.DefaultSelector() as selector:
