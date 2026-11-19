@@ -149,6 +149,30 @@ class FailureMatrixTest(unittest.TestCase):
         backup.return_value.execute.assert_called_once_with()
         runner.save.assert_called_once_with('passed')
 
+    def test_backup_runs_after_the_service_guard_is_released(self):
+        runner = object.__new__(matrix.Matrix)
+        runner.config = config(); runner.matrix = declarations()
+        runner.matrix['backup'] = {'host': 'hou4', 'recovery_identity': '/private/recovery.agekey'}
+        runner.run = Path('/private/run'); runner.workflow = Mock(transports={})
+        events = []
+        @contextmanager
+        def guard():
+            events.append('admit')
+            try: yield
+            finally: events.append('release')
+        runner.workflow.capture_guard = guard
+        runner.verify_workflow = lambda: events.append('verify')
+        runner.record = Mock(); runner.save = Mock(); runner.restore = Mock()
+        runner.verify_hou4_advisory = Mock()
+        runner.scenario = lambda name, *_: events.append(name)
+        with patch.object(matrix.deploy_lab, 'transport', return_value=('pinned',)), \
+                patch.object(matrix.lab_backup_matrix, 'BackupScenario') as backup:
+            backup.return_value.execute.side_effect = lambda: events.append('backup')
+            runner.run_all()
+        self.assertEqual(events, ['verify', 'admit', 'application', 'monitoring',
+                                  'dependency', 'verify', 'release', 'backup'])
+        self.assertEqual(runner.scenarios, ['application', 'monitoring', 'dependency', 'backup'])
+
 
 if __name__ == '__main__':
     unittest.main()
