@@ -1,0 +1,12 @@
+{
+  "version": 1,
+  "environment": "test",
+  "transport": "bootstrap",
+  "management_url": "https://netbird-test.lab-test.example.invalid",
+  "resolver_file": "/private/lab/resolv.conf",
+  "hosts": {
+    "netbird-test.lab-test.example.invalid": "192.168.50.11",
+    "auth-test.lab-test.example.invalid": "192.168.50.11",
+    "staff-test.lab-test.example.invalid": "192.168.50.11"
+  }
+}

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run a command through an existing dedicated test VPN container on Linux."""
+"""Run lab commands with private DNS, using LAN bootstrap or a dedicated VPN."""
 
 import argparse
 import hashlib
@@ -48,19 +48,27 @@ def private_file(value, uid):
 
 def load_config(path, uid):
     config = json.loads(private_file(path, uid).read_text())
-    require(set(config) - {'hosts'} == {'version', 'environment', 'container', 'image',
-            'state_directory', 'resolver_file', 'management_url', 'address'},
-            'Declare the complete lab transport configuration')
     require(type(config['version']) is int and config['version'] == 1 and config['environment'] == 'test',
             'Only version 1 test transport configurations are supported')
-    require(re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', config['container']) and
-            re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}', config['image']),
-            'Declare one container and its digest-pinned image')
-    state = Path(config['state_directory'])
-    require(state.is_absolute() and state.is_dir() and not state.is_symlink(),
-            'Declare the existing dedicated peer state directory')
-    require(state.stat().st_uid == uid and not state.stat().st_mode & 0o077,
-            'The dedicated peer state directory must be operator-owned and mode 0700')
+    kind = config.get('transport', 'vpn')
+    require(kind in ('vpn', 'bootstrap'), 'Select VPN or bootstrap transport')
+    if kind == 'bootstrap':
+        require(set(config) == {'version', 'environment', 'transport', 'resolver_file',
+                'management_url', 'hosts'}, 'Declare only bootstrap DNS inputs, without VPN state')
+    else:
+        require(set(config) - {'hosts', 'transport'} == {'version', 'environment', 'container', 'image',
+                'state_directory', 'resolver_file', 'management_url', 'address'},
+                'Declare the complete lab VPN configuration')
+        require(re.fullmatch(r'[a-zA-Z0-9][a-zA-Z0-9_.-]*', config['container']) and
+                re.fullmatch(r'[a-z0-9./:_-]+@sha256:[a-f0-9]{64}', config['image']),
+                'Declare one container and its digest-pinned image')
+        state = Path(config['state_directory'])
+        require(state.is_absolute() and state.is_dir() and not state.is_symlink(),
+                'Declare the existing dedicated peer state directory')
+        require(state.stat().st_uid == uid and not state.stat().st_mode & 0o077,
+                'The dedicated peer state directory must be operator-owned and mode 0700')
+        require(ipaddress.ip_address(config['address']) in ipaddress.ip_network('100.91.0.0/16'),
+                'Select the test administrative peer overlay address')
     resolver = private_file(config['resolver_file'], uid)
     servers = []
     for line in resolver.read_text().splitlines():
@@ -75,10 +83,12 @@ def load_config(path, uid):
                 'The namespace resolver file supports nameserver addresses and timeout/attempts options')
         servers.append(ipaddress.ip_address(fields[1]))
     require(bool(servers), 'Declare at least one namespace DNS server')
-    management_origin(config['management_url'])
-    validate_hosts(config)
-    require(ipaddress.ip_address(config['address']) in ipaddress.ip_network('100.91.0.0/16'),
-            'Select the test administrative peer overlay address')
+    origin = management_origin(config['management_url'])
+    hosts = validate_hosts(config)
+    if kind == 'bootstrap':
+        require(origin[1] in hosts and all(any(ipaddress.ip_address(value) in ipaddress.ip_network(cidr)
+                for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')) for value in hosts.values()),
+                'Bootstrap must pin the management origin and every declared name to lab LAN addresses')
     return config
 
 
@@ -168,9 +178,14 @@ def enter(config_path, contract, command):
     require(os.readlink('/proc/self/ns/mnt') != contract['mount_namespace'],
             'Resolver changes require a new private mount namespace')
     config = load_config(config_path, contract['uid'])
+    bootstrap = config.get('transport') == 'bootstrap'
+    peer = None if bootstrap else inspect_peer(config)
     require(config == contract['config'] and resolver_hash(config) == contract['resolver_sha256']
-            and inspect_peer(config) == contract['peer'],
+            and peer == contract['peer'],
             'The dedicated transport changed before namespace entry')
+    if bootstrap:
+        require(os.readlink('/proc/self/ns/net') == contract['network_namespace'],
+                'Bootstrap must retain the invoking controller network namespace')
     agent = agent_socket(contract['agent'], contract['uid'])
     hosts = hosts_view(HOSTS_FILE.read_text(), config) if config.get('hosts') else None
     # The caller created a private mount namespace before entering this function.
@@ -183,13 +198,14 @@ def enter(config_path, contract, command):
             path.write_text(hosts); path.chmod(0o644)
             subprocess.run(['mount', '--bind', str(path), '/etc/hosts'], check=True)
     operator = pwd.getpwuid(contract['uid'])
-    argv = ['nsenter', '--target', str(contract['peer']['pid']), '--net',
-            'setpriv', '--reuid', str(contract['uid']), '--regid', str(contract['gid']),
+    argv = ['setpriv', '--reuid', str(contract['uid']), '--regid', str(contract['gid']),
             '--init-groups', '--no-new-privs', '--bounding-set=-all', '--inh-caps=-all',
             '--ambient-caps=-all', '/usr/bin/env', '-i',
             'HOME=' + operator.pw_dir, 'USER=' + operator.pw_name, 'LOGNAME=' + operator.pw_name,
             'PATH=/usr/local/sbin:/usr/local/bin:/usr/sbin:/usr/bin:/sbin:/bin',
             'SSH_AUTH_SOCK=' + agent, *command]
+    if not bootstrap:
+        argv = ['nsenter', '--target', str(peer['pid']), '--net', *argv]
     os.execvp(argv[0], argv)
 
 
@@ -207,10 +223,13 @@ def main(argv=None):
             return 0
         require(sys.platform == 'linux' and os.getuid() > 0, 'Run from a non-root Linux controller account')
         config = load_config(args.config, os.getuid())
+        bootstrap = config.get('transport') == 'bootstrap'
         contract = {'uid': os.getuid(), 'gid': os.getgid(), 'config': config,
-                    'peer': inspect_peer(config), 'resolver_sha256': resolver_hash(config),
+                    'peer': None if bootstrap else inspect_peer(config), 'resolver_sha256': resolver_hash(config),
                     'mount_namespace': os.readlink('/proc/self/ns/mnt'),
                     'agent': agent_socket(os.environ['SSH_AUTH_SOCK'], os.getuid())}
+        if bootstrap:
+            contract['network_namespace'] = os.readlink('/proc/self/ns/net')
         argv = ['sudo', '-n', 'unshare', '--mount', '--propagation', 'private', '/usr/bin/python3',
                 str(Path(__file__).resolve()), '--config', str(Path(args.config).resolve()),
                 '--inside-private-mount', json.dumps(contract), '--', *command]
@@ -219,7 +238,7 @@ def main(argv=None):
         print(str(error), file=sys.stderr)
         return 1
     except (OSError, ValueError, KeyError, TypeError, subprocess.SubprocessError):
-        print('Lab transport failed; check the private configuration, VPN status and sudo access', file=sys.stderr)
+        print('Lab transport failed; check the private configuration, selected transport and sudo access', file=sys.stderr)
         return 1
     return 0
 

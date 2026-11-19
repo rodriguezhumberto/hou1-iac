@@ -5,6 +5,8 @@ supports existing test hosts on `100.91.0.0/16`, with controller-managed HOU1 TL
 It does not bootstrap hosts, enroll the controller, change public DNS, seed identities,
 deploy Authentik/control-plane changes or run destructive acceptance drills.
 Bootstrap and enrollment gaps are assigned in the [intervention audit](deployment-interventions.md).
+The separate [fresh lab procedure](probes/lab-bootstrap.md) orders bootstrap
+playbooks, peer enrollment and the managed handoff.
 
 ## Inputs
 
@@ -83,6 +85,18 @@ JSON evidence under the workflow run directory.
 
 ### Isolated controller transport
 
+Before VPN enrollment, use [the bootstrap transport](../examples/lab-bootstrap-network.json)
+with `transport: bootstrap`. It keeps the controller's network namespace and
+supplies the same private DNS/hosts view. Every pinned name must use a lab LAN
+address, including the management origin. No VPN container or peer state is
+required. Ansible target guards and verified SSH host keys still apply.
+
+```bash
+python3 scripts/lab-network.py --config /private/lab/bootstrap-network.json -- \
+  /private/tooling/bin/ansible-playbook -i /private/lab/bootstrap-inventory.yml \
+  ansible/playbooks/rehearsal-prepare.yml
+```
+
 On a Linux controller, `scripts/lab-network.py` runs a command through an already
 enrolled, dedicated test VPN container. Copy [the transport example](../examples/lab-network.json)
 outside Git and declare its container, image digest, peer state, management URL,
@@ -107,6 +121,8 @@ address, then rechecks them before entry. A private mount namespace supplies DNS
 the command enters only the selected network namespace and runs as the operator
 without capabilities. Controller routes, resolver and hosts file stay unchanged. It does not
 create, enroll or restart peers, modify firewall rules, or use renewal peers.
+The bootstrap transport needs the same namespace/sudo tools and SSH agent, but
+does not inspect Docker or enter a VPN namespace.
 
 `plan` is the default and makes no managed-host connections. It validates the
 local configuration and lists the sequence; it does not establish connectivity.

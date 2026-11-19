@@ -57,6 +57,66 @@ class LabNetworkTest(unittest.TestCase):
                 'HostConfig': {'NetworkMode': 'bridge', 'Privileged': False, 'CapAdd': ['NET_ADMIN']},
                 'Mounts': [{'Source': self.config['state_directory'], 'Destination': '/var/lib/netbird', 'RW': True}]}
 
+    def bootstrap(self):
+        self.config = {'version': 1, 'environment': 'test', 'transport': 'bootstrap',
+                       'management_url': self.config['management_url'],
+                       'resolver_file': self.config['resolver_file'],
+                       'hosts': {'netbird-test.lab-test.example.invalid': '192.168.50.11'}}
+        self.path.write_text(json.dumps(self.config))
+        return self.config
+
+    def test_bootstrap_needs_only_private_lan_dns_inputs(self):
+        self.bootstrap()
+        self.assertEqual(network.load_config(self.path, os.getuid()), self.config)
+        for change in ({'hosts': {}}, {'environment': 'production'},
+                       {'hosts': {'netbird-test.lab-test.example.invalid': '100.91.0.10'}},
+                       {'hosts': {'netbird-test.lab-test.example.invalid': '198.51.100.11'}},
+                       {'container': 'unexpected-vpn'}):
+            with self.subTest(change=change):
+                self.path.write_text(json.dumps({**self.config, **change}))
+                with self.assertRaises(ValueError):
+                    network.load_config(self.path, os.getuid())
+
+    def test_bootstrap_outer_command_does_not_require_an_enrolled_peer(self):
+        self.bootstrap()
+        with patch.object(network, 'inspect_peer') as inspect, \
+                patch.dict(os.environ, {'SSH_AUTH_SOCK': str(self.root / 'agent')}), \
+                patch.object(network.os, 'execvp') as execute:
+            self.assertEqual(network.main(['--config', str(self.path), '--', '/bin/true']), 0)
+        inspect.assert_not_called()
+        argv = execute.call_args.args[1]
+        contract = json.loads(argv[argv.index('--inside-private-mount') + 1])
+        self.assertIsNone(contract['peer'])
+        self.assertEqual(contract['network_namespace'], os.readlink('/proc/self/ns/net'))
+
+    def test_bootstrap_entry_preserves_network_and_drops_privileges(self):
+        self.bootstrap()
+        contract = {**self.contract(), 'peer': None, 'network_namespace': 'net:[controller]'}
+        hosts = self.root / 'hosts'; hosts.write_text('127.0.0.1 localhost\n')
+        for changed in (False, True):
+            def namespace(path):
+                return 'mnt:[private]' if path.endswith('/mnt') else 'net:[wrong]' if changed else 'net:[controller]'
+            with self.subTest(changed=changed), patch.object(network.os, 'geteuid', return_value=0), \
+                    patch.dict(os.environ, {'SUDO_UID': str(os.getuid()), 'SUDO_GID': str(os.getgid())}), \
+                    patch.object(network.os, 'readlink', side_effect=namespace), \
+                    patch.object(network, 'HOSTS_FILE', hosts), \
+                    patch.object(network, 'inspect_peer') as inspect, \
+                    patch.object(network.subprocess, 'run') as run, patch.object(network.os, 'execvp') as execute:
+                if changed:
+                    with self.assertRaises(ValueError):
+                        network.enter(self.path, contract, ['/bin/true'])
+                    run.assert_not_called()
+                    execute.assert_not_called()
+                else:
+                    network.enter(self.path, contract, ['/bin/true'])
+                    argv = execute.call_args.args[1]
+                    self.assertEqual(argv[0], 'setpriv')
+                    self.assertNotIn('nsenter', argv)
+                    self.assertIn('--bounding-set=-all', argv)
+                    self.assertIn('--no-new-privs', argv)
+                    self.assertEqual(len(run.call_args_list), 2)
+                inspect.assert_not_called()
+
     def test_peer_identity_isolation_and_connection_are_checked(self):
         container = self.inspect_fixture()
         status = {'management': {'url': self.config['management_url'] + ':443', 'connected': True},
