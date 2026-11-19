@@ -25,13 +25,16 @@ release the fresh-VM wipe checkpoint below.
 The later [quarantined VM run](../evidence/quarantined-recovery-2026-11-19.md)
 accepted cold startup and local application/identity behavior on a separate VM,
 with peer handoff and companion transport deliberately deferred.
+Use the [lab handoff plan](lab-peer-handoff.md) before replacing the active lab.
 
 ## Before wiping HOU1
 
 For a separate fresh VM while HOU1 remains active, set
 `host_recovery_quarantine: true` and bind its private bootstrap inventory to that
 VM's distinct LAN address. The controller source must remain one explicit `/32`;
-LAN sources are accepted only in this test mode. Run `restore-test-host.yml` with
+test restores accept a public or RFC1918 source; production requires a public
+source. Normal test restore still requires its production-deny and test-address
+inputs. Run `restore-test-host.yml` with
 frozen point/source/image inputs and independent recovery access confirmed.
 
 Quarantine creates every restored Docker network as internal, declares published
@@ -41,6 +44,9 @@ private bridge proxy address for local probes. Saved issuers
 resolve to the restored proxy inside Docker. Publication is refused; do not run
 the peer handoff against the active HOU1. HOU4 connectivity/firewall exceptions
 are unnecessary for local recovery checks and remain a separate decision.
+Changing inventory flags cannot promote this copy: publication checks the
+retained request and rejects quarantine without stopping its services or
+writing a failure marker. A normal handoff requires a fresh restore attempt.
 
 The following wipe/publication checkpoints apply to replacement of the active
 host, not to an unpublished quarantined copy.

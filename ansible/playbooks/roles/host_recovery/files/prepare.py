@@ -52,15 +52,17 @@ def validate(request, metadata, lock, app, netbird):
             raise ValueError('Require the isolated test suffix and test runtime key')
     subnet = ipaddress.ip_network(request['netbird_subnet'], strict=True)
     source = ipaddress.ip_network(request['bootstrap_cidr'], strict=True)
+    lan_source = (not production and source.version == 4 and any(
+        source.subnet_of(ipaddress.ip_network(cidr))
+        for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')))
     if (subnet.version != 4 or subnet.prefixlen < 16 or not subnet.subnet_of(ipaddress.ip_network('100.64.0.0/10'))
             or (not production and str(subnet) == '100.90.0.0/16')
             or source.version != 4 or source.prefixlen != 32
-            or not (source.network_address.is_global or
-                    (quarantine and source.network_address.is_private and not source.network_address.is_loopback))
+            or not (source.network_address.is_global or lan_source)
             or app.get('staff_vpn_subnet') != str(subnet)
             or app['HOU1_VPN_IP'] != request['server_ip']
             or ipaddress.ip_address(request['server_ip']) not in subnet):
-        raise ValueError('Require the saved VPN boundary and one public bootstrap source')
+        raise ValueError('Require the saved VPN boundary and one public bootstrap source (RFC1918 allowed for test only)')
     repositories = dict(REPOSITORIES)
     receipt = metadata.get('application_image')
     if production and receipt is None:

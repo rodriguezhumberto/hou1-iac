@@ -140,6 +140,23 @@ class HostRecoveryPreparationTest(unittest.TestCase):
             with self.subTest(change=change), self.assertRaises(ValueError):
                 prepare.validate({**local, **change}, metadata, images, app, vpn)
 
+    def test_lan_bootstrap_requires_one_test_controller_and_normal_isolation(self):
+        cfg, metadata, images, app, vpn = self.values()
+        for quarantine in [False, True]:
+            for source in ['10.20.30.40/32', '172.20.10.2/32', '192.168.50.20/32']:
+                with self.subTest(quarantine=quarantine, source=source):
+                    self.assertEqual(prepare.validate({**cfg, 'quarantine': quarantine,
+                        'bootstrap_cidr': source}, metadata, images, app, vpn), cfg['origins'])
+            for source in ['192.168.50.0/24', '127.0.0.1/32', '169.254.1.2/32',
+                           '100.91.0.2/32', '192.0.2.1/32', '0.0.0.0/32', '::1/128']:
+                with self.subTest(quarantine=quarantine, source=source), self.assertRaises(ValueError):
+                    prepare.validate({**cfg, 'quarantine': quarantine,
+                        'bootstrap_cidr': source}, metadata, images, app, vpn)
+        for missing in ['deny_cidrs', 'test_addresses']:
+            with self.subTest(missing=missing), self.assertRaisesRegex(ValueError, 'production isolation'):
+                prepare.validate({**cfg, 'bootstrap_cidr': '192.168.50.20/32', missing: []},
+                                 metadata, images, app, vpn)
+
     def test_standard_host_runtime_identity_must_match_the_saved_path(self):
         cfg, metadata, images, app, vpn = self.values()
         cfg['runtime_age_path'] = '/root/.config/sops/age/keys.txt'
@@ -346,6 +363,23 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
 
 class HostRecoveryRuntimeTest(unittest.TestCase):
+    def test_quarantined_entrypoint_rejects_publication_without_failure_cleanup(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory) / 'fixture-01'
+            root.mkdir()
+            cfg = {**inputs(), 'quarantine': True}
+            (root / 'request.json').write_text(json.dumps(cfg))
+            report = root / 'restore-report.json'
+            report.write_text('{"passed":true,"quarantine":true}')
+            before = {path.name: path.read_bytes() for path in root.iterdir()}
+            with patch.object(restore, 'ROOT', root), patch.object(restore, 'RECOVERY_BASE', root.parent), \
+                 patch.object(restore, 'configure') as configure, patch.object(restore, 'dc') as dc:
+                with self.assertRaisesRegex(ValueError, 'cannot be published'):
+                    restore.main('publish')
+                configure.assert_not_called()
+                dc.assert_not_called()
+            self.assertEqual({path.name: path.read_bytes() for path in root.iterdir()}, before)
+
     def test_quarantined_copy_refuses_publication_before_reading_or_mutating_state(self):
         with patch.object(restore, 'run') as run, patch.object(restore, 'dc') as dc:
             with self.assertRaisesRegex(ValueError, 'cannot be published'):

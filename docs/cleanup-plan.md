@@ -277,3 +277,10 @@ recovery. The measured 5–6 GiB configuration supports this lab workload; physi
 host capacity remains a provisioning concern. Peer handoff still needs the
 firewall, endpoint and identity transition reviewed with the existing recovery
 checkpoints.
+
+The [lab handoff plan](probes/lab-peer-handoff.md) now separates endpoint choice,
+independent transport preparation, fresh normal restore, publication and rollback.
+Quarantined publication is rejected before failure cleanup; test recovery accepts
+one RFC1918 controller `/32` while retaining normal isolation inputs. Production's
+public-source requirement remains unchanged. Endpoint selection and validation of
+the current controller reconnect path precede any handoff.

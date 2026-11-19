@@ -88,6 +88,22 @@ def fixture(root):
 
 
 class ProductionRecoveryTest(unittest.TestCase):
+    def test_production_recovery_still_rejects_private_controller_sources(self):
+        cfg = request()
+        metadata = dict(environment='production', staff_revision=cfg['staff_revision'],
+                        recovery_files=[cfg['runtime_age_path']], application_image=images.receipt(cfg['staff_revision']))
+        image_lock = host.lock()
+        image_lock.pop('node')
+        image_lock['astro-app'] = images.IMAGE
+        app = dict(staff_vpn_subnet=cfg['netbird_subnet'], HOU1_VPN_IP=cfg['server_ip'],
+                   STAFF_OIDC_ISSUER=cfg['origins']['auth'], STAFF_OIDC_REDIRECT_URI=cfg['origins']['staff'],
+                   PUBLIC_SITE_ORIGIN=cfg['origins']['public'])
+        vpn = {'server': {'exposedAddress': cfg['origins']['netbird']}}
+        self.assertEqual(host.prepare.validate(cfg, metadata, image_lock, app, vpn), cfg['origins'])
+        for source in ['10.20.30.40/32', '172.20.10.2/32', '192.168.50.20/32']:
+            with self.subTest(source=source), self.assertRaisesRegex(ValueError, 'bootstrap source'):
+                host.prepare.validate({**cfg, 'bootstrap_cidr': source}, metadata, image_lock, app, vpn)
+
     def test_real_templates_and_digest_backed_bundle_preserve_production_boundary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)

@@ -361,6 +361,9 @@ def main(action):
         raise ValueError('Wrong recovery root or environment')
     if (ROOT / 'first-error.json').exists() or (ROOT / (action + '-report.json')).exists():
         raise ValueError('Do not resume an earlier or completed attempt')
+    # A rejected action must leave the healthy quarantine and its evidence intact.
+    if action == 'publish' and cfg.get('quarantine', False):
+        raise ValueError('Quarantined replacement cannot be published; use a separate reviewed handoff')
     configure(cfg)
     if cfg['environment'] == 'production' and not cfg.get('application_image'):
         raise ValueError('Production recovery requires a CI artifact')

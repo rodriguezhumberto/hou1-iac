@@ -26,6 +26,8 @@
       - request.id == host_recovery_id
       - request.environment == cms_environment
       - request.server_ip == netbird_ip
+      - request.quarantine | default(false) is sameas false
+    fail_msg: Publication requires a matching non-quarantined restore; changing inventory flags cannot promote a quarantined copy.
   vars:
     request: '{{ host_recovery_publication_request.content | b64decode | from_json }}'
   no_log: true
