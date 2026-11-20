@@ -15,6 +15,8 @@ ROOT = Path(__file__).resolve().parent
 RECOVERY_BASE = Path('/var/lib/hou1-host-recovery')
 APP = AUTH = AUTH_DATA = VPN = MEDIA = None
 PROJECTS = {}
+LAB_DNS_POLICY = Path('/etc/hou-lab-dns-firewall.json')
+LAB_DNS_HELPER = '/usr/local/libexec/hou-lab-dns-firewall'
 
 spec = importlib.util.spec_from_file_location('host_recovery_contract', Path(__file__).resolve().with_name('contract.py'))
 contract = importlib.util.module_from_spec(spec)
@@ -285,11 +287,28 @@ def verify_quarantine(cfg):
         raise ValueError('Recovery network is external or shared with another workload')
 
 
+def prepare_container_dns(cfg):
+    """Create only restored services, then reconcile DNS before starting writers."""
+    if cfg['environment'] != 'test' or cfg.get('quarantine', False) or not LAB_DNS_POLICY.exists():
+        return
+    required = set()
+    for project, services in [('auth', ['postgresql', 'authentik-server', 'authentik-worker']),
+                              ('netbird', ['netbird-server', 'dashboard']),
+                              ('app', ['astro-app', 'nginx'])]:
+        document = json.loads(dc(project, 'config', '--format', 'json'))
+        for service in services:
+            required.update(document['networks'][name]['name']
+                            for name in document['services'][service]['networks'])
+        dc(project, 'create', '--no-build', '--no-recreate', '--pull', 'never', *services)
+    run(LAB_DNS_HELPER, '--require-networks', *sorted(required))
+
+
 def restore(cfg):
     started = time.monotonic()
     install(cfg)
     for project in PROJECTS:
         dc(project, 'config', '--quiet')
+    prepare_container_dns(cfg)
     dc('auth', 'up', '-d', '--pull', 'never', 'postgresql')
     wait_database()
     if sql("SELECT count(*) FROM information_schema.tables WHERE table_schema='public'") != '0':

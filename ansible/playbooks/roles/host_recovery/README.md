@@ -33,6 +33,11 @@ requires the same receipt and owner. Provider mode is test-only, rejects legacy
 host-isolation inputs and leaves provider rules and legacy rehearsal probes
 unmanaged. Reconcile monitoring through its normal entry point afterward.
 
+With opted-in lab DNS, cold recovery creates only its seven restored containers
+before reconciling their actual bridge allowances. Writers start afterward.
+This runs after recovery's firewall reset and network creation, so preparation's
+earlier DNS rules cannot leave recovered services without resolver access.
+
 `host_recovery_quarantine: true` is test-only. It restores a separate empty VM
 on Docker-internal networks, binds ingress/STUN to loopback, and resolves saved
 service names to the restored proxy inside those networks. It refuses publication
