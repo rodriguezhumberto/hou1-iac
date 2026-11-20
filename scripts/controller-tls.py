@@ -2,6 +2,7 @@
 """SOPS-backed controller ACME issuance, scoped delivery and renewal status."""
 import argparse
 import base64
+from contextlib import contextmanager
 import fcntl
 import io
 import ipaddress
@@ -22,8 +23,8 @@ from hou1_tls_material import validate_bundle, validate_lineages
 IMAGE='certbot/dns-cloudflare:v5.1.0'
 
 
-def run(args, **kwargs):
-    return subprocess.run(args,capture_output=True,check=True,timeout=60,**kwargs).stdout
+def run(args, timeout=60, **kwargs):
+    return subprocess.run(args,capture_output=True,check=True,timeout=timeout,**kwargs).stdout
 
 
 def private_write(path, data):
@@ -56,6 +57,7 @@ def read_config(path, transport=False):
             or any(not re.fullmatch(r'age1[0-9a-z]{58}',r) for r in c['recipients'])):
         raise ValueError('Declare the ACME email and age recipients')
     private_file(c['age_key_file'])
+    if 'coordination_lock' in c:private_file(c['coordination_lock'])
     if not Path(c['dns_secret_source']).is_absolute() or not Path(c['dns_secret_source']).is_file():
         raise ValueError('Supply the encrypted DNS-only bundle')
     for binary in ('sops','openssl','docker'):
@@ -93,7 +95,28 @@ def encrypted(value,c,root):
 
 
 def ssh(c, action, data):
-    return json.loads(run(['ssh','-F',c['ssh_config'],c['ssh_host'],action],input=json.dumps(data).encode()))
+    return json.loads(run(['ssh','-F',c['ssh_config'],c['ssh_host'],action],
+                          input=json.dumps(data).encode(),timeout=1200 if action=='deploy-v1' else 60))
+
+
+@contextmanager
+def deployment_admission(c, enabled=True, timeout=900):
+    """Opt into the controller workflow lock before changing its selected inputs."""
+    if not enabled or not c.get('coordination_lock'):
+        yield
+        return
+    path=private_file(c['coordination_lock'])
+    descriptor=os.open(path,os.O_RDWR | os.O_NOFOLLOW)
+    with os.fdopen(descriptor,'r+') as lock:
+        deadline=time.monotonic()+timeout
+        while True:
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic()>=deadline:raise TimeoutError('Managed workflow still owns renewal admission')
+                time.sleep(min(0.2,max(0,deadline-time.monotonic())))
+        yield
 
 
 def extract_state(state,c,certs):
@@ -208,7 +231,7 @@ def main():
         print(json.dumps({'configuration_valid':True}));return
     if args.publish_status:
         print(json.dumps(publish(c,root)));return
-    with open(root/'controller.lock','a') as lock:
+    with deployment_admission(c,enabled=not args.dry_run), open(root/'controller.lock','a') as lock:
         os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         try:
             report=issue(c,root,dry_run=args.dry_run,deploy=args.deploy)

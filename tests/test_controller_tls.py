@@ -249,7 +249,7 @@ class ControllerTlsTest(unittest.TestCase):
 
     def test_gateway_denies_shell_arguments_bootstrap_and_other_commands(self):
         with patch.object(sys,'argv',['gateway']):
-            for action,tail in [('deploy-v1',[]),('status-v1',['--metrics'])]:
+            for action,tail in [('deploy-v1',['--renew']),('status-v1',['--metrics'])]:
                 with patch.dict(os.environ,SSH_ORIGINAL_COMMAND=action),patch.object(gateway.os,'execv') as execute:
                     gateway.main();execute.assert_called_once_with('/usr/bin/sudo',['sudo','-n','/usr/local/libexec/hou1-tls-receive',*tail])
             for action in ('bash','deploy-v1 --bootstrap','deploy-v1 --prepare','deploy-v1 --verify',
@@ -284,6 +284,13 @@ class ControllerTlsTest(unittest.TestCase):
             Path(c['ssh_config']).write_text(base);known.chmod(0o666)
             with self.assertRaises(ValueError):controller.read_config(config,transport=True)
             known.chmod(0o600);root.chmod(0o755)
+            with self.assertRaises(ValueError):controller.read_config(config)
+            root.chmod(0o700)
+            lock=root/'workflow.lock';lock.touch(mode=0o600)
+            c['coordination_lock']=str(lock)
+            controller.private_write(config,json.dumps(c).encode())
+            self.assertEqual(controller.read_config(config)[0],c)
+            lock.unlink();lock.symlink_to(root/'age.key')
             with self.assertRaises(ValueError):controller.read_config(config)
 
     def test_real_sops_issuance_dry_run_cleanup_and_failed_delivery_preserve_success(self):
@@ -437,7 +444,10 @@ class ControllerTlsTest(unittest.TestCase):
                     text=env.from_string((ROLES/'controller_tls/templates'/f'{name}.j2').read_text()).render(**variables)
                     unit='hou1-tls-'+environment+('-status' if name.startswith('status') else '')+'.'+name.rsplit('.',1)[1]
                     path=root/unit;path.write_text(text.replace('/private/tls/controller-tls.py','/usr/bin/true'));files.append(str(path))
-                    if name=='renew.service':self.assertIn('--deploy',text)
+                    if name=='renew.service':
+                        self.assertIn('--deploy',text)
+                        self.assertIn('Restart=on-failure',text)
+                        self.assertIn('StartLimitBurst=3',text)
                     if name.endswith('timer'):self.assertIn('Persistent=true',text)
                 result=subprocess.run(['systemd-analyze','--user','verify',*files],capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)

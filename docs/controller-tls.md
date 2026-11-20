@@ -33,6 +33,7 @@ The controller JSON configuration has these fields:
 | `dns_secret_source` | Absolute SOPS JSON path containing only `cloudflare_dns_api_token`. |
 | `netbird_subnet`, `netbird_ip` | Declared VPN subnet and HOU1 address. |
 | `ssh_config`, `ssh_host` | Protected SSH configuration path and its renewal host alias. |
+| `coordination_lock` | Optional existing private controller workflow lock; issuance/delivery waits up to 15 minutes before changing selected inputs. |
 
 Use a DNS token limited to DNS edits for the approved zone. Give the renewal
 identity access to that DNS-only bundle, ACME state and certificate bundle;
@@ -100,8 +101,11 @@ under `no_log`; no age identity or DNS credential is copied to HOU1.
 
    `hou1-renewal` has no administrative groups. Its root-controlled key is
    restricted to that exact VPN source and the `deploy-v1` / `status-v1` gateway.
-   Sudo permits only the fixed argument-free receiver and its `--metrics` mode;
+   Sudo permits only the fixed receiver's coordinated renewal and metrics modes;
    bootstrap, shells, forwarding, file transfers and arbitrary commands are denied.
+   Gateway delivery shares the backup capture lock and rejects interrupted writer
+   intent. Ansible imports rely on their caller's existing capture admission, so
+   managed reconciliation does not acquire that lock twice.
 4. Configure SSH with the pinned host key, HOU1 VPN address, `User hou1-renewal`,
    `StrictHostKeyChecking yes`, a populated `UserKnownHostsFile`, its dedicated
    `IdentityFile`, `IdentitiesOnly yes`, `BatchMode yes`, and
@@ -129,6 +133,9 @@ under `no_log`; no age identity or DNS credential is copied to HOU1.
    jitter; the timer persists missed runs. A separate minutely timer publishes
    status. Timer names include the explicit environment. Disable scheduling by
    running the same playbook with that environment and the enable flag `false`.
+   Failed renewal jobs retry after 30 seconds, bounded to three starts per eight
+   hours. Delivery SSH allows 20 minutes, including its bounded capture-lock wait;
+   status publication keeps its one-minute limit.
 6. Publish status and enable the existing VPN collector integration:
 
    ```bash

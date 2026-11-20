@@ -1,0 +1,16 @@
+---
+- name: Install root-only TLS receiver
+  ansible.builtin.copy:
+    src: receive.py
+    dest: /usr/local/libexec/hou1-tls-receive
+    owner: root
+    group: root
+    mode: '0700'
+
+- name: Install shared certificate validation
+  ansible.builtin.copy:
+    src: '{{ role_path }}/../../../../scripts/hou1_tls_material.py'
+    dest: /usr/local/libexec/hou1_tls_material.py
+    owner: root
+    group: root
+    mode: '0600'

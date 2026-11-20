@@ -1,6 +1,7 @@
 #!/usr/bin/python3
 """Fixed root TLS receiver. The renewal account cannot choose paths or commands."""
 import fcntl
+from contextlib import contextmanager, ExitStack
 import hashlib
 import json
 import math
@@ -9,6 +10,7 @@ from pathlib import Path
 import re
 import socket
 import ssl
+import stat
 import sys
 import tempfile
 import time
@@ -17,6 +19,28 @@ from hou1_tls_material import MAX_BYTES, run, validate_bundle, validate_lineages
 
 CONFIG = Path('/etc/hou1-tls/receiver.json')
 STATE = Path('/var/lib/hou1-tls')
+CAPTURE_LOCK = Path('/run/lock/hou1-backup-export.lock')
+WRITER_INTENT = Path('/var/lib/hou1-backup/restart-intent.json')
+
+
+@contextmanager
+def renewal_admission(timeout=900):
+    """Gateway renewals share capture admission; Ansible already holds it."""
+    descriptor=os.open(CAPTURE_LOCK,os.O_CREAT | os.O_RDWR | os.O_NOFOLLOW,0o600)
+    with os.fdopen(descriptor,'r+') as lock:
+        info=os.fstat(lock.fileno())
+        if not stat.S_ISREG(info.st_mode) or info.st_uid!=os.geteuid():
+            raise PermissionError('Invalid capture lock')
+        deadline=time.monotonic()+timeout
+        while True:
+            try:
+                fcntl.flock(lock,fcntl.LOCK_EX | fcntl.LOCK_NB)
+                break
+            except BlockingIOError:
+                if time.monotonic()>=deadline:raise TimeoutError('Capture still owns renewal admission')
+                time.sleep(min(0.2,max(0,deadline-time.monotonic())))
+        if WRITER_INTENT.exists():raise RuntimeError('Interrupted writers require recovery before renewal')
+        yield
 
 
 def private_write(path, data):
@@ -190,13 +214,15 @@ def publish_status(c, data, now=None):
 def main():
     c=read_config()
     args=sys.argv[1:]
-    if args not in ([],['--bootstrap'],['--prepare'],['--bootstrap','--prepare'],['--verify'],['--metrics']):
+    if args not in ([],['--bootstrap'],['--prepare'],['--bootstrap','--prepare'],['--verify'],['--metrics'],['--renew']):
         raise ValueError('Unknown receiver action')
     if args!=['--verify']:
         payload=sys.stdin.buffer.read(MAX_BYTES+1)
         if len(payload)>MAX_BYTES:raise ValueError('Certificate payload too large')
         data=json.loads(payload)
-    with open(STATE/'receiver.lock','a') as lock:
+    with ExitStack() as stack:
+        if args==['--renew']:stack.enter_context(renewal_admission())
+        lock=stack.enter_context(open(STATE/'receiver.lock','a'))
         os.chmod(lock.name,0o600);fcntl.flock(lock,fcntl.LOCK_EX|fcntl.LOCK_NB)
         if args==['--metrics']:receipt=publish_status(c,data)
         elif args==['--verify']:receipt=verify_installed(c)

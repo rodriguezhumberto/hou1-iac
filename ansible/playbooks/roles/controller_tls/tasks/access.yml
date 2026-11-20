@@ -25,6 +25,9 @@
   ansible.builtin.assert:
     that: hou1_tls_receiver_config.stat.exists
 
+- name: Install the receiver matching the renewal gateway before granting access
+  ansible.builtin.import_tasks: receiver-programs.yml
+
 - name: Create the non-administrative renewal account
   ansible.builtin.user:
     name: hou1-renewal
@@ -60,7 +63,7 @@
     group: root
     mode: '0440'
     content: |
-      hou1-renewal ALL=(root) NOPASSWD: /usr/local/libexec/hou1-tls-receive ""
+      hou1-renewal ALL=(root) NOPASSWD: /usr/local/libexec/hou1-tls-receive --renew
       hou1-renewal ALL=(root) NOPASSWD: /usr/local/libexec/hou1-tls-receive --metrics
     validate: /usr/sbin/visudo -csf %s
 
