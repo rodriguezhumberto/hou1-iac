@@ -8,6 +8,11 @@ lost peer's exact managed groups, replaces only that disconnected identity,
 reattaches the groups, restores DNS, refreshes selected transports, then verifies
 private SSH before closing bootstrap access.
 
+Publication also requires `hou1_backup_receiver_ip` from the existing backup
+inputs. It is validated before opening ingress, then used to verify the exact
+retained metrics/backup policies before retiring the lost peer. A standalone
+recovery inventory must carry that topology input explicitly.
+
 Optional inputs belong in private recovery inventory:
 
 - `host_recovery_management_refresh_argv`: credential-free command for one

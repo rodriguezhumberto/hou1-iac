@@ -135,6 +135,20 @@ class RecoveryRenewalTest(unittest.TestCase):
 
 
 class RecoveryTransportTest(unittest.TestCase):
+    def test_receiver_input_is_required_before_publication(self):
+        tasks = yaml.safe_load((TASKS / 'transport-preflight.yml').read_text())
+        guard = tasks[0]
+        self.assertEqual(guard['name'], 'Require the declared backup receiver before opening ingress')
+        values = dict(netbird_subnet='100.91.0.0/16', netbird_ip='100.91.0.10')
+        scenarios = [({}, False), ({'hou1_backup_receiver_ip': ''}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.22/32'}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.10'}, False),
+                     ({'hou1_backup_receiver_ip': '100.90.0.22'}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.22'}, True)]
+        result = run_plays([guard_play({**values, **change}, [guard], None if valid else guard['name'])
+                            for change, valid in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_companion_requires_an_explicit_independent_pinned_destination(self):
         config = dict(inventory_host='hou4-recovery', public_ip='8.8.8.8', known_hosts_file='/private/known_hosts')
         inventory = {'hou4-recovery': {'ansible_host': '8.8.8.8'}}

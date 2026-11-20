@@ -1,4 +1,13 @@
 ---
+- name: Require the declared backup receiver before opening ingress
+  ansible.builtin.assert:
+    that:
+      - hou1_backup_receiver_ip | default('') is string
+      - hou1_backup_receiver_ip | default('') | ansible.utils.ipaddr('address') == hou1_backup_receiver_ip | default('')
+      - hou1_backup_receiver_ip | default('') | ansible.utils.ipaddr(netbird_subnet) == hou1_backup_receiver_ip | default('')
+      - hou1_backup_receiver_ip != netbird_ip
+    fail_msg: Supply the existing backup receiver overlay address from its declared recovery or backup inputs before publication.
+
 - name: Require an explicit boolean for optional renewal reassignment
   ansible.builtin.assert:
     that: host_recovery_renewal_handoff | default(false) is boolean
