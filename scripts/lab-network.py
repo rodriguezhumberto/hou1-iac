@@ -51,7 +51,7 @@ def load_config(path, uid):
     require(type(config['version']) is int and config['version'] == 1 and config['environment'] == 'test',
             'Only version 1 test transport configurations are supported')
     kind = config.get('transport', 'vpn')
-    require(kind in ('vpn', 'bootstrap'), 'Select VPN or bootstrap transport')
+    require(kind in ('vpn', 'bootstrap', 'recovery'), 'Select VPN, bootstrap or recovery transport')
     if kind == 'bootstrap':
         require(set(config) == {'version', 'environment', 'transport', 'resolver_file',
                 'management_url', 'hosts'}, 'Declare only bootstrap DNS inputs, without VPN state')
@@ -166,7 +166,9 @@ def peer_connected(config, timeout=20):
 
 def inspect_peer(config):
     peer = inspect_container(config)
-    require(peer_connected(config), 'The VPN container is not connected to the declared test account and address')
+    connected = peer_connected(config)
+    require(connected or config.get('transport') == 'recovery',
+            'The VPN container is not connected to the declared test account and address')
     return peer
 
 

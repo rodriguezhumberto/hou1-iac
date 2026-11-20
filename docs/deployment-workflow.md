@@ -129,6 +129,12 @@ create, enroll or restart peers, modify firewall rules, or use renewal peers.
 The bootstrap transport needs the same namespace/sudo tools and SSH agent, but
 does not inspect Docker or enter a VPN namespace.
 
+An explicit private config with `transport: recovery` enters the same dedicated
+VPN namespace while management is disconnected. Container/image/state/account
+and overlay-address checks still apply, including revalidation before entry.
+Use this for publication that reconnects the retained controller before private
+SSH cutover. Normal VPN transport continues to require a connected peer.
+
 For recovery, `scripts/reconnect-lab-controller.py --config /private/lab/network.json`
 validates the same VPN configuration without changing it. `--apply` reconnects
 only that controller using saved enrollment; it preserves the container and

@@ -154,6 +154,22 @@ class LabNetworkTest(unittest.TestCase):
         self.assertEqual(contract['peer'], self.peer)
         self.assertEqual(contract['uid'], os.getuid())
 
+    def test_recovery_allows_disconnection_only_with_the_same_enrolled_identity(self):
+        status = {'management': {'url': self.config['management_url'], 'connected': False},
+                  'netbirdIp': self.config['address'] + '/16'}
+        def inspect(config, state):
+            with patch.object(network.subprocess, 'check_output', side_effect=[
+                    json.dumps([self.inspect_fixture()]), json.dumps(state)]):
+                return network.inspect_peer(config)
+        with self.assertRaises(ValueError): inspect(self.config, status)
+        recovery = {**self.config, 'transport': 'recovery'}
+        self.path.write_text(json.dumps(recovery))
+        self.assertEqual(network.load_config(self.path, os.getuid()), recovery)
+        self.assertEqual(inspect(recovery, status), self.peer)
+        for changed in [{**status, 'netbirdIp': '100.90.0.10/16'},
+                        {**status, 'management': {'url': 'https://netbird-test.other.invalid', 'connected': False}}]:
+            with self.subTest(status=changed), self.assertRaises(ValueError): inspect(recovery, changed)
+
     def contract(self):
         return {'uid': os.getuid(), 'gid': os.getgid(), 'config': self.config, 'peer': self.peer,
                 'agent': str(self.root / 'agent'), 'resolver_sha256': network.resolver_hash(self.config),
