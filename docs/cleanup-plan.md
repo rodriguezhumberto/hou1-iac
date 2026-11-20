@@ -302,3 +302,11 @@ setup. A maintained DNS reconciliation repaired the host; cold recovery now
 prepares those allowances before writers start. The corrected cold sequence has
 offline coverage but has not had a new empty-host run. Publication and real peer
 transport remain pending.
+
+The [publication follow-up](evidence/publication-2026-11-20.md) passed replacement
+enrollment, controller/private SSH cutover, automatic companion reconnection,
+normal runtime migration, fresh verified off-host backup, unchanged container IDs
+and replacement reboot. It retains the failed guards and continued-host
+corrections separately. A new empty-host run remains the next reproducibility
+acceptance step; external Google sign-in, real alert delivery and renewal were
+not exercised by this run.

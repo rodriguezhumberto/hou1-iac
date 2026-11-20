@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Replacement operational handoff | [Publication, backup and reboot acceptance, 2026-11-20](publication-2026-11-20.md) |
 | Same-address replacement | [Normal restore and DNS follow-up, 2026-11-20](normal-recovery-2026-11-20.md) |
 | Reduced-memory lab | [Concurrent guests, backup and reboot checks, 2026-11-19](reduced-memory-2026-11-19.md) |
 | Original lab after hypervisor OOM | [Access, key-pin and backup recovery, 2026-11-19](oom-recovery-2026-11-19.md) |
