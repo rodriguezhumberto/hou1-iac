@@ -135,9 +135,19 @@ class RecoveryRenewalTest(unittest.TestCase):
 
 
 class RecoveryTransportTest(unittest.TestCase):
+    def test_monitoring_omission_is_explicit_and_test_only_before_publication(self):
+        guard = yaml.safe_load((TASKS / 'transport-preflight.yml').read_text())[0]
+        scenarios = [({'cms_environment': 'test', 'host_recovery_monitoring_required': False}, True),
+                     ({'cms_environment': 'production', 'host_recovery_monitoring_required': True}, True),
+                     ({'cms_environment': 'production', 'host_recovery_monitoring_required': False}, False),
+                     ({'cms_environment': 'test', 'host_recovery_monitoring_required': 'false'}, False)]
+        result = run_plays([guard_play(values, [guard], None if valid else guard['name'])
+                            for values, valid in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_receiver_input_is_required_before_publication(self):
         tasks = yaml.safe_load((TASKS / 'transport-preflight.yml').read_text())
-        guard = tasks[0]
+        guard = next(task for task in tasks if task['name'] == 'Require the declared backup receiver before opening ingress')
         self.assertEqual(guard['name'], 'Require the declared backup receiver before opening ingress')
         values = dict(netbird_subnet='100.91.0.0/16', netbird_ip='100.91.0.10')
         scenarios = [({}, False), ({'hou1_backup_receiver_ip': ''}, False),

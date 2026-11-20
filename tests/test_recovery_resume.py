@@ -17,6 +17,27 @@ TASKS = ROLES / 'host_recovery/tasks'
 
 
 class RecoveryResumeTest(unittest.TestCase):
+    def test_backup_only_test_handoff_resumes_without_creating_monitoring_grants(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            state, stage, evidence, daemon, trace, operations, values, pipeline = self.scenario(root, 'delete')
+            state['groups'] = [g for g in state['groups'] if not g['id'].startswith('metrics-')]
+            state['policies'] = [p for p in state['policies'] if p['id'] != 'metrics-policy']
+            values['host_recovery_monitoring_required'] = False
+            first = run_play(values, pipeline)
+            self.assertNotEqual(first.returncode, 0)
+            saved = json.loads((evidence / 'peer-handoff.json').read_text())
+            self.assertFalse(saved['scope']['monitoring_required'])
+            self.assertEqual([g['id'] for g in saved['source_groups']], ['backup-source'])
+            changed = run_play({**values, 'host_recovery_resume': True, 'host_recovery_monitoring_required': True}, pipeline)
+            self.assertNotEqual(changed.returncode, 0)
+            for _ in range(2):
+                result = run_play({**values, 'host_recovery_resume': True}, pipeline)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual([op for op in operations if op[0] == 'DELETE'], [('DELETE', 'lost')])
+            self.assertEqual([op for op in operations if op[0] == 'PUT'], [('PUT', 'backup-source')])
+            self.assertFalse(any(g['id'].startswith('metrics-') for g in state['groups']))
+
     def test_publication_requires_a_non_quarantined_retained_request(self):
         checkpoint = yaml.safe_load((TASKS / 'publication-checkpoint.yml').read_text())
         guard = next(task for task in checkpoint if task['name'] ==

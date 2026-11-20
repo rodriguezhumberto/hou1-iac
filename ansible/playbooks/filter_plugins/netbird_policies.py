@@ -187,15 +187,24 @@ def backup_plan(groups, peers, policies, receiver_ip, source_ip, subnet, environ
     return dict(groups=planned, policy=policy)
 
 
-def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id, environment):
+def recovery_source_groups(groups, peers, policies, monitor_ip, server_ip, subnet, lost_peer_id, environment,
+                           monitoring_required=True):
     """Pin existing managed source groups before retiring the selected lost server."""
     if environment not in ('test', 'production'):
         raise AnsibleFilterError('Declare the recovery environment')
-    metrics = monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet,
-                              'test-servers' if environment == 'test' else 'prod-servers')
+    if type(monitoring_required) is not bool or (not monitoring_required and environment != 'test'):
+        raise AnsibleFilterError('Only explicit test recovery may omit monitoring')
+    plans = []
+    if monitoring_required:
+        plans.append(monitoring_plan(groups, peers, policies, monitor_ip, server_ip, subnet,
+                                     'test-servers' if environment == 'test' else 'prod-servers'))
+    elif (any(g['name'] in ('hou1-monitoring-test', 'hou1-metrics-test') for g in groups)
+          or any(p['name'] in ('hou1-monitoring-test-metrics', 'hou1-monitoring-test-staff-probe') for p in policies)):
+        raise AnsibleFilterError('Cannot omit existing or partial monitoring resources during recovery')
     backups = backup_plan(groups, peers, policies, monitor_ip, server_ip, subnet, environment)
+    plans.append(backups)
     selected = []
-    for plan in (metrics, backups):
+    for plan in plans:
         if plan['policy'] is None or plan['policy']['changed']:
             raise AnsibleFilterError('Recovery requires the existing exact managed monitoring and backup policies')
         source = plan['groups'][1]

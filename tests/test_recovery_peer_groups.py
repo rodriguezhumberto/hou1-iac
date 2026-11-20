@@ -31,6 +31,27 @@ def plan(state, lost='lost'):
 
 
 class RecoveryPeerGroupsTest(unittest.TestCase):
+    def test_test_only_omission_requires_complete_monitoring_absence(self):
+        state = fixture()
+        absent = deepcopy(state)
+        absent['groups'] = [g for g in state['groups'] if not g['id'].startswith('metrics-')]
+        absent['policies'] = [p for p in state['policies'] if p['id'] != 'metrics-policy']
+        def select(value, required=True, environment='test'):
+            return POLICY['recovery_source_groups'](value['groups'], value['peers'], value['policies'],
+                '100.91.0.22', '100.91.0.10', '100.91.0.0/16', 'lost', environment, required)
+        with self.assertRaises(Exception): select(absent)
+        before = deepcopy(absent)
+        self.assertEqual([g['id'] for g in select(absent, False)], ['backup-source'])
+        self.assertEqual(absent, before)
+        for required, environment in [('false', 'test'), (False, 'production')]:
+            with self.subTest(required=required, environment=environment), self.assertRaises(Exception):
+                select(absent, required, environment)
+        for resource in [*state['groups'][1:3], state['policies'][0],
+                         dict(name='hou1-monitoring-test-staff-probe', id='probe-policy')]:
+            partial = deepcopy(absent)
+            partial['policies' if 'policy' in resource['id'] else 'groups'].append(resource)
+            with self.subTest(resource=resource['id']), self.assertRaises(Exception): select(partial, False)
+
     def test_only_exact_lost_peer_and_managed_groups_can_be_pinned(self):
         state = fixture()
         before = deepcopy(state)

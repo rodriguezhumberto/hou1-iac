@@ -1,4 +1,11 @@
 ---
+- name: Validate explicit monitoring recovery scope before publication
+  ansible.builtin.assert:
+    that:
+      - host_recovery_monitoring_required | default(true) is boolean
+      - host_recovery_monitoring_required | default(true) or cms_environment == 'test'
+    fail_msg: Monitoring remains required unless explicitly omitted for test recovery with no managed monitoring resources.
+
 - name: Require the declared backup receiver before opening ingress
   ansible.builtin.assert:
     that:

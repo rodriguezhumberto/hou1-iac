@@ -13,6 +13,13 @@ inputs. It is validated before opening ingress, then used to verify the exact
 retained metrics/backup policies before retiring the lost peer. A standalone
 recovery inventory must carry that topology input explicitly.
 
+`host_recovery_monitoring_required` defaults to `true`. A test point without any
+managed exporter groups, metrics policy or staff-probe policy may explicitly set
+it to `false`; recovery still requires the exact backup policy and pins this
+omission in the handoff plan. Partial monitoring resources stop recovery. No new
+monitoring grants are created to make a restore pass. Production keeps the
+existing requirement, and legacy handoff scopes remain compatible.
+
 Optional inputs belong in private recovery inventory:
 
 - `host_recovery_management_refresh_argv`: credential-free command for one
