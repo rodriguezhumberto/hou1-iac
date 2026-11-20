@@ -92,7 +92,7 @@ def source_state(allow_empty=False):
         require(allow_empty and not status['last_success'], 'Successful source point is missing')
     return {'manifest': manifest, 'status': status,
             'recipient': config['recipient'], 'intent': (root / 'restart-intent.json').exists(),
-            'service': unit('hou1-backup-prepare.service')}
+            'service': unit('hou1-backup-prepare.service'), 'timer': unit('hou1-backup-prepare.timer')}
 
 
 def receiver_state(contract):
@@ -220,13 +220,21 @@ def run(contract):
     if action == 'access':
         return {'private_access': True}
     if contract['role'] == 'hou1':
-        require(action in ('source-state', 'source-status', 'ensure-capture', 'capture'), 'Unsupported source operation')
+        require(action in ('source-state', 'source-status', 'ensure-capture', 'activate-timer', 'capture'), 'Unsupported source operation')
         state = source_state(allow_empty=True) if action in ('source-status', 'ensure-capture') else source_state()
         if action == 'ensure-capture':
             require(not state['intent'] or state['service']['ActiveState'] in ('active', 'activating'),
                     'Interrupted writers require recovery before capture')
-            if not state['status']['last_success'] and state['service']['ActiveState'] in ('inactive', 'failed'):
-                output(['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service'])
+            if state['service']['ActiveState'] in ('inactive', 'failed'):
+                # Fresh recovery is inactive and needs the same lock as capture.
+                # The controller requests this only after releasing admission.
+                output(['systemctl', 'start', 'hou1-backup-recover.service'])
+                if not state['status']['last_success']:
+                    output(['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service'])
+        if action == 'activate-timer':
+            require(not state['intent'] and state['status']['last_success'] > 0
+                    and state['manifest'] == contract['expected'], 'Schedule requires the verified source point')
+            output(['systemctl', 'start', 'hou1-backup-prepare.timer'])
         if action == 'capture':
             require(not state['intent'] and state['service']['ActiveState'] in ('inactive', 'failed'),
                     'Source capture or writer recovery is already active')

@@ -340,6 +340,45 @@ class BackupProtocolTest(unittest.TestCase):
             result = run_plays(plays)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 
+    def test_deferred_initialization_does_not_activate_services_under_capture_lock(self):
+        import fcntl
+        import yaml
+        from helpers import run_plays
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/backup_source/tasks/recovery.yml').read_text())
+        names = {'Recover interrupted writers at boot and before enabling local capture',
+                 'Enable nightly local capture before off-host collection'}
+        selected = [task for task in tasks if task['name'] in names]
+        self.assertEqual(len(selected), 2)
+        with tempfile.TemporaryDirectory() as folder:
+            lock = Path(folder) / 'capture.lock'; calls = Path(folder) / 'requests.jsonl'
+            fixture = []
+            for task in selected:
+                fixture.append({'ansible.builtin.set_fact': {
+                    'service_request': task['ansible.builtin.systemd_service']}})
+                fixture.append({'ansible.builtin.command': {'argv': [
+                    '/usr/bin/python3', '-c',
+                    'import fcntl,json,sys; from pathlib import Path; '
+                    'request=json.load(sys.stdin); '
+                    f'handle=Path({str(lock)!r}).open("a+"); '
+                    'fcntl.flock(handle, fcntl.LOCK_EX|fcntl.LOCK_NB) if request.get("state")=="started" else None; '
+                    f'Path({str(calls)!r}).open("a").write(json.dumps(request)+"\\n")'],
+                    'stdin': '{{ service_request | to_json }}'}})
+            # A newly installed recover service must not compete for admission.
+            with lock.open('a+') as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = run_plays([{'variables': {'hou1_backup_capture_on_initialize': False}, 'tasks': fixture}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            requests = [json.loads(line) for line in calls.read_text().splitlines()]
+            self.assertTrue(all(request['enabled'] for request in requests))
+            self.assertNotIn('state', requests[0])
+            self.assertNotIn('state', requests[1])
+            calls.unlink()
+            # The public playbook's default still activates both services.
+            result = run_plays([{'tasks': fixture}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual([json.loads(line)['state'] for line in calls.read_text().splitlines()],
+                             ['started', 'started'])
+
     def test_source_input_guards_run_before_policy_or_filesystem_changes(self):
         import yaml
         from helpers import guard_play, run_plays

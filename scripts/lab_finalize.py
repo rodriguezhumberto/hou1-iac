@@ -108,6 +108,16 @@ class Finalization(BackupClient):
         play = Path(self.config['hosts'][role]['repository']) / f'ansible/playbooks/{role}.yml'
         self.workflow.playbook(role, play, role + '-reconcile')
 
+    def enable_schedule(self):
+        self.request('hou1', 'activate-timer', expected=self.point)
+
+        def ready(state):
+            require(state['manifest'] == self.point and not state['intent'],
+                    'Source point changed before schedule verification')
+            return state['timer']['ActiveState'] == 'active'
+
+        self.observe('hou1', 'source-status', ready, 60)
+
     def execute(self):
         w = self.workflow
         require(all(w.selections[role]['contracts']['backup_enabled'] for role in ('hou1', 'hou4')),
@@ -116,7 +126,7 @@ class Finalization(BackupClient):
         with w.capture_guard():
             w.step('hou1-reconcile', lambda: self.reconcile('hou1'))
             w.step('hou1-verify', lambda: w.probe('hou1'))
-            # Timer activation may queue a capture. Keep it blocked until initialization ends.
+            # Configure units without starting recovery or scheduled capture.
             play = Path(self.config['hosts']['hou1']['repository']) / 'ansible/playbooks/backups.yml'
             w.step('backup-source-initialize', lambda: w.playbook('hou1', play, 'backup-source-initialize',
                 extra_args=('-e', json.dumps({'hou1_backup_capture_on_initialize': False}))))
@@ -130,3 +140,5 @@ class Finalization(BackupClient):
             w.step('offline-decryption-and-integrity', self.verify_offline)
             for role in ('hou1', 'hou4'):
                 w.step(role + '-final-verify', lambda role=role: w.probe(role))
+            # A missed timer event can queue capture, which waits for this guard.
+            w.step('enable-source-schedule', self.enable_schedule)

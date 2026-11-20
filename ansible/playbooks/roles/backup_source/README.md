@@ -16,9 +16,11 @@ an established VPN inventory. Required inputs and recovery boundaries are in the
   only when no earlier capture succeeded.
 
 `hou1_backup_capture_on_initialize` defaults to `true`. The lab finalization
-controller overrides it to `false` while initializing under capture admission,
-then requests/observes capture after releasing admission. Timer enablement and
-writer recovery remain owned by this role.
+controller overrides it to `false` while configuring under capture admission.
+Units stay enabled; inactive recovery/timer units are not started, and existing
+active timers are preserved. After release, the controller starts writer recovery
+and observes initial capture, then activates scheduling after verification.
+The role still owns unit definitions and boot enablement.
 
 The controller sends ten-second keepalives; a minute of silence releases an
 abandoned hold without waiting for the operating system's TCP timeout.

@@ -97,8 +97,8 @@ records the subsequent deployment/backup exclusion and controller-loss checks.
 Keep reusable logic in Git and private values outside it.
 `scripts/lab_finalize.py` orders restore finalization through component playbooks;
 `lab_backup_client.py` shares pinned backup transport and offline verification
-with the failure matrix. Source initialization stays under admission so activating
-its timer cannot interrupt the playbook; capture runs after admission is released.
+with the failure matrix. Source configuration stays under admission; writer
+recovery and capture start after release. Scheduling activates after verification.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
 `shared_ingress_independent`; the combined project remains the default.

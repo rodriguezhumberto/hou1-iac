@@ -68,10 +68,11 @@ class FinalizationTest(unittest.TestCase):
         f.capture_initial = capture; f.collect = collect
         f.wait_access = lambda role: self.events.append('access-' + role)
         f.verify_offline = lambda: self.events.append('offline')
+        f.enable_schedule = lambda: self.events.append('schedule')
         f.execute()
         self.assertEqual(self.events, ['admit', 'hou1-reconcile', 'verify-hou1',
             'backup-source-initialize', 'release', 'capture', 'access-hou4', 'admit', 'hou4-reconcile',
-            'collect', 'offline', 'verify-hou1', 'verify-hou4', 'release'])
+            'collect', 'offline', 'verify-hou1', 'verify-hou4', 'schedule', 'release'])
 
     def test_reconcile_failure_releases_lock_without_capture_or_receiver_changes(self):
         self.workflow.playbook.side_effect = ValueError('source migration failed')
@@ -89,6 +90,26 @@ class FinalizationTest(unittest.TestCase):
             self.finalize.execute()
         self.assertEqual([call.args[0] for call in self.workflow.playbook.call_args_list], ['hou1', 'hou1'])
         self.finalize.collect.assert_not_called()
+
+    def test_verification_failure_keeps_source_schedule_deferred(self):
+        f = self.finalize
+        f.capture_initial = Mock(); f.collect = Mock(); f.wait_access = Mock()
+        f.verify_offline = Mock(side_effect=ValueError('offline verification failed'))
+        f.enable_schedule = Mock()
+        with self.assertRaisesRegex(ValueError, 'offline verification failed'):
+            f.execute()
+        f.enable_schedule.assert_not_called()
+        self.assertFalse(self.locked)
+
+    def test_schedule_observation_requires_the_verified_point(self):
+        f = self.finalize; f.point = self.point; f.prefix = Mock(); f.request = Mock()
+        state = {'manifest': self.point, 'intent': False, 'timer': {'ActiveState': 'active'}}
+        f.remote = Mock(return_value=state)
+        f.enable_schedule()
+        f.request.assert_called_once_with('hou1', 'activate-timer', expected=self.point)
+        f.remote.return_value = {**state, 'manifest': {**self.point, 'id': 'changed'}}
+        with self.assertRaisesRegex(ValueError, 'point changed'):
+            f.enable_schedule()
 
     def test_resume_accepts_same_point_and_rejects_foreign_or_changed_bindings(self):
         self.workflow.finalization['point'] = self.point
@@ -187,8 +208,8 @@ class InitializationRuntimeTest(unittest.TestCase):
             return [call.args[0] for call in command.call_args_list if call.args[0][0] == 'systemctl']
 
     def test_ensure_capture_reuses_success_or_active_service_and_retries_failed_initial_only(self):
-        for success, active, starts in [(0, 'inactive', 1), (0, 'failed', 1), (0, 'activating', 0),
-                                         (123, 'inactive', 0), (123, 'failed', 0)]:
+        for success, active, starts in [(0, 'inactive', 2), (0, 'failed', 2), (0, 'activating', 0),
+                                         (123, 'inactive', 1), (123, 'failed', 1)]:
             state = {'status': {'last_success': success}, 'intent': False, 'service': {'ActiveState': active}}
             with self.subTest(success=success, active=active):
                 self.assertEqual(len(self.run_remote(self.contract('hou1', 'ensure-capture'), state)), starts)
@@ -197,6 +218,22 @@ class InitializationRuntimeTest(unittest.TestCase):
         state = {'status': {'last_success': 0}, 'intent': True, 'service': {'ActiveState': 'failed'}}
         with self.assertRaisesRegex(ValueError, 'Interrupted writers'):
             self.run_remote(self.contract('hou1', 'ensure-capture'), state)
+
+    def test_first_capture_starts_recovery_before_prepare_without_enabling_timer(self):
+        state = {'status': {'last_success': 0}, 'intent': False, 'service': {'ActiveState': 'inactive'}}
+        self.assertEqual(self.run_remote(self.contract('hou1', 'ensure-capture'), state), [
+            ['systemctl', 'start', 'hou1-backup-recover.service'],
+            ['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service']])
+
+    def test_timer_activation_requires_matching_successful_point_and_no_intent(self):
+        point = {'id': 'verified'}
+        state = {'manifest': point, 'status': {'last_success': 123}, 'intent': False}
+        contract = {**self.contract('hou1', 'activate-timer'), 'expected': point}
+        self.assertEqual(self.run_remote(contract, state),
+                         [['systemctl', 'start', 'hou1-backup-prepare.timer']])
+        for change in ({'manifest': {'id': 'other'}}, {'status': {'last_success': 0}}, {'intent': True}):
+            with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'verified source point'):
+                self.run_remote(contract, {**state, **change})
 
     def test_collector_reuses_exact_committed_point_without_starting_again(self):
         point = {'id': 'point', 'sha256': 'checksum'}

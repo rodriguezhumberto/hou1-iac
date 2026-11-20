@@ -72,10 +72,11 @@ After publication and private VPN reconnection, use version 2 inputs:
 ```
 
 The phase reconciles HOU1's source/storage layout and initializes `backups.yml`
-under capture admission. It disables that playbook's synchronous initial capture;
-a timer-triggered capture waits for admission to be released. The controller then
-requests initial capture if none has succeeded and observes VPN recovery without
-replaying start requests. A successful existing source point is reused.
+under capture admission, deferring recovery-service and initial-capture activation.
+Existing active timers remain active. After releasing admission, the controller
+starts writer recovery, requests initial capture if none has succeeded, and
+observes VPN recovery without replaying start requests. A successful existing
+source point is reused.
 
 After HOU4 reconnects, the phase holds capture admission again, reconciles HOU4,
 collects the selected point, and verifies its ciphertext, offline decryption and
@@ -85,6 +86,8 @@ Capture observation is bounded to 50 minutes; collection to 33 minutes 20 second
 An older scheduled transfer finishes before collection is requested; both waits
 share the collection budget.
 Both hosts must pass final readiness checks.
+Only then does the controller start the enabled source timer. On a fresh host,
+a failed finalization leaves that timer enabled but inactive until retry or reboot.
 
 To resume, add `--resume /private/lab/runs/previous/receipt.json`. Each attempt
 uses a new directory and repeats reconciliation. Resume requires the same inputs,
