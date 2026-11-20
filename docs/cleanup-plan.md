@@ -317,3 +317,8 @@ controller phase. Two full lab runs preserved the source point and all container
 IDs. Resume binds frozen inputs and the selected point; collection lets an older
 scheduled transfer finish within the same deadline. Capture runs outside admission
 because it needs the same host lock.
+
+The next [clean replay preparation](evidence/clean-replay-preparation-2026-11-20.md)
+has a fresh verified off-host point, exact source/image/peer bindings and a
+successful disposable database restore. The scoped VM225 provisioning brief is
+ready; reinstall and uninterrupted restore remain pending external provisioning.
