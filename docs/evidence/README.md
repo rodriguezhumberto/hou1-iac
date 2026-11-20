@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Latest replacement acceptance | [Fresh restore and corrected finalization, 2026-11-20](clean-replay-2026-11-20.md) |
 | Next empty-host rehearsal | [Verified inputs and provisioning handoff, 2026-11-20](clean-replay-preparation-2026-11-20.md) |
 | Published restore finalization | [Ordered backup initialization and resume, 2026-11-20](finalization-2026-11-20.md) |
 | Replacement operational handoff | [Publication, backup and reboot acceptance, 2026-11-20](publication-2026-11-20.md) |

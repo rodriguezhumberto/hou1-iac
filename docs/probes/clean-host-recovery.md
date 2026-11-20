@@ -120,6 +120,11 @@ and nonempty Docker container/image stores.
 
 ## Restore, review, publish
 
+After verifying the new SSH key, render the managed inventory and run its
+[`inputs` phase](../lab-inventory.md#render-and-inspect) before cold restore.
+This checks the receiver's new source-key pin too; private extra-variable files
+override inventory values. Update their owning inputs, not generated snapshots.
+
 Run once from the immutable infrastructure revision under review:
 
 ```bash

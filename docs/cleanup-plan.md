@@ -322,3 +322,11 @@ The next [clean replay preparation](evidence/clean-replay-preparation-2026-11-20
 has a fresh verified off-host point, exact source/image/peer bindings and a
 successful disposable database restore. The scoped VM225 provisioning brief is
 ready; reinstall and uninterrupted restore remain pending external provisioning.
+
+The [fresh replay](evidence/clean-replay-2026-11-20.md) passed cold restore and
+initial publication without host repairs. Finalization exposed a separate stale
+SSH check and inactive recovery service competing for capture admission; both
+now have fixes and regressions. Continued finalization, first off-host capture,
+unchanged repeat and reboot passed. The complete sequence still needs another
+empty-host run after these corrections; external login, delivery and renewal
+checks remain separate.
