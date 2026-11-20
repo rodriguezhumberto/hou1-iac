@@ -294,3 +294,11 @@ replacement LAN address/MAC and retained policy digest; publication/resume refus
 ownership changes. Existing host recovery and production behavior remain the
 default. This avoids two owners for the lab boundary. Provider reachability must
 include the dedicated controller as well as the companion before interruption.
+
+The [same-address normal restore](evidence/normal-recovery-2026-11-20.md) passed
+on the freshly installed replacement while the original remained fenced.
+Pre-publication login exposed container DNS allowances lost during firewall/network
+setup. A maintained DNS reconciliation repaired the host; cold recovery now
+prepares those allowances before writers start. The corrected cold sequence has
+offline coverage but has not had a new empty-host run. Publication and real peer
+transport remain pending.
