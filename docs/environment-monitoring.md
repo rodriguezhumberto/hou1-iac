@@ -22,7 +22,9 @@ in this role. Use a scoped controller grant to read the existing encrypted
 NetBird API token. Retire the grant after the release checks.
 
 Run `ansible/playbooks/monitoring.yml` with the selected inventory and the inputs
-above. It must connect through `netbird_ip`, with bootstrap disabled. Check mode,
+above. Supply `hou1_monitoring_inventory_group` through explicit extra-vars: host
+selection happens before host-scoped inventory variables are available.
+It must connect through `netbird_ip`, with bootstrap disabled. Check mode,
 multiple target hosts, public management and mismatched environments fail before
 API writes or package installation. The existing isolated package lease remains
 in effect during rehearsals; production uses ordinary package management.

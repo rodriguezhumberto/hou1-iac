@@ -223,8 +223,11 @@ for a capture admission timeout; its previous successful export status is preser
 Apply the established source's `backups.yml` once to upgrade its helper and service
 budget. Routine HOU1 reconciliation then maintains the helper. The failure matrix
 uses the same lock across its interruptions. Direct Ansible commands, read-only
-workflow phases, TLS jobs and reboot observers do not acquire this guard; schedule
+workflow phases and reboot observers do not acquire this guard; schedule
 those operations separately from capture when they need uninterrupted VPN access.
+Renewal-gateway delivery shares the host lock. Set the TLS controller's optional
+`coordination_lock` to this workflow's `.workflow.lock` to serialize changes to
+its selected certificate bundle as well. Status publication remains independent.
 
 For a declared isolated application bundle, HOU1 refreshes its fixed local Git
 remote before selecting the checkout. Bootstrap uses the same
@@ -238,6 +241,9 @@ invocation. The security role's delegated SSH check uses the same workflow pin,
 overriding older `security_netbird_ssh_options` in private inputs. Standalone
 playbooks retain that variable's existing behavior. A failure stops later steps;
 completed changes on either host remain.
+Unmatched host patterns fail instead of accepting a skipped deployment. Component
+playbooks that select hosts through a variable need that selector in extra-vars,
+as documented by the component; host-scoped inventory values arrive too late.
 
 `verify` repeats preflight and readiness checks without running deployment
 playbooks. Container checks cover the declared projects, not arbitrary host

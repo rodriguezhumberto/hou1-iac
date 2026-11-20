@@ -145,6 +145,7 @@ def environment(config, host):
     env.update(ANSIBLE_CONFIG=str(repo / 'ansible/ansible.cfg'),
                ANSIBLE_COLLECTIONS_PATH=config['collections_path'],
                ANSIBLE_COLLECTIONS_SCAN_SYS_PATH='False', ANSIBLE_HOST_KEY_CHECKING='True',
+               ANSIBLE_HOST_PATTERN_MISMATCH='error',
                ANSIBLE_ROLES_PATH=str(repo / 'ansible/playbooks/roles'),
                ANSIBLE_FILTER_PLUGINS=str(repo / 'ansible/playbooks/filter_plugins'),
                ANSIBLE_ACTION_PLUGINS=str(repo / 'ansible/playbooks/action_plugins'),

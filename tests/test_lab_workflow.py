@@ -391,6 +391,22 @@ class LabWorkflowTest(unittest.TestCase):
         with self.assertRaisesRegex(workflow.WorkflowError, 'in inventory'):
             self.load()
 
+    def test_missing_host_pattern_fails_instead_of_reporting_an_empty_deployment(self):
+        host = self.config['hosts']['hou1']
+        play = Path(host['repository']) / 'ansible/playbooks/hou1.yml'
+        play.write_text(yaml.safe_dump([{'hosts': 'missing_monitoring_targets',
+            'gather_facts': False, 'tasks': [{'ansible.builtin.fail': {'msg': 'must not connect'}}]}]))
+        subprocess.run(['git', '-C', host['repository'], 'add', '.'], check=True)
+        subprocess.run(['git', '-C', host['repository'], '-c', 'user.name=Fixture', '-c',
+            'user.email=fixture@example.invalid', 'commit', '-qm', 'unmatched play fixture'], check=True)
+        host['revision'] = subprocess.check_output(
+            ['git', '-C', host['repository'], 'rev-parse', 'HEAD'], text=True).strip()
+        run = self.root / 'missing-hosts'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        runner.transports['hou1'] = workflow.transport(host)
+        with self.assertRaisesRegex(workflow.WorkflowError, 'missing-hosts failed'):
+            runner.playbook('hou1', play, 'missing-hosts')
+
     def test_invalid_private_yaml_does_not_expose_input_content(self):
         source = self.private('malformed.yml', 'credential: [private-marker\n')
         self.config['hosts']['hou1']['inputs'] = [str(source)]
