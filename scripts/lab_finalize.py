@@ -83,6 +83,11 @@ class Finalization(BackupClient):
         source = self.remote('hou1', 'source-state')
         require(source['manifest'] == self.point and not source['intent'],
                 'Source point changed before off-host collection')
+        deadline = time.monotonic() + 2000
+        # A scheduled transfer may still hold the previous export open. Let it
+        # finish before requesting the selected point; both waits share a budget.
+        self.observe('hou4', 'receiver-state',
+                     lambda state: state['service']['ActiveState'] not in BUSY, 2000)
         self.request('hou4', 'collect', expected=self.point)
 
         def ready(state):
@@ -97,7 +102,7 @@ class Finalization(BackupClient):
                     'Collection failed before committing the selected point')
             return False
 
-        self.observe('hou4', 'receiver-state', ready, 2000)
+        self.observe('hou4', 'receiver-state', ready, max(0, deadline - time.monotonic()))
 
     def reconcile(self, role):
         play = Path(self.config['hosts'][role]['repository']) / f'ansible/playbooks/{role}.yml'

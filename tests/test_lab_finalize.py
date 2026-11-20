@@ -146,8 +146,30 @@ class FinalizationTest(unittest.TestCase):
         self.workflow.save.assert_called()
         f.request = Mock(); f.remote.return_value = {'points': {self.point['id']: {'manifest': self.point}},
             'partials': [], 'service': state['service']}
-        f.remote.side_effect = [state, f.remote.return_value, f.remote.return_value]
+        f.remote.side_effect = [state, f.remote.return_value, f.remote.return_value, f.remote.return_value]
         f.collect()
+
+    def test_older_scheduled_transfer_finishes_before_selected_point_is_requested(self):
+        f = self.finalize; f.point = self.point; f.prefix = Mock()
+        old_active = {'points': {}, 'partials': ['.incoming-old'],
+                      'service': {'ActiveState': 'activating', 'Result': 'success'}}
+        old_done = {'points': {}, 'partials': [],
+                    'service': {'ActiveState': 'inactive', 'Result': 'success'}}
+        committed = {**old_done, 'points': {self.point['id']: {'manifest': self.point}}}
+        observations = iter([old_active, old_done, old_done, old_active, committed])
+        events = []
+        def remote(role, operation, **kwargs):
+            if role == 'hou1':
+                return {'manifest': self.point, 'intent': False}
+            state = next(observations)
+            events.append((operation, state['service']['ActiveState']))
+            return state
+        f.remote = Mock(side_effect=remote)
+        with patch.object(controller.time, 'sleep'):
+            f.collect()
+        self.assertEqual(events, [('receiver-state', 'activating'), ('receiver-state', 'inactive'),
+            ('collect', 'inactive'), ('receiver-state', 'activating'), ('receiver-state', 'inactive')])
+        f.remote.assert_any_call('hou4', 'collect', expected=self.point)
 
 
 class InitializationRuntimeTest(unittest.TestCase):

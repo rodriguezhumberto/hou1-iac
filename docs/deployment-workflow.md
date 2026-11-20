@@ -82,6 +82,8 @@ collects the selected point, and verifies its ciphertext, offline decryption and
 SQLite integrity against the selected application revision. Decrypted output is
 removed on success or failure. The offline identity stays on the controller.
 Capture observation is bounded to 50 minutes; collection to 33 minutes 20 seconds.
+An older scheduled transfer finishes before collection is requested; both waits
+share the collection budget.
 Both hosts must pass final readiness checks.
 
 To resume, add `--resume /private/lab/runs/previous/receipt.json`. Each attempt
