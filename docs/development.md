@@ -94,6 +94,8 @@ steps to code, private inputs or external prerequisites. The
 The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap
 and repeat checks. [Capture coordination](evidence/capture-coordination-2026-11-19.md)
 records the subsequent deployment/backup exclusion and controller-loss checks.
+The [clean recovery replay](evidence/uninterrupted-replay-2026-11-20.md) records
+uninterrupted restore, publication, backup finalization, unchanged repeat and reboot.
 Keep reusable logic in Git and private values outside it.
 `scripts/lab_finalize.py` orders restore finalization through component playbooks;
 `lab_backup_client.py` shares pinned backup transport and offline verification

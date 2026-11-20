@@ -318,15 +318,13 @@ IDs. Resume binds frozen inputs and the selected point; collection lets an older
 scheduled transfer finish within the same deadline. Capture runs outside admission
 because it needs the same host lock.
 
-The next [clean replay preparation](evidence/clean-replay-preparation-2026-11-20.md)
-has a fresh verified off-host point, exact source/image/peer bindings and a
-successful disposable database restore. The scoped VM225 provisioning brief is
-ready; reinstall and uninterrupted restore remain pending external provisioning.
+The [previous fresh replay](evidence/clean-replay-2026-11-20.md) exposed a stale
+SSH check and recovery activation competing for capture admission. Both received
+fixes and regressions; its failed and continued invocations remain separate.
 
-The [fresh replay](evidence/clean-replay-2026-11-20.md) passed cold restore and
-initial publication without host repairs. Finalization exposed a separate stale
-SSH check and inactive recovery service competing for capture admission; both
-now have fixes and regressions. Continued finalization, first off-host capture,
-unchanged repeat and reboot passed. The complete sequence still needs another
-empty-host run after these corrections; external login, delivery and renewal
-checks remain separate.
+The subsequent [uninterrupted replay](evidence/uninterrupted-replay-2026-11-20.md)
+closed that acceptance gap at HOU1 `b81c3c1` and HOU4 `3d0ae0f`: empty-host restore,
+publication, first verified off-host capture, full unchanged finalization and
+reboot passed without corrections. All twelve container IDs survived repeat and
+reboot; HOU4 retained its identity and VM223 stayed fenced. External Google
+sign-in, actual alert delivery and TLS renewal remain separate checks.
