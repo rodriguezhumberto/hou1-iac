@@ -310,3 +310,10 @@ and replacement reboot. It retains the failed guards and continued-host
 corrections separately. A new empty-host run remains the next reproducibility
 acceptance step; external Google sign-in, real alert delivery and renewal were
 not exercised by this run.
+
+The [finalization workflow](evidence/finalization-2026-11-20.md) now makes normal
+runtime migration, backup initialization and verified off-host collection one
+controller phase. Two full lab runs preserved the source point and all container
+IDs. Resume binds frozen inputs and the selected point; collection lets an older
+scheduled transfer finish within the same deadline. Capture runs outside admission
+because it needs the same host lock.
