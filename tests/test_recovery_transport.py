@@ -281,7 +281,9 @@ class RecoveryTransportTest(unittest.TestCase):
                            {'host_recovery_renewal_handoff': 'true'},
                            {'host_recovery_companion': {'inventory_host': 'localhost', 'public_ip': '8.8.8.8',
                                                         'known_hosts_file': '/private/known_hosts'}}):
-                result = run_play(values, [preflight, {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}}])
+                complete = dict(cms_environment='test', netbird_subnet='100.91.0.0/16',
+                                netbird_ip='100.91.0.10', hou1_backup_receiver_ip='100.91.0.22')
+                result = run_play({**complete, **values}, [preflight, {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}}])
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(marker.exists())
 
