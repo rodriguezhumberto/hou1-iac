@@ -96,6 +96,8 @@ and repeat checks. [Capture coordination](evidence/capture-coordination-2026-11-
 records the subsequent deployment/backup exclusion and controller-loss checks.
 The [clean recovery replay](evidence/uninterrupted-replay-2026-11-20.md) records
 uninterrupted restore, publication, backup finalization, unchanged repeat and reboot.
+The [unattended follow-up](evidence/unattended-lab-2026-11-20.md) records scoped
+renewal scheduling, coordinated delivery, source metrics and periodic reader checks.
 Keep reusable logic in Git and private values outside it.
 `scripts/lab_finalize.py` orders restore finalization through component playbooks;
 `lab_backup_client.py` shares pinned backup transport and offline verification

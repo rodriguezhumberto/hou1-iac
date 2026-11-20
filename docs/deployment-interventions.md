@@ -25,11 +25,15 @@ were closed and preserves its failed attempts separately.
 | Empty `prod-servers` group required in lab account | Private input override for current policy planner | Make required policy groups explicit; the name does not authorize production peers |
 | Synthetic passwords applied after identity provisioning | Explicit test-only `rehearsal-identities.yml`; fresh seed, reader probe and zero-change repeat passed | Users, roles and VPN grants remain owned by their existing components |
 | Authentik backup self-check needed host decryption | Unified endpoint/key bindings, encrypted capture/collection and offline integrity verified; recovery identity stays on controller | Verify actual database restore separately |
-| Google callback not verified | External OAuth registration; login/branding disabled | Verify callback before enabling; preserve the approved allowlist |
+| Google callback not verified | External OAuth registration; human upstream sign-in remains unexercised | Validate from an approved lab client; preserve the allowlist |
 | Nginx-stop drill removed administrative VPN access | Console recovery; failed drill preserved | Require independent recovery access and a VM-local restart timer for ingress drills |
 | Runtime snapshots, login checks and reboot receipts | Workflow owns container/source/TLS/HTTPS checks; login and reboot wrappers remain private | Maintain the remaining acceptance tools with declared targets and distinct failure records |
 | Playbook invocation and logs | `scripts/deploy-lab.py`; existing-host reconciliation and verification passed | Extend only after bootstrap prerequisites have owners |
-| Scheduled capture interrupted deployment SSH | Managed workflow and failure matrix share the capture lock; two live overlaps and bounded controller-loss checks passed | Direct Ansible/TLS/reboot paths remain outside the guard; preserve writer recovery |
+| Scheduled capture interrupted deployment SSH | Managed workflow, failure matrix and updated renewal gateway share capture admission; optional controller TLS lock protects selected bundle updates | Direct Ansible/reboot paths remain outside; preserve writer recovery |
+| Renewal setup would overwrite existing controller jobs | Named executor profiles own separate launcher, configuration and sudoers files | Use the same profile for peer and scheduling inputs |
+| Private renewal origin unavailable in container DNS | Explicit address pin covers provisioning API and peer container with normal TLS checks | Keep the pin bound to the reviewed endpoint |
+| Peer installer blocked inside administrative wrapper | Controller-local public playbook needs local privilege escalation; enrolled peer was reused | Keep the installer outside wrappers setting `NoNewPrivileges` |
+| Monitoring selector arrived after host selection | Explicit extra-vars owner; managed unmatched patterns now fail instead of skipping | Retain the native no-host regression and component targeting contract |
 
 ## Ownership decisions
 

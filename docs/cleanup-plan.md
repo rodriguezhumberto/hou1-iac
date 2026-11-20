@@ -255,9 +255,9 @@ twelve container IDs and produced a new recovery point after admission released.
 Bounded controller keepalives prevent an abandoned hold; the failure matrix uses
 the same guard. See [coordination acceptance](evidence/capture-coordination-2026-11-19.md).
 
-Direct Ansible commands, TLS jobs and reboot observers remain outside this guard.
-Extend coordination to other entry points before claiming concurrent operation
-there. The [live transfer drill](evidence/backup-transfer-2026-11-19.md) now passed
+Direct Ansible commands and reboot observers remain outside this guard. Updated
+TLS gateway delivery shares host admission; its optional controller lock also
+serializes certificate-bundle updates. The [live transfer drill](evidence/backup-transfer-2026-11-19.md) now passed
 alone and in the complete matrix, including automatic retry and offline recovery
 checks. Its first combined attempt exposed delayed companion access after capture;
 bounded read-only admission fixed that without replaying service-start requests.
@@ -331,9 +331,14 @@ sign-in, actual alert delivery and TLS renewal remain separate checks.
 
 The [renewal follow-up](evidence/lab-renewal-2026-11-20.md) passed ACME dry-run,
 scoped account provisioning, verified unchanged delivery and rejection checks.
-Automatic renewal scheduling and actual rotation remain open. The subsequent
-[Discord drill](evidence/lab-alert-delivery-2026-11-20.md) enabled Alertmanager and
+The subsequent [Discord drill](evidence/lab-alert-delivery-2026-11-20.md) enabled Alertmanager and
 verified real firing/resolved delivery through an existing Prometheus rule, with
-timed recovery and zero notification failures. Optional application metrics and
-synthetic-login collection remain disabled. Google login awaits device access to
-the private lab. No WAN publication was added.
+timed recovery and zero notification failures.
+
+[Unattended lab acceptance](evidence/unattended-lab-2026-11-20.md) then enabled scoped
+renewal/status timers, HOU1 service/database/TLS metrics and HOU4's periodic reader
+probe. Scheduled execution, transport restart, failure reporting/retry, exact
+access boundaries and verified backup passed. All fourteen service IDs survived
+normal finalization. Actual certificate rotation, controller-VM reboot/replacement
+and human Google login remain separate checks; request-specific metrics stay off.
+No WAN publication was added.
