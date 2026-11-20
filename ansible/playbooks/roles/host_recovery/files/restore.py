@@ -3,6 +3,7 @@
 import argparse
 import importlib.util
 import datetime
+import hashlib
 import json
 import os
 from pathlib import Path
@@ -142,6 +143,13 @@ def saved_environment(path):
             if line and not line.startswith('#') and '=' in line for key, value in [line.split('=', 1)]}
 
 
+def managed_override(config):
+    """Use the app_compose ownership format for this validated recovery rendering."""
+    fingerprint = hashlib.sha256(json.dumps(config, sort_keys=True, separators=(',', ':')).encode()).hexdigest()
+    return ('# Managed by hou1-iac. Automatically read by every existing docker compose call.\n'
+            '# Generated app_compose SHA256: ' + fingerprint + '\n' + json.dumps(config, indent=2) + '\n')
+
+
 def hold_public_ports(configs):
     configs['netbird']['services']['netbird-server']['ports'] = ['127.0.0.1:3478:3478/udp']
     configs['app']['services']['nginx']['ports'] = ['127.0.0.1:80:80', '127.0.0.1:443:443']
@@ -186,8 +194,10 @@ def install(cfg):
         shutil.copyfile(payload / 'app-config' / name, APP / name)
         (APP / name).chmod(0o600)
     override = ROOT / 'app.override.json'
-    shutil.copyfile(override if override.exists() else payload / 'app-config/docker-compose.override.yml',
-                    APP / 'docker-compose.override.yml')
+    if override.exists():
+        (APP / 'docker-compose.override.yml').write_text(managed_override(json.loads(override.read_text())))
+    else:
+        shutil.copyfile(payload / 'app-config/docker-compose.override.yml', APP / 'docker-compose.override.yml')
     (APP / 'docker-compose.override.yml').chmod(0o600)
     if receipt is not None:
         (APP / 'application-image.json').write_text(json.dumps(receipt, indent=2) + '\n')

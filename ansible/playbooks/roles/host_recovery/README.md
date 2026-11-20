@@ -50,6 +50,10 @@ before reconciling their actual bridge allowances. Writers start afterward.
 This runs after recovery's firewall reset and network creation, so preparation's
 earlier DNS rules cannot leave recovered services without resolver access.
 
+The validated cold Compose override uses the standard `app_compose` ownership
+header and fingerprint. Normal reconciliation can then replace recovery rendering
+with declared runtime inputs while retaining the operator-owned-file guard.
+
 `host_recovery_quarantine: true` is test-only. It restores a separate empty VM
 on Docker-internal networks, binds ingress/STUN to loopback, and resolves saved
 service names to the restored proxy inside those networks. It refuses publication

@@ -363,6 +363,19 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
 
 class HostRecoveryRuntimeTest(unittest.TestCase):
+    def test_recovery_override_retains_standard_ownership_without_changing_compose(self):
+        spec = importlib.util.spec_from_file_location('recovery_compose_filter', FILES.parents[2] / 'filter_plugins/app_compose.py')
+        filters = importlib.util.module_from_spec(spec); spec.loader.exec_module(filters)
+        config = {'services': {'nginx': {'stop_signal': 'SIGQUIT', 'networks': {'app-network': {}}}},
+                  'networks': {'app-network': {'name': 'site-test-application', 'external': True}}}
+        text = restore.managed_override(config)
+        self.assertTrue(text.startswith('# Managed by hou1-iac.'))
+        self.assertIn('# Generated app_compose SHA256: ' + filters.fingerprint(config), text)
+        self.assertEqual(yaml.safe_load(text), config)
+        self.assertEqual(filters.migration_errors(text, {}), [])
+        changed = text.replace('site-test-application', 'unreviewed-network')
+        self.assertTrue(filters.migration_errors(changed, {}))
+
     def test_quarantined_entrypoint_rejects_publication_without_failure_cleanup(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory) / 'fixture-01'
