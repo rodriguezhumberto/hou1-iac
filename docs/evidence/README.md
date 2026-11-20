@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Lab operations-channel alerts | [Real firing and resolved delivery, 2026-11-20](lab-alert-delivery-2026-11-20.md) |
 | Lab renewal setup and delivery | [ACME dry-run, scoped access and delivery, 2026-11-20](lab-renewal-2026-11-20.md) |
 | Latest replacement acceptance | [Uninterrupted clean replay, repeat and reboot, 2026-11-20](uninterrupted-replay-2026-11-20.md) |
 | Previous corrected replay | [Fresh restore and corrected finalization, 2026-11-20](clean-replay-2026-11-20.md) |

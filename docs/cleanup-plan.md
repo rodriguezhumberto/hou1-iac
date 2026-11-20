@@ -331,6 +331,9 @@ sign-in, actual alert delivery and TLS renewal remain separate checks.
 
 The [renewal follow-up](evidence/lab-renewal-2026-11-20.md) passed ACME dry-run,
 scoped account provisioning, verified unchanged delivery and rejection checks.
-Automatic scheduling, actual rotation and alert delivery remain open; Alertmanager
-and renewal schedules are disabled. Google login awaits device access to the
-private lab. No WAN publication was added.
+Automatic renewal scheduling and actual rotation remain open. The subsequent
+[Discord drill](evidence/lab-alert-delivery-2026-11-20.md) enabled Alertmanager and
+verified real firing/resolved delivery through an existing Prometheus rule, with
+timed recovery and zero notification failures. Optional application metrics and
+synthetic-login collection remain disabled. Google login awaits device access to
+the private lab. No WAN publication was added.
