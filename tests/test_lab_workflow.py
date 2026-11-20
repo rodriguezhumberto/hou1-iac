@@ -294,7 +294,8 @@ class LabWorkflowTest(unittest.TestCase):
         argv = json.loads(invocation.read_text())
         self.assertEqual(argv[argv.index('--limit') + 1], host['target'])
         extra = json.loads(argv[-1])
-        self.assertEqual(extra, {'target_hosts': host['target']})
+        self.assertEqual(extra, {'target_hosts': host['target'],
+                                'security_netbird_ssh_options': runner.transports['hou1'][0][1:]})
         hosts = {name: json.loads((run / 'host_vars' / (name + '.json')).read_text())
                  for name in (host['target'], 'localhost')}
         self.assertEqual(hosts[host['target']]['ansible_host'], host['ssh_host_ip'])
@@ -348,6 +349,41 @@ class LabWorkflowTest(unittest.TestCase):
         runner.playbook('hou1', play, 'delegated')
         import socket
         self.assertEqual(json.loads(output.read_text())['hostname'], socket.gethostname())
+
+    def test_security_probe_uses_workflow_pin_despite_old_extra_variable_options(self):
+        self.inventory('hou1', new_user='fixture')
+        host = self.config['hosts']['hou1']
+        stale = self.private('stale-security.yml', yaml.safe_dump({
+            'security_netbird_ssh_options': ['-F', '/old/ssh-config', '-o',
+                                             'UserKnownHostsFile=/old/known-hosts']}))
+        host['inputs'] = [str(stale)]
+        capture = self.root / 'security-probe-argv.json'
+        binary = self.root / 'probe-bin'; binary.mkdir()
+        ssh = binary / 'ssh'
+        ssh.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                       f'Path({str(capture)!r}).write_text(json.dumps(sys.argv[1:]))\n')
+        ssh.chmod(0o700)
+        play = Path(host['repository']) / 'ansible/playbooks/hou1.yml'
+        play.write_text(yaml.safe_dump([{'hosts': host['target'], 'gather_facts': False,
+            'tasks': [{'ansible.builtin.import_tasks': str(
+                ROOT / 'ansible/playbooks/roles/security/tasks/verify-access.yml')}]}]))
+        subprocess.run(['git', '-C', host['repository'], 'add', '.'], check=True)
+        subprocess.run(['git', '-C', host['repository'], '-c', 'user.name=Fixture', '-c',
+            'user.email=fixture@example.invalid', 'commit', '-qm', 'security probe fixture'], check=True)
+        host['revision'] = subprocess.check_output(
+            ['git', '-C', host['repository'], 'rev-parse', 'HEAD'], text=True).strip()
+        run = self.root / 'security-probe'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        fixed = workflow.transport(host)
+        runner.transports['hou1'] = fixed
+        env = workflow.environment(self.config, host)
+        env['PATH'] = str(binary) + os.pathsep + env['PATH']
+        with patch.object(workflow, 'environment', return_value=env):
+            runner.playbook('hou1', play, 'security-probe')
+        argv = json.loads(capture.read_text())
+        self.assertEqual(argv[:len(fixed[0]) - 1], fixed[0][1:])
+        self.assertNotIn('UserKnownHostsFile=/old/known-hosts', argv)
+        self.assertEqual(argv[-2:], ['fixture@' + host['ssh_host_ip'], 'sudo -n true'])
 
     def test_global_ansible_extra_vars_are_rejected_before_execution(self):
         source = self.private('extra.yml', 'ansible_connection: ssh\n')

@@ -231,8 +231,10 @@ release can also be selected for rollback.
 
 Each playbook uses its own repository configuration and the selected toolchain,
 collections and age identity. Host limits and frozen SSH settings apply to every
-invocation. Any failure stops the sequence. This is ordered reconciliation, not
-a transaction that rolls back the other host.
+invocation. The security role's delegated SSH check uses the same workflow pin,
+overriding older `security_netbird_ssh_options` in private inputs. Standalone
+playbooks retain that variable's existing behavior. A failure stops later steps;
+completed changes on either host remain.
 
 `verify` repeats preflight and readiness checks without running deployment
 playbooks. Container checks cover the declared projects, not arbitrary host

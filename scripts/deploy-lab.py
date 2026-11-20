@@ -313,6 +313,9 @@ class Workflow:
         if local:
             overrides.update(ansible_connection='local', ansible_become=False)
         else:
+            # The security role launches its own delegated SSH command. Bind it
+            # to this same verified transport, including over older extra-vars.
+            overrides['security_netbird_ssh_options'] = fixed[1:]
             # Extra-vars also affect delegated tasks. Freeze the remote transport
             # only on its inventory host and retain local controller execution.
             frozen = {'ansible_connection': 'ssh', 'ansible_ssh_executable': 'ssh',
