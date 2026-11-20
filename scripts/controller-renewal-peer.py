@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Provision a persistent, isolated NetBird peer for certificate delivery only."""
 import ipaddress
+from http.client import HTTPSConnection
 import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -47,6 +49,8 @@ def validate(config):
             or root.stat().st_mode & 0o077):
         raise ValueError('Runtime must be controller-owned and private')
     if 'management_address' in config:
+        if not isinstance(config['management_address'], str):
+            raise ValueError('Declare the management address as an IPv4 string')
         address = ipaddress.IPv4Address(config['management_address'])
         if (address.is_unspecified or address.is_loopback or address.is_link_local
                 or address.is_multicast or address == ipaddress.IPv4Address('255.255.255.255')):
@@ -140,11 +144,35 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError('Management API redirects are forbidden')
 
 
+class PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    """Use the private address without changing TLS SNI, CA checks or Host."""
+    def __init__(self, address, context=None):
+        super().__init__(context=context)
+        self.address = address
+
+    def https_open(self, request):
+        address = self.address
+
+        class Connection(HTTPSConnection):
+            def connect(self):
+                raw = socket.create_connection((address, self.port), self.timeout)
+                try:
+                    self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+                except BaseException:
+                    raw.close()
+                    raise
+
+        return self.do_open(Connection, request, context=self._context)
+
+
 def provision(config, token):
     validate(config)
     if not isinstance(token, str) or not token or any(c.isspace() for c in token):
         raise ValueError('Missing protected management token')
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    handlers = [urllib.request.ProxyHandler({}), NoRedirect()]
+    if 'management_address' in config:
+        handlers.append(PinnedHTTPSHandler(config['management_address']))
+    opener = urllib.request.build_opener(*handlers)
 
     def api(method, path, body=None):
         request = urllib.request.Request(config['management_url'] + '/api' + path, method=method,

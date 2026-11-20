@@ -56,7 +56,7 @@
     group: root
     mode: '0755'
 
-- name: Permit only argument-free delivery and the fixed status receiver
+- name: Permit only coordinated renewal and the fixed status receiver
   ansible.builtin.copy:
     dest: /etc/sudoers.d/hou1-renewal
     owner: root

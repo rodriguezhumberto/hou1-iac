@@ -5,9 +5,13 @@ import json
 import os
 from pathlib import Path
 import pwd
+import ssl
 import subprocess
 import tempfile
+import threading
 import unittest
+import urllib.error
+from http.server import BaseHTTPRequestHandler, HTTPServer
 from unittest.mock import patch
 
 from jinja2 import Environment, StrictUndefined
@@ -75,9 +79,50 @@ class RenewalPeerTest(unittest.TestCase):
         for config in [self.config, {**pinned, 'management_address': '192.0.2.26'}]:
             with self.assertRaises(ValueError):
                 peer.require_container(details, config)
-        for address in ['127.0.0.1', '0.0.0.0', '169.254.1.1', '224.0.0.1', '::1', 'host.invalid']:
+        for address in ['127.0.0.1', '0.0.0.0', '169.254.1.1', '224.0.0.1', '::1', 'host.invalid', 123, None]:
             with self.subTest(address=address), self.assertRaises(ValueError):
                 peer.validate({**pinned, 'management_address': address})
+
+    def test_private_api_pin_preserves_ca_hostname_host_header_and_redirect_refusal(self):
+        root = Path(self.directory.name)
+        cert, key = root / 'cert.pem', root / 'key.pem'
+        subprocess.run(['openssl', 'req', '-x509', '-newkey', 'rsa:2048', '-nodes',
+                        '-keyout', str(key), '-out', str(cert), '-days', '1',
+                        '-subj', '/CN=vpn.example.invalid', '-addext',
+                        'subjectAltName=DNS:vpn.example.invalid'], check=True, capture_output=True)
+        seen = []
+
+        class Handler(BaseHTTPRequestHandler):
+            def do_GET(self):
+                seen.append(self.headers['Host'])
+                if self.path == '/redirect':
+                    self.send_response(302)
+                    self.send_header('Location', 'https://other.example.invalid/')
+                else:
+                    self.send_response(200)
+                self.end_headers()
+                self.wfile.write(b'{}')
+
+            def log_message(self, *args): pass
+
+        server = HTTPServer(('127.0.0.1', 0), Handler)
+        context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+        context.load_cert_chain(cert, key)
+        server.socket = context.wrap_socket(server.socket, server_side=True)
+        thread = threading.Thread(target=server.serve_forever, daemon=True); thread.start()
+        opener = peer.urllib.request.build_opener(peer.urllib.request.ProxyHandler({}), peer.NoRedirect(),
+            peer.PinnedHTTPSHandler('127.0.0.1', context=ssl.create_default_context(cafile=str(cert))))
+        try:
+            base = 'https://vpn.example.invalid:' + str(server.server_port)
+            with opener.open(base + '/api', timeout=3) as response:
+                self.assertEqual(response.status, 200)
+            self.assertEqual(seen, ['vpn.example.invalid:' + str(server.server_port)])
+            with self.assertRaises(urllib.error.URLError):
+                opener.open('https://other.example.invalid:' + str(server.server_port), timeout=3)
+            with self.assertRaises(ValueError):
+                opener.open(base + '/redirect', timeout=3)
+        finally:
+            server.shutdown(); server.server_close(); thread.join(timeout=3)
 
     def test_installed_launcher_selects_only_its_own_configuration(self):
         self.assertEqual(executor.configuration('/usr/local/libexec/controller-renewal-exec'),

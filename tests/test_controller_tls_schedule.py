@@ -17,7 +17,7 @@ class RenewalScheduleTest(unittest.TestCase):
         for profile, suffix in [('', ''), ('lab', '-lab')]:
             scenarios.append(guard_play({'hou1_tls_executor_profile': profile}, tasks + [
                 {'ansible.builtin.assert': {'that': '_hou1_tls_executor_suffix == ' + repr(suffix)}}]))
-        for profile in ['../production', 'lab;id', 'LAB', None, 'x' * 33]:
+        for profile in ['../production', 'lab;id', 'lab\n', 'LAB', None, 'x' * 33]:
             scenarios.append(guard_play({'hou1_tls_executor_profile': profile}, tasks, tasks[0]['name']))
         result = run_plays(scenarios)
         self.assertEqual(result.returncode, 0, result.stdout + result.stderr)

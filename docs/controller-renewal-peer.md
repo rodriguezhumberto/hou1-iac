@@ -55,8 +55,9 @@ the original paths. Profiles do not change the environment-bound timer names.
 
 For a private management origin unavailable through container DNS, optionally
 set `hou1_tls_peer_config.management_address` to its reachable IPv4 address.
-Only that hostname is pinned inside the peer container; TLS still verifies the
-configured hostname. Reconciliation refuses an unexplained pin change/removal.
+The provisioning API client and peer container use that address; TLS still
+verifies the configured hostname. Reconciliation refuses an unexplained pin
+change/removal. No controller-wide resolver or hosts-file edit is needed.
 
 Install the maintained TLS programs and their companion modules in the private
 job directories using Ansible `copy`, mode `0700`. Configurations must belong to
@@ -76,6 +77,8 @@ recurring jobs do not require it. Preserve the peer's private runtime directory
 on this controller; keep any exported recovery copy encrypted. Do not copy it
 to HOU1 or HOU4. Recreating a lost identity requires a new setup grant and
 explicit reconciliation of the old peer/group and receiver source restrictions.
+Run this controller-local playbook outside command wrappers that set
+`NoNewPrivileges`: its installer needs local Ansible privilege escalation.
 
 The enrollment receipt records the stable VPN address. Use it for the dedicated
 renewal receiver grants on both nodes, with their existing pinned host keys.
