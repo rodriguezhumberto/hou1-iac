@@ -221,9 +221,12 @@ Verify HOU4 reconnects with its retained peer; use its console if re-enrollment
 is necessary. Confirm the operator's personal SSH key on both nodes. Update
 HOU4's backup source SSH pin through its existing Ansible backup role using the
 verified **new** HOU1 host public key. Do not disable host-key verification.
-Reapply the existing HOU1 `monitoring.yml` and `backups.yml` over VPN, with their
-preserved private inputs, to reconcile policies referring to the replacement
-peer. Prove a fresh off-host collection and real Discord delivery/recovery.
+For the managed two-host lab, run the [finalize phase](../deployment-workflow.md#finalize-a-published-restore).
+It reconciles the source/storage layout before backup initialization, updates
+the receiver and verifies the collected point offline. Reconcile any separately
+declared HOU1 exporter through `monitoring.yml`; do not create missing monitoring
+grants during recovery. Prove a fresh off-host collection and real Discord
+delivery/recovery.
 
 Run the isolated application/session/media/rollback drill against the recovered
 services, external Google sign-in, approved/rejected VPN access, public staff
@@ -264,9 +267,11 @@ with the original private handoff plan. It validates the retained replacement
 identity and exact group/policy scope before repairing remaining stages. Missing
 plans or latched restore/publication errors still stop recovery. Empty groups
 alone do not establish ownership or authorize reassignment.
-Reapply `monitoring.yml` and `backups.yml` over VPN, then HOU4's backup receiver
-role with the verified HOU1 SSH host key. Existing group membership and policy
-ownership guards still apply; do not bypass them to adopt unknown groups.
+Use the managed lab's `finalize` phase with the verified HOU1 SSH host key.
+Outside that workflow, reconcile the normal source/storage layout before
+`backups.yml`, then the receiver; maintain separately declared monitoring through
+its owning playbook. Existing group membership and policy ownership guards still
+apply; do not bypass them to adopt unknown groups.
 Preserve the checked repair separately from the automated recovery evidence.
 
 Use these iterations to prove metrics, backup capture/collection, alert delivery,
