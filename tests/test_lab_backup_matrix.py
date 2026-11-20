@@ -105,7 +105,9 @@ class BackupControllerTest(unittest.TestCase):
         self.root = Path(self.folder.name)
         self.identity = self.root / 'offline.agekey'; self.identity.write_text('fixture key'); self.identity.chmod(0o600)
         self.config = {'hosts': {'hou1': {}, 'hou4': {}}, 'application': {'revision': 'a' * 40}}
-        with patch.object(controller.deploy, 'Workflow'):
+        with patch.object(controller.deploy, 'Workflow') as workflow:
+            workflow.return_value.config = self.config
+            workflow.return_value.run = self.root / 'run'
             self.scenario = controller.BackupScenario(self.config,
                 {'host': 'hou4', 'recovery_identity': str(self.identity)}, self.root / 'run')
 
@@ -134,7 +136,7 @@ class BackupControllerTest(unittest.TestCase):
 
     def test_identity_drift_stops_before_transport(self):
         self.identity.write_text('replacement identity')
-        with patch.object(controller.deploy, 'transport') as transport:
+        with patch.object(self.scenario.workflow, 'backup_transport') as transport:
             with self.assertRaisesRegex(ValueError, 'identity changed'):
                 self.scenario.prefix('hou4')
             transport.assert_not_called()
@@ -156,7 +158,8 @@ class BackupControllerTest(unittest.TestCase):
             if 'verify-recovery.py' in str(command):
                 plaintext.mkdir(); (plaintext / 'secret').write_text('synthetic plaintext')
                 return subprocess.CompletedProcess(command, 1, stdout='', stderr='verification failed')
-            kwargs['stdout'].write(b'fixture ciphertext')
+            kwargs['stdout'].write(json.dumps(scenario.point).encode() if command[-1].endswith('manifest.json')
+                                   else b'fixture ciphertext')
             return subprocess.CompletedProcess(command, 0)
         with patch.object(controller.subprocess, 'run', side_effect=run):
             with self.assertRaisesRegex(ValueError, 'verification failed'):

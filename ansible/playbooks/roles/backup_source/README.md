@@ -15,6 +15,11 @@ an established VPN inventory. Required inputs and recovery boundaries are in the
 - `tasks/recovery.yml` installs systemd units and seeds an initial recovery point
   only when no earlier capture succeeded.
 
+`hou1_backup_capture_on_initialize` defaults to `true`. The lab finalization
+controller overrides it to `false` while initializing under capture admission,
+then requests/observes capture after releasing admission. Timer enablement and
+writer recovery remain owned by this role.
+
 The controller sends ten-second keepalives; a minute of silence releases an
 abandoned hold without waiting for the operating system's TCP timeout.
 Capture waits at most fifteen minutes for the host lock. Recovery stays

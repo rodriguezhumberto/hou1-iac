@@ -78,14 +78,19 @@ def receiver_config(contract):
     return config
 
 
-def source_state():
+def source_state(allow_empty=False):
     config = json.loads(SOURCE.read_text())
     require(config.get('environment') == 'test', 'Source must be an established test backup')
     root = Path(config['work_root'])
     require(root == Path('/var/lib/hou1-backup'), 'Unexpected source work directory')
-    with (root / 'ready.export').open('rb') as stream:
-        manifest = json.loads(stream.readline(8193))
-    return {'manifest': manifest, 'status': json.loads((root / 'last-export.json').read_text()),
+    manifest, status = None, {'last_success': 0, 'last_run_success': 0}
+    try:
+        status = json.loads((root / 'last-export.json').read_text())
+        with (root / 'ready.export').open('rb') as stream:
+            manifest = json.loads(stream.readline(8193))
+    except FileNotFoundError:
+        require(allow_empty and not status['last_success'], 'Successful source point is missing')
+    return {'manifest': manifest, 'status': status,
             'recipient': config['recipient'], 'intent': (root / 'restart-intent.json').exists(),
             'service': unit('hou1-backup-prepare.service')}
 
@@ -215,15 +220,31 @@ def run(contract):
     if action == 'access':
         return {'private_access': True}
     if contract['role'] == 'hou1':
-        require(action in ('source-state', 'capture'), 'Unsupported source operation')
-        state = source_state()
+        require(action in ('source-state', 'source-status', 'ensure-capture', 'capture'), 'Unsupported source operation')
+        state = source_state(allow_empty=True) if action in ('source-status', 'ensure-capture') else source_state()
+        if action == 'ensure-capture':
+            require(not state['intent'] or state['service']['ActiveState'] in ('active', 'activating'),
+                    'Interrupted writers require recovery before capture')
+            if not state['status']['last_success'] and state['service']['ActiveState'] in ('inactive', 'failed'):
+                output(['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service'])
         if action == 'capture':
             require(not state['intent'] and state['service']['ActiveState'] in ('inactive', 'failed'),
                     'Source capture or writer recovery is already active')
             output(['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service'])
         return state
-    require(action in ('receiver-state', 'interrupt'), 'Unsupported receiver operation')
-    return interrupt(contract) if action == 'interrupt' else receiver_state(contract)
+    require(action in ('receiver-state', 'collect', 'interrupt'), 'Unsupported receiver operation')
+    if action == 'interrupt':
+        return interrupt(contract)
+    state = receiver_state(contract)
+    if action == 'collect':
+        expected = contract['expected']
+        retained = state['points'].get(expected['id'])
+        if retained:
+            require(retained['manifest'] == expected, 'Retained point differs from selected source')
+        elif state['service']['ActiveState'] in ('inactive', 'failed'):
+            require(state['service']['RuntimeMaxUSec'] not in ('infinity', '0'), 'Receiver runtime must be bounded')
+            output(['systemctl', 'start', '--no-block', 'hou4-backup.service'])
+    return state
 
 
 if __name__ == '__main__':

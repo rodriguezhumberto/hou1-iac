@@ -256,6 +256,18 @@ class LabWorkflowTest(unittest.TestCase):
             self.assertEqual(probe.call_count, 2)
             deploy.assert_not_called()
 
+    def test_finalization_rejects_legacy_or_missing_identity_before_host_access(self):
+        run = self.root / 'finalize'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        with patch.object(runner, 'preflight') as access, patch.object(runner, 'playbook') as deploy:
+            with self.assertRaisesRegex(workflow.WorkflowError, 'version 2'):
+                runner.execute('finalize', str(self.private('offline-key', 'fixture')))
+            access.assert_not_called(); deploy.assert_not_called()
+        with patch.object(workflow.Workflow, 'execute') as execute:
+            self.assertEqual(workflow.main(['--config', str(self.input), '--phase', 'verify',
+                                           '--resume', '/private/receipt.json']), 1)
+            execute.assert_not_called()
+
     def test_workflow_rejects_input_drift_before_invoking_ansible(self):
         host = self.config['hosts']['hou1']
         run = self.root / 'drift'; run.mkdir(mode=0o700)

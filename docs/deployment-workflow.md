@@ -62,6 +62,35 @@ directory as mode `0700`. Prepare tools with `make setup` in both repositories.
 
 Use the selected tooling Python when `VENV` is elsewhere.
 
+### Finalize a published restore
+
+After publication and private VPN reconnection, use version 2 inputs:
+
+```bash
+.venv/bin/python scripts/deploy-lab.py --config /private/lab/workflow.json \
+  --phase finalize --recovery-identity /private/recovery/offline.agekey
+```
+
+The phase reconciles HOU1's source/storage layout and initializes `backups.yml`
+under capture admission. It disables that playbook's synchronous initial capture;
+a timer-triggered capture waits for admission to be released. The controller then
+requests initial capture if none has succeeded and observes VPN recovery without
+replaying start requests. A successful existing source point is reused.
+
+After HOU4 reconnects, the phase holds capture admission again, reconciles HOU4,
+collects the selected point, and verifies its ciphertext, offline decryption and
+SQLite integrity against the selected application revision. Decrypted output is
+removed on success or failure. The offline identity stays on the controller.
+Capture observation is bounded to 50 minutes; collection to 33 minutes 20 seconds.
+Both hosts must pass final readiness checks.
+
+To resume, add `--resume /private/lab/runs/previous/receipt.json`. Each attempt
+uses a new directory and repeats reconciliation. Resume requires the same inputs,
+revisions, transports and offline identity; a previously selected source point
+must still match. It never silently substitutes a newer point. This phase does
+not restore, publish or rebuild a host; login, reboot and alert-delivery acceptance
+remain separate checks.
+
 ### Failure matrix
 
 The non-destructive interruption matrix uses the same private workflow inputs

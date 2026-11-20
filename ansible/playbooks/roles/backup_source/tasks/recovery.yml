@@ -52,5 +52,6 @@
     name: hou1-backup-prepare.service
     state: started
   when: >-
-    not hou1_backup_last_export.stat.exists or
-    (hou1_backup_capture_status.content | b64decode | from_json).last_success | default(0) | int == 0
+    (hou1_backup_capture_on_initialize | default(true) | bool) and
+    (not hou1_backup_last_export.stat.exists or
+    (hou1_backup_capture_status.content | b64decode | from_json).last_success | default(0) | int == 0)

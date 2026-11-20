@@ -56,11 +56,11 @@ network changes.
    remain on loopback. Then select the reviewed access assertion and run
    `publish-test-recovery.yml`, using only the pinned disconnected lost peer.
 5. Refresh the dedicated controller and retained companion, verify private SSH,
-   then reconcile the normal runtime before initializing backups: cold restore
-   retains the integrated source layout until normal source/storage migration.
-   Run initial backup capture outside the managed workflow's capture lock.
-   Reconcile monitoring, backup and renewal through their existing entry points.
-   Update the backup source SSH pin through its owning role.
+   then run the workflow's [finalize phase](../deployment-workflow.md#finalize-a-published-restore).
+   It orders normal source/storage migration before backup initialization, releases
+   admission before capture, updates the receiver's source SSH pin through its
+   owning role, and verifies the collected point offline. Cold restore retains
+   the integrated source layout until this reconciliation.
 6. Require login/denial checks, real peer transport, a fresh verified off-host
    point, alert delivery/recovery, reboot recovery and unchanged reconciliation.
    Preserve failed observations separately from later repairs.

@@ -21,6 +21,7 @@ from urllib.parse import urlsplit
 import yaml
 
 import lab_runtime
+from lab_backup_client import write_private
 import lab_contracts
 from lab_capture_guard import CaptureGuard, PROGRAM as CAPTURE_GUARD_PROGRAM
 from ssh_target import pinned_ssh, private_file
@@ -45,13 +46,6 @@ def directory(value):
     require(path.is_absolute() and path.is_dir() and not path.is_symlink(),
             'Use existing absolute directories')
     return path
-
-
-def write_private(path, content):
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(descriptor, 'w') as stream:
-        os.fchmod(stream.fileno(), 0o600)
-        stream.write(content)
 
 
 def load_config(path):
@@ -291,6 +285,8 @@ class Workflow:
             'application': self.config['application'], 'steps': self.results}
         if self.config['version'] == 2:
             value['capabilities'] = self.capabilities
+        if hasattr(self, 'finalization'):
+            value['finalization'] = self.finalization
         write_private(temporary, json.dumps(value, indent=2) + '\n')
         temporary.replace(path)
 
@@ -395,8 +391,11 @@ class Workflow:
         path = self.run / (service + suffix)
         write_private(path, json.dumps(report, indent=2) + '\n')
 
+    def backup_transport(self, service):
+        return transport(self.config['hosts'][service])
+
     @contextmanager
-    def capture_guard(self):
+    def capture_guard(self, name="capture-admission"):
         self.check_inputs()
         host = self.config['hosts']['hou1']
         fixed, _, _ = self.transports['hou1']
@@ -404,15 +403,19 @@ class Workflow:
         command = [*fixed, '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
                    host['ssh_host_ip'], shlex.join(['sudo', '-n', 'python3', '-u', '-c',
                                                   CAPTURE_GUARD_PROGRAM, '--hold'])]
-        with CaptureGuard(command, self.run / 'capture-admission.log') as guard:
+        with CaptureGuard(command, self.run / (name + '.log')) as guard:
             self.capture = guard
             try:
                 yield
             finally:
                 self.capture = None
 
-    def execute(self, phase):
+    def execute(self, phase, recovery_identity=None, resume=None):
         self.phase = phase
+        if phase == 'finalize':
+            require(self.config['version'] == 2 and recovery_identity,
+                    'Finalization requires version 2 inputs and --recovery-identity')
+            private_file(recovery_identity)
         if self.config['version'] == 2:
             for service in SERVICES:
                 self.step(service + '-inputs', lambda s=service: self.prepare_inputs(s))
@@ -421,6 +424,15 @@ class Workflow:
             require(phase != 'inputs', 'The inputs phase requires a version 2 workflow')
             for service in SERVICES:
                 self.step(service + '-preflight', lambda s=service: self.preflight(s))
+        if phase == 'finalize':
+            from lab_finalize import Finalization
+            finalization = Finalization(self, recovery_identity, resume)
+            for service in SERVICES:
+                self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
+            finalization.execute()
+            self.status = 'passed'
+            self.save()
+            return
         with ExitStack() as stack:
             if phase == 'reconcile':
                 self.step('capture-admission', lambda: stack.enter_context(self.capture_guard()))
@@ -443,11 +455,15 @@ class Workflow:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
-    parser.add_argument('--phase', choices=('plan', 'inputs', 'handoff', 'preflight', 'reconcile', 'verify'), default='plan')
+    parser.add_argument('--phase', choices=('plan', 'inputs', 'handoff', 'preflight', 'reconcile', 'verify', 'finalize'), default='plan')
+    parser.add_argument('--recovery-identity', help='Controller-only offline age identity; required for finalize')
+    parser.add_argument('--resume', help='Previous private finalization receipt; recheck inputs and reuse its point')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
         config = load_config(args.config)
+        require(args.phase == 'finalize' or not (args.recovery_identity or args.resume),
+                'Recovery identity and resume apply only to finalize')
         if args.phase == 'plan':
             inputs = ['hou1-inputs', 'hou4-inputs', 'input-contracts'] if config['version'] == 2 else []
             access = ['hou1-preflight', 'hou4-preflight']
@@ -461,7 +477,16 @@ def main(argv=None):
             run = Path(tempfile.mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-'),
                                         dir=config['run_directory']))
             print('Private run directory: ' + str(run), flush=True)
-            Workflow(config, run).execute(args.phase)
+            runner = Workflow(config, run)
+            try:
+                if args.phase == 'finalize':
+                    runner.execute(args.phase, args.recovery_identity, args.resume)
+                else:
+                    runner.execute(args.phase)
+            except BaseException:
+                runner.status = 'failed'
+                runner.save()
+                raise
     except WorkflowError as error:
         print(str(error), file=sys.stderr)
         return 1

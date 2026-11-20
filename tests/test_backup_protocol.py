@@ -310,10 +310,11 @@ class BackupProtocolTest(unittest.TestCase):
                      if task['name'] == 'Check whether the restored host has an initial recovery point')
         plays = []
         with tempfile.TemporaryDirectory() as directory:
-            for case, status, expected in [
-                    ('absent', None, 1), ('failed-first', {'last_run_success': 0, 'last_success': 0}, 1),
-                    ('successful', {'last_run_success': 1, 'last_success': 1234}, 0),
-                    ('failed-later', {'last_run_success': 0, 'last_success': 1234}, 0)]:
+            for case, status, expected, capture_enabled in [
+                    ('absent', None, 1, True), ('failed-first', {'last_run_success': 0, 'last_success': 0}, 1, True),
+                    ('successful', {'last_run_success': 1, 'last_success': 1234}, 0, True),
+                    ('failed-later', {'last_run_success': 0, 'last_success': 1234}, 0, True),
+                    ('controller-deferred', None, 0, False)]:
                 root = Path(directory) / case
                 root.mkdir()
                 record, calls = root / 'last-export.json', root / 'calls'
@@ -334,7 +335,8 @@ class BackupProtocolTest(unittest.TestCase):
                 checks = [{'ansible.builtin.assert': {'that':
                     f"lookup('ansible.builtin.file', '{calls}', errors='ignore') | default('', true) "
                     f"| split | length == {expected}"}}]
-                plays.append({'tasks': selected + selected + checks})
+                plays.append({'variables': {'hou1_backup_capture_on_initialize': capture_enabled},
+                              'tasks': selected + selected + checks})
             result = run_plays(plays)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
 

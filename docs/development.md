@@ -9,6 +9,7 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | --- | --- | --- |
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
 | Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
+| Finalize a published lab restore and verify off-host recovery | `scripts/deploy-lab.py --phase finalize` | [Finalization](deployment-workflow.md#finalize-a-published-restore) |
 | Check lab release, identity and backup inputs locally | `scripts/deploy-lab.py --phase inputs` | [Input contracts](lab-inputs.md) |
 | Generate private inventories and verify managed access | `scripts/prepare-lab.py` | [Inventory generation](lab-inventory.md) |
 | Bootstrap empty isolated VMs from frozen inputs | Existing rehearsal and host playbooks | [Fresh lab bootstrap](probes/lab-bootstrap.md) |
@@ -94,6 +95,10 @@ The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap
 and repeat checks. [Capture coordination](evidence/capture-coordination-2026-11-19.md)
 records the subsequent deployment/backup exclusion and controller-loss checks.
 Keep reusable logic in Git and private values outside it.
+`scripts/lab_finalize.py` orders restore finalization through component playbooks;
+`lab_backup_client.py` shares pinned backup transport and offline verification
+with the failure matrix. Source initialization stays under admission so activating
+its timer cannot interrupt the playbook; capture runs after admission is released.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
 `shared_ingress_independent`; the combined project remains the default.
