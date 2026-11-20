@@ -66,6 +66,29 @@ class RenewalPeerTest(unittest.TestCase):
             with self.assertRaises(ValueError):
                 peer.target_peers(self.config, broken)
 
+    def test_private_management_pin_is_explicit_and_cannot_drift(self):
+        pinned = {**self.config, 'management_address': '192.0.2.25'}
+        peer.validate(pinned)
+        details = copy.deepcopy(self.details)
+        details['HostConfig']['ExtraHosts'] = ['vpn.example.invalid:192.0.2.25']
+        peer.require_container(details, pinned)
+        for config in [self.config, {**pinned, 'management_address': '192.0.2.26'}]:
+            with self.assertRaises(ValueError):
+                peer.require_container(details, config)
+        for address in ['127.0.0.1', '0.0.0.0', '169.254.1.1', '224.0.0.1', '::1', 'host.invalid']:
+            with self.subTest(address=address), self.assertRaises(ValueError):
+                peer.validate({**pinned, 'management_address': address})
+
+    def test_installed_launcher_selects_only_its_own_configuration(self):
+        self.assertEqual(executor.configuration('/usr/local/libexec/controller-renewal-exec'),
+                         Path('/etc/controller-renewal/exec.json'))
+        self.assertEqual(executor.configuration('/usr/local/libexec/controller-renewal-exec-lab'),
+                         Path('/etc/controller-renewal/exec-lab.json'))
+        for name in ['controller-renewal-exec-', 'controller-renewal-exec-../production',
+                     'controller-renewal-exec-BAD', 'controller-renewal-exec-lab;sh']:
+            with self.subTest(name=name), self.assertRaises(ValueError):
+                executor.configuration(name)
+
     def test_policy_refuses_extra_ports_membership_direction_or_owner(self):
         peer.require_owned_policy(self.expected, self.expected)
         for key, value in [('ports', ['22', '443']), ('bidirectional', True),
@@ -189,6 +212,8 @@ class RenewalPeerTest(unittest.TestCase):
         with self.assertRaises(ValueError): executor.invocation(doc, 'tls-deploy', self.details)
 
     def test_successful_enrollment_is_idempotent_and_never_adds_admin_membership(self):
+        self.config['management_address'] = '192.0.2.25'
+        self.details['HostConfig']['ExtraHosts'] = ['vpn.example.invalid:192.0.2.25']
         calls, policies = [], []
         groups = [{'id': 'all', 'name': 'All', 'peers': []}]
         peers = [{'id': str(i), 'ip': ip, 'groups': [{'id': 'servers', 'name': 'environment-servers'}]}
@@ -232,6 +257,7 @@ class RenewalPeerTest(unittest.TestCase):
             if argv[1] == 'ps': return b'container' if created else b''
             if argv[1] == 'run':
                 self.assertEqual(argv[argv.index('--network') + 1], 'bridge')
+                self.assertEqual(argv[argv.index('--add-host') + 1], 'vpn.example.invalid:192.0.2.25')
                 created = True
             if argv[1] == 'inspect': return json.dumps([self.details]).encode()
             if 'up' in argv:
@@ -302,3 +328,7 @@ class RenewalPeerTest(unittest.TestCase):
             self.assertIn('/usr/bin/sudo -n /usr/local/libexec/controller-renewal-exec hou1-production-' + suffix, isolated)
             self.assertIn('NoNewPrivileges=no', isolated)
             self.assertNotIn('--config', isolated)
+            profiled = template.render(**variables, hou1_tls_executor_job_prefix='hou1-test',
+                                       _hou1_tls_executor_suffix='-lab')
+            self.assertIn('/usr/bin/sudo -n /usr/local/libexec/controller-renewal-exec-lab hou1-test-' + suffix,
+                          profiled)

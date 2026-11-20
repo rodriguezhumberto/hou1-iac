@@ -117,6 +117,8 @@ under `no_log`; no age identity or DNS credential is copied to HOU1.
    hostname and the expected leaf fingerprint over a fresh TLS connection for
    every probe hostname. No-op deployments still verify the served certificates.
    Only verified delivery advances the private success receipt.
+   Keep `hou1_tls_executor_profile` consistent with the scoped peer's profile
+   when selecting namespace jobs; an empty profile retains the original launcher.
 5. Enable the controller user timers with `tls-renewal-schedule.yml`, supplying
    `hou1_tls_schedule_environment`, `hou1_tls_controller_config` and boolean
    `hou1_tls_schedule_enabled: true`. The selected encrypted bundle must have a

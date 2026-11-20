@@ -1,0 +1,10 @@
+---
+- name: Validate the optional renewal executor profile before controller changes
+  ansible.builtin.assert:
+    that:
+      - hou1_tls_executor_profile is string
+      - hou1_tls_executor_profile == '' or hou1_tls_executor_profile is match('^[a-z][a-z0-9-]{0,31}$')
+
+- name: Select this profile's fixed launcher, configuration and sudoers suffix
+  ansible.builtin.set_fact:
+    _hou1_tls_executor_suffix: '{{ "-" ~ hou1_tls_executor_profile if hou1_tls_executor_profile else "" }}'

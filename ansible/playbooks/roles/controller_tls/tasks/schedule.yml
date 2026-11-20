@@ -1,4 +1,7 @@
 ---
+- name: Select the independently owned renewal executor
+  ansible.builtin.import_tasks: executor.yml
+
 - name: Require an explicit scheduling environment and boolean enable switch
   ansible.builtin.assert:
     that:
@@ -24,10 +27,16 @@
       ansible.builtin.assert:
         that: hou1_tls_schedule_config.environment == hou1_tls_schedule_environment
       no_log: true
+    - name: Install controller TLS programs from this checkout
+      ansible.builtin.copy:
+        src: '{{ role_path }}/../../../../scripts/{{ item }}'
+        dest: '{{ hou1_tls_schedule_directory }}/{{ item }}'
+        mode: '0700'
+      loop: [controller-tls.py, hou1_tls_material.py]
     - name: Verify private configuration and scoped SSH before changing timers
       ansible.builtin.command:
         argv: >-
-          {{ ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec', hou1_tls_executor_job_prefix ~ '-check-config']
+          {{ ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec' ~ _hou1_tls_executor_suffix, hou1_tls_executor_job_prefix ~ '-check-config']
              if hou1_tls_executor_job_prefix else
              [ansible_playbook_python, role_path ~ '/../../../../scripts/controller-tls.py', '--config', hou1_tls_controller_config, '--check-config'] }}
       changed_when: false
@@ -41,12 +50,6 @@
       register: hou1_tls_linger
       changed_when: false
       failed_when: hou1_tls_linger.stdout | trim != 'yes'
-    - name: Install controller TLS programs from this checkout
-      ansible.builtin.copy:
-        src: '{{ role_path }}/../../../../scripts/{{ item }}'
-        dest: '{{ hou1_tls_schedule_directory }}/{{ item }}'
-        mode: '0700'
-      loop: [controller-tls.py, hou1_tls_material.py]
     - name: Create the controller user unit directory
       ansible.builtin.file:
         path: '{{ lookup("env", "HOME") }}/.config/systemd/user'
@@ -72,7 +75,10 @@
 
     - name: Publish an initial renewal status before dependent monitoring starts
       ansible.builtin.command:
-        argv: ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec', '{{ hou1_tls_executor_job_prefix }}-status']
+        argv: >-
+          {{ ['sudo', '-n', '/usr/local/libexec/controller-renewal-exec' ~ _hou1_tls_executor_suffix, hou1_tls_executor_job_prefix ~ '-status']
+             if hou1_tls_executor_job_prefix else
+             [ansible_playbook_python, hou1_tls_schedule_directory ~ '/controller-tls.py', '--config', hou1_tls_controller_config, '--publish-status'] }}
       changed_when: false
       no_log: true
 
