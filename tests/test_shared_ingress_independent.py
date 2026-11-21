@@ -1,12 +1,16 @@
 """Independent ingress rendering and recovery contracts remain explicit and reversible."""
 import importlib.util
 import json
+import os
+from pathlib import Path
+import sys
+import tempfile
 import unittest
 from unittest.mock import patch
 import yaml
 from jinja2 import Environment
 
-from helpers import ROOT
+from helpers import ROOT, run_play
 
 
 FILTER_SPEC = importlib.util.spec_from_file_location(
@@ -24,6 +28,59 @@ CUTOVER_SPEC.loader.exec_module(cutover)
 
 
 class IndependentIngressTest(unittest.TestCase):
+    def ingress_model(self, application, installed=None, source=None):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            app, ingress, binary = (root / name for name in ('application', 'ingress', 'bin'))
+            for path in (app, ingress, binary):
+                path.mkdir()
+            (app / 'docker-compose.yml').write_text(json.dumps(application))
+            if installed is not None:
+                (ingress / 'docker-compose.yml').write_text(json.dumps(installed))
+            docker = binary / 'docker'
+            docker.write_text(f'#!{sys.executable}\n' + '''import json,pathlib,sys
+args=sys.argv[1:]
+directory=pathlib.Path(args[args.index('--project-directory')+1])
+model=directory/'docker-compose.yml'
+if '--file' in args:model=pathlib.Path(args[args.index('--file')+1])
+print(json.dumps(json.loads(model.read_text())))
+''')
+            docker.chmod(0o755)
+            variables = {'app_directory': str(app), 'shared_ingress_directory': str(ingress),
+                         'shared_ingress_project': 'fixture-ingress'}
+            if source is not None:
+                variables['application_image_compose'] = source
+            tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/shared_ingress/tasks/nginx-model.yml').read_text())
+            expected = (source if source is not None else installed if installed is not None else application)
+            if 'nginx' in expected.get('services', {}):
+                tasks += [{'ansible.builtin.assert': {'that': [
+                    "shared_ingress_nginx_service.image == 'nginx:fixture'",
+                    ('application_image_compose is not defined' if source is None else
+                     'application_image_compose == ' + repr(source)),
+                ]}}]
+            return run_play(variables, [{'block': tasks,
+                'environment': {'PATH': str(binary) + ':' + os.environ['PATH']}}])
+
+    def test_identity_only_reconcile_reads_the_existing_independent_listener(self):
+        result = self.ingress_model({'services': {'application': {'image': 'app:fixture'}}},
+                                    {'services': {'nginx': {'image': 'nginx:fixture', 'ports': ['443:443']}}})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_first_migration_uses_the_deployed_legacy_listener(self):
+        result = self.ingress_model({'services': {'nginx': {'image': 'nginx:fixture', 'ports': ['443:443']}}})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_application_release_remains_the_explicit_listener_image_source(self):
+        result = self.ingress_model({}, {'services': {'nginx': {'image': 'nginx:previous'}}},
+                                    {'services': {'nginx': {'image': 'nginx:fixture', 'ports': ['443:443']}}})
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_invalid_existing_ingress_does_not_fall_back_to_legacy(self):
+        result = self.ingress_model({'services': {'nginx': {'image': 'nginx:fixture', 'ports': ['443:443']}}},
+                                    {'services': {'application': {'image': 'app:fixture'}}})
+        self.assertNotEqual(result.returncode, 0, result.stdout + result.stderr)
+        self.assertIn('Require a supported Nginx service', result.stdout)
+
     def test_default_compose_remains_combined(self):
         result = app_compose.compose_override('/data', '/ingress', 'netbird', '172.20.0.5')
         self.assertNotIn('profiles', result['services']['nginx'])
@@ -73,7 +130,7 @@ class IndependentIngressTest(unittest.TestCase):
         environment = Environment()
         environment.filters['bool'] = bool
         rendered = environment.from_string(source).render(
-            application_image_compose={'services': {'nginx': {'image': 'nginx:stable'}}},
+            shared_ingress_nginx_service={'image': 'nginx:stable'},
             app_directory='/opt/application', netbird_control_plane_directory='/opt/netbird',
             netbird_ingress_proxy_ip='172.30.80.2', netbird_ingress_network='netbird-ingress',
             shared_ingress_app_network='application', authentik_enable_ingress_network=False,
@@ -121,7 +178,7 @@ class IndependentIngressTest(unittest.TestCase):
         environment.filters['bool'] = bool
         template = environment.from_string(source)
         context = {
-            'application_image_compose': {'services': {'nginx': {'image': 'nginx:stable'}}},
+            'shared_ingress_nginx_service': {'image': 'nginx:stable'},
             'app_directory': '/opt/application',
             'netbird_control_plane_directory': '/opt/netbird',
             'netbird_ingress_proxy_ip': '172.30.80.2',

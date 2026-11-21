@@ -32,6 +32,11 @@ separate project. Application routing still belongs to the selected source.
 `shared_ingress_independent: true` enables the migration slice. It renders a
 separate project under `shared_ingress_directory`, attaches it to the external
 backend network, installs a strict recovery validator and writes `recovery.json`.
+Application deployment supplies the source Nginx model. Separate Authentik or
+NetBird runs reuse the installed independent listener, falling back to the legacy
+application model only before migration. This lets restored application projects
+omit Nginx without blocking identity updates; an invalid installed listener fails
+instead of selecting another image.
 The legacy Nginx service receives `SIGQUIT` and a 30-second Compose stop grace so
 in-flight connections can drain before its ports are released. The independent
 service has an Nginx configuration healthcheck; the existing Compose `--wait`
