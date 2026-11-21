@@ -11,8 +11,8 @@ must explicitly authorize elevated VPN/dashboard access. `provision_users: true`
 prepares missing Authentik identities without passwords or invitations.
 
 NetBird creates external users on first login. Enable
-`identity_admission_schedule_enabled` to reconcile their declared permissions
-within a minute, without operator intervention. The scheduled command uses
+`identity_admission_schedule_enabled` to reconcile their declared permissions on
+the next one-minute timer run, without operator intervention. The command uses
 `identity_admission_transport_argv`, the shared controller
 `identity_admission_coordination_lock` and HOU1's capture lock. A busy workflow is
 skipped; failures retry at the next timer event. Existing unrelated memberships,

@@ -164,7 +164,7 @@ alone never grant network administration.
 Enable `identity_admission_schedule_enabled` with the controller transport and
 coordination lock to apply permissions automatically after first Google login.
 NetBird external users do not exist before that login; the timer reconciles new
-records within a minute while unrelated groups and the emergency owner remain
+records on its one-minute cadence while unrelated groups and the emergency owner remain
 unchanged. `google_secret_source` can reference the deployment's Authentik SOPS
 bundle as the single Google-allowlist source.
 

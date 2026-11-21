@@ -336,17 +336,20 @@ def reconcile(args, stack):
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')
 
+    capture = None
     if args.capture_lock:
         from lab_capture_guard import CaptureGuard
         directory = stack.enter_context(tempfile.TemporaryDirectory(prefix='.admission-', dir=Path(args.config).parent))
         command = ssh + [shlex.join(['sudo', '-n', 'python3',
             '/usr/local/libexec/hou1-backup-operation-lock.py', '--hold'])]
-        stack.enter_context(CaptureGuard(command, Path(directory) / 'capture.log', timeout=35))
+        capture = stack.enter_context(CaptureGuard(command, Path(directory) / 'capture.log', timeout=35))
 
     container = None
 
     def auth(method, path, body=None):
         nonlocal container
+        if capture:
+            capture.check()
         if container is None:
             command = shlex.join(['sudo', '-n', 'docker', 'compose', '-p', profile['compose_project'],
                                   '-f', profile['compose_file'], 'ps', '-q', profile['compose_service']])
@@ -360,19 +363,28 @@ def reconcile(args, stack):
             'method': method, 'path': path, 'body': body}), capture_output=True,
             text=True, check=True, timeout=35)
         result = json.loads(r.stdout)
+        if capture:
+            capture.check()
         if isinstance(result, dict) and (result.get('next') or result.get('pagination', {}).get('next')):
             raise ValueError('Refusing partially paginated Authentik inputs')
         return result
 
     def netbird(method, path, body=None):
+        if capture:
+            capture.check()
         req = urllib.request.Request(c['netbird_url'] + '/api' + path, method=method,
             data=None if body is None else json.dumps(body).encode(), headers={
                 'Authorization': 'Token ' + token['netbird_api_token'], 'Content-Type': 'application/json'})
         with urllib.request.urlopen(req, timeout=20) as r:
             data = r.read()
+            if capture:
+                capture.check()
             return json.loads(data) if data else {}
 
-    print(json.dumps(configure(c, auth, netbird, profile)))
+    report = configure(c, auth, netbird, profile)
+    if capture:
+        capture.check()
+    print(json.dumps(report))
 
 
 if __name__ == '__main__':

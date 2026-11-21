@@ -328,6 +328,41 @@ class ProductionAdmissionTest(AdmissionTest):
 
 
 class StaffAccessTest(unittest.TestCase):
+    def test_lost_host_capture_lock_stops_api_requests_and_success_reporting(self):
+        config = {'environment': 'test', 'google_emails': ['base@example.invalid'],
+                  'netbird_url': 'https://netbird-test.example.invalid',
+                  'authentik_issuer': 'https://auth-test.example.invalid/application/o/netbird-test/',
+                  'netbird_subnet': '100.91.0.0/16', 'ssh': ['ssh', 'fixture'],
+                  'netbird_token_file': 'token.enc.json', 'age_key_file': '/private/key'}
+        token = {'netbird_management_url': config['netbird_url'], 'netbird_api_token': 'fixture'}
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            profile = root / 'profile.json'
+            profile.write_text(json.dumps(identity_profile('test', private=False)))
+            for target in ('auth', 'netbird', 'report'):
+                def configure(c, auth, netbird, selected):
+                    if target == 'auth':
+                        return auth('GET', 'core/users/')
+                    if target == 'netbird':
+                        return netbird('GET', '/users')
+                    return {}
+                with self.subTest(target=target), \
+                        patch('sys.argv', ['admission', '--config', str(root / 'input.enc.json'),
+                                           '--profile', str(profile), '--identity-secrets', 'names.enc.json',
+                                           '--capture-lock']), \
+                        patch.object(m, 'load_encrypted_config', side_effect=[config, {'IDENTITY_NAMES': identity_names()}, token]), \
+                        patch.object(m, 'pinned_ssh', return_value=config['ssh']), \
+                        patch.object(m, 'configure', side_effect=configure), \
+                        patch('lab_capture_guard.CaptureGuard') as factory, \
+                        patch.object(m.subprocess, 'run') as command, \
+                        patch.object(m.urllib.request, 'urlopen') as http, redirect_stdout(io.StringIO()) as output:
+                    factory.return_value.__enter__.return_value.check.side_effect = ValueError('capture lock lost')
+                    with self.assertRaisesRegex(ValueError, 'capture lock lost'):
+                        m.main()
+                    command.assert_not_called()
+                    http.assert_not_called()
+                    self.assertEqual(output.getvalue(), '')
+
     def test_declared_admin_permissions_converge_after_first_login_and_remove_old_staff_access(self):
         user = {'pk': 7, 'email': 'admin@example.invalid', 'is_active': True,
                 'path': 'goauthentik.io/sources/google', 'groups': ['reader', 'unrelated']}
