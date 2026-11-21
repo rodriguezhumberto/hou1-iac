@@ -1,0 +1,81 @@
+---
+- name: Retire scheduling when private admission inputs are removed
+  ansible.builtin.include_tasks: disable.yml
+  when: identity_admission_secret_source | length == 0 and authentik_environment is defined
+  args:
+    apply:
+      delegate_to: localhost
+      become: false
+
+- name: Apply declared base-user permissions
+  when: identity_admission_secret_source | length > 0
+  delegate_to: localhost
+  become: false
+  block:
+    - name: Require an explicit identity environment and scoped private inputs
+      ansible.builtin.assert:
+        that:
+          - authentik_environment in ['test', 'prod']
+          - authentik_google_enabled | default(true) | bool
+          - identity_admission_schedule_enabled is boolean
+          - identity_admission_capture_admitted is boolean
+          - identity_admission_secret_source is match('^/[A-Za-z0-9_./-]+$')
+          - identity_admission_state_directory is match('^/[A-Za-z0-9_./-]+$')
+          - authentik_identity_secret_source is match('^/[A-Za-z0-9_./-]+$')
+          - authentik_controller_age_key_file is match('^/[A-Za-z0-9_./-]+$')
+          - not ansible_check_mode
+      no_log: true
+
+    - name: Validate first-login scheduling before changing permissions
+      ansible.builtin.import_tasks: schedule-inputs.yml
+
+    - name: Create the controller identity state directory
+      ansible.builtin.file:
+        path: '{{ identity_admission_state_directory }}'
+        state: directory
+        mode: '0700'
+
+    - name: Export the selected public profile for admission validation
+      ansible.builtin.copy:
+        content: '{{ authentik_identity_profiles[authentik_environment] | to_nice_json }}'
+        dest: '{{ identity_admission_state_directory }}/profile.json'
+        mode: '0600'
+      no_log: true
+
+    - name: Select the public admission entry point and protected input files
+      ansible.builtin.set_fact:
+        identity_admission_argv:
+          - '{{ identity_admission_python }}'
+          - '{{ role_path }}/../../../../scripts/rehearsal-netbird-admission.py'
+          - --profile
+          - '{{ identity_admission_state_directory }}/profile.json'
+          - --identity-secrets
+          - '{{ authentik_identity_secret_source }}'
+          - --config
+          - '{{ identity_admission_secret_source }}'
+          - --age-key-file
+          - '{{ authentik_controller_age_key_file }}'
+
+    - name: Reconcile admission and declared application and VPN roles
+      ansible.builtin.command:
+        argv: >-
+          {{ identity_admission_argv +
+             ([] if identity_admission_capture_admitted else ['--capture-lock']) +
+             (['--coordination-lock', identity_admission_coordination_lock]
+              if not identity_admission_capture_admitted and identity_admission_coordination_lock else []) }}
+      register: identity_admission_result
+      changed_when: true
+      no_log: true
+
+    - name: Require deployment reconciliation rather than a maintenance skip
+      ansible.builtin.assert:
+        that: (identity_admission_result.stdout | from_json).skipped is not defined
+
+    - name: Retain the admission result without account names or credentials
+      ansible.builtin.copy:
+        content: '{{ identity_admission_result.stdout }}'
+        dest: '{{ identity_admission_state_directory }}/last-deployment.json'
+        mode: '0600'
+
+    - name: Configure first-login permission reconciliation
+      ansible.builtin.include_tasks: schedule.yml

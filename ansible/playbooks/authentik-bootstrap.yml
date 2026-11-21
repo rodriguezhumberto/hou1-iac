@@ -18,3 +18,5 @@
   roles:
     - role: authentik
       tags: [authentik, bootstrap, identity]
+    - role: identity_admission
+      tags: [authentik, bootstrap, identity, admission]

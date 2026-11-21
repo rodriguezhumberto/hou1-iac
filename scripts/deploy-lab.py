@@ -311,6 +311,7 @@ class Workflow:
             argv += ['-e', '@' + source]
         fixed, user, port = self.transports[service]
         overrides = {'target_hosts': host['target']}
+        overrides['identity_admission_capture_admitted'] = self.capture is not None
         if local:
             overrides.update(ansible_connection='local', ansible_become=False)
         else:

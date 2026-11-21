@@ -1,0 +1,36 @@
+---
+- name: Create the controller user-unit directory
+  ansible.builtin.file:
+    path: '{{ lookup("env", "HOME") }}/.config/systemd/user'
+    state: directory
+    mode: '0700'
+  when: identity_admission_schedule_enabled
+
+- name: Install environment-scoped admission scheduling
+  ansible.builtin.template:
+    src: '{{ item }}.j2'
+    dest: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-identity-{{ authentik_environment }}.{{ item }}'
+    mode: '0600'
+  loop: [service, timer]
+  when: identity_admission_schedule_enabled
+
+- name: Check for this environment's installed admission timer
+  ansible.builtin.stat:
+    path: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-identity-{{ authentik_environment }}.timer'
+  register: identity_admission_timer_exists
+
+- name: Enable or stop only this environment's admission timer
+  ansible.builtin.systemd_service:
+    name: 'hou1-identity-{{ authentik_environment }}.timer'
+    scope: user
+    daemon_reload: true
+    enabled: '{{ identity_admission_schedule_enabled }}'
+    state: '{{ "started" if identity_admission_schedule_enabled else "stopped" }}'
+  when: identity_admission_schedule_enabled or identity_admission_timer_exists.stat.exists
+
+- name: Stop an existing admission job when scheduling is disabled
+  ansible.builtin.systemd_service:
+    name: 'hou1-identity-{{ authentik_environment }}.service'
+    scope: user
+    state: stopped
+  when: not identity_admission_schedule_enabled and identity_admission_timer_exists.stat.exists

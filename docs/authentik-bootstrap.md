@@ -149,8 +149,24 @@ then exercises the running policies for approved, unlisted and unverified
 identities before disabling NetBird's manual approval queue. A connector or
 account/subnet mismatch leaves NetBird settings unchanged. Staff assignments
 replace only managed Authentik staff-role groups and add NetBird's `staff`
-auto-group. They preserve unrelated groups and the regular NetBird `user` role;
-staff-app administrators receive no network-administrator grant.
+auto-group by default. They preserve unrelated groups; without explicit VPN or
+dashboard fields, NetBird accounts retain the regular `user` role. Application
+administration alone never grants network administration.
+
+For declared base accounts, set `identity_admission_secret_source` in private
+inventory. The normal Authentik, full-stack and managed HOU1 entry points run
+[base-user reconciliation](../ansible/playbooks/roles/identity_admission/README.md).
+The encrypted manifest may set `provision_users: true` and explicitly declare
+`vpn_group` and `netbird_role` alongside each application role. Defaults retain
+staff-only connectivity and a regular NetBird user; elevated application roles
+alone never grant network administration.
+
+Enable `identity_admission_schedule_enabled` with the controller transport and
+coordination lock to apply permissions automatically after first Google login.
+NetBird external users do not exist before that login; the timer reconciles new
+records within a minute while unrelated groups and the emergency owner remain
+unchanged. `google_secret_source` can reference the deployment's Authentik SOPS
+bundle as the single Google-allowlist source.
 
 After a new user's first Google/NetBird login, rerun admission, refresh the staff
 session and verify the intended role and VPN reachability. Production admission

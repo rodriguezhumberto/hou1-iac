@@ -1,6 +1,7 @@
 """Approval may change only after environment isolation and effective IdP checks."""
 
 import copy
+import fcntl
 import importlib.util
 import io
 import json
@@ -320,6 +321,85 @@ class ProductionAdmissionTest(AdmissionTest):
 
 
 class StaffAccessTest(unittest.TestCase):
+    def test_declared_admin_permissions_converge_after_first_login_and_remove_old_staff_access(self):
+        user = {'pk': 7, 'email': 'admin@example.invalid', 'is_active': True,
+                'path': 'goauthentik.io/sources/google', 'groups': ['reader', 'unrelated']}
+        users, updates = [], []
+        assignment = [{'email': user['email'], 'role': 'admin',
+                       'vpn_group': 'administrators', 'netbird_role': 'admin'}]
+
+        def auth(method, path, body=None):
+            if path.startswith('core/groups/?'):
+                return {'results': [{'pk': r, 'name': n} for r, n in identity_names()['role_groups'].items()]}
+            if path == 'core/users/7/':
+                if method == 'PATCH':
+                    user.update(body)
+                    updates.append(('auth', copy.deepcopy(body)))
+                return copy.deepcopy(user)
+            raise AssertionError((method, path))
+
+        def netbird(method, path, body=None):
+            if path == '/groups':
+                return [{'id': 'staff', 'name': 'staff'}, {'id': 'admins', 'name': 'administrators'}]
+            if path == '/users':
+                return copy.deepcopy(users)
+            if path == '/peers':
+                return []
+            if path == '/users/human':
+                users[0].update(body)
+                updates.append(('netbird', copy.deepcopy(body)))
+                return users[0]
+            raise AssertionError((method, path))
+
+        args = assignment, [user], {'id': 'connector'}, auth, netbird, identity_names()['role_groups']
+        self.assertEqual(m.configure_staff_access(*args)['staff_users_awaiting_first_login'], 1)
+        self.assertEqual(user['groups'], ['admin', 'unrelated'])
+        users.append({'id': 'human', 'email': user['email'], 'idp_id': 'connector', 'role': 'user',
+                      'is_blocked': False, 'pending_approval': False, 'auto_groups': ['staff', 'unrelated']})
+        self.assertEqual(m.configure_staff_access(*args)['staff_users_configured'], 1)
+        self.assertEqual(users[0]['auto_groups'], ['admins', 'unrelated'])
+        self.assertEqual(users[0]['role'], 'admin')
+        count = len(updates)
+        m.configure_staff_access(*args)
+        self.assertEqual(len(updates), count)
+        users[0]['role'] = 'owner'
+        with self.assertRaises(ValueError):
+            m.configure_staff_access(*args)
+
+    def test_missing_base_identity_is_prepared_without_passwords_or_invitations(self):
+        calls = []
+        def auth(method, path, body):
+            calls.append((method, path, body))
+            return {'pk': 9, **body}
+        assignments = [{'email': 'base@example.invalid', 'role': 'editor'}]
+        users = m.provision_base_users(assignments, [], auth)
+        self.assertEqual(users[0]['path'], 'goauthentik.io/sources/google')
+        self.assertNotIn('password', calls[0][2])
+        self.assertEqual(calls[0][:2], ('POST', 'core/users/'))
+        m.provision_base_users(assignments, users, auth)
+        self.assertEqual(len(calls), 1)
+        with self.assertRaises(ValueError):
+            m.provision_base_users(assignments, users + users, auth)
+
+    def test_privileged_fields_require_known_explicit_values(self):
+        base = {'email': 'base@example.invalid', 'role': 'admin'}
+        for change in [{'vpn_group': 'All'}, {'netbird_role': 'owner'}, {'role': 'owner'}]:
+            with self.subTest(change=change), self.assertRaises(ValueError):
+                m.validate_assignments([{**base, **change}], [base['email']])
+
+    def test_scheduled_reconcile_skips_a_busy_controller_lock_before_loading_secrets(self):
+        with tempfile.TemporaryDirectory() as directory:
+            path = Path(directory) / 'operation.lock'
+            path.touch(mode=0o600)
+            with path.open('r+') as lock:
+                fcntl.flock(lock, fcntl.LOCK_EX)
+                with patch('sys.argv', ['admission', '--config', 'unused', '--profile', 'unused',
+                                       '--identity-secrets', 'unused', '--coordination-lock', str(path)]), \
+                        patch.object(m, 'load_encrypted_config') as load, redirect_stdout(io.StringIO()) as output:
+                    m.main()
+                load.assert_not_called()
+                self.assertEqual(json.loads(output.getvalue()), {'skipped': 'managed operation active'})
+
     def test_app_admin_gets_staff_network_access_without_network_admin_privileges(self):
         user = {'pk': 7, 'email': 'allowed@gmail.com', 'is_active': True,
                 'path': 'goauthentik.io/sources/google', 'groups': ['unrelated', 'reader']}

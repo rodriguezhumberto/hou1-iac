@@ -2,6 +2,8 @@
 """Enforce environment-bound Authentik admission before disabling NetBird approvals."""
 
 import argparse
+from contextlib import ExitStack
+import fcntl
 import importlib.util
 import json
 import os
@@ -10,10 +12,11 @@ import re
 import shlex
 import subprocess
 import sys
+import tempfile
 import urllib.parse
 import urllib.request
 
-from ssh_target import pinned_ssh
+from ssh_target import pinned_ssh, private_file
 
 # Use the same profile validator as managed-host bootstrap.
 _spec = importlib.util.spec_from_file_location(
@@ -57,6 +60,31 @@ def unique(items, key, value):
 STAFF_ROLES = ('reader', 'editor', 'admin')
 
 
+def validate_assignments(assignments, emails):
+    if (not isinstance(assignments, list)
+            or any(not isinstance(user, dict) or user.get('email') not in emails
+                   or user.get('role') not in STAFF_ROLES
+                   or user.get('vpn_group', 'staff') not in ('staff', 'administrators')
+                   or user.get('netbird_role', 'user') not in ('user', 'admin') for user in assignments)
+            or len({user['email'] for user in assignments}) != len(assignments)):
+        raise ValueError('Declare unique allowlisted users and explicit application/VPN permissions')
+
+
+def provision_base_users(assignments, users, auth):
+    """Prepare declared Google identities without passwords or invitations."""
+    for assignment in assignments:
+        matches = [user for user in users if user.get('email') == assignment['email']]
+        if len(matches) > 1:
+            raise ValueError('Duplicate base identity email')
+        if not matches:
+            users.append(auth('POST', 'core/users/', {
+                'username': assignment['email'], 'email': assignment['email'],
+                'name': assignment.get('name', assignment['email']), 'type': 'internal',
+                'path': 'goauthentik.io/sources/google', 'is_active': True,
+            }))
+    return users
+
+
 def deployment_profile(config, profile):
     """Bind encrypted inputs to a separately selected, inventory-exported profile."""
     identity.validate_profile(profile)
@@ -83,7 +111,7 @@ def configure_staff_access(assignments, users, provider, auth, netbird, role_gro
     """Keep network staff access separate from application privilege."""
     if not assignments:
         return {'staff_users_configured': 0, 'staff_users_awaiting_first_login': 0}
-    staff = unique(netbird('GET', '/groups'), 'name', 'staff')
+    network_groups = netbird('GET', '/groups')
     groups = auth_results(auth, 'core/groups/?page_size=1000')
     role_ids = {role: unique(groups, 'name', name)['pk'] for role, name in role_groups.items()}
     peers = netbird('GET', '/peers')
@@ -108,19 +136,25 @@ def configure_staff_access(assignments, users, provider, auth, netbird, role_gro
             waiting += 1
             continue
         nb_user = unique(matches, 'email', assignment['email'])
-        if nb_user['role'] != 'user' or nb_user['is_blocked'] or nb_user['pending_approval']:
-            raise ValueError('Staff network assignment requires an active regular NetBird user')
-        desired = sorted(set(nb_user.get('auto_groups', [])) | {staff['id']})
-        if sorted(nb_user.get('auto_groups', [])) != desired:
+        desired_role = assignment.get('netbird_role', 'user')
+        if (nb_user['role'] not in ('user', 'admin') or nb_user['is_blocked'] or nb_user['pending_approval']
+                or ('netbird_role' not in assignment and nb_user['role'] != 'user')):
+            raise ValueError('Network assignment requires an active user and an explicit privileged role')
+        group = unique(network_groups, 'name', assignment.get('vpn_group', 'staff'))
+        current_groups = set(nb_user.get('auto_groups', []))
+        if 'vpn_group' in assignment:
+            current_groups -= {g['id'] for g in network_groups if g['name'] in ('staff', 'administrators')}
+        desired = sorted(current_groups | {group['id']})
+        if sorted(nb_user.get('auto_groups', [])) != desired or nb_user['role'] != desired_role:
             netbird('PUT', '/users/' + urllib.parse.quote(nb_user['id'], safe=''), {
-                'auto_groups': desired, 'role': nb_user['role'], 'is_blocked': nb_user['is_blocked']})
+                'auto_groups': desired, 'role': desired_role, 'is_blocked': nb_user['is_blocked']})
         actual = unique(netbird('GET', '/users'), 'id', nb_user['id'])
-        if sorted(actual['auto_groups']) != desired or actual['role'] != 'user':
+        if sorted(actual['auto_groups']) != desired or actual['role'] != desired_role:
             raise ValueError('NetBird staff group readback differs')
         owned_ids = {p['id'] for p in peers if p.get('user_id') == nb_user['id']}
         actual_peers = netbird('GET', '/peers')
-        if not all(staff['id'] in [g['id'] for g in p['groups']] for p in actual_peers if p['id'] in owned_ids):
-            raise ValueError('Staff group did not propagate to existing devices')
+        if not all(group['id'] in [g['id'] for g in p['groups']] for p in actual_peers if p['id'] in owned_ids):
+            raise ValueError('Declared network group did not propagate to existing devices')
         configured += 1
     return {'staff_users_configured': configured, 'staff_users_awaiting_first_login': waiting}
 
@@ -131,9 +165,9 @@ def configure(config, auth, netbird, profile):
     if not emails or any(e != e.lower() or e.count('@') != 1 or '*' in e or any(c.isspace() for c in e) for e in emails):
         raise ValueError('Supply explicit lowercase Google account addresses')
     assignments = config.get('staff_users', [])
-    if (len({u['email'] for u in assignments}) != len(assignments)
-            or any(u['email'] not in emails or u['role'] not in STAFF_ROLES for u in assignments)):
-        raise ValueError('Staff roles require unique, explicitly allowlisted Google accounts')
+    validate_assignments(assignments, emails)
+    if type(config.get('provision_users', False)) is not bool:
+        raise ValueError('provision_users must be a boolean')
     users = auth_results(auth, 'core/users/?page_size=1000')
     if not users:
         raise ValueError('An existing identity is required for live policy checks')
@@ -159,6 +193,8 @@ def configure(config, auth, netbird, profile):
             and b['enabled'] and not b['negate'] and b.get('failure_result') is False for b in bindings
         ):
             raise ValueError('Google allowlist must gate both source flows in ALL mode')
+    if config.get('provision_users', False):
+        users = provision_base_users(assignments, users, auth)
     expression = (
         'userinfo = context.get("oauth_userinfo", {})\n'
         'verified = userinfo.get("email_verified", userinfo.get("verified_email", False))\n'
@@ -262,8 +298,27 @@ def main():
     p.add_argument('--identity-secrets', required=True, help='SOPS Authentik bundle containing IDENTITY_NAMES')
     p.add_argument('--profile', required=True, help='Public JSON exported from the selected Ansible inventory')
     p.add_argument('--age-key-file', help='Age identity for config decryption (or SOPS_AGE_KEY_FILE)')
+    p.add_argument('--coordination-lock', help='Scheduled runs skip while a managed deployment holds this private lock')
+    p.add_argument('--capture-lock', action='store_true', help='Coordinate scheduled writes with host backup capture')
     args = p.parse_args()
+    with ExitStack() as stack:
+        if args.coordination_lock:
+            lock = stack.enter_context(private_file(args.coordination_lock).open('r+'))
+            try:
+                fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+            except BlockingIOError:
+                print(json.dumps({'skipped': 'managed operation active'}))
+                return
+        reconcile(args, stack)
+
+
+def reconcile(args, stack):
     c = load_encrypted_config(args.config, args.age_key_file)
+    if c.get('google_secret_source'):
+        google = load_encrypted_config(c['google_secret_source'], args.age_key_file)['GOOGLE_ALLOWED_EMAILS']
+        if 'google_emails' in c and set(c['google_emails']) != set(google):
+            raise ValueError('Admission and Google source allowlists differ')
+        c['google_emails'] = google
     with open(args.profile, encoding='utf-8') as stream:
         public_profile = json.load(stream)
     names = load_encrypted_config(args.identity_secrets, args.age_key_file)['IDENTITY_NAMES']
@@ -272,6 +327,13 @@ def main():
     token = load_encrypted_config(c['netbird_token_file'], c['age_key_file'])
     if token['netbird_management_url'] != c['netbird_url']:
         raise ValueError('Token belongs to a different NetBird deployment')
+
+    if args.capture_lock:
+        from lab_capture_guard import CaptureGuard
+        directory = stack.enter_context(tempfile.TemporaryDirectory(prefix='.admission-', dir=Path(args.config).parent))
+        command = ssh + [shlex.join(['sudo', '-n', 'python3',
+            '/usr/local/libexec/hou1-backup-operation-lock.py', '--hold'])]
+        stack.enter_context(CaptureGuard(command, Path(directory) / 'capture.log', timeout=35))
 
     container = None
 

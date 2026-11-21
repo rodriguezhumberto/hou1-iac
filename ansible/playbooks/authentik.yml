@@ -16,3 +16,5 @@
   roles:
     - role: authentik
       tags: [authentik, deploy]
+    - role: identity_admission
+      tags: [authentik, deploy, identity, admission]

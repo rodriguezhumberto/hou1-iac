@@ -199,6 +199,10 @@
       become: false
       no_log: true
 
+    - name: Apply declared base-user permissions after registering Authentik
+      ansible.builtin.include_role:
+        name: identity_admission
+
     - name: Reassert private test egress and credential boundaries after a managed rerun
       ansible.builtin.include_role:
         name: rehearsal_gates
