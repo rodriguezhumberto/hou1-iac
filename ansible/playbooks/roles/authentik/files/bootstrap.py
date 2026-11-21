@@ -48,6 +48,10 @@ class AuthentikAPI:
                 # including PATCHes of its write-only consumer secret.
                 if resource == 'sources/oauth':
                     patch['provider_type'] = payload['provider_type']
+                    # Discovery inference also runs on PATCH. Keep the managed
+                    # PKCE method explicit when updating a write-only secret.
+                    if 'pkce' in payload:
+                        patch['pkce'] = payload['pkce']
                 lookup = existing['slug'] if resource in ('core/applications', 'sources/oauth') else existing['pk']
                 self.request('PATCH', f'/{resource}/{lookup}/', patch)
             return existing['pk']
