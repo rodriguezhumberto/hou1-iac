@@ -105,9 +105,12 @@ class AdmissionTest(unittest.TestCase):
             'extra': {'user_approval_required': True, 'peer_approval_enabled': True}}}
         self.nb_users = [{'id': str(i), 'email': u['email'], 'role': 'user', 'idp_id': 'connector', 'pending_approval': True} for i, u in enumerate([self.users[0], self.users[2]])]
         self.nb_calls = []
+        self.auth_writes = []
         self.fail_policy = False
 
     def auth(self, method, path, body=None):
+        if method != 'GET' and not path.endswith('/test/'):
+            self.auth_writes.append((method, path, copy.deepcopy(body)))
         if path.startswith('core/users/?'): return {'results': copy.deepcopy(self.users)}
         if path == 'sources/oauth/google/': return {'enabled': True, 'provider_type': 'google', 'authentication_flow': 'login', 'enrollment_flow': 'enroll'}
         if path.startswith('flows/instances/?'): return {'results': self.flows}
@@ -151,9 +154,13 @@ class AdmissionTest(unittest.TestCase):
         self.assertFalse(self.account['settings']['local_auth_disabled'])
         self.assertEqual([u['role'] for u in self.nb_users], ['user', 'user'])
         self.assertEqual([u['pending_approval'] for u in self.nb_users], [False, True])
+        writes = len(self.auth_writes)
+        account_updates = len([c for c in self.nb_calls if c[0] == 'PUT'])
         m.configure(self.config, self.auth, self.netbird, self.profile)
         self.assertEqual(len(self.policies), 2)
         self.assertEqual(len(self.bindings), 3)
+        self.assertEqual(len(self.auth_writes), writes)
+        self.assertEqual(len([c for c in self.nb_calls if c[0] == 'PUT']), account_updates)
 
     def test_unsafe_source_or_failed_live_policy_check_keeps_manual_approval(self):
         for fault in ['source-flow', 'live-policy', 'fail-open-binding']:

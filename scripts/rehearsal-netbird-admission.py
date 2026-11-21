@@ -200,23 +200,30 @@ def configure(config, auth, netbird, profile):
         'verified = userinfo.get("email_verified", userinfo.get("verified_email", False))\n'
         f'return verified is True and userinfo.get("email", "").lower() in {emails!r}'
     )
-    auth('PATCH', 'policies/expression/' + source_policy['pk'] + '/', {'expression': expression})
+    if source_policy.get('expression') != expression:
+        auth('PATCH', 'policies/expression/' + source_policy['pk'] + '/', {'expression': expression})
     name = 'HOU1 ' + profile['environment'] + ' NetBird allowlist'
     matches = [p for p in policies if p['name'] == name]
     if len(matches) > 1:
         raise ValueError('Duplicate managed admission policy')
     payload = {'name': name, 'expression': admission_expression(emails, fixture_ids)}
-    policy = auth('PATCH', 'policies/expression/' + matches[0]['pk'] + '/', payload) if matches else auth('POST', 'policies/expression/', payload)
+    if not matches:
+        policy = auth('POST', 'policies/expression/', payload)
+    elif any(matches[0].get(key) != value for key, value in payload.items()):
+        policy = auth('PATCH', 'policies/expression/' + matches[0]['pk'] + '/', payload)
+    else:
+        policy = matches[0]
     payload = {'target': app['pk'], 'policy': policy['pk'], 'order': 0,
                'enabled': True, 'negate': False, 'failure_result': False}
     existing = [b for b in bindings if b['target'] == app['pk'] and b['policy'] == policy['pk']]
     if len(existing) > 1:
         raise ValueError('Duplicate managed admission binding')
-    if existing:
+    if existing and any(existing[0].get(key) != value for key, value in payload.items()):
         auth('PATCH', 'policies/bindings/' + existing[0]['pk'] + '/', payload)
-    else:
+    elif not existing:
         auth('POST', 'policies/bindings/', payload)
-    auth('PATCH', app_path, {'policy_engine_mode': 'all'})
+    if app.get('policy_engine_mode') != 'all':
+        auth('PATCH', app_path, {'policy_engine_mode': 'all'})
     # Test the running policy engine before changing NetBird's admission switch.
     for user in users:
         expected = user['is_active'] and (
@@ -251,8 +258,9 @@ def configure(config, auth, netbird, profile):
     settings = account['settings']
     if assignments and not settings['groups_propagation_enabled']:
         raise ValueError('Staff access requires existing device group propagation')
-    settings['extra']['user_approval_required'] = False
-    netbird('PUT', '/accounts/' + account['id'], {'settings': settings})
+    if settings['extra'].get('user_approval_required') is not False:
+        settings['extra']['user_approval_required'] = False
+        netbird('PUT', '/accounts/' + account['id'], {'settings': settings})
     actual = netbird('GET', '/accounts')[0]['settings']
     if actual != settings:
         raise ValueError('NetBird settings readback differs from the requested settings')
