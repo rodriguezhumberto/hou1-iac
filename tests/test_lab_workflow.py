@@ -286,15 +286,18 @@ class LabWorkflowTest(unittest.TestCase):
                            f'Path({str(invocation)!r}).write_text(json.dumps(sys.argv[1:]))\n')
         program.chmod(0o700)
         self.config['ansible_bin_directory'] = str(binary)
+        host = self.config['hosts']['hou1']
+        host['inputs'].append(str(self.private('stale-admission.json', json.dumps({
+            'identity_admission_capture_admitted': True}))))
         run = self.root / 'invocation'; run.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, run)
-        host = self.config['hosts']['hou1']
         runner.transports['hou1'] = workflow.transport(host)
         runner.playbook('hou1', Path(host['repository']) / 'ansible/playbooks/hou1.yml', 'deploy')
         argv = json.loads(invocation.read_text())
         self.assertEqual(argv[argv.index('--limit') + 1], host['target'])
         extra = json.loads(argv[-1])
         self.assertEqual(extra, {'target_hosts': host['target'],
+                                'identity_admission_capture_admitted': False,
                                 'security_netbird_ssh_options': runner.transports['hou1'][0][1:]})
         hosts = {name: json.loads((run / 'host_vars' / (name + '.json')).read_text())
                  for name in (host['target'], 'localhost')}
@@ -304,6 +307,11 @@ class LabWorkflowTest(unittest.TestCase):
         self.assertIn('StrictHostKeyChecking=yes', hosts[host['target']]['ansible_ssh_common_args'])
         self.assertEqual(hosts['localhost']['ansible_connection'], 'local')
         self.assertNotIn('--tags', argv)
+        with patch.object(runner, 'capture') as capture:
+            capture.run.side_effect = subprocess.run
+            runner.playbook('hou1', Path(host['repository']) / 'ansible/playbooks/hou1.yml', 'admitted-deploy')
+        admitted = json.loads(json.loads(invocation.read_text())[-1])
+        self.assertTrue(admitted['identity_admission_capture_admitted'])
 
     def test_public_playbook_can_select_a_tagged_recovery_phase(self):
         binary = self.root / 'tagged-bin'; binary.mkdir()
