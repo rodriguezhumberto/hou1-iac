@@ -4,6 +4,7 @@ from contextlib import contextmanager
 import hashlib
 import json
 from pathlib import Path
+import shutil
 import subprocess
 import sys
 import tempfile
@@ -52,6 +53,58 @@ class BackupRuntimeTest(unittest.TestCase):
             (path / 'receipt.json').write_text('changed metadata')
             with self.assertRaisesRegex(ValueError, 'previous recovery point changed'):
                 runtime.preserved_prior(root, prior, current)
+
+    def test_retention_can_remove_an_enumerated_point_before_inspection(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); old, _ = self.point(root)
+            _, kept = self.point(root, '20261119T050000Z-123456abcdef')
+            inspect = runtime.point_files
+
+            def prune(path):
+                if path == old:
+                    shutil.rmtree(old)
+                inspect(path)
+
+            with patch.object(runtime, 'point_files', side_effect=prune):
+                self.assertEqual(set(runtime.completed(root)), {kept['id']})
+
+    def test_retention_can_remove_a_point_while_its_files_are_hashed(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); old, _ = self.point(root)
+            _, kept = self.point(root, '20261119T050000Z-123456abcdef')
+            digest = runtime.digest
+
+            def prune(stream):
+                if Path(stream.name).parent == old:
+                    shutil.rmtree(old)
+                return digest(stream)
+
+            with patch.object(runtime, 'digest', side_effect=prune):
+                self.assertEqual(set(runtime.completed(root)), {kept['id']})
+
+    def test_missing_retained_files_and_broken_symlinks_are_still_rejected(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); path, _ = self.point(root)
+            (path / 'receipt.json').unlink()
+            with self.assertRaisesRegex(ValueError, 'Unexpected recovery point files'):
+                runtime.completed(root)
+            shutil.rmtree(path)
+            path.symlink_to(root / 'missing', target_is_directory=True)
+            with self.assertRaisesRegex(ValueError, 'Invalid recovery directory'):
+                runtime.completed(root)
+
+    def test_a_file_disappearing_inside_a_retained_directory_still_fails(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); path, _ = self.point(root)
+            digest = runtime.digest
+
+            def remove_receipt(stream):
+                (path / 'receipt.json').unlink(missing_ok=True)
+                return digest(stream)
+
+            with patch.object(runtime, 'digest', side_effect=remove_receipt):
+                with self.assertRaises(FileNotFoundError):
+                    runtime.completed(root)
 
     def test_production_and_wrong_host_or_overlay_stop_before_host_commands(self):
         base = dict(environment='test', role='hou4', hostname='fixture', address='100.91.0.21',

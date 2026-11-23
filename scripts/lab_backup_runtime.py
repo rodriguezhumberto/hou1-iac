@@ -50,20 +50,28 @@ def completed(root):
     for path in root.iterdir():
         if path.name.startswith('.'):
             continue
-        point_files(path)
-        manifest = json.loads((path / 'manifest.json').read_text())
-        receipt = json.loads((path / 'receipt.json').read_text())
-        require(manifest.get('schema') == 1 and manifest.get('environment') == 'test'
-                and manifest.get('id') == path.name
-                and re.fullmatch(r'[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}', path.name), 'Invalid retained manifest')
-        require(type(manifest.get('size')) is int and manifest['size'] > 0
-                and (path / 'recovery.age').stat().st_size == manifest['size'], 'Retained size differs')
-        hashes = {}
-        for name in POINT_FILES:
-            with (path / name).open('rb') as stream:
-                hashes[name] = digest(stream)
-        require(hashes['recovery.age'] == manifest.get('sha256') == receipt.get('sha256'),
-                'Retained ciphertext or receipt differs')
+        try:
+            point_files(path)
+            manifest = json.loads((path / 'manifest.json').read_text())
+            receipt = json.loads((path / 'receipt.json').read_text())
+            require(manifest.get('schema') == 1 and manifest.get('environment') == 'test'
+                    and manifest.get('id') == path.name
+                    and re.fullmatch(r'[0-9]{8}T[0-9]{6}Z-[a-f0-9]{12}', path.name), 'Invalid retained manifest')
+            require(type(manifest.get('size')) is int and manifest['size'] > 0
+                    and (path / 'recovery.age').stat().st_size == manifest['size'], 'Retained size differs')
+            hashes = {}
+            for name in POINT_FILES:
+                with (path / name).open('rb') as stream:
+                    hashes[name] = digest(stream)
+            require(hashes['recovery.age'] == manifest.get('sha256') == receipt.get('sha256'),
+                    'Retained ciphertext or receipt differs')
+        except (FileNotFoundError, ValueError):
+            # Collection commits before pruning superseded points. An observer
+            # can enumerate one just before retention removes its directory.
+            # Incomplete retained directories and broken symlinks still fail.
+            if not path.exists() and not path.is_symlink():
+                continue
+            raise
         result[path.name] = {'manifest': manifest, 'hashes': hashes}
     return result
 
