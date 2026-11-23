@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Human login, base permissions and current failure matrix | [Identity and recovery acceptance, 2026-11-23](identity-failure-matrix-2026-11-23.md) |
 | Unattended lab renewal and application monitoring | [Scheduling, recovery, metrics and periodic login, 2026-11-20](unattended-lab-2026-11-20.md) |
 | Lab operations-channel alerts | [Real firing and resolved delivery, 2026-11-20](lab-alert-delivery-2026-11-20.md) |
 | Lab renewal setup and delivery | [ACME dry-run, scoped access and delivery, 2026-11-20](lab-renewal-2026-11-20.md) |

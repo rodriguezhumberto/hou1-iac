@@ -342,3 +342,9 @@ access boundaries and verified backup passed. All fourteen service IDs survived
 normal finalization. Actual certificate rotation, controller-VM reboot/replacement
 and human Google login remain separate checks; request-specific metrics stay off.
 No WAN publication was added.
+
+The [identity follow-up and matrix](evidence/identity-failure-matrix-2026-11-23.md)
+records owner-confirmed Google/staff login and SSH, declared base permissions,
+and all four automated interruption scenarios on the updated identity revision.
+Fresh empty-host replay with those final inputs is the next recovery acceptance
+step; controller replacement and certificate rotation/rollback remain separate.
