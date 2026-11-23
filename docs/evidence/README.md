@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Fresh-host recovery with final identity inputs | [First-pass deployment, unchanged repeat and reboot, 2026-11-23](uninterrupted-identity-replay-2026-11-23.md) |
 | Corrected fresh-host recovery with final identity inputs | [Restore, publication corrections and verified backup, 2026-11-23](corrected-identity-replay-2026-11-23.md) |
 | Human login, base permissions and current failure matrix | [Identity and recovery acceptance, 2026-11-23](identity-failure-matrix-2026-11-23.md) |
 | Unattended lab renewal and application monitoring | [Scheduling, recovery, metrics and periodic login, 2026-11-20](unattended-lab-2026-11-20.md) |
