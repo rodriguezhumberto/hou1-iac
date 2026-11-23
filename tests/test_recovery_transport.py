@@ -68,9 +68,11 @@ class RecoveryRenewalTest(unittest.TestCase):
                 with self.assertRaises(Exception): plan(altered, values)
 
     def test_real_tasks_rebind_once_retry_partial_work_and_reject_interference(self):
-        for interference in (None, 'partial', 'source-member', 'receiver-member', 'policy', 'resource'):
+        for interference in (None, 'display-counts', 'partial', 'source-member', 'receiver-member', 'policy', 'resource'):
             with self.subTest(interference=interference):
                 state, config = fixture()
+                if interference == 'display-counts':
+                    state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = 2
                 writes = []
 
                 class Handler(BaseHTTPRequestHandler):
@@ -92,6 +94,7 @@ class RecoveryRenewalTest(unittest.TestCase):
                         for group in state['groups']:
                             group['peers'] = [peer for peer in group['peers'] if peer['id'] != 'lost']
                         state['groups'][0]['peers'].append({'id': 'new'})
+                        if interference == 'display-counts': state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = 1
                         if interference == 'partial': state['groups'][2]['peers'] = [{'id': 'new'}]
                         if interference == 'source-member': state['groups'][-2]['peers'].append({'id': 'foreign'})
                         if interference == 'receiver-member': state['groups'][-1]['peers'].append({'id': 'foreign'})
@@ -104,6 +107,8 @@ class RecoveryRenewalTest(unittest.TestCase):
                         writes.append(identifier)
                         group = next(g for g in state['groups'] if g['id'] == identifier)
                         group.update(body, peers=[{'id': peer} for peer in body['peers']])
+                        if interference == 'display-counts' and identifier == 'renewal-targets':
+                            state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = len(group['peers'])
                         self.respond(group)
 
                 server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
@@ -124,11 +129,11 @@ class RecoveryRenewalTest(unittest.TestCase):
                     result = run_play(values, tasks)
                 finally:
                     server.shutdown(); server.server_close(); thread.join()
-                success = interference in (None, 'partial')
+                success = interference in (None, 'partial', 'display-counts')
                 self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
                 if success:
                     self.assertEqual(writes, ['metrics-source', 'backup-source', 'renewal-targets']
-                                     if interference is None else ['backup-source', 'renewal-targets'])
+                                     if interference in (None, 'display-counts') else ['backup-source', 'renewal-targets'])
                     self.assertEqual(state['groups'][-1]['peers'], [{'id': 'monitor'}, {'id': 'new'}])
                 else:
                     self.assertEqual(writes, [])

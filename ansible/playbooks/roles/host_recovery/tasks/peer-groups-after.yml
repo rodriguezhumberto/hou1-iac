@@ -41,7 +41,17 @@
       register: host_recovery_renewal_state_after
     - name: Refuse changed renewal source, receivers or policy
       ansible.builtin.assert:
-        that: current == host_recovery_renewal_group
+        # NetBird updates group display counts when the lost peer is removed.
+        # Keep historical receipt bodies intact and compare their actual grants.
+        that:
+          - current.id == host_recovery_renewal_group.id
+          - current.name == host_recovery_renewal_group.name
+          - current.peers == host_recovery_renewal_group.peers
+          - current.source == host_recovery_renewal_group.source
+          - current.policy.id == host_recovery_renewal_group.policy.id
+          - >-
+            (current.policy.body | netbird_policy_body) ==
+            (host_recovery_renewal_group.policy.body | netbird_policy_body)
       vars:
         current: >-
           {{ host_recovery_renewal_state_after.results[0].json |
