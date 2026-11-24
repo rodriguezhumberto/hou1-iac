@@ -358,3 +358,11 @@ retains its failed attempt and certificate-metadata fix separately. Controller
 replacement/reboot and human-client automatic reconnection remain distinct checks.
 [Controller responsibilities](controller-responsibilities.md) record the later
 separation from the coding-agent host; current recovery continues on that host.
+
+The subsequent [client reconnection check](evidence/client-reconnection-2026-11-24.md)
+used one timed lab management-server interruption. Machine clients recovered
+without refresh, and the owner confirmed automatic Mac recovery plus staff/SSH
+access. Observer failures and continued checks remain separate. The remaining
+controller work needs a current complete owner-decryptable recovery package,
+verified off-controller retention and independent replacement/reboot acceptance;
+controller separation stays assigned to a later handoff.

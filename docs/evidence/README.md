@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Automatic personal and machine client reconnection | [Timed lab management restart and owner confirmation, 2026-11-24](client-reconnection-2026-11-24.md) |
 | Lab TLS lifecycle and metadata preservation | [Changed certificates and injected reload-failure rollback, 2026-11-24](tls-lifecycle-2026-11-24.md) |
 | Scheduled identity outage recovery | [Normal timer failure and automatic retry, 2026-11-24](scheduled-identity-outage-2026-11-24.md) |
 | Fresh-host recovery with final identity inputs | [First-pass deployment, unchanged repeat and reboot, 2026-11-23](uninterrupted-identity-replay-2026-11-23.md) |

@@ -64,6 +64,13 @@ Recheck indirect imports, private helpers, root files and SSH-key custody.
 Actual domains, account names and deployment repository names stay in private
 inputs.
 
+A historical encrypted renewal copy is not proof of a complete current controller
+backup. Before controller-loss acceptance, verify current dependency coverage,
+owner decryption and retention outside the controller and managed hosts. Keep the
+owner recovery identity in owner custody; preserve the scoped recurring-job keys.
+The [client recovery and artifact audit](evidence/client-reconnection-2026-11-24.md)
+records the latest boundary.
+
 ## Handoff for the later migration agent
 
 1. Inventory each environment's jobs, peer identities, paths, key scopes, encrypted
