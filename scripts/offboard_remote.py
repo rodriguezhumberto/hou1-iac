@@ -22,6 +22,8 @@ import uuid
 AUDIT_BASE = Path('/var/lib/hou1-operations')
 AUDIT_OWNER = 0
 REASONS = {'departure', 'role-removal', 'security-incident', 'test-drill'}
+RELEASE_IMAGES = {'authentik-server': 'ghcr.io/goauthentik/server:2025.10.4',
+                  'netbird-server': 'netbirdio/netbird-server:0.82.0'}
 
 
 class Failure(Exception):
@@ -88,7 +90,22 @@ def pages(c, path):
     raise Failure('authentik_page_limit')
 
 
+def release_images(c):
+    """Explicit operator approval binds recovery artifacts to supported releases."""
+    if 'release_images' not in c:
+        return RELEASE_IMAGES
+    images = c['release_images']
+    require(isinstance(images, dict) and set(images) == set(RELEASE_IMAGES), 'invalid_release_images')
+    for service, tag in RELEASE_IMAGES.items():
+        repository = tag.rsplit(':', 1)[0]
+        require(isinstance(images[service], str)
+                and re.fullmatch(re.escape(repository) + r'@sha256:[0-9a-f]{64}', images[service]) is not None,
+                'invalid_release_images')
+    return images
+
+
 def capabilities(c, live=False):
+    images = release_images(c)
     app = containers(c)[0]
     inspect = run(['docker', 'inspect', app])[0]
     require((inspect['Config'].get('Labels') or {}).get('io.pearlandpaws.staff-offboarding-schema') == '1', 'staff_release_missing_offboarding_support')
@@ -100,10 +117,10 @@ def capabilities(c, live=False):
         require(result.get('schema') == 1 and result.get('persistent_subject_blocking') is True
                 and result.get('environment') == c['environment'] and result.get('issuer') == c['staff_issuer'], 'staff_runtime_identity_mismatch')
     image = run(['docker', 'inspect', containers(c)[1]])[0]['Config']['Image']
-    require(image == 'ghcr.io/goauthentik/server:2025.10.4', 'untested_authentik_release')
+    require(image == images['authentik-server'], 'untested_authentik_release')
     suffix = 'test' if c['environment'] == 'test' else 'prod'
     image = run(['docker', 'inspect', 'hou1-netbird-' + suffix + '-netbird-server-1'])[0]['Config']['Image']
-    require(image == 'netbirdio/netbird-server:0.82.0', 'untested_netbird_release')
+    require(image == images['netbird-server'], 'untested_netbird_release')
     return {'schema': 1, 'persistent_subject_blocking': True}
 
 
@@ -118,7 +135,10 @@ def subject(provider, user):
 def eligible_user(c, user):
     fixture = (c['environment'] == 'test' and user['type'] == 'internal'
                and user['username'].startswith('offboard-test-') and user['email'].endswith('@example.invalid'))
-    require(not user['is_superuser'] and (fixture or (user['type'] == 'external'
+    # Managed Google enrollment and preprovisioning use internal application
+    # users. The source path, not the internal/external distinction, separates
+    # these people from local recovery identities and service accounts.
+    require(not user['is_superuser'] and (fixture or (user['type'] in ('external', 'internal')
             and user['path'] == 'goauthentik.io/sources/google')), 'recovery_or_unsupported_identity')
     return fixture
 
@@ -260,8 +280,9 @@ def validate_request(request):
     require(request['reason'] in REASONS and re.fullmatch(r'[A-Za-z0-9][A-Za-z0-9._:/-]{0,119}', request['reference']) is not None, 'invalid_audit_reference')
     c = request['config']
     require(c['environment'] in ('test', 'production'), 'invalid_environment')
-    require(set(c) == {'environment', 'staff_issuer', 'staff_application', 'staff_client_id',
+    require(set(c) - {'release_images'} == {'environment', 'staff_issuer', 'staff_application', 'staff_client_id',
                        'netbird_application', 'netbird_client_id'}, 'invalid_remote_configuration')
+    release_images(c)
     for key in ('staff_application', 'netbird_application'):
         require(re.fullmatch(r'[a-z0-9-]+', c[key]) is not None, 'invalid_application_slug')
     return c
