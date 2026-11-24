@@ -13,11 +13,15 @@ class ProductionRunbookTest(unittest.TestCase):
             "BACKUP_ID=", "BACKUP_SHA256=", "APP_IMAGE=", "TEST_REHEARSAL=", "OIDC_TESTS=",
             "authentik-preflight.yml", "authentik-bootstrap.yml", "netbird-authentik-cutover.yml",
             "verify-recovery.py", "recovery.age", "receipt.json", "break-glass.sh", "authentik-rollback.sh",
-            "Current production evidence and remaining handoff limits:", "test-only", "ON_ERROR_STOP",
+            "## Dated production acceptance", "test-only", "ON_ERROR_STOP",
             "PostgreSQL", "Nginx", "Staff login", "1%", "5 minutes", "15 minutes",
         )
         for marker in required:
             self.assertIn(marker, text)
+        normalized = " ".join(text.split())
+        self.assertIn("not a fresh inspection of production", normalized)
+        self.assertIn("Later lab passes do not extend their production acceptance scope", normalized)
+        self.assertIn("evidence/nginx-release-status-2026-11-24.md", text)
 
     def test_runbook_does_not_contain_secret_values_or_test_deploy_targets(self):
         text = RUNBOOK.read_text(encoding="utf-8")
