@@ -51,6 +51,9 @@ need review before use with a newly provisioned test environment.
 
 ## Execution locations
 
+[Controller responsibilities](controller-responsibilities.md) distinguish persistent
+operations from the coding agent and record the future separation handoff.
+
 - The controller runs Ansible, decrypts deployment inputs, validates release
   artifacts and manages TLS issuance and renewal. Local tests use disposable fixtures.
 - HOU1 runs OS security, the NetBird client, application/Nginx, Authentik/PostgreSQL

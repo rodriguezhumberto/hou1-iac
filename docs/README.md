@@ -16,6 +16,7 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 | Manage users and device access | [NetBird operations](netbird-operations.md), [identity admission](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) |
 | Revoke access and sessions | [Offboarding](operator-offboarding.md) |
 | Recover identity/VPN access | [Break-glass recovery](netbird-break-glass.md) |
+| Understand or separate the operations controller | [Controller responsibilities and migration handoff](controller-responsibilities.md) |
 | Renew TLS or recover the controller | [Controller TLS](controller-tls.md), [renewal peer](controller-renewal-peer.md) |
 | Configure monitoring and SSO | [Monitoring](environment-monitoring.md), [Grafana SSO](grafana-sso.md) |
 | Inspect requests or synthetic logins | [Request metrics](request-login-monitoring.md), [staff probe](probes/staff-login-probe.md) |
