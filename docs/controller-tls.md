@@ -165,7 +165,10 @@ HOU4's target availability and stale-publication alerts cover that failure.
 
 The controller retains previous encrypted ACME and certificate bundles. The
 receiver restores original file content or symlinks if validation after install,
-reload or served verification fails. For operator rollback, stop the selected
+reload or served verification fails. Rotation preserves existing certificate-file
+permissions and ownership; rollback also restores symlink ownership. New files
+remain private. This retains access granted to existing certificate consumers.
+For operator rollback, stop the selected
 timer, select the reviewed previous encrypted bundle, and import it through the
 same administrative Ansible path. Validate the current certificate's remaining
 lifetime first; expired or near-expired material is refused. Recheck every served

@@ -134,6 +134,63 @@ class ControllerTlsTest(unittest.TestCase):
                         receiver.install(c,bundle,bootstrap=bootstrap)
             self.assertEqual({p.name:p.read_bytes() for p in folder.iterdir()},before)
 
+    def test_rotation_and_failed_reload_preserve_certificate_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=self.config(Path(directory))
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                receiver.install(c,self.bundles[0],bootstrap=True)
+            folder=Path(c['certificate_directory'])/'live/auth.example.invalid'
+            paths=[folder/name for name in ('fullchain.pem','privkey.pem')]
+            for path in paths:
+                path.chmod(0o640)
+                if os.geteuid()==0:
+                    os.chown(path,12345,12345)
+
+            def metadata():
+                return [(path.stat().st_mode & 0o777, path.stat().st_uid,
+                         path.stat().st_gid) for path in paths]
+
+            expected=metadata()
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                self.assertTrue(receiver.install(c,self.bundles[1])['changed'])
+            self.assertEqual(metadata(),expected)
+            before=[path.read_bytes() for path in paths]
+
+            def fail_first_reload(config,*args):
+                if args==('-s','reload') and not events:
+                    events.append('failed')
+                    raise RuntimeError('injected reload failure')
+
+            events=[]
+            with patch.object(receiver,'nginx',side_effect=fail_first_reload),patch.object(receiver,'served'):
+                with self.assertRaisesRegex(RuntimeError,'previous certificate files restored'):
+                    receiver.install(c,self.bundles[0])
+            self.assertEqual([path.read_bytes() for path in paths],before)
+            self.assertEqual(metadata(),expected)
+
+            archive=Path(c['certificate_directory'])/'archive'
+            archive.mkdir()
+            for path in paths:
+                path.replace(archive/path.name)
+                path.symlink_to('../../archive/'+path.name)
+                if os.geteuid()==0:
+                    os.lchown(path,12346,12346)
+            link_owners=[(path.lstat().st_uid,path.lstat().st_gid) for path in paths]
+            events=[]
+            with patch.object(receiver,'nginx',side_effect=fail_first_reload),patch.object(receiver,'served'):
+                with self.assertRaises(RuntimeError):
+                    receiver.install(c,self.bundles[0])
+            self.assertTrue(all(path.is_symlink() for path in paths))
+            self.assertEqual([os.readlink(path) for path in paths],
+                             ['../../archive/'+path.name for path in paths])
+            self.assertEqual([(path.lstat().st_uid,path.lstat().st_gid) for path in paths],link_owners)
+            self.assertEqual([path.read_bytes() for path in paths],before)
+            self.assertEqual(metadata(),expected)
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                receiver.install(c,self.bundles[0])
+            self.assertEqual(metadata(),expected)
+            self.assertFalse(list(Path(directory).rglob('.tls-*')))
+
     def test_import_requests_bootstrap_only_for_explicit_bootstrap_inventory(self):
         tasks=yaml.safe_load((ROLES/'controller_tls/tasks/main.yml').read_text())
         task=next(t for t in tasks if t.get('register')=='hou1_tls_import')

@@ -43,11 +43,19 @@ def renewal_admission(timeout=900):
         yield
 
 
-def private_write(path, data):
+def private_write(path, data, metadata=None):
     with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.tls-', delete=False) as stream:
         temp = Path(stream.name)
         try:
-            stream.write(data); stream.flush(); os.fsync(stream.fileno()); os.fchmod(stream.fileno(),0o600)
+            stream.write(data); stream.flush(); os.fsync(stream.fileno())
+            if metadata is not None:
+                mode, uid, gid = metadata
+                current = os.fstat(stream.fileno())
+                if (current.st_uid, current.st_gid) != (uid, gid):
+                    os.fchown(stream.fileno(), uid, gid)
+                os.fchmod(stream.fileno(), mode)
+            else:
+                os.fchmod(stream.fileno(),0o600)
             temp.replace(path)
         finally:
             temp.unlink(missing_ok=True)
@@ -151,12 +159,17 @@ def install(c, bundle, bootstrap=False, prepare=False):
         if folder.is_symlink():raise ValueError('Certificate lineage cannot be a symlink')
         for filename, key in [('fullchain.pem','fullchain'),('privkey.pem','private_key')]:
             path = folder/filename
-            paths.append((path,item[key].encode(),snapshot(path,root)))
-    changed = any(not path.is_file() or path.read_bytes()!=data for path,data,_ in paths)
+            previous = snapshot(path,root)
+            info = path.stat() if previous[0] != 'absent' else None
+            file_metadata = (stat.S_IMODE(info.st_mode), info.st_uid, info.st_gid) if info else None
+            link = path.lstat() if previous[0] == 'link' else None
+            link_owner = (link.st_uid, link.st_gid) if link else None
+            paths.append((path,item[key].encode(),previous,file_metadata,link_owner))
+    changed = any(not path.is_file() or path.read_bytes()!=data for path,data,_,_,_ in paths)
     # Bootstrap may stop after import or after starting only part of ingress.
     # Identical material needs no mutation while that first deployment resumes.
     # Managed imports and any rotation retain live validation and rollback.
-    initial = bootstrap and (not changed or all(previous[0]=='absent' for _,_,previous in paths))
+    initial = bootstrap and (not changed or all(previous[0]=='absent' for _,_,previous,_,_ in paths))
     # Unchanged material can wait for the application's activation phase to
     # repair stopped backends before Nginx resolves their Docker DNS names.
     verify_runtime = not (initial or (prepare and not changed))
@@ -164,20 +177,22 @@ def install(c, bundle, bootstrap=False, prepare=False):
         nginx(c,'-t')
     try:
         if changed:
-            for path,data,_ in paths:
+            for path,data,_,file_metadata,_ in paths:
                 path.parent.mkdir(parents=True,exist_ok=True,mode=0o700)
-                private_write(path,data)
+                private_write(path,data,file_metadata)
         if verify_runtime:
             nginx(c,'-t')
             if changed:nginx(c,'-s','reload')
             verify_served(c,metadata)
     except Exception:
         if changed:
-            for path,_,previous in reversed(paths):
+            for path,_,previous,file_metadata,link_owner in reversed(paths):
                 kind,data = previous
                 if kind=='link':
                     path.unlink(missing_ok=True);path.symlink_to(data)
-                elif kind=='file':private_write(path,data)
+                    if (path.lstat().st_uid, path.lstat().st_gid) != link_owner:
+                        os.lchown(path,*link_owner)
+                elif kind=='file':private_write(path,data,file_metadata)
                 else:path.unlink(missing_ok=True)
             nginx(c,'-t');nginx(c,'-s','reload')
         raise RuntimeError('TLS deployment failed; previous certificate files restored') from None
