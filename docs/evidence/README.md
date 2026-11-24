@@ -7,6 +7,9 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Interrupted TLS activation, native firewall cleanup and recovered offboarding | [Targeted operational failure paths, 2026-11-24](operational-failure-paths-2026-11-24.md) |
+| Standalone finalization from an empty backup source | [First capture and resulting-point restore, 2026-11-24](standalone-first-capture-2026-11-24.md) |
+| Restore from an off-host collected point | [Constrained component recovery, 2026-11-24](collected-point-restore-2026-11-24.md) |
 | Automatic personal and machine client reconnection | [Timed lab management restart and owner confirmation, 2026-11-24](client-reconnection-2026-11-24.md) |
 | Lab TLS lifecycle and metadata preservation | [Changed certificates and injected reload-failure rollback, 2026-11-24](tls-lifecycle-2026-11-24.md) |
 | Scheduled identity outage recovery | [Normal timer failure and automatic retry, 2026-11-24](scheduled-identity-outage-2026-11-24.md) |
