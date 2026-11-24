@@ -1,4 +1,6 @@
 ---
+# Explicit opt-in; standard retains the four-GiB admission requirement.
+recovery_drill_resource_profile: standard
 recovery_drill_root: "/var/tmp/hou1-recovery-drill-{{ recovery_drill_id }}"
 recovery_drill_project: "hou1-recovery-drill-{{ recovery_drill_id }}"
 recovery_drill_admin_username: vps-staff-admin

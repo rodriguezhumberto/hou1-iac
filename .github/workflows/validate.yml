@@ -47,12 +47,12 @@ jobs:
           sudo install -m 0755 "$RUNNER_TEMP/sops" /usr/local/bin/sops
       - name: Prepare the current Nginx configuration parser
         run: |
-          docker pull nginx:1.28-alpine
+          docker pull nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3
           cat > "$RUNNER_TEMP/nginx-validator" <<'EOF'
           #!/bin/sh
           # Nginx -t creates temp directories; keep them owned by the test runner.
           exec docker run --rm --user "$(id -u):$(id -g)" \
-            -v /tmp:/tmp --entrypoint nginx nginx:1.28-alpine -e stderr "$@"
+            -v /tmp:/tmp --entrypoint nginx nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3 -e stderr "$@"
           EOF
           chmod +x "$RUNNER_TEMP/nginx-validator"
           echo "NGINX_BIN=$RUNNER_TEMP/nginx-validator" >> "$GITHUB_ENV"

@@ -17,11 +17,31 @@ Use the [clean-host procedure](clean-host-recovery.md) for the separate fresh-OS
 gate; it restores the original projects and host management instead of another
 isolated Compose project.
 
+The drill-owned proxy uses Nginx `1.30.7-alpine` pinned to
+`sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3`,
+matching the application security update. Cache that exact image before the
+drill. CI's Nginx parser and disposable Compose fixtures use the same pin.
+Application deployment continues to take its ingress image from the selected
+application release; merge and release that repository's security update too.
+
 ## Controller inputs
 
 Use the exact infrastructure commit under review and the staff commit recorded
 in the selected backup. Use [contributor setup](../../CONTRIBUTING.md) and install `age`. Pin the new test host's SSH identity in its private inventory. Reserve at least 4 GiB available RAM and 10 GiB free disk
 before the drill; allow additional room for application builds and backup growth.
+
+For an explicitly requested attempt without resizing the VM, set private input
+`recovery_drill_resource_profile: constrained`. The default `standard` profile
+retains its 4 GiB available-RAM requirement. Constrained admission requires
+2.5 GiB available RAM, the same 10 GiB free disk, cgroup-v2 RAM/swap enforcement
+and a saved CI image; source builds are refused. Preparation owns the generated
+per-service limits: 2 GiB total RAM and 512 MiB additional swap across all seven
+containers. The driver monitors host headroom/pressure, enforced container limits
+and OOM flags; failure stops only the drill project before normal cleanup.
+`resource-report.json` records observations. No existing service limits or VM
+allocation change. A constrained OOM is a failed capacity experiment, not proof
+that the recovery point is corrupt; preserve diagnostics and use a fresh attempt
+after adding capacity.
 
 Keep these files in a mode-0700 operator directory:
 
@@ -57,7 +77,9 @@ recovery_drill_probe_secrets:
 The default fixture usernames are `vps-staff-admin` and `vps-staff-reader`;
 override `recovery_drill_admin_username` / `recovery_drill_reader_username` only
 with existing internal test identities whose reader/admin roles are already in
-the backup. The original CMS snapshot must have empty pet content, as in the
+the backup. Maintained `lab-staff-*` fixture names are also supported; recovered
+password hashes must match the supplied protected probe inputs.
+The original CMS snapshot must have empty pet content, as in the
 rehearsal fixture. The test adds content/media to the restored copy, checks
 persistence, rolls back to that empty snapshot and checks fresh sign-in.
 
@@ -97,6 +119,9 @@ The recovery sequence is:
 4. Start empty PostgreSQL. Require a successful query against the actual
    database over TCP, rather than accepting the temporary initialization socket.
    Refuse a nonempty schema and import with `ON_ERROR_STOP`.
+   NetBird SQLite integrity/count checks first allow SQLite to recover any hot
+   rollback journal in the private restored payload. They refuse live/outside
+   paths and do not discard journals or open databases with immutable mode.
 5. With restored writers stopped, clear backed-up IdP sessions/codes/token
    records and revoke staff sessions. Start only the restored services and wait
    for real PostgreSQL, Authentik and app health checks.

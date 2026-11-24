@@ -16,6 +16,7 @@
       - recovery_drill_reference_jwks is match('^/')
       - recovery_drill_app_source is match('^/')
       - not ansible_check_mode
+      - recovery_drill_resource_profile in ['standard', 'constrained']
     fail_msg: Use a new explicit test drill ID, immutable staff revision, private controller files and established test inventory.
 
 - name: Require headroom for the additional isolated stack
@@ -25,11 +26,19 @@
       - -c
       - |
         from pathlib import Path
-        import os
+        import json, os, subprocess, sys
         fs = os.statvfs('/var/tmp')
         available = int(next(line.split()[1] for line in Path('/proc/meminfo').read_text().splitlines() if line.startswith('MemAvailable:'))) * 1024
         assert fs.f_bavail * fs.f_frsize >= 10 * 1024**3, 'Need at least 10 GiB free disk; also budget for archive/build growth'
-        assert available >= 4 * 1024**3, 'Need at least 4 GiB available RAM for the additional stack'
+        profile = sys.argv[1]
+        assert profile in ('standard', 'constrained'), 'Unknown recovery resource profile'
+        required = (2560 if profile == 'constrained' else 4096) * 1024**2
+        assert available >= required, 'Insufficient available RAM for the selected recovery resource profile'
+        if profile == 'constrained':
+            format_spec = '{' * 2 + 'json .' + '}' * 2
+            info = json.loads(subprocess.check_output(['docker', 'info', '--format', format_spec], timeout=15))
+            assert info['MemoryLimit'] and info['SwapLimit'] and info['CgroupVersion'] == '2', 'Constrained recovery requires cgroup-v2 RAM and swap limits'
+      - '{{ recovery_drill_resource_profile }}'
   changed_when: false
 
 - name: Check the recovery destination before copying anything
@@ -88,7 +97,7 @@
       ansible.builtin.copy:
         dest: "{{ recovery_drill_staging.path }}/request.json"
         mode: '0600'
-        content: "{{ {'environment': 'test', 'project': recovery_drill_project, 'root': recovery_drill_root, 'staff_revision': recovery_drill_staff_ref, 'test_suffix': recovery_drill_test_suffix, 'app_source': recovery_drill_app_source, 'primary_containers': recovery_drill_primary_containers, 'admin_username': recovery_drill_admin_username, 'reader_username': recovery_drill_reader_username} | to_nice_json }}"
+        content: "{{ {'environment': 'test', 'project': recovery_drill_project, 'root': recovery_drill_root, 'staff_revision': recovery_drill_staff_ref, 'test_suffix': recovery_drill_test_suffix, 'app_source': recovery_drill_app_source, 'primary_containers': recovery_drill_primary_containers, 'admin_username': recovery_drill_admin_username, 'reader_username': recovery_drill_reader_username, 'resource_profile': recovery_drill_resource_profile} | to_nice_json }}"
       delegate_to: localhost
       become: false
 
