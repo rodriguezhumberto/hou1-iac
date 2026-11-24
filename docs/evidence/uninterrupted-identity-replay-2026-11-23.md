@@ -3,7 +3,8 @@
 Attempt `clean-20261123-181803` passed functional acceptance at HOU1 `53822ad`
 and HOU4 `3d0ae0f`. Cold restore, sealed checks, initial publication, declared
 prerequisites, normal finalization, receipt-based repeat and planned guest reboot
-passed their first invocations. No deployment resume or host repair was needed.
+passed their first invocations. No failed-stage continuation or host repair was
+needed.
 
 ## Starting boundary
 
@@ -56,11 +57,11 @@ rejected before remote execution. Its original stderr was retained. The current
 frozen-pin observer then passed before and after reboot. This observer correction
 was separate from the successful primary recovery and deployment invocations.
 
-Fresh external human Google sign-in and Mac staff, NetBird and private SSH checks
-were pending when this report was written. Earlier confirmation applied to the
-previous guest. Controller replacement/reboot and certificate rotation/rollback
-were not exercised here. Production and VM223 were untouched by controller
-actions; VM223's provider fence and disks were retained.
+After the rebuilt VM225 reboot, the owner confirmed fresh Google sign-in, staff
+application access, NetBird connectivity and private SSH from the Mac all passed.
+This confirmation applies to the rebuilt guest. Controller replacement/reboot
+and certificate rotation/rollback were not exercised here. Production and VM223
+were untouched by controller actions; VM223's provider fence and disks were retained.
 
 Private receipts, immutable inputs and logs:
 `/home/dev/.ssh/hou-lab/handoff-preparation/20261123T181803Z/`.
