@@ -1,5 +1,6 @@
 """Replacement-host guards use synthetic identities, source and certificates."""
 import importlib.util
+import base64
 import json
 from pathlib import Path
 import shutil
@@ -102,8 +103,57 @@ class HostRecoveryPreparationTest(unittest.TestCase):
                    STAFF_OIDC_ISSUER='https://auth-test.' + cfg['test_suffix'] + '/application/o/staff/',
                    STAFF_OIDC_REDIRECT_URI='https://staff-test.' + cfg['test_suffix'] + '/api/staff/oidc/callback',
                    PUBLIC_SITE_ORIGIN='https://test.' + cfg['test_suffix'])
-        vpn = {'server': {'exposedAddress': 'https://netbird-test.' + cfg['test_suffix'] + ':443', 'disableGeoliteUpdate': True}}
+        vpn = {'server': {'exposedAddress': 'https://netbird-test.' + cfg['test_suffix'] + ':443', 'disableGeoliteUpdate': True,
+                          'authSecret': base64.b64encode(b'r' * 32).decode(),
+                          'store': {'encryptionKey': base64.b64encode(b's' * 32).decode()},
+                          'auth': {'sessionCookieEncryptionKey': base64.b64encode(b'c' * 32).decode()}}}
         return cfg, metadata, lock(), app, vpn
+
+    def test_original_netbird_secrets_roundtrip_and_legacy_reconstruction(self):
+        from jinja2 import Environment, StrictUndefined
+        _, _, _, _, vpn = self.values()
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            # Legacy captures retain all three original keys in config.yaml.
+            values = prepare.netbird_secrets(vpn, root)
+            self.assertEqual(values, dict(relay_auth_secret=vpn['server']['authSecret'],
+                store_encryption_key=vpn['server']['store']['encryptionKey'],
+                cookie_encryption_key=vpn['server']['auth']['sessionCookieEncryptionKey']))
+            saved = root / 'secrets.json'
+            saved.write_text(json.dumps(values))
+            self.assertEqual(prepare.netbird_secrets(vpn, root), values)
+            # The maintained reconciliation template consumes the restored values
+            # without rotating keys. Compare its encryption fields end to end.
+            template = (FILES.parents[1] / 'netbird_control_plane/templates/config.yaml.j2').read_text()
+            engine = Environment(undefined=StrictUndefined)
+            engine.filters['to_json'] = json.dumps
+            rendered = engine.from_string(template).render(
+                netbird_control_plane_secrets=json.loads(saved.read_text()),
+                netbird_domain='vpn.example.invalid', netbird_ingress_proxy_ip='172.30.80.2')
+            reconciled = yaml.safe_load(rendered)
+            self.assertEqual(prepare.netbird_secrets(reconciled, root), values)
+            for invalid in [{**values, 'store_encryption_key': base64.b64encode(b'x' * 32).decode()},
+                            {**values, 'extra': 'unrecognized'}]:
+                saved.write_text(json.dumps(invalid))
+                with self.assertRaisesRegex(ValueError, 'disagree'):
+                    prepare.netbird_secrets(vpn, root)
+            saved.unlink()
+            for config in [{}, {'server': {}}, {'server': {**vpn['server'], 'authSecret': 'invalid'}}]:
+                with self.assertRaises(ValueError): prepare.netbird_secrets(config, root)
+            saved.symlink_to(root / 'absent')
+            with self.assertRaises(ValueError): prepare.netbird_secrets(vpn, root)
+
+    def test_legacy_prepare_bundles_private_original_secrets_for_guest_install(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            cfg, payload, bundle, images = self.fixture(root)
+            original = yaml.safe_load((payload / 'netbird-files/config.yaml').read_text())
+            prepare.prepare(cfg, payload, bundle, images, root / 'prepared')
+            secret_file = root / 'prepared/netbird-secrets.json'
+            self.assertEqual(secret_file.stat().st_mode & 0o777, 0o600)
+            self.assertEqual(json.loads(secret_file.read_text()), prepare.netbird_secrets(original, payload / 'netbird-files'))
+            with tarfile.open(root / 'prepared/bundle.tar') as archive:
+                self.assertEqual(json.load(archive.extractfile('netbird-secrets.json')), json.loads(secret_file.read_text()))
 
     def test_raw_urls_image_locks_and_runtime_key_scope(self):
         cfg, metadata, images, app, vpn = self.values()
@@ -363,6 +413,40 @@ class HostRecoveryPreparationTest(unittest.TestCase):
 
 
 class HostRecoveryRuntimeTest(unittest.TestCase):
+    def test_guest_netbird_install_preserves_keys_with_private_reconciliation_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory); source = root / 'saved'; source.mkdir()
+            (source / 'data').mkdir(); (source / 'data/state.db').write_bytes(b'synthetic database')
+            server = HostRecoveryPreparationTest().values()[-1]
+            (source / 'config.yaml').write_text(yaml.safe_dump(server))
+            secrets_file = root / 'netbird-secrets.json'
+            values = prepare.netbird_secrets(server, source)
+            secrets_file.write_text(json.dumps(values))
+            with patch.object(restore.os, 'chown') as chown:
+                restore.copy_netbird(source, root / 'installed', secrets_file)
+            restored = root / 'installed'
+            self.assertEqual(json.loads((restored / 'secrets.json').read_text()), values)
+            self.assertEqual((restored / 'secrets.json').stat().st_mode & 0o777, 0o600)
+            self.assertEqual((restored / 'data/state.db').read_bytes(), b'synthetic database')
+            self.assertEqual(prepare.netbird_secrets(yaml.safe_load((restored / 'config.yaml').read_text()), restored), values)
+            self.assertIn(unittest.mock.call(restored / 'secrets.json', 0, 0), chown.call_args_list)
+            # Run the maintained reconciliation guard/load path against the
+            # installed state. The absent generator must be skipped via creates.
+            from helpers import run_plays
+            tasks = yaml.safe_load((FILES.parents[1] / 'netbird_control_plane/tasks/main.yml').read_text())
+            names = {'Check for persistent encryption secrets', 'Check for existing server data',
+                     'Never regenerate encryption keys for existing server data',
+                     'Generate persistent random encryption secrets only once',
+                     'Load persistent encryption secrets', 'Decode persistent encryption secrets',
+                     'Validate the persistent encryption key format before starting the server'}
+            selected = [task for task in tasks if task['name'] in names]
+            selected.append({'ansible.builtin.assert': {
+                'that': 'netbird_control_plane_secrets == expected_original_keys'}})
+            result = run_plays([{'variables': {'netbird_control_plane_directory': str(restored),
+                                              'expected_original_keys': values}, 'tasks': selected}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(json.loads((restored / 'secrets.json').read_text()), values)
+
     def test_recovery_override_retains_standard_ownership_without_changing_compose(self):
         spec = importlib.util.spec_from_file_location('recovery_compose_filter', FILES.parents[2] / 'filter_plugins/app_compose.py')
         filters = importlib.util.module_from_spec(spec); spec.loader.exec_module(filters)

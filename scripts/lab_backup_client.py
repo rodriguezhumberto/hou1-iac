@@ -5,6 +5,7 @@ import json
 import os
 from pathlib import Path
 import re
+import signal
 import shlex
 import shutil
 import subprocess
@@ -27,6 +28,22 @@ def write_private(path, content):
     with os.fdopen(descriptor, 'w') as stream:
         os.fchmod(stream.fileno(), 0o600)
         stream.write(content)
+
+
+def run_verifier(command, timeout=660):
+    """Reap the verifier and its decryptor before the caller removes plaintext."""
+    with subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                          text=True, start_new_session=True) as process:
+        try:
+            stdout, stderr = process.communicate(timeout=timeout)
+            return subprocess.CompletedProcess(command, process.returncode, stdout, stderr)
+        finally:
+            # The verifier may have exited while its age child still owns files.
+            try:
+                os.killpg(process.pid, signal.SIGKILL)
+            except ProcessLookupError:
+                pass
+            process.wait()
 
 
 class BackupClient:
@@ -103,10 +120,9 @@ class BackupClient:
         plaintext = self.run / 'verified-plaintext'
         try:
             self.prefix('hou4')  # Recheck inputs and offline identity before using it.
-            result = subprocess.run([sys.executable, str(ROOT / 'scripts/verify-recovery.py'),
+            result = run_verifier([sys.executable, str(ROOT / 'scripts/verify-recovery.py'),
                 '--archive', str(point / 'recovery.age'), '--manifest', str(point / 'manifest.json'),
-                '--identity', str(self.identity), '--output', str(plaintext), '--environment', 'test'],
-                capture_output=True, text=True, timeout=660)
+                '--identity', str(self.identity), '--output', str(plaintext), '--environment', 'test'])
             write_private(self.run / 'offline-verification.stdout', result.stdout)
             write_private(self.run / 'offline-verification.stderr', result.stderr)
             require(result.returncode == 0, 'Offline recovery verification failed')

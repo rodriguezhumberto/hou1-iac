@@ -73,21 +73,31 @@ After publication and private VPN reconnection, use version 2 inputs:
 
 The phase reconciles HOU1's source/storage layout and initializes `backups.yml`
 under capture admission, deferring recovery-service and initial-capture activation.
-Existing active timers remain active. After releasing admission, the controller
+Existing timers retain their enablement and activity. A newly installed timer
+stays disabled across reboot. After releasing admission, the controller
 starts writer recovery, requests initial capture if none has succeeded, and
 observes VPN recovery without replaying start requests. A successful existing
-source point is reused.
+source point is reused while exportable. Before reconciliation, exact resume
+rejects a point older than the six-hour export window unless HOU4 already retains
+the exact point. Start a new attempt without `--resume` to request and bind a
+fresh capture; its request checks the previous source point before mutation.
 
 After HOU4 reconnects, the phase holds capture admission again, reconciles HOU4,
 collects the selected point, and verifies its ciphertext, offline decryption and
 SQLite integrity against the selected application revision. Decrypted output is
-removed on success or failure. The offline identity stays on the controller.
+removed on success, failure or timeout after verifier descendants are terminated.
+Verifier staging lives inside `verified-plaintext`, owned by the controller call.
+After a controller crash, stop any remaining verifier/decryptor processes and
+remove that directory in the interrupted private run before discarding the run.
+Older interrupted runs may also have sibling `.verify-*` staging; remove it only
+after confirming it belongs to that stopped verification. The offline identity
+stays on the controller and is not part of this cleanup.
 Capture observation is bounded to 50 minutes; collection to 33 minutes 20 seconds.
 An older scheduled transfer finishes before collection is requested; both waits
 share the collection budget.
 Both hosts must pass final readiness checks.
-Only then does the controller start the enabled source timer. On a fresh host,
-a failed finalization leaves that timer enabled but inactive until retry or reboot.
+Only then does the controller enable and start the source timer. On a fresh host,
+a failed finalization leaves scheduling disabled, including after reboot.
 
 To resume, add `--resume /private/lab/runs/previous/receipt.json`. Each attempt
 uses a new directory and repeats reconciliation. Resume requires the same inputs,
@@ -95,6 +105,14 @@ revisions, transports and offline identity; a previously selected source point
 must still match. It never silently substitutes a newer point. This phase does
 not restore, publish or rebuild a host; login, reboot and alert-delivery acceptance
 remain separate checks.
+
+Offline verification authenticates and extracts the point, checks SQLite and
+required files, and confirms nonempty SQL. It does not import PostgreSQL or start
+NetBird. Periodically restore a newly collected point in an isolated disposable
+environment and retain that point's service-level results separately from the
+earlier replay. The [standalone first-capture acceptance](evidence/standalone-first-capture-2026-11-24.md)
+records an empty-source public finalization followed by an isolated restore of
+its newly collected point. Local regressions remain distinct from live evidence.
 
 ### Failure matrix
 

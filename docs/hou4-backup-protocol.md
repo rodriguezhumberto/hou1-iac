@@ -40,11 +40,21 @@ client remain running. These are consistent component snapshots, not a distribut
 transaction; schedule identity/policy edits outside the capture window.
 SQLite and its recovery journals are copied while the application is stopped,
 then opened in private staging. This preserves committed WAL data while keeping
-the live database directory read-only to the capture service.
+the live database directory read-only to the capture service. Media must contain
+only regular files and directories: links and special entries fail capture before
+`ready.export` is replaced, matching the schema-1 outer extractor.
+
+New encrypted points include NetBird's original `secrets.json` alongside its
+configuration and state. Cold recovery checks all three 32-byte keys against the
+saved configuration; legacy points reconstruct this source from those saved
+values. The guest installs it as root:root `0600`, so normal control-plane
+reconciliation reuses the original keys without rotation.
 
 Before each stop, a root-only fsynced `restart-intent.json` records the fixed
 writer group. Normal cleanup, `ExecStopPost` and the enabled boot recovery service
-restart interrupted writers. SIGKILL or power loss cannot run Python cleanup;
+restart interrupted writers. Both ordinary restart and boot recovery require
+every recorded writer to be running, and healthy when a healthcheck is declared,
+before clearing intent (bounded to 120 seconds of polling). SIGKILL or power loss cannot run Python cleanup;
 boot recovery handles recorded intent. Invalid intent or failed restart remains
 for investigation. A failed attempt removes partial files and preserves the
 previous `ready.export` and last-success timestamp.
@@ -69,7 +79,11 @@ HOU4 checks the pinned SSH identity/exit status, bounded manifest, environment,
 age header, exact byte count and SHA256 before atomically committing a point.
 Partial, stale, corrupt and replayed transfers fail. Retention runs only after a
 successful commit and does not delete retained points merely to fit an incoming
-archive. HOU1 has no HOU4 deletion credential. **Transfer integrity does not prove
+archive. The receiver atomically renames expired points to private `.pruned-*`
+directories before recursive deletion; the next collection cleans interrupted
+deletions. Observers still reject incomplete visible committed directories.
+Deploy the matching HOU4 collector change before relying on concurrent retention
+observation. HOU1 has no HOU4 deletion credential. **Transfer integrity does not prove
 decryption or service recoverability.**
 
 ## Pairing established nodes

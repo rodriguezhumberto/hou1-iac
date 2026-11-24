@@ -1,5 +1,6 @@
 """Consistent snapshots, offline age recovery, restart safety and narrow transport policies."""
 from contextlib import closing
+import base64
 import importlib.util
 import io
 import json
@@ -26,6 +27,11 @@ recovery=load('backup_recovery',ROOT/'scripts/verify-recovery.py')
 policies=load('backup_policies',ROOT/'ansible/playbooks/filter_plugins/netbird_policies.py')
 
 
+def writer_status(services=None):
+    return json.dumps([dict(Service=service, State='running', Health='healthy')
+                       for service in (services or [item for group in source.WRITERS.values() for item in group])]).encode()
+
+
 class BackupProtocolTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which('age'),'age required')
     def test_digest_receipt_survives_encrypted_capture_and_offline_extraction(self):
@@ -36,6 +42,7 @@ class BackupProtocolTest(unittest.TestCase):
                            revision=revision, platform='linux/amd64', image_id='sha256:' + 'c' * 64)
             (Path(config['app']['root']) / 'application-image.json').write_text(json.dumps(receipt))
             def command(argv, output=None, timeout=300):
+                if '--format' in argv: return writer_status()
                 if 'ps' in argv: return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv: output.write(b'CREATE TABLE restored (value text);'); return b''
                 if argv[0] == 'git': return revision.encode()
@@ -57,8 +64,16 @@ class BackupProtocolTest(unittest.TestCase):
         with sqlite3.connect(app/'database/forms.db') as db:
             db.executescript('CREATE TABLE fixture (value text); INSERT INTO fixture VALUES ("recover-me");')
         (app/'media/photo.jpg').write_bytes(b'fixture-media')
-        for p,names in [(auth,['compose.yaml','authentik.env','oidc-clients.env','secrets.enc.yaml']),(app,['.env','docker-compose.yml','docker-compose.override.yml']),(netbird,['compose.yaml','config.yaml','dashboard.env'])]:
+        for p,names in [(auth,['compose.yaml','authentik.env','oidc-clients.env','secrets.enc.yaml']),(app,['.env','docker-compose.yml','docker-compose.override.yml']),(netbird,['compose.yaml','config.yaml','dashboard.env','secrets.json'])]:
             for name in names:(p/name).write_text('synthetic-private-config')
+        keys = dict(relay_auth_secret=base64.b64encode(b'r' * 32).decode(),
+                    store_encryption_key=base64.b64encode(b's' * 32).decode(),
+                    cookie_encryption_key=base64.b64encode(b'c' * 32).decode())
+        (netbird/'secrets.json').write_text(json.dumps(keys))
+        (netbird/'config.yaml').write_text(json.dumps({'server': {
+            'authSecret': keys['relay_auth_secret'],
+            'store': {'encryptionKey': keys['store_encryption_key']},
+            'auth': {'sessionCookieEncryptionKey': keys['cookie_encryption_key']}}}))
         (app/'certbot/conf').mkdir(parents=True)
         (app/'certbot/conf/cert.pem').write_text('synthetic-certificate')
         # Certbot's relative renewal symlinks must survive safe offline extraction.
@@ -78,6 +93,7 @@ class BackupProtocolTest(unittest.TestCase):
             root=Path(directory);config,key=self.fixture(root);events=[]
             def command(argv,output=None,timeout=300):
                 events.append(argv)
+                if '--format' in argv: return writer_status()
                 if argv[-4:]==['ps','--status','running','--services']:
                     return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv:output.write(b'CREATE TABLE recovered (value text);\n');return b''
@@ -87,7 +103,8 @@ class BackupProtocolTest(unittest.TestCase):
             archive_tree=source.archive_tree
             def archive_after_restart(output,directory,names):
                 if Path(output).name=='netbird.tar.gz':
-                    self.assertEqual(events[-1][-2:],['start','netbird-server'])
+                    self.assertIn(['start','netbird-server'], [event[-2:] for event in events])
+                    self.assertEqual(events[-1][-4:], ['ps', '--all', '--format', 'json'])
                 return archive_tree(output,directory,names)
             with patch.object(source,'command',side_effect=command),patch.object(source,'archive_tree',side_effect=archive_after_restart),patch.object(source,'application_receipt',return_value=None):
                 source.prepare(config)
@@ -102,6 +119,18 @@ class BackupProtocolTest(unittest.TestCase):
             self.assertEqual((output/'cms/media/photo.jpg').read_bytes(),b'fixture-media')
             self.assertTrue((output/'app-config/certbot/conf/link.pem').is_symlink())
             self.assertEqual((output/'netbird-files/data/state.db').read_bytes(),b'netbird-fixture-state')
+            self.assertEqual((output/'netbird-files/secrets.json').read_bytes(),
+                             (Path(config['netbird']['root'])/'secrets.json').read_bytes())
+            prepare = load('backup_host_prepare', ROOT/'ansible/playbooks/roles/host_recovery/files/prepare.py')
+            restore = load('backup_host_restore', ROOT/'ansible/playbooks/roles/host_recovery/files/restore.py')
+            saved = output/'netbird-files'
+            values = prepare.netbird_secrets(json.loads((saved/'config.yaml').read_text()), saved)
+            secret_file = root/'validated-secrets.json'; secret_file.write_text(json.dumps(values))
+            with patch.object(restore.os, 'chown'):
+                restore.copy_netbird(saved, root/'guest-netbird', secret_file)
+            self.assertEqual(prepare.netbird_secrets(
+                json.loads((root/'guest-netbird/config.yaml').read_text()), root/'guest-netbird'), values)
+            self.assertEqual((root/'guest-netbird/secrets.json').stat().st_mode & 0o777, 0o600)
             self.assertEqual((output/'host-recovery/0').read_text(),'synthetic-host-runtime-key')
             stops=[e for e in events if 'stop' in e];starts=[e for e in events if 'start' in e]
             self.assertEqual(len(stops),3);self.assertEqual(len(starts),3)
@@ -131,6 +160,7 @@ class BackupProtocolTest(unittest.TestCase):
                 path.chmod(0o400)
             database.parent.chmod(0o500)
             def command(argv, output=None, timeout=300):
+                if '--format' in argv: return writer_status()
                 if 'ps' in argv:
                     return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv:
@@ -157,6 +187,61 @@ class BackupProtocolTest(unittest.TestCase):
                 self.assertFalse(list((root / 'work').glob('.snapshot-*')))
             finally:
                 database.parent.chmod(0o700)
+
+    def test_media_rejects_links_and_special_entries_before_point_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            media = root / 'media'; media.mkdir()
+            (media / 'photo').write_bytes(b'synthetic media')
+            for kind in ('relative', 'escaping', 'fifo'):
+                with self.subTest(kind=kind):
+                    entry = media / 'unsupported'
+                    if kind == 'fifo': os.mkfifo(entry)
+                    else: entry.symlink_to('photo' if kind == 'relative' else '../outside')
+                    ready = root / 'ready.export'; ready.write_bytes(b'previous point')
+                    def capture(config, stream):
+                        source.copy_media(media, root / 'staged')
+                    with patch.object(source, 'export', side_effect=capture):
+                        with self.assertRaisesRegex(ValueError, 'Unsupported media'):
+                            source.prepare({'work_root': str(root)})
+                    self.assertEqual(ready.read_bytes(), b'previous point')
+                    self.assertFalse((root / 'staged').exists())
+                    entry.unlink()
+            source.copy_media(media, root / 'staged')
+            self.assertEqual((root / 'staged/photo').read_bytes(), b'synthetic media')
+
+    def test_restart_waits_for_health_and_keeps_intent_when_writer_exits(self):
+        project = {'name': 'fixture', 'root': '/fixture'}
+        with tempfile.TemporaryDirectory() as directory:
+            intent = Path(directory) / 'restart-intent.json'
+            states = [dict(Service='astro-app', State='running', Health='starting'),
+                      dict(Service='astro-app', State='exited', Health='')]
+            def command(argv, **kwargs):
+                if '--services' in argv: return b'astro-app\n'
+                if '--format' in argv: return json.dumps([states.pop(0)]).encode()
+                return b''
+            with patch.object(source, 'command', side_effect=command), \
+                    patch.object(source.time, 'monotonic', side_effect=[0, 1, 2, 121]), \
+                    patch.object(source.time, 'sleep'):
+                with self.assertRaisesRegex(RuntimeError, 'Writer recovery incomplete'):
+                    with source.frozen(project, ['astro-app'], (intent, 'app')): pass
+            self.assertTrue(intent.exists())
+            ready = json.dumps([dict(Service='astro-app', State='running', Health='healthy')]).encode()
+            with patch.object(source, 'command', side_effect=[b'', ready]):
+                source.recover({'work_root': directory, 'app': project})
+            self.assertFalse(intent.exists())
+
+    def test_writer_health_poll_accepts_compose_ndjson_and_absent_healthchecks(self):
+        project = {'name': 'fixture', 'root': '/fixture'}
+        states = [dict(Service='astro-app', State='running', Health='starting'),
+                  dict(Service='astro-app', State='running', Health='healthy')]
+        def poll(argv, **kwargs):
+            return json.dumps(states.pop(0)).encode() + b'\n'
+        with patch.object(source, 'command', side_effect=poll), patch.object(source.time, 'sleep') as sleep:
+            source.wait_writers(project, ['astro-app'])
+            sleep.assert_called_once_with(1)
+        with patch.object(source, 'command', return_value=b'{"Service":"netbird-server","State":"running","Health":""}\n'):
+            source.wait_writers(project, ['netbird-server'])
 
     def test_failed_preparation_preserves_previous_completed_ciphertext(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -202,6 +287,7 @@ class BackupProtocolTest(unittest.TestCase):
                 def command(argv,output=None,timeout=300):
                     if 'pg_dump' in argv:
                         return subprocess.run(['docker','exec',name,'pg_dump','-U','authentik','-d','authentik','--no-owner','--format=plain'],stdout=output,stderr=subprocess.PIPE,check=True).stdout
+                    if '--format' in argv: return writer_status()
                     if 'ps' in argv:return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                     if argv[0]=='git':return b'0123456789012345678901234567890123456789'
                     return b''
@@ -221,16 +307,17 @@ class BackupProtocolTest(unittest.TestCase):
         events=[]
         def command(argv,**kwargs):
             events.append(argv)
+            if '--format' in argv: return writer_status()
             if 'ps' in argv:return b'astro-app\n'
             if 'stop' in argv:raise RuntimeError('Synthetic failed stop')
         with patch.object(source,'command',side_effect=command):
             with self.assertRaises(RuntimeError):
                 with source.frozen(project,['astro-app']):pass
-        self.assertEqual(events[-1][-2:],['start','astro-app'])
-        with patch.object(source,'command',side_effect=lambda argv,**_:b'astro-app\n') as run:
+        self.assertIn(['start','astro-app'], [event[-2:] for event in events])
+        with patch.object(source,'command',side_effect=lambda argv,**_:writer_status() if '--format' in argv else b'astro-app\n') as run:
             with self.assertRaises(ValueError):
                 with source.frozen(project,['astro-app']):raise ValueError('snapshot failed')
-        self.assertEqual(run.call_args.args[0][-2:],['start','astro-app'])
+        self.assertEqual(run.call_args.args[0][-4:], ['ps', '--all', '--format', 'json'])
 
     def test_durable_intent_precedes_stop_and_survives_failed_restart(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -238,6 +325,7 @@ class BackupProtocolTest(unittest.TestCase):
             project={'name':'fixture','root':'/fixture'}
             def command(argv,**kwargs):
                 events.append(argv)
+                if '--format' in argv: return writer_status()
                 if 'ps' in argv:return b'astro-app\n'
                 if 'stop' in argv:self.assertEqual(json.loads(intent.read_text()),dict(schema=1,component='app'))
                 if 'start' in argv:raise RuntimeError('Synthetic restart failure')
@@ -255,7 +343,7 @@ class BackupProtocolTest(unittest.TestCase):
                 (root/'ready.export').write_bytes(b'previous-complete-point')
                 (root/'.snapshot-fixture').mkdir();(root/'.snapshot-fixture/private').write_bytes(b'partial-plaintext')
                 (root/'.prepared-fixture').write_bytes(b'partial-ciphertext')
-                with patch.object(source,'command',side_effect=[b'',('\n'.join(services)+'\n').encode()]) as run:
+                with patch.object(source,'command',side_effect=[b'', writer_status(services)]) as run:
                     source.recover(config)
                 self.assertEqual(run.call_args_list[0].args[0],source.compose(config[component])+['start',*services])
                 self.assertEqual((root/'ready.export').read_bytes(),b'previous-complete-point')
@@ -273,7 +361,7 @@ class BackupProtocolTest(unittest.TestCase):
                     with self.assertRaises(ValueError):source.recover(dict(work_root=str(root)))
                     command.assert_not_called()
             intent.write_text(json.dumps(dict(schema=1,component='app')))
-            with patch.object(source,'command',return_value=b''):
+            with patch.object(source,'command',return_value=b''), patch.object(source.time, 'monotonic', side_effect=[0, 121]):
                 with self.assertRaises(RuntimeError):source.recover(dict(work_root=str(root),app=dict(name='app',root='/fixture')))
             self.assertTrue(intent.exists())
 
@@ -369,7 +457,8 @@ class BackupProtocolTest(unittest.TestCase):
                 result = run_plays([{'variables': {'hou1_backup_capture_on_initialize': False}, 'tasks': fixture}])
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             requests = [json.loads(line) for line in calls.read_text().splitlines()]
-            self.assertTrue(all(request['enabled'] for request in requests))
+            self.assertTrue(requests[0]['enabled'])
+            self.assertNotIn('enabled', requests[1])
             self.assertNotIn('state', requests[0])
             self.assertNotIn('state', requests[1])
             calls.unlink()

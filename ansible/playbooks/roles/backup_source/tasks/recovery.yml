@@ -33,7 +33,9 @@
   ansible.builtin.systemd_service:
     name: hou1-backup-prepare.timer
     daemon_reload: true
-    enabled: true
+    # Omit preserves established scheduling; a fresh unit stays disabled across
+    # reboot until the controller has verified the first off-host point.
+    enabled: "{{ true if hou1_backup_capture_on_initialize | default(true) | bool else omit }}"
     state: "{{ 'started' if hou1_backup_capture_on_initialize | default(true) | bool else omit }}"
 
 - name: Check whether the restored host has an initial recovery point

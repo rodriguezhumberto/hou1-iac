@@ -3,11 +3,13 @@
 import argparse
 import importlib.util
 import datetime
+import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
+import shlex
 import sqlite3
 import subprocess
 import time
@@ -73,6 +75,8 @@ def copy_tree(source, destination, uid=0, gid=0, public=False):
 
 
 def copy_certificates(environment, source, destination):
+    # Supported Nginx loads keys as root. Normalize to root:root, directories
+    # 0750/files 0640; archive numeric owners are deliberately not trusted.
     if environment == 'test':
         copy_tree(source, destination)
     else:
@@ -82,6 +86,15 @@ def copy_certificates(environment, source, destination):
         for name in ('live', 'archive'):
             if (source / name).is_dir():
                 copy_tree(source / name, destination / name)
+
+
+def copy_netbird(source, destination, secrets_file):
+    copy_tree(source, destination)
+    # prepare.py validates against config.yaml, reconstructing legacy points
+    # without generating or rotating any encryption material.
+    shutil.copyfile(secrets_file, destination / 'secrets.json')
+    os.chown(destination / 'secrets.json', 0, 0)
+    (destination / 'secrets.json').chmod(0o600)
 
 
 def write(name, data):
@@ -225,7 +238,7 @@ def install(cfg):
         copy_tree(payload / 'authentik-files' / name, AUTH_DATA / name, 1000, 1000)
     (AUTH_DATA / 'postgres').mkdir(mode=0o700)
     os.chown(AUTH_DATA / 'postgres', 70, 70)
-    copy_tree(payload / 'netbird-files', VPN)
+    copy_netbird(payload / 'netbird-files', VPN, ROOT / 'netbird-secrets.json')
     key = Path(cfg['runtime_age_path'])
     key.parent.mkdir(parents=True, mode=0o700, exist_ok=True)
     shutil.copyfile(payload / 'host-recovery/0', key)
@@ -355,9 +368,119 @@ def restore(cfg):
     return report
 
 
+def publication_write(path, value):
+    """Persist publication intent/checkpoints before externally visible changes."""
+    temporary = path.with_name(path.name + '.new')
+    with temporary.open('w') as stream:
+        os.chmod(temporary, 0o600)
+        stream.write(value)
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.replace(temporary, path)
+    fd = os.open(path.parent, os.O_RDONLY | os.O_DIRECTORY)
+    try:
+        os.fsync(fd)
+    finally:
+        os.close(fd)
+
+
+def publication_firewall():
+    """Read canonical UFW rules; comments distinguish this attempt's additions."""
+    rules = []
+    for line in run('ufw', 'show', 'added').decode().splitlines():
+        fields = shlex.split(line)
+        if fields[:2] != ['ufw', 'allow']:
+            continue
+        if fields[2:3] == ['in']:
+            fields.pop(2)
+        if len(fields) == 3:
+            rules.append((fields[2], None))
+        elif len(fields) == 5 and fields[3] == 'comment':
+            rules.append((fields[2], fields[4]))
+    return rules
+
+
+def publication_identity(cfg):
+    return hashlib.sha256(json.dumps(cfg, sort_keys=True).encode()).hexdigest()
+
+
+def publication_cleanup(cfg):
+    """Seal an interrupted publication, retaining the error and original intent."""
+    if cfg.get('quarantine', False):
+        raise ValueError('Quarantined replacement has no publication cleanup')
+    path = ROOT / 'publication-intent.json'
+    journal = json.loads(path.read_text())
+    if journal.get('config_sha256') != publication_identity(cfg):
+        raise ValueError('Publication cleanup request differs from the saved intent')
+    if (ROOT / 'publish-report.json').exists():
+        raise ValueError('Successful publication must not be rolled back as an interruption')
+    expected = {'app': ('nginx', ['127.0.0.1:80:80', '127.0.0.1:443:443']),
+                'netbird': ('netbird-server', ['127.0.0.1:3478:3478/udp'])}
+    if (journal.get('schema') != 1 or set(journal.get('compose', {})) != set(expected)
+            or journal.get('firewall_comment') != 'hou1-recovery-' + cfg['id']
+            or not isinstance(journal.get('owned_firewall'), list)
+            or len(set(journal['owned_firewall'])) != len(journal['owned_firewall'])
+            or not set(journal['owned_firewall']).issubset({'80/tcp', '443/tcp', '3478/udp'})):
+        raise ValueError('Invalid publication cleanup intent')
+    for project, (service, ports) in expected.items():
+        if json.loads(journal['compose'][project])['services'][service]['ports'] != ports:
+            raise ValueError('Publication cleanup intent is not private')
+    errors = []
+    for project, service in [('app', 'nginx'), ('netbird', 'netbird-server')]:
+        try:
+            dc(project, 'stop', '--timeout', '30', service, timeout=100)
+        except Exception:
+            errors.append('stop-' + project)
+    # Resolve destinations from the validated deployment, never from a journal
+    # path supplied by the caller. Restore private bindings even if stop failed.
+    for project, original in journal['compose'].items():
+        try:
+            file = PROJECTS[project][1] / ('docker-compose.yml' if project == 'app' else 'compose.yaml')
+            publication_write(file, original)
+        except Exception:
+            errors.append('compose-' + project)
+    for port in journal['owned_firewall']:
+        try:
+            matches = [(rule, comment) for rule, comment in publication_firewall() if rule == port]
+            if not matches:
+                continue
+            if matches != [(port, journal['firewall_comment'])]:
+                raise ValueError('Publication firewall ownership changed')
+            run('ufw', '--force', 'delete', 'allow', port, 'comment', journal['firewall_comment'])
+        except Exception:
+            errors.append('firewall-' + port)
+    journal['cleanup'] = {'passed': not errors, 'failed_steps': errors}
+    publication_write(path, json.dumps(journal, indent=2) + '\n')
+    if not (ROOT / 'first-error.json').exists():
+        publication_write(ROOT / 'first-error.json', json.dumps({
+            'action': 'publish', 'error_type': 'InterruptedPublication',
+            'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat(),
+            'publication_cleanup_passed': not errors}, indent=2) + '\n')
+    if errors:
+        raise RuntimeError('Publication cleanup incomplete; retain intent and retry cleanup only')
+    return {'passed': True, 'private_bindings_restored': True, 'publication_retry_allowed': False}
+
+
+def recover_publication(cfg):
+    with (ROOT / 'publication.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return publication_cleanup(cfg)
+
+
 def publish(cfg):
     if cfg.get('quarantine', False):
         raise ValueError('Quarantined replacement cannot be published; use a separate reviewed handoff')
+    with (ROOT / 'publication.lock').open('a') as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        return publish_locked(cfg)
+
+
+def publish_locked(cfg):
+    if cfg.get('quarantine', False):
+        raise ValueError('Quarantined replacement cannot be published; use a separate reviewed handoff')
+    if (ROOT / 'publication-intent.json').exists():
+        publication_cleanup(cfg)
+        raise ValueError('Interrupted publication sealed; retain evidence and use a fresh attempt')
     report = json.loads((ROOT / 'restore-report.json').read_text())
     if (not report['passed'] or (cfg['environment'] == 'production' and
             (report.get('environment') != 'production' or report.get('staff_revision') != cfg['staff_revision']
@@ -365,29 +488,38 @@ def publish(cfg):
              or report.get('ports_bound_to_loopback') is not True
              or report.get('sessions_revoked_before_writers') is not True))):
         raise ValueError('Restore checkpoint has not passed')
-    changes = []
+    changes, originals = [], {}
     for project, service, before, after in [
         ('netbird', 'netbird-server', ['127.0.0.1:3478:3478/udp'], ['3478:3478/udp']),
         ('app', 'nginx', ['127.0.0.1:80:80', '127.0.0.1:443:443'], ['80:80', '443:443']),
     ]:
         file = PROJECTS[project][1] / ('docker-compose.yml' if project == 'app' else 'compose.yaml')
-        config = json.loads(file.read_text())
+        originals[project] = file.read_text()
+        config = json.loads(originals[project])
         if config['services'][service]['ports'] != before:
             raise ValueError('Unexpected publication baseline')
         config['services'][service]['ports'] = after
         changes.append((file, config))
-    for file, config in changes:
-        file.write_text(json.dumps(config, indent=2) + '\n')
-    for port in ['80', '443']:
-        run('ufw', 'allow', port + '/tcp')
-    run('ufw', 'allow', '3478/udp')
-    dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server')
-    dc('app', 'up', '-d', '--pull', 'never', '--no-deps', 'nginx')
-    dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
-    report = {'passed': True, 'environment': cfg['environment'], 'ports_published': True,
-              'access_reconciliation_operator_asserted': True, 'host_enrollment_pending': True}
-    write('publish-report.json', report)
-    return report
+    existing = {port for port, _ in publication_firewall()}
+    journal = {'schema': 1, 'config_sha256': publication_identity(cfg), 'compose': originals,
+               'firewall_comment': 'hou1-recovery-' + cfg['id'],
+               'owned_firewall': [port for port in ['80/tcp', '443/tcp', '3478/udp'] if port not in existing]}
+    publication_write(ROOT / 'publication-intent.json', json.dumps(journal, indent=2) + '\n')
+    try:
+        for file, config in changes:
+            publication_write(file, json.dumps(config, indent=2) + '\n')
+        for port in journal['owned_firewall']:
+            run('ufw', 'allow', port, 'comment', journal['firewall_comment'])
+        dc('netbird', 'up', '-d', '--pull', 'never', 'netbird-server')
+        dc('app', 'up', '-d', '--pull', 'never', '--no-deps', 'nginx')
+        dc('app', 'exec', '-T', 'nginx', 'nginx', '-t')
+        report = {'passed': True, 'environment': cfg['environment'], 'ports_published': True,
+                  'access_reconciliation_operator_asserted': True, 'host_enrollment_pending': True}
+        publication_write(ROOT / 'publish-report.json', json.dumps(report, indent=2) + '\n')
+        return report
+    except Exception:
+        publication_cleanup(cfg)
+        raise
 
 
 def main(action):
@@ -395,7 +527,7 @@ def main(action):
     cfg = json.loads((ROOT / 'request.json').read_text())
     if cfg['environment'] not in ('test', 'production') or ROOT != RECOVERY_BASE / cfg['id']:
         raise ValueError('Wrong recovery root or environment')
-    if (ROOT / 'first-error.json').exists() or (ROOT / (action + '-report.json')).exists():
+    if action != 'recover-publication' and ((ROOT / 'first-error.json').exists() or (ROOT / (action + '-report.json')).exists()):
         raise ValueError('Do not resume an earlier or completed attempt')
     # A rejected action must leave the healthy quarantine and its evidence intact.
     if action == 'publish' and cfg.get('quarantine', False):
@@ -403,6 +535,8 @@ def main(action):
     configure(cfg)
     if cfg['environment'] == 'production' and not cfg.get('application_image'):
         raise ValueError('Production recovery requires a CI artifact')
+    if action == 'recover-publication':
+        return recover_publication(cfg)
     try:
         return {'restore': restore, 'publish': publish}[action](cfg)
     except Exception as error:
@@ -420,7 +554,7 @@ def main(action):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('action', choices=['restore', 'publish'], nargs='?', default='restore')
+    parser.add_argument('action', choices=['restore', 'publish', 'recover-publication'], nargs='?', default='restore')
     try:
         print(json.dumps(main(parser.parse_args().action)))
     except Exception:

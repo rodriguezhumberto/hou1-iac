@@ -62,10 +62,18 @@ class Finalization(BackupClient):
                 'Offline recovery identity does not match the source recipient')
         if self.point:
             require(before['manifest'] == self.point, 'Selected source point changed since the previous attempt')
-        self.request('hou1', 'ensure-capture')
+        refresh = bool(before['manifest'] and not before.get('exportable', True) and self.point is None)
+        if refresh:
+            # A new attempt can bind a fresh point. Exact resume never switches.
+            self.request('hou1', 'capture', expected=before['manifest'])
+        else:
+            self.request('hou1', 'ensure-capture')
 
         def ready(state):
             if state['service']['ActiveState'] in BUSY:
+                return False
+            if refresh and state['manifest'] == before['manifest']:
+                require(state['service']['Result'] == 'success', 'Fresh capture failed; preserve the previous point')
                 return False
             if not state['status']['last_success'] and state['service']['Result'] == 'success':
                 return False  # A queued --no-block start may not have run yet.
@@ -78,6 +86,24 @@ class Finalization(BackupClient):
         self.point = state['manifest']
         self.workflow.finalization['point'] = self.point
         self.workflow.save()
+
+    def preflight(self):
+        """Reject stale exact resume before either host is reconciled."""
+        source = self.remote('hou1', 'source-preflight')
+        if not source.get('configured', True):
+            require(self.point is None, 'Selected source point is missing during resume')
+            return
+        if self.point:
+            require(source['manifest'] == self.point, 'Selected source point changed since the previous attempt')
+        if source.get('manifest') and not source.get('exportable', True):
+            if self.point:
+                receiver = self.remote('hou4', 'receiver-state')
+                retained = receiver['points'].get(self.point['id'])
+                require(retained and retained['manifest'] == self.point,
+                        'Selected source point is stale and uncollected; use a new finalize attempt without --resume')
+            else:
+                require(not source['intent'] and source['service']['ActiveState'] not in BUSY,
+                        'Stale source point requires idle, recovered writers before a new attempt')
 
     def collect(self):
         source = self.remote('hou1', 'source-state')
@@ -114,7 +140,8 @@ class Finalization(BackupClient):
         def ready(state):
             require(state['manifest'] == self.point and not state['intent'],
                     'Source point changed before schedule verification')
-            return state['timer']['ActiveState'] == 'active'
+            return (state['timer']['ActiveState'] == 'active'
+                    and state['timer']['UnitFileState'] == 'enabled')
 
         self.observe('hou1', 'source-status', ready, 60)
 
@@ -122,6 +149,7 @@ class Finalization(BackupClient):
         w = self.workflow
         require(all(w.selections[role]['contracts']['backup_enabled'] for role in ('hou1', 'hou4')),
                 'Finalization requires both backup endpoints enabled')
+        w.step('backup-preflight', self.preflight)
         # Finish source/storage migration before backup-source initialization.
         with w.capture_guard():
             w.step('hou1-reconcile', lambda: self.reconcile('hou1'))

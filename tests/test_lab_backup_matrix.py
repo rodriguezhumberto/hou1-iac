@@ -16,6 +16,7 @@ from helpers import ROOT
 sys.path.insert(0, str(ROOT / 'scripts'))
 import lab_backup_matrix as controller
 import lab_backup_runtime as runtime
+import lab_backup_client as client
 
 
 class BackupRuntimeTest(unittest.TestCase):
@@ -208,14 +209,16 @@ class BackupControllerTest(unittest.TestCase):
         scenario.prefix = Mock(return_value=['ssh', 'fixture'])
         plaintext = scenario.run / 'verified-plaintext'
         def run(command, **kwargs):
-            if 'verify-recovery.py' in str(command):
-                plaintext.mkdir(); (plaintext / 'secret').write_text('synthetic plaintext')
-                return subprocess.CompletedProcess(command, 1, stdout='', stderr='verification failed')
             kwargs['stdout'].write(json.dumps(scenario.point).encode() if command[-1].endswith('manifest.json')
                                    else b'fixture ciphertext')
             return subprocess.CompletedProcess(command, 0)
-        with patch.object(controller.subprocess, 'run', side_effect=run):
-            with self.assertRaisesRegex(ValueError, 'verification failed'):
+        def verify(command):
+            plaintext.mkdir(); stage = plaintext / '.verify-fixture'; stage.mkdir()
+            (stage / 'secret').write_text('synthetic plaintext')
+            raise subprocess.TimeoutExpired(command, 660)
+        with patch.object(controller.subprocess, 'run', side_effect=run), \
+                patch.object(client, 'run_verifier', side_effect=verify):
+            with self.assertRaises(subprocess.TimeoutExpired):
                 scenario.verify_offline()
         self.assertFalse(plaintext.exists())
 

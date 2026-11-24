@@ -28,7 +28,7 @@ def output(command):
 
 
 def unit(name):
-    fields = 'ActiveState,Result,MainPID,ExecMainPID,ExecMainStatus,ExecMainStartTimestampMonotonic,RuntimeMaxUSec'
+    fields = 'ActiveState,UnitFileState,Result,MainPID,ExecMainPID,ExecMainStatus,ExecMainStartTimestampMonotonic,RuntimeMaxUSec'
     return dict(line.split('=', 1) for line in output(
         ['systemctl', 'show', name, '--property=' + fields]).splitlines() if '=' in line)
 
@@ -86,7 +86,9 @@ def receiver_config(contract):
     return config
 
 
-def source_state(allow_empty=False):
+def source_state(allow_empty=False, allow_unconfigured=False):
+    if allow_unconfigured and not SOURCE.exists():
+        return {'configured': False}
     config = json.loads(SOURCE.read_text())
     require(config.get('environment') == 'test', 'Source must be an established test backup')
     root = Path(config['work_root'])
@@ -98,7 +100,9 @@ def source_state(allow_empty=False):
             manifest = json.loads(stream.readline(8193))
     except FileNotFoundError:
         require(allow_empty and not status['last_success'], 'Successful source point is missing')
-    return {'manifest': manifest, 'status': status,
+    return {'configured': True, 'manifest': manifest, 'status': status,
+            'exportable': bool(manifest and type(manifest.get('created')) is int
+                               and time.time() - 21600 <= manifest['created'] <= time.time() + 60),
             'recipient': config['recipient'], 'intent': (root / 'restart-intent.json').exists(),
             'service': unit('hou1-backup-prepare.service'), 'timer': unit('hou1-backup-prepare.timer')}
 
@@ -228,7 +232,10 @@ def run(contract):
     if action == 'access':
         return {'private_access': True}
     if contract['role'] == 'hou1':
-        require(action in ('source-state', 'source-status', 'ensure-capture', 'activate-timer', 'capture'), 'Unsupported source operation')
+        require(action in ('source-state', 'source-status', 'source-preflight', 'ensure-capture',
+                           'activate-timer', 'capture'), 'Unsupported source operation')
+        if action == 'source-preflight':
+            return source_state(allow_empty=True, allow_unconfigured=True)
         state = source_state(allow_empty=True) if action in ('source-status', 'ensure-capture') else source_state()
         if action == 'ensure-capture':
             require(not state['intent'] or state['service']['ActiveState'] in ('active', 'activating'),
@@ -242,10 +249,12 @@ def run(contract):
         if action == 'activate-timer':
             require(not state['intent'] and state['status']['last_success'] > 0
                     and state['manifest'] == contract['expected'], 'Schedule requires the verified source point')
-            output(['systemctl', 'start', 'hou1-backup-prepare.timer'])
+            output(['systemctl', 'enable', '--now', 'hou1-backup-prepare.timer'])
         if action == 'capture':
             require(not state['intent'] and state['service']['ActiveState'] in ('inactive', 'failed'),
                     'Source capture or writer recovery is already active')
+            if 'expected' in contract:
+                require(state['manifest'] == contract['expected'], 'Source point changed before fresh capture')
             output(['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service'])
         return state
     require(action in ('receiver-state', 'collect', 'interrupt'), 'Unsupported receiver operation')

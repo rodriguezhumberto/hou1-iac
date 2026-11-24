@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prepare an environment-bound replacement-host bundle without touching either VPS."""
 import argparse
+import base64
 import importlib.util
 import ipaddress
 import json
@@ -177,6 +178,26 @@ def quarantine_networks(request, auth, vpn, web, override):
                 network['internal'] = True
 
 
+def netbird_secrets(config, source):
+    """Recover original schema-1 keys, including points predating secrets.json."""
+    try:
+        server = config['server']
+        values = {'relay_auth_secret': server['authSecret'],
+                  'store_encryption_key': server['store']['encryptionKey'],
+                  'cookie_encryption_key': server['auth']['sessionCookieEncryptionKey']}
+        for value in values.values():
+            if (not isinstance(value, str) or len(base64.b64decode(value, validate=True)) != 32
+                    or base64.b64encode(base64.b64decode(value, validate=True)).decode() != value):
+                raise ValueError('Invalid original NetBird encryption material')
+        path = Path(source) / 'secrets.json'
+        if path.is_symlink() or (path.exists() and (not path.is_file()
+                or json.loads(path.read_text()) != values)):
+            raise ValueError('Saved NetBird secrets disagree with server configuration')
+        return values
+    except (KeyError, TypeError) as error:
+        raise ValueError('Missing original NetBird encryption material') from error
+
+
 def prepare(request, payload, source_bundle, image_lock, output):
     os.umask(0o077)
     payload, output = Path(payload).resolve(), Path(output)
@@ -185,6 +206,7 @@ def prepare(request, payload, source_bundle, image_lock, output):
     app = drill.environment(payload / 'app-config/.env')
     netbird = yaml.safe_load((payload / 'netbird-files/config.yaml').read_text())
     origins = validate(request, metadata, lock, app, netbird)
+    original_netbird_secrets = netbird_secrets(netbird, payload / 'netbird-files')
     receipt = artifact.saved(payload, request['staff_revision'])
     auth = yaml.safe_load((payload / 'authentik/compose.yaml').read_text())
     vpn = yaml.safe_load((payload / 'netbird-files/compose.yaml').read_text())
@@ -232,6 +254,9 @@ def prepare(request, payload, source_bundle, image_lock, output):
         raise ValueError('Never reuse a staging directory')
     output.mkdir(parents=True, mode=0o700)
     try:
+        secrets_path = output / 'netbird-secrets.json'
+        secrets_path.write_text(json.dumps(original_netbird_secrets) + '\n')
+        secrets_path.chmod(0o600)
         repository = output / 'source.git'
         subprocess.run(['git', 'clone', '--bare', '--branch', 'recovery', str(source_bundle), str(repository)], capture_output=True, check=True)
         def git(*args):

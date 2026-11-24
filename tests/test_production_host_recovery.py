@@ -55,7 +55,9 @@ def fixture(root):
                   SECONDARY_CERT_DIR='shared', STAFF_CERT_DIR='shared')
     (payload / 'app-config/.env').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
     (payload / 'netbird-files/config.yaml').write_text(yaml.safe_dump({'server': {
-        'exposedAddress': cfg['origins']['netbird'], 'disableGeoliteUpdate': True}}))
+        'exposedAddress': cfg['origins']['netbird'], 'disableGeoliteUpdate': True,
+        **{key: value for key, value in host.HostRecoveryPreparationTest().values()[-1]['server'].items()
+           if key in ('authSecret', 'store', 'auth')}}}))
     web_path = payload / 'app-config/docker-compose.yml'
     web = yaml.safe_load(web_path.read_text())
     web['networks'] = {'app-network': {'driver': 'bridge'}}
@@ -136,7 +138,8 @@ class ProductionRecoveryTest(unittest.TestCase):
             cfg, payload, bundle, lock = fixture(root)
             path = payload / 'netbird-files/config.yaml'
             for index, setting in enumerate([None, False, True]):
-                config = {'server': {'exposedAddress': cfg['origins']['netbird']}}
+                config = {'server': {key: value for key, value in yaml.safe_load(path.read_text())['server'].items()
+                                     if key != 'disableGeoliteUpdate'}}
                 if setting is not None:
                     config['server']['disableGeoliteUpdate'] = setting
                 original = yaml.safe_dump(config).encode()
@@ -255,11 +258,15 @@ class ProductionRecoveryTest(unittest.TestCase):
             (source / 'live/example/privkey.pem').symlink_to('../../archive/example/key1.pem')
             (source / 'cloudflare.ini').write_text('synthetic DNS credential fixture')
             (source / 'accounts/registration').write_text('synthetic account fixture')
-            with patch.object(host.restore.os, 'chown'):
+            with patch.object(host.restore.os, 'chown') as chown:
                 host.restore.copy_certificates('production', source, destination)
             self.assertEqual({path.name for path in destination.iterdir()}, {'live', 'archive'})
             self.assertEqual((destination / 'live/example/privkey.pem').read_text(), 'synthetic key fixture')
             self.assertTrue((destination / 'live/example/privkey.pem').is_symlink())
+            self.assertTrue(chown.call_args_list)
+            self.assertTrue(all(call.args[1:] == (0, 0) for call in chown.call_args_list))
+            self.assertEqual((destination / 'archive/example/key1.pem').stat().st_mode & 0o777, 0o640)
+            self.assertEqual((destination / 'archive/example').stat().st_mode & 0o777, 0o750)
 
     def test_successful_production_publication_uses_the_completed_restore_contract(self):
         cfg = request(); cfg['application_image'] = images.receipt(cfg['staff_revision'])

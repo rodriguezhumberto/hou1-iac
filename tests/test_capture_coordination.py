@@ -32,7 +32,8 @@ class CaptureCoordinationTest(unittest.TestCase):
             '/run/lock/hou1-backup-export.lock', str(self.lock)).replace(
             '/var/lib/hou1-backup/restart-intent.json', str(self.intent))
         (self.root / 'operation_lock.py').write_text(program)
-        (self.root / 'export.py').write_bytes((FILES / 'export.py').read_bytes())
+        (self.root / 'export.py').write_text((FILES / 'export.py').read_text().replace(
+            '/var/lib/hou1-tls/activation.json', str(self.root / 'activation.json')))
         spec = importlib.util.spec_from_file_location('fixture_lock', self.root / 'operation_lock.py')
         self.operation = importlib.util.module_from_spec(spec)
         spec.loader.exec_module(self.operation)
@@ -42,6 +43,29 @@ class CaptureCoordinationTest(unittest.TestCase):
 
     def guard(self, name='guard', timeout=3):
         return CaptureGuard(self.hold, self.root / (name + '.log'), timeout=timeout)
+
+    def test_capture_refuses_pending_tls_before_snapshot_or_writer_mutation(self):
+        spec = importlib.util.spec_from_file_location('tls_gated_capture', self.root / 'export.py')
+        source = importlib.util.module_from_spec(spec); spec.loader.exec_module(source)
+        config = self.root / 'source.json'
+        config.write_text(json.dumps({'work_root': str(self.root)}))
+        pending = self.root / 'activation.json'; pending.write_text('synthetic private intent')
+        ready = self.root / 'ready.export'; ready.write_bytes(b'previous recovery point')
+        with patch.object(source, 'CONFIG', config), patch.object(source, 'TLS_ACTIVATION', pending), \
+                patch.object(source, 'recover') as recover, patch.object(source, 'prepare') as prepare:
+            with self.assertRaisesRegex(RuntimeError, 'Pending TLS activation'):
+                source.run()
+            prepare.assert_not_called()
+            self.assertEqual(ready.read_bytes(), b'previous recovery point')
+            self.assertEqual(json.loads((self.root / 'last-export.json').read_text())['last_run_success'], 0)
+            # Writer recovery must remain available to repair unrelated intent.
+            source.run(recovery_only=True)
+            self.assertEqual(recover.call_count, 2)
+            prepare.assert_not_called()
+            pending.unlink()
+            prepare.return_value = {'created': 123, 'id': 'synthetic-point'}
+            source.run()
+            prepare.assert_called_once()
 
     def start(self, program):
         process = subprocess.Popen([sys.executable, '-u', '-c', program],

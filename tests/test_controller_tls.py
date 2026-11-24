@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import signal
 from pathlib import Path
 import socket
 import ssl
@@ -60,6 +61,14 @@ class ControllerTlsTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.trust.stop();cls.temporary.cleanup()
+
+    def setUp(self):
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        self.state = Path(state.name)
+        self.state_patch = patch.object(receiver, 'STATE', self.state)
+        self.state_patch.start()
+        self.addCleanup(self.state_patch.stop)
 
     def config(self,root):
         return {'environment':'production','lineages':self.lineages,'app_directory':str(root/'app'),
@@ -190,6 +199,97 @@ class ControllerTlsTest(unittest.TestCase):
                 receiver.install(c,self.bundles[0])
             self.assertEqual(metadata(),expected)
             self.assertFalse(list(Path(directory).rglob('.tls-*')))
+
+    def test_redelivery_recovers_real_process_death_between_writes_and_before_reload(self):
+        for writes in (1, 2):
+            with self.subTest(writes=writes), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                c = self.config(root)
+                receiver.install(c, self.bundles[0], bootstrap=True)
+                folder = Path(c['certificate_directory']) / 'live/auth.example.invalid'
+                paths = [folder / name for name in ('fullchain.pem', 'privkey.pem')]
+                for path in paths:
+                    path.chmod(0o640)
+                old_metadata = material.validate_bundle(self.bundles[0], 'production', self.lineages)
+                served_generation = root / 'served.json'
+                served_generation.write_text(json.dumps(old_metadata))
+                source = ROLES / 'controller_tls/files/receive.py'
+                program = f"""
+import importlib.util,json,os,signal,sys
+from pathlib import Path
+sys.path.insert(0,{str(ROOT / 'scripts')!r})
+spec=importlib.util.spec_from_file_location('receiver',{str(source)!r})
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.STATE=Path({str(self.state)!r})
+c={c!r}
+bundle={self.bundles[1]!r}
+original=m.private_write
+count=0
+def interrupted(path,data,metadata=None):
+    global count
+    original(path,data,metadata)
+    if path.name in ('fullchain.pem','privkey.pem'):
+        count+=1
+        if count=={writes}:os.kill(os.getpid(),signal.SIGKILL)
+m.private_write=interrupted
+# Syntax validation uses the real certificate/key checks, so a torn pair is
+# fatal unless the journal is restored before the normal Nginx preflight.
+def nginx(config,*args):
+    folder=Path(config['certificate_directory'])/'live/auth.example.invalid'
+    current={{'environment':'production','certificates':{{'auth.example.invalid':{{
+        'fullchain':(folder/'fullchain.pem').read_text(),
+        'private_key':(folder/'privkey.pem').read_text()}}}}}}
+    metadata=m.validate_bundle(current,'production',config['lineages'])
+    if args==('-s','reload'):Path({str(served_generation)!r}).write_text(json.dumps(metadata))
+m.nginx=nginx
+m.install(c,bundle)
+"""
+                child = subprocess.run([sys.executable, '-c', program], capture_output=True, text=True)
+                self.assertEqual(child.returncode, -signal.SIGKILL, child.stdout + child.stderr)
+                journal = self.state / 'activation.json'
+                self.assertTrue(journal.exists())
+                self.assertEqual(journal.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(json.loads(served_generation.read_text()), old_metadata)
+                with self.assertRaisesRegex(RuntimeError, 'redelivery'):
+                    receiver.verify_installed(c)
+                events = []
+                def nginx(config, *args):
+                    installed = {'environment': 'production', 'certificates': {'auth.example.invalid': {
+                        'fullchain': paths[0].read_text(), 'private_key': paths[1].read_text()}}}
+                    metadata = material.validate_bundle(installed, 'production', self.lineages)
+                    events.append(args)
+                    if args == ('-s', 'reload'):
+                        served_generation.write_text(json.dumps(metadata))
+                def served(config, metadata):
+                    self.assertEqual(json.loads(served_generation.read_text()), metadata)
+                with patch.object(receiver, 'nginx', side_effect=nginx), patch.object(receiver, 'served', side_effect=served):
+                    result = receiver.install(c, self.bundles[1])
+                    self.assertTrue(result['verified_served_certificate'])
+                    self.assertFalse(receiver.install(c, self.bundles[1])['changed'])
+                self.assertEqual(events.count(('-s', 'reload')), 2)
+                self.assertFalse(journal.exists())
+                self.assertEqual([path.stat().st_mode & 0o777 for path in paths], [0o640, 0o640])
+
+    def test_activation_rollback_failure_keeps_durable_intent_and_contract_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c = self.config(Path(directory))
+            receiver.install(c, self.bundles[0], bootstrap=True)
+            with patch.object(receiver, 'nginx', side_effect=lambda config, *args:
+                              (_ for _ in ()).throw(RuntimeError('reload failed')) if args == ('-s', 'reload') else None):
+                with self.assertRaisesRegex(RuntimeError, 'reload failed'):
+                    receiver.install(c, self.bundles[1])
+            journal = self.state / 'activation.json'
+            self.assertTrue(journal.exists())
+            with patch.object(receiver, 'nginx') as nginx:
+                with self.assertRaisesRegex(ValueError, 'contract'):
+                    receiver.install({**c, 'app_directory': c['app_directory'] + '-other'}, self.bundles[1])
+                nginx.assert_not_called()
+            with patch.object(receiver, 'nginx'), patch.object(receiver, 'served'):
+                # Returning to the original desired bundle still reports the
+                # interrupted transaction repair as a change.
+                self.assertTrue(receiver.install(c, self.bundles[0])['changed'])
+                self.assertTrue(receiver.install(c, self.bundles[1])['verified_served_certificate'])
+            self.assertFalse(journal.exists())
 
     def test_import_requests_bootstrap_only_for_explicit_bootstrap_inventory(self):
         tasks=yaml.safe_load((ROLES/'controller_tls/tasks/main.yml').read_text())

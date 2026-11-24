@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Fixed root TLS receiver. The renewal account cannot choose paths or commands."""
+import base64
 import fcntl
 from contextlib import contextmanager, ExitStack
 import hashlib
@@ -43,6 +44,14 @@ def renewal_admission(timeout=900):
         yield
 
 
+def sync_directory(path):
+    descriptor = os.open(path, os.O_RDONLY | os.O_DIRECTORY | os.O_NOFOLLOW)
+    try:
+        os.fsync(descriptor)
+    finally:
+        os.close(descriptor)
+
+
 def private_write(path, data, metadata=None):
     with tempfile.NamedTemporaryFile(dir=path.parent, prefix='.tls-', delete=False) as stream:
         temp = Path(stream.name)
@@ -56,7 +65,9 @@ def private_write(path, data, metadata=None):
                 os.fchmod(stream.fileno(), mode)
             else:
                 os.fchmod(stream.fileno(),0o600)
+            os.fsync(stream.fileno())
             temp.replace(path)
+            sync_directory(path.parent)
         finally:
             temp.unlink(missing_ok=True)
 
@@ -133,6 +144,8 @@ def verify_served(c, metadata):
 
 
 def verify_installed(c):
+    if load_activation(c) is not None:
+        raise RuntimeError('Interrupted TLS activation requires bundle redelivery')
     root=Path(c['certificate_directory'])
     if root.is_symlink() or (root/'live').is_symlink():
         raise ValueError('Certificate directories cannot be symlinks')
@@ -148,15 +161,127 @@ def verify_installed(c):
     return {'passed':True,'verified_served_certificate':True}
 
 
+def activation_path():
+    info = STATE.lstat()
+    if (not stat.S_ISDIR(info.st_mode) or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o700):
+        raise PermissionError('Private receiver state directory required')
+    return STATE / 'activation.json'
+
+
+def activation_contract(c):
+    return hashlib.sha256(json.dumps(c, sort_keys=True).encode()).hexdigest()
+
+
+def save_activation(c, paths, verify_runtime):
+    entries = []
+    root = Path(c['certificate_directory'])
+    for path, _, previous, metadata, link_owner in paths:
+        kind, data = previous
+        entries.append({'path': str(path.relative_to(root)), 'kind': kind,
+                        'data': base64.b64encode(data).decode() if kind == 'file' else data,
+                        'metadata': metadata, 'link_owner': link_owner})
+    journal = {'version': 1, 'contract': activation_contract(c),
+               'phase': 'restore-before-retry', 'verify_runtime': verify_runtime,
+               'previous': entries}
+    payload = json.dumps(journal).encode()
+    if len(payload) > 4 * MAX_BYTES:
+        raise ValueError('TLS activation snapshot exceeds the private journal limit')
+    private_write(activation_path(), payload)
+
+
+def load_activation(c):
+    path = activation_path()
+    if not path.exists() and not path.is_symlink():
+        return None
+    info = path.lstat()
+    if (not stat.S_ISREG(info.st_mode) or info.st_uid != os.geteuid()
+            or stat.S_IMODE(info.st_mode) != 0o600 or info.st_size > 4 * MAX_BYTES):
+        raise PermissionError('Invalid private TLS activation journal')
+    journal = json.loads(path.read_text())
+    if (set(journal) != {'version', 'contract', 'phase', 'verify_runtime', 'previous'}
+            or journal['version'] != 1 or journal['contract'] != activation_contract(c)
+            or journal['phase'] != 'restore-before-retry'
+            or type(journal['verify_runtime']) is not bool):
+        raise ValueError('TLS activation journal does not match the receiver contract')
+    expected = {f'live/{name}/{filename}' for name in c['lineages']
+                for filename in ('fullchain.pem', 'privkey.pem')}
+    entries = journal['previous']
+    if (not isinstance(entries, list) or len(entries) != len(expected)
+            or any(not isinstance(entry, dict) or
+                   set(entry) != {'path', 'kind', 'data', 'metadata', 'link_owner'}
+                   for entry in entries)
+            or {entry['path'] for entry in entries} != expected):
+        raise ValueError('Invalid TLS activation entries')
+    for entry in entries:
+        kind, data, metadata, owner = (entry[key] for key in ('kind', 'data', 'metadata', 'link_owner'))
+        if kind not in ('absent', 'file', 'link'):
+            raise ValueError('Invalid TLS activation snapshot')
+        if kind == 'absent':
+            if any(value is not None for value in (data, metadata, owner)):
+                raise ValueError('Invalid absent TLS snapshot')
+            continue
+        if (not isinstance(metadata, list) or len(metadata) != 3
+                or any(type(value) is not int or value < 0 for value in metadata)
+                or metadata[0] > 0o7777):
+            raise ValueError('Invalid TLS snapshot metadata')
+        if kind == 'file':
+            if not isinstance(data, str) or owner is not None:
+                raise ValueError('Invalid TLS file snapshot')
+            entry['data'] = base64.b64decode(data, validate=True)
+        elif (not isinstance(data, str) or not data or not isinstance(owner, list)
+              or len(owner) != 2 or any(type(value) is not int or value < 0 for value in owner)
+              or not (Path(c['certificate_directory']) / entry['path']).parent.joinpath(data).resolve().is_relative_to(
+                  Path(c['certificate_directory']).resolve())):
+            raise ValueError('Invalid TLS link snapshot')
+    return journal
+
+
+def clear_activation():
+    activation_path().unlink()
+    sync_directory(STATE)
+
+
+def restore_activation(c, journal):
+    # This operation is idempotent. Keep the journal until the entire previous
+    # generation is back and Nginx has accepted it; a second interruption retries.
+    root = Path(c['certificate_directory'])
+    for entry in reversed(journal['previous']):
+        path = root / entry['path']
+        kind, data = entry['kind'], entry['data']
+        if kind == 'link':
+            path.unlink(missing_ok=True)
+            path.symlink_to(data)
+            if (path.lstat().st_uid, path.lstat().st_gid) != tuple(entry['link_owner']):
+                os.lchown(path, *entry['link_owner'])
+            sync_directory(path.parent)
+        elif kind == 'file':
+            private_write(path, data, entry['metadata'])
+        elif path.exists() or path.is_symlink():
+            path.unlink()
+            sync_directory(path.parent)
+    if journal['verify_runtime']:
+        nginx(c, '-t')
+        nginx(c, '-s', 'reload')
+    clear_activation()
+
+
 def install(c, bundle, bootstrap=False, prepare=False):
     metadata = validate_bundle(bundle,c['environment'],c['lineages'])
     root = Path(c['certificate_directory'])
     if root.is_symlink() or (root/'live').is_symlink():
         raise ValueError('Certificate directories cannot be symlinks')
+    for name in c['lineages']:
+        if (root/'live'/name).is_symlink():
+            raise ValueError('Certificate lineage cannot be a symlink')
+    pending = load_activation(c)
+    if pending is not None:
+        # A previous process may have left a torn pair or unactivated new files.
+        # Restore before the normal preflight, which cannot parse a torn pair.
+        restore_activation(c, pending)
     paths = []
     for name, item in bundle['certificates'].items():
         folder = root/'live'/name
-        if folder.is_symlink():raise ValueError('Certificate lineage cannot be a symlink')
         for filename, key in [('fullchain.pem','fullchain'),('privkey.pem','private_key')]:
             path = folder/filename
             previous = snapshot(path,root)
@@ -166,15 +291,15 @@ def install(c, bundle, bootstrap=False, prepare=False):
             link_owner = (link.st_uid, link.st_gid) if link else None
             paths.append((path,item[key].encode(),previous,file_metadata,link_owner))
     changed = any(not path.is_file() or path.read_bytes()!=data for path,data,_,_,_ in paths)
-    # Bootstrap may stop after import or after starting only part of ingress.
-    # Identical material needs no mutation while that first deployment resumes.
-    # Managed imports and any rotation retain live validation and rollback.
+    # An empty bootstrap can stop before ingress exists. Identical prepare
+    # imports defer runtime checks until Compose has repaired stopped backends.
     initial = bootstrap and (not changed or all(previous[0]=='absent' for _,_,previous,_,_ in paths))
-    # Unchanged material can wait for the application's activation phase to
-    # repair stopped backends before Nginx resolves their Docker DNS names.
     verify_runtime = not (initial or (prepare and not changed))
     if verify_runtime:
         nginx(c,'-t')
+    if changed:
+        # Persist every original and its metadata before the first replacement.
+        save_activation(c, paths, verify_runtime)
     try:
         if changed:
             for path,data,_,file_metadata,_ in paths:
@@ -186,17 +311,11 @@ def install(c, bundle, bootstrap=False, prepare=False):
             verify_served(c,metadata)
     except Exception:
         if changed:
-            for path,_,previous,file_metadata,link_owner in reversed(paths):
-                kind,data = previous
-                if kind=='link':
-                    path.unlink(missing_ok=True);path.symlink_to(data)
-                    if (path.lstat().st_uid, path.lstat().st_gid) != link_owner:
-                        os.lchown(path,*link_owner)
-                elif kind=='file':private_write(path,data,file_metadata)
-                else:path.unlink(missing_ok=True)
-            nginx(c,'-t');nginx(c,'-s','reload')
+            restore_activation(c, load_activation(c))
         raise RuntimeError('TLS deployment failed; previous certificate files restored') from None
-    return {'passed':True,'changed':changed,'bootstrap_only':initial,
+    if changed:
+        clear_activation()
+    return {'passed':True,'changed':changed or pending is not None,'bootstrap_only':initial,
             'verified_served_certificate':verify_runtime,
             'sha256':{name:item['sha256'] for name,item in metadata.items()}}
 

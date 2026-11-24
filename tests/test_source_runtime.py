@@ -220,6 +220,7 @@ class SourceRuntimeTest(unittest.TestCase):
             events = []
             def command(argv, output=None, timeout=300):
                 events.append(argv)
+                if '--format' in argv: return backups.writer_status()
                 if 'ps' in argv:
                     return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv:

@@ -42,6 +42,7 @@ class FinalizationTest(unittest.TestCase):
                 self.events.append('release'); self.locked = False
         w.capture_guard.side_effect = guard
         self.finalize = controller.Finalization(w, str(self.identity))
+        self.finalize.preflight = Mock()
         self.point = {'id': '20261119T040000Z-abcdef123456', 'sha256': 'a' * 64}
 
     def receipt(self):
@@ -103,7 +104,8 @@ class FinalizationTest(unittest.TestCase):
 
     def test_schedule_observation_requires_the_verified_point(self):
         f = self.finalize; f.point = self.point; f.prefix = Mock(); f.request = Mock()
-        state = {'manifest': self.point, 'intent': False, 'timer': {'ActiveState': 'active'}}
+        state = {'manifest': self.point, 'intent': False,
+                 'timer': {'ActiveState': 'active', 'UnitFileState': 'enabled'}}
         f.remote = Mock(return_value=state)
         f.enable_schedule()
         f.request.assert_called_once_with('hou1', 'activate-timer', expected=self.point)
@@ -170,6 +172,64 @@ class FinalizationTest(unittest.TestCase):
         f.remote.side_effect = [state, f.remote.return_value, f.remote.return_value, f.remote.return_value]
         f.collect()
 
+    def test_stale_uncollected_resume_fails_before_reconciliation(self):
+        f = self.finalize; f.point = self.point
+        f.remote = Mock(side_effect=[{'configured': True, 'manifest': self.point, 'exportable': False},
+                                     {'points': {}}])
+        f.preflight = lambda: controller.Finalization.preflight(f)
+        with self.assertRaisesRegex(ValueError, 'stale and uncollected'):
+            f.execute()
+        self.workflow.playbook.assert_not_called()
+
+    def test_stale_resume_reuses_exact_committed_copy(self):
+        f = self.finalize; f.point = self.point
+        f.remote = Mock(side_effect=[{'configured': True, 'manifest': self.point, 'exportable': False},
+                                     {'points': {self.point['id']: {'manifest': self.point}}}])
+        controller.Finalization.preflight(f)
+        self.assertEqual(f.point, self.point)
+
+    def test_new_attempt_refreshes_stale_point_once_and_binds_new_point(self):
+        stale = {'manifest': self.point, 'recipient': 'age1fixture', 'intent': False, 'exportable': False,
+                 'status': {'last_success': 123}, 'service': {'ActiveState': 'inactive', 'Result': 'success'}}
+        fresh = {**stale, 'manifest': {**self.point, 'id': 'fresh-point'}, 'exportable': True}
+        f = self.finalize; f.prefix = Mock(); f.request = Mock()
+        f.remote = Mock(side_effect=[stale, stale, fresh])
+        with patch.object(controller.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'age1fixture\n')), \
+                patch.object(controller.time, 'sleep'):
+            f.capture_initial()
+        f.request.assert_called_once_with('hou1', 'capture', expected=self.point)
+        self.assertEqual(f.point, fresh['manifest'])
+
+    def test_public_execute_initializes_empty_source_before_first_capture(self):
+        f = self.finalize
+        f.preflight = lambda: controller.Finalization.preflight(f)
+        f.prefix = Mock(); requests = []; initialized = False; captured = False
+        state = {'manifest': None, 'recipient': 'age1fixture', 'intent': False, 'exportable': False,
+                 'status': {'last_success': 0}, 'service': {'ActiveState': 'inactive', 'Result': 'success'}}
+        def play(role, path, name, **kwargs):
+            nonlocal initialized
+            if name == 'backup-source-initialize':
+                initialized = True
+        def remote(role, operation, **kwargs):
+            nonlocal captured
+            if operation == 'source-preflight':
+                return {'configured': False}
+            if operation == 'source-status':
+                self.assertTrue(initialized)
+                return {**state, 'manifest': self.point, 'status': {'last_success': 123}} if captured else state
+            if operation == 'ensure-capture':
+                self.assertTrue(initialized); self.assertFalse(self.locked)
+                self.assertIsNone(state['manifest']); captured = True; requests.append(operation)
+                return state
+            self.fail('unexpected operation ' + operation)
+        f.remote = Mock(side_effect=remote); self.workflow.playbook.side_effect = play
+        f.wait_access = Mock(); f.collect = Mock(); f.verify_offline = Mock(); f.enable_schedule = Mock()
+        with patch.object(controller.subprocess, 'run', return_value=subprocess.CompletedProcess([], 0, 'age1fixture\n')):
+            f.execute()
+        self.assertEqual(requests, ['ensure-capture'])
+        self.assertEqual(f.point, self.point)
+        f.collect.assert_called_once(); f.verify_offline.assert_called_once(); f.enable_schedule.assert_called_once()
+
     def test_older_scheduled_transfer_finishes_before_selected_point_is_requested(self):
         f = self.finalize; f.point = self.point; f.prefix = Mock()
         old_active = {'points': {}, 'partials': ['.incoming-old'],
@@ -230,7 +290,7 @@ class InitializationRuntimeTest(unittest.TestCase):
         state = {'manifest': point, 'status': {'last_success': 123}, 'intent': False}
         contract = {**self.contract('hou1', 'activate-timer'), 'expected': point}
         self.assertEqual(self.run_remote(contract, state),
-                         [['systemctl', 'start', 'hou1-backup-prepare.timer']])
+                         [['systemctl', 'enable', '--now', 'hou1-backup-prepare.timer']])
         for change in ({'manifest': {'id': 'other'}}, {'status': {'last_success': 0}}, {'intent': True}):
             with self.subTest(change=change), self.assertRaisesRegex(ValueError, 'verified source point'):
                 self.run_remote(contract, {**state, **change})
@@ -258,3 +318,31 @@ class InitializationRuntimeTest(unittest.TestCase):
                 (root / 'last-export.json').write_text(json.dumps({'last_success': 123}))
                 with self.assertRaisesRegex(ValueError, 'point is missing'):
                     runtime.source_state(allow_empty=True)
+
+    def test_source_preflight_allows_unconfigured_host_and_checks_export_window(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder); config = root / 'source.json'
+            with patch.object(runtime, 'SOURCE', config):
+                self.assertEqual(runtime.source_state(allow_empty=True, allow_unconfigured=True), {'configured': False})
+            config.write_text(json.dumps(dict(environment='test', work_root='/var/lib/hou1-backup', recipient='age1fixture')))
+            (root / 'last-export.json').write_text(json.dumps({'last_success': 123}))
+            original_path = Path
+            def mapped(value):
+                return root if value == '/var/lib/hou1-backup' else original_path(value)
+            with patch.object(runtime, 'SOURCE', config), patch.object(runtime, 'Path', side_effect=mapped), \
+                    patch.object(runtime, 'unit', return_value={}), patch.object(runtime.time, 'time', return_value=30000):
+                for created, expected in [(8400, True), (8399, False), (30060, True), (30061, False)]:
+                    (root / 'ready.export').write_text(json.dumps({'created': created}) + '\nsynthetic ciphertext')
+                    with self.subTest(created=created):
+                        self.assertIs(runtime.source_state()['exportable'], expected)
+
+    def test_fresh_capture_request_requires_unchanged_previous_point(self):
+        point = {'id': 'prior-point'}
+        state = {'manifest': point, 'status': {'last_success': 123}, 'intent': False,
+                 'service': {'ActiveState': 'inactive'}}
+        contract = {**self.contract('hou1', 'capture'), 'expected': {'id': 'changed'}}
+        with self.assertRaisesRegex(ValueError, 'Source point changed'):
+            self.run_remote(contract, state)
+        contract['expected'] = point
+        self.assertEqual(self.run_remote(contract, state),
+                         [['systemctl', 'start', '--no-block', 'hou1-backup-prepare.service']])

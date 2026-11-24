@@ -136,6 +136,12 @@ the declared controller /32.
 Review the protected restore report, certificate report and diagnostics. Saved
 certificate/key pairs must still cover the declared hostnames and be unexpired;
 missing/expired material stops preparation, rather than weakening TLS checks.
+Certificate restoration deliberately normalizes ownership to root:root, with
+`0750` directories and `0640` files; lineage symlinks remain intact. The supported
+Nginx master loads keys as root. Archive UIDs and custom group-reader permissions
+are not restored. Apply an explicitly reviewed consumer policy before using a
+custom non-root certificate reader.
+
 Production reinstalls only `live` and `archive` certificate lineages; controller
 ACME accounts, DNS credentials and renewal hooks are not reinstalled as runtime
 configuration. Reestablish [controller TLS renewal](controller-tls.md) separately.
@@ -214,6 +220,25 @@ same publication playbook with `host_recovery_resume: true`. Initial runs keep
 that option `false`. A latched `first-error.json`, missing/foreign publication
 checkpoint or changed request still stops recovery; resume does not bypass the
 restore engine's failure protections.
+
+Publication saves private Compose originals and the exact firewall additions in
+`publication-intent.json` before changing bindings. A caught failure stops ingress,
+restores loopback bindings and removes only this attempt's tagged UFW additions;
+pre-existing allows remain. A process crash can leave these changes pending until
+reentry or cleanup. Through the existing independent root management path, run:
+
+```bash
+sudo python3 /var/lib/hou1-host-recovery/<id>/restore.py recover-publication
+```
+
+This action validates the retained request and intent, stops restored ingress,
+restores private bindings and retries owned firewall cleanup. It preserves the
+error latch and refuses a successful publication checkpoint; it cannot publish
+or resume the failed attempt. If cleanup reports failure, preserve its journal,
+repair the stated stop/firewall problem and repeat cleanup only. After cleanup,
+retain diagnostics and use a fresh host and recovery ID. The owner must still
+resolve unrelated pre-existing firewall allows through their normal management
+procedure. No WAN reachability is inferred from a guest binding alone.
 
 Before deletion, `peer-handoff.json` pins the lost ID/name/address, environment,
 management URL and exact group/policy plan. A missing old peer is accepted only

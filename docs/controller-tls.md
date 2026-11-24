@@ -168,6 +168,18 @@ receiver restores original file content or symlinks if validation after install,
 reload or served verification fails. Rotation preserves existing certificate-file
 permissions and ownership; rollback also restores symlink ownership. New files
 remain private. This retains access granted to existing certificate consumers.
+Before replacing files, the receiver owns a root-only, fsynced
+`/var/lib/hou1-tls/activation.json` journal containing the prior generation and
+metadata, bound to its receiver configuration. If the process dies between writes
+or before reload, redeliver the bundle through the existing controller command.
+The receiver first restores and activates the prior generation, then retries the
+delivery and verifies the served fingerprint. Interrupted rollback retains the
+journal for another delivery; configuration mismatch refuses recovery. Preserve
+this private journal until recovery succeeds. Standalone verification refuses a
+pending activation rather than reporting completion.
+Backup capture checks this journal under the shared lock and refuses to replace
+the previous point until redelivery repairs the certificate generation.
+
 For operator rollback, stop the selected
 timer, select the reviewed previous encrypted bundle, and import it through the
 same administrative Ansible path. Validate the current certificate's remaining
