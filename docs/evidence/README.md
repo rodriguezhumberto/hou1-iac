@@ -7,6 +7,7 @@ private logs, plaintext inputs and credentials outside Git.
 
 | Topic | Report |
 | --- | --- |
+| Nginx security source and production-release distinction | [Dated release metadata, 2026-11-24](nginx-release-status-2026-11-24.md) |
 | Interrupted TLS activation, native firewall cleanup and recovered offboarding | [Targeted operational failure paths, 2026-11-24](operational-failure-paths-2026-11-24.md) |
 | Standalone finalization from an empty backup source | [First capture and resulting-point restore, 2026-11-24](standalone-first-capture-2026-11-24.md) |
 | Restore from an off-host collected point | [Constrained component recovery, 2026-11-24](collected-point-restore-2026-11-24.md) |

@@ -61,7 +61,7 @@ backup freshness; and request/login metrics. Configure separate production
 synthetic identities and enable the [environment-bound login probe](probes/staff-login-probe.md)
 before relying on end-to-end login monitoring. Repeat affected checks after
 routing/receiver changes and keep rehearsal-only guards intact. See the
-[production status](production-oidc-runbook.md#production-status) for accepted
+[dated production acceptance](production-oidc-runbook.md#dated-production-acceptance) for accepted
 results and remaining validation limits.
 
 For rollback, remove the HOU1 scrape job and disable its HOU4 rule switches,

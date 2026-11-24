@@ -2,9 +2,9 @@
 
 Commands run from the repository root. Executable programs remain in `scripts/`
 and their owning Ansible roles; this folder holds their procedures.
-An isolated HOU1/HOU4 lab is available; see its
-[deployment evidence](../evidence/isolated-lab-2026-11-17.md). These procedures
-still contain older fixture aliases; check their targets before use. See
+The isolated HOU1/HOU4 lab's recorded acceptance is summarized in
+[current status](../cleanup-plan.md). Some fixed-fixture tools retain older
+aliases enforced by their code; check their targets before use. See
 [environment targeting](../development.md#environment-targeting).
 Direct-SSH tools require [explicit destinations and host-key pins](rehearsal-targets.md).
 

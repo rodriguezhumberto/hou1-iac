@@ -1,4 +1,4 @@
-# Application lifecycle work
+# Application lifecycle contract
 
 Make application health and recovery portable between Compose and Kubernetes.
 Keep orchestration-specific behavior in deployment configuration.
@@ -7,8 +7,8 @@ Keep orchestration-specific behavior in deployment configuration.
 
 - Preserve `/api/health.json` as a basic process/HTTP check. It must remain
   reachable when local storage is unavailable.
-- Add `/api/ready.json`: return 200 when startup is complete and required local
-  database/media storage is usable; otherwise return 503. Responses disclose no
+- `/api/ready.json` returns 200 when startup is complete and required local
+  database/media storage is usable; otherwise it returns 503. Responses disclose no
   paths, credentials, identity settings or raw errors and are never cached.
 - Identity, CAPTCHA and notification providers are feature dependencies. Their
   outages must not make the whole application fail readiness.
@@ -17,7 +17,10 @@ Keep orchestration-specific behavior in deployment configuration.
 - On termination, stop admitting work, report unready, drain existing requests
   within a fixed deadline, then close local resources.
 
-## Work order
+## Implementation sequence
+
+The following sequence was implemented in application PR #69; it is retained
+as the design rationale rather than an outstanding task list.
 
 1. Extract startup/storage ownership from middleware into a small runtime module.
    Keep authentication, data paths, schema and request behavior compatible.
@@ -33,9 +36,10 @@ Keep orchestration-specific behavior in deployment configuration.
 
 ## Current implementation
 
-Application PR #69 merged this contract as `463a28b`; its trusted release is
-deployed to the isolated lab. The application's `docs/application-lifecycle.md`
-maps runtime ownership and supported launch.
+Application PR #69 introduced this contract as `463a28b`, used by the recorded
+lab acceptance. It is also included in the later v0.3.0 source release;
+that tag does not select new lab deployment inputs. The application's
+`docs/application-lifecycle.md` maps runtime ownership and supported launch.
 Deployment verification validates declared capabilities and checks readiness;
 older releases retain their existing checks. See the
 [validation record](evidence/application-lifecycle-2026-11-17.md).
@@ -47,10 +51,9 @@ legacy container checks.
 
 ## Deployment boundary
 
-Test-host deployment is authorized for this work. Keep production, unrelated
-working-tree edits and historical evidence intact. New application source still
-needs a matching trusted CI image/receipt before managed-host deployment; local
-images must not be relabeled as CI artifacts.
+New application source needs a matching trusted CI image/receipt before
+managed-host deployment. Source release publication does not update the selected
+private deployment inputs. Local images must not be relabeled as CI artifacts.
 
 ## Kubernetes mapping
 

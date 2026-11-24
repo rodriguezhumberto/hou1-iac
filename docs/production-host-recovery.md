@@ -4,11 +4,13 @@ The production entry points share the test restore engine but require an explici
 production contract. Keep test-only restore, publication and component-drill guards
 intact. This procedure does not authorize a wipe or website traffic cutover.
 
-## Latest live result
+## Dated production recovery result
 
 The [November 12 recovery](evidence/production-host-recovery-2026-11-12.json)
 completed a clean-OS restore and operational handoff with corrections. An
 uninterrupted run remains unproven: [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+Later [uninterrupted lab recovery](evidence/uninterrupted-identity-replay-2026-11-23.md)
+passed for its recorded test environment; it is not another production run.
 The recorded run needed these manual corrections:
 
 - Correct controller bootstrap/host-key settings and resume the security role.

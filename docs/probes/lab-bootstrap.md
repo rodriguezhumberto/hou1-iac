@@ -26,8 +26,9 @@ Keep cloud-init instance identity stable across user-data edits. When adopting
 explicit metadata on an existing VM, preserve its current effective instance ID;
 changing it can rerun first-boot tasks and rotate SSH keys on the next reboot.
 
-The current small lab uses a 5 GiB balloon minimum, 6 GiB maximum and 2 GiB guest
-swap for each HOU1 VM; HOU4 stays at 4 GiB. See the
+The recorded small-lab profile used a 5 GiB balloon minimum, 6 GiB maximum and
+2 GiB guest swap for each HOU1 VM, with HOU4 at 4 GiB. Recheck the selected
+provisioning inputs and available capacity before another run. See the
 [measured workload and limits](../evidence/reduced-memory-2026-11-19.md).
 Budget physical-host capacity for both maxima and hypervisor overhead.
 

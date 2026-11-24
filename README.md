@@ -75,10 +75,12 @@ path. See [NetBird operations](docs/netbird-operations.md).
 
 The current HOU1/HOU4 lab uses a privately configured namespace and a separate VPN
 account. Default test groups stay empty; private inventories select the hosts.
-Fresh-host bootstrap and unchanged reconciliation passed from frozen inputs;
-see the [rebuild evidence](docs/evidence/lab-bootstrap-2026-11-19.md).
-The managed workflow and failure matrix now serialize capture with deployment;
-see the [coordination acceptance](docs/evidence/capture-coordination-2026-11-19.md).
+Recorded acceptance includes [fresh replacement, repeat and reboot](docs/evidence/uninterrupted-identity-replay-2026-11-23.md),
+[standalone first capture and collected-point restore](docs/evidence/standalone-first-capture-2026-11-24.md),
+and [targeted interruption recovery](docs/evidence/operational-failure-paths-2026-11-24.md).
+The [current status](docs/cleanup-plan.md) distinguishes these lab results from
+production and controller-replacement gates. The managed workflow and failure
+matrix serialize capture with deployment, identity admission and TLS delivery.
 See the [intervention audit](docs/deployment-interventions.md) and
 [deployment workflow](docs/deployment-workflow.md) for coordinated reconciliation
 and isolated controller transport. The [bootstrap procedure](docs/probes/lab-bootstrap.md)

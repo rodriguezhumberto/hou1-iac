@@ -2,8 +2,11 @@
 
 `scripts/deploy-lab.py` coordinates the existing HOU1 and HOU4 playbooks. It
 supports existing test hosts on `100.91.0.0/16`, with controller-managed HOU1 TLS.
-It does not bootstrap hosts, enroll the controller, change public DNS, seed identities,
-deploy Authentik/control-plane changes or run destructive acceptance drills.
+Reconciliation includes declared identity admission through its existing role,
+including preprovisioned Google users and explicit application/VPN grants.
+Initial Authentik/control-plane bootstrap and synthetic password seeding use
+separate playbooks. This workflow does not install a fresh OS, enroll the
+controller, change public DNS or run destructive acceptance drills.
 Bootstrap and enrollment gaps are assigned in the [intervention audit](deployment-interventions.md).
 The separate [fresh lab procedure](probes/lab-bootstrap.md) orders bootstrap
 playbooks, peer enrollment and the managed handoff.

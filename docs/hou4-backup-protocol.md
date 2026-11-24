@@ -179,3 +179,9 @@ power cut was not tested. [Original component restore](evidence/hou1-recovery-re
 [owner decryption](evidence/owner-recovery-access-2026-11-12.json) are separate
 results. The production run needed corrections; uninterrupted automation remains
 [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+
+Later [standalone first-capture acceptance](evidence/standalone-first-capture-2026-11-24.md)
+passed from an empty lab backup source, then restored its newly collected point
+into isolated services. The [collected-point drill](evidence/collected-point-restore-2026-11-24.md)
+records the constrained service-restore gate. These lab results close those
+specific evidence gaps without relabelling the earlier production run.

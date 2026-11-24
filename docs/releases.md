@@ -16,6 +16,15 @@ move or reuse them. Record the tested refs/digest, previous compatible release,
 backup ID, validation and approval before deployment. A merged PR or published
 image does not change a running node.
 
+## Source and production records
+
+The [November 24 Nginx record](evidence/nginx-release-status-2026-11-24.md)
+distinguishes the existing v0.2.2 maintenance hotfix, its recorded November 22
+production image update, and the later v0.3.0 main-line application source release.
+The main-line release includes additional features; it does not prove that those
+features were deployed. Frozen deployment inputs and retained recovery points
+continue to select their original source/image bindings until explicitly changed.
+
 ## Deployment and rollback
 
 From the pinned infrastructure checkout, run the established-host deployment with

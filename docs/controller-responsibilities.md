@@ -3,8 +3,8 @@
 The controller is an operations host and its installed automation. The coding
 agent develops, tests and invokes that automation within the owner's authorized
 scope. Scheduled operations must work without an agent, conversation or editor.
-The current coding-agent host temporarily serves both roles. Continue recovery
-work there; move controller duties in a separate, recorded handoff afterward.
+The current coding-agent host temporarily serves both roles. It remains the
+operational controller until a separate, recorded handoff completes.
 
 ## Responsibilities and boundaries
 
@@ -39,17 +39,19 @@ with the owner. Moving automation does not transfer those decisions to an agent.
 
 ## Current coupling to remove later
 
-The current host runs both test and production renewal/status jobs, plus test
-identity admission. An active test alert receiver and inactive legacy units also
-exist. Inventory installed units and their actual enabled/running state before
+The recorded controller inventory includes test and production renewal/status
+jobs, test identity admission, a test alert receiver and inactive legacy units.
+Inventory installed units and their actual enabled/running state before
 selecting a migration scope; filenames alone do not establish current ownership.
 Production duties need their own continuity plan even when the recovery drill is
 test-only.
 
 Current dependencies include private absolute paths, installed program copies,
 root-owned fixed launchers/sudoers, the persistent user manager, Docker namespaces,
-SSH-agent availability and clean pinned repositories. Tooling currently selected
-under `/tmp` and jobs reading this development checkout are migration debts.
+SSH-agent availability and clean pinned repositories. Recheck each job's actual
+tooling and import paths: temporary installations and jobs reading a development
+checkout are migration debts. Later foreground recovery runs used tooling under
+private persistent state, which does not prove every scheduled job was migrated.
 Prepare durable tool installations and dedicated operational checkouts so editing
 code or ending an agent session cannot invalidate recurring jobs. Keep the
 existing public commands and recovery formats when changing installation paths.
@@ -102,8 +104,8 @@ records the latest boundary.
    attempts separately from successful acceptance.
 
 The accepted VM225 restore/reboot does not establish controller replacement.
-Continue remaining recovery acceptance from the current host; full controller
-separation remains future work. Reusing the accepted host point does not require
+Existing controller duties remain on the current host until the separate
+migration is accepted. Reusing the accepted host point does not require
 another VM225 reinstall merely to document or migrate controller responsibilities.
 
 Use [managed workflow](deployment-workflow.md), [input contracts](lab-inputs.md),

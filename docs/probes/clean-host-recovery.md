@@ -11,20 +11,23 @@ commands. See [production replacement recovery](../production-host-recovery.md) 
 the separate environment-bound entry points. Keep HOU4 and its retained backups
 intact.
 
-[Clean CI-image evidence](../evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
-records completed test restore, handoff and reboot. Earlier failed attempts and
-continued-host repairs remain separate historical reports; see
-[evidence](../evidence/README.md). A repaired-host
-result does not establish an uninterrupted run. See the production recovery
-guide for the separate production acceptance requirements.
+The [uninterrupted identity replay](../evidence/uninterrupted-identity-replay-2026-11-23.md)
+accepted test restore, publication, unchanged repeat and reboot with the final
+identity inputs and owner-confirmed external access. The later
+[standalone finalization](../evidence/standalone-first-capture-2026-11-24.md)
+accepted an empty backup source and service restore of its resulting point.
+Earlier failed attempts and continued-host repairs retain their original scope
+in [evidence](../evidence/README.md). These lab results do not establish the
+separate production acceptance requirements.
 
 Use an isolated replacement VM with reviewed inventory and identities. The
 [disposable restore gate](../evidence/clean-restore-2026-11-19.md) verifies the
 point and PostgreSQL import without changing either current VM; it does not
 release the fresh-VM wipe checkpoint below.
-The later [quarantined VM run](../evidence/quarantined-recovery-2026-11-19.md)
+The earlier [quarantined VM run](../evidence/quarantined-recovery-2026-11-19.md)
 accepted cold startup and local application/identity behavior on a separate VM,
 with peer handoff and companion transport deliberately deferred.
+Those exclusions describe that earlier run, not the later full replacement result.
 Use the [lab handoff plan](lab-peer-handoff.md) before replacing the active lab.
 
 ## Before wiping HOU1
