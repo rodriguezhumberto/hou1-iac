@@ -348,3 +348,13 @@ records owner-confirmed Google/staff login and SSH, declared base permissions,
 and all four automated interruption scenarios on the updated identity revision.
 Fresh empty-host replay with those final inputs is the next recovery acceptance
 step; controller replacement and certificate rotation/rollback remain separate.
+
+The [accepted identity replay](evidence/uninterrupted-identity-replay-2026-11-23.md)
+closed fresh-host acceptance with the final identity inputs and owner-confirmed
+external access. Subsequent [scheduled identity outage acceptance](evidence/scheduled-identity-outage-2026-11-24.md)
+and [TLS lifecycle acceptance](evidence/tls-lifecycle-2026-11-24.md) exercised normal
+timer retry, changed certificates and injected reload-failure rollback. The latter
+retains its failed attempt and certificate-metadata fix separately. Controller
+replacement/reboot and human-client automatic reconnection remain distinct checks.
+[Controller responsibilities](controller-responsibilities.md) record the later
+separation from the coding-agent host; current recovery continues on that host.
