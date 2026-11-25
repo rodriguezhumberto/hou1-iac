@@ -1,4 +1,7 @@
 ---
+- name: Select the independently owned renewal executor
+  ansible.builtin.import_tasks: executor.yml
+
 - name: Require explicit controller-only renewal inputs
   ansible.builtin.assert:
     that:
@@ -74,13 +77,13 @@
     - name: Install the isolated Python entry point
       ansible.builtin.copy:
         src: namespace-exec.py
-        dest: /usr/local/libexec/controller-renewal-exec
+        dest: '/usr/local/libexec/controller-renewal-exec{{ _hou1_tls_executor_suffix }}'
         owner: root
         group: root
         mode: '0755'
     - name: Allow only configured non-root TLS jobs in the selected namespace
       ansible.builtin.copy:
-        dest: /etc/controller-renewal/exec.json
+        dest: '/etc/controller-renewal/exec{{ _hou1_tls_executor_suffix }}.json'
         content: '{{ {"container": hou1_tls_peer_config.container, "uid": ansible_user_uid | int, "gid": ansible_user_gid | int, "jobs": hou1_tls_peer_jobs} | to_nice_json }}'
         owner: root
         group: root
@@ -88,12 +91,12 @@
       no_log: true
     - name: Limit namespace entry to exact renewal job identifiers
       ansible.builtin.copy:
-        dest: /etc/sudoers.d/controller-renewal
+        dest: '/etc/sudoers.d/controller-renewal{{ _hou1_tls_executor_suffix }}'
         owner: root
         group: root
         mode: '0440'
         content: |
           {% for job in hou1_tls_peer_jobs.keys() | sort %}
-          {{ ansible_user_id }} ALL=(root) NOPASSWD: /usr/local/libexec/controller-renewal-exec {{ job }}
+          {{ ansible_user_id }} ALL=(root) NOPASSWD: /usr/local/libexec/controller-renewal-exec{{ _hou1_tls_executor_suffix }} {{ job }}
           {% endfor %}
         validate: /usr/sbin/visudo -cf %s

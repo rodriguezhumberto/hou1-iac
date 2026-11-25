@@ -2,6 +2,7 @@
 """Coordinate reconciliation of two existing, explicitly selected test hosts."""
 
 import argparse
+from contextlib import contextmanager, ExitStack
 from datetime import datetime, timezone
 import fcntl
 import hashlib
@@ -11,6 +12,7 @@ import os
 from pathlib import Path
 import re
 import shlex
+import signal
 import subprocess
 import sys
 import tempfile
@@ -19,7 +21,9 @@ from urllib.parse import urlsplit
 import yaml
 
 import lab_runtime
+from lab_backup_client import write_private
 import lab_contracts
+from lab_capture_guard import CaptureGuard, PROGRAM as CAPTURE_GUARD_PROGRAM
 from ssh_target import pinned_ssh, private_file
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -42,13 +46,6 @@ def directory(value):
     require(path.is_absolute() and path.is_dir() and not path.is_symlink(),
             'Use existing absolute directories')
     return path
-
-
-def write_private(path, content):
-    descriptor = os.open(path, os.O_WRONLY | os.O_CREAT | os.O_TRUNC | os.O_NOFOLLOW, 0o600)
-    with os.fdopen(descriptor, 'w') as stream:
-        os.fchmod(stream.fileno(), 0o600)
-        stream.write(content)
 
 
 def load_config(path):
@@ -148,6 +145,7 @@ def environment(config, host):
     env.update(ANSIBLE_CONFIG=str(repo / 'ansible/ansible.cfg'),
                ANSIBLE_COLLECTIONS_PATH=config['collections_path'],
                ANSIBLE_COLLECTIONS_SCAN_SYS_PATH='False', ANSIBLE_HOST_KEY_CHECKING='True',
+               ANSIBLE_HOST_PATTERN_MISMATCH='error',
                ANSIBLE_ROLES_PATH=str(repo / 'ansible/playbooks/roles'),
                ANSIBLE_FILTER_PLUGINS=str(repo / 'ansible/playbooks/filter_plugins'),
                ANSIBLE_ACTION_PLUGINS=str(repo / 'ansible/playbooks/action_plugins'),
@@ -260,6 +258,7 @@ class Workflow:
                 + [p for host in config['hosts'].values() for p in host['capabilities']])
         self.phase = None
         self.status = 'running'
+        self.capture = None
 
     def step(self, name, operation):
         record = {'step': name, 'status': 'running'}
@@ -287,10 +286,14 @@ class Workflow:
             'application': self.config['application'], 'steps': self.results}
         if self.config['version'] == 2:
             value['capabilities'] = self.capabilities
+        if hasattr(self, 'finalization'):
+            value['finalization'] = self.finalization
         write_private(temporary, json.dumps(value, indent=2) + '\n')
         temporary.replace(path)
 
     def check_inputs(self):
+        if self.capture is not None:
+            self.capture.check()
         for service, host in self.config['hosts'].items():
             check_revision(host)
             require(input_fingerprints(host) == self.inputs[service],
@@ -298,7 +301,7 @@ class Workflow:
         require(lab_contracts.fingerprints(self.capabilities) == self.capabilities,
                 'Referenced capability files changed during this attempt; rerun input checks')
 
-    def playbook(self, service, play, log_name, local=False):
+    def playbook(self, service, play, log_name, local=False, extra_args=()):
         host = self.config['hosts'][service]
         self.check_inputs()
         require(transport(host) == self.transports[service], 'SSH settings changed during this attempt')
@@ -308,9 +311,13 @@ class Workflow:
             argv += ['-e', '@' + source]
         fixed, user, port = self.transports[service]
         overrides = {'target_hosts': host['target']}
+        overrides['identity_admission_capture_admitted'] = self.capture is not None
         if local:
             overrides.update(ansible_connection='local', ansible_become=False)
         else:
+            # The security role launches its own delegated SSH command. Bind it
+            # to this same verified transport, including over older extra-vars.
+            overrides['security_netbird_ssh_options'] = fixed[1:]
             # Extra-vars also affect delegated tasks. Freeze the remote transport
             # only on its inventory host and retain local controller execution.
             frozen = {'ansible_connection': 'ssh', 'ansible_ssh_executable': 'ssh',
@@ -332,12 +339,13 @@ class Workflow:
                 'ansible_python_interpreter': '{{ ansible_playbook_python }}'}))
             write_private(overlay, json.dumps({'all': {'hosts': {host['target']: {}, 'localhost': {}}}}))
             argv += ['-i', str(overlay)]
-        argv += ['-e', json.dumps(overrides)]
+        argv += ['-e', json.dumps(overrides), *extra_args]
         log = self.run / (log_name + '.log')
         descriptor = os.open(log, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
         with os.fdopen(descriptor, 'w') as stream:
-            result = subprocess.run(argv, cwd=host['repository'], env=environment(self.config, host),
-                                    stdout=stream, stderr=subprocess.STDOUT)
+            run = self.capture.run if self.capture is not None and not local else subprocess.run
+            result = run(argv, cwd=host['repository'], env=environment(self.config, host),
+                         stdout=stream, stderr=subprocess.STDOUT)
         require(result.returncode == 0, f'{log_name} failed; see the private run log')
 
     def prepare_inputs(self, service):
@@ -388,28 +396,63 @@ class Workflow:
         path = self.run / (service + suffix)
         write_private(path, json.dumps(report, indent=2) + '\n')
 
-    def execute(self, phase):
+    def backup_transport(self, service):
+        return transport(self.config['hosts'][service])
+
+    @contextmanager
+    def capture_guard(self, name="capture-admission"):
+        self.check_inputs()
+        host = self.config['hosts']['hou1']
+        fixed, _, _ = self.transports['hou1']
+        require(transport(host) == self.transports['hou1'], 'SSH settings changed before capture admission')
+        command = [*fixed, '-o', 'ServerAliveInterval=15', '-o', 'ServerAliveCountMax=3',
+                   host['ssh_host_ip'], shlex.join(['sudo', '-n', 'python3', '-u', '-c',
+                                                  CAPTURE_GUARD_PROGRAM, '--hold'])]
+        with CaptureGuard(command, self.run / (name + '.log')) as guard:
+            self.capture = guard
+            try:
+                yield
+            finally:
+                self.capture = None
+
+    def execute(self, phase, recovery_identity=None, resume=None):
         self.phase = phase
+        if phase == 'finalize':
+            require(self.config['version'] == 2 and recovery_identity,
+                    'Finalization requires version 2 inputs and --recovery-identity')
+            private_file(recovery_identity)
         if self.config['version'] == 2:
             for service in SERVICES:
                 self.step(service + '-inputs', lambda s=service: self.prepare_inputs(s))
             self.step('input-contracts', self.validate_contracts)
-            if phase != 'inputs':
-                for service in SERVICES:
-                    self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
         else:
             require(phase != 'inputs', 'The inputs phase requires a version 2 workflow')
             for service in SERVICES:
                 self.step(service + '-preflight', lambda s=service: self.preflight(s))
-        if phase == 'handoff':
+        if phase == 'finalize':
+            from lab_finalize import Finalization
+            finalization = Finalization(self, recovery_identity, resume)
             for service in SERVICES:
-                self.step(service + '-handoff', lambda s=service: self.probe(s, verify=False, handoff=True))
-        if phase not in ('preflight', 'inputs', 'handoff'):
-            for service in SERVICES:
-                if phase == 'reconcile':
-                    play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
-                    self.step(service + '-reconcile', lambda s=service, p=play: self.playbook(s, p, s + '-reconcile'))
-                self.step(service + '-verify', lambda s=service: self.probe(s))
+                self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
+            finalization.execute()
+            self.status = 'passed'
+            self.save()
+            return
+        with ExitStack() as stack:
+            if phase == 'reconcile':
+                self.step('capture-admission', lambda: stack.enter_context(self.capture_guard()))
+            if self.config['version'] == 2 and phase != 'inputs':
+                for service in SERVICES:
+                    self.step(service + '-preflight', lambda s=service: self.probe(s, verify=False))
+            if phase == 'handoff':
+                for service in SERVICES:
+                    self.step(service + '-handoff', lambda s=service: self.probe(s, verify=False, handoff=True))
+            if phase not in ('preflight', 'inputs', 'handoff'):
+                for service in SERVICES:
+                    if phase == 'reconcile':
+                        play = Path(self.config['hosts'][service]['repository']) / f'ansible/playbooks/{service}.yml'
+                        self.step(service + '-reconcile', lambda s=service, p=play: self.playbook(s, p, s + '-reconcile'))
+                    self.step(service + '-verify', lambda s=service: self.probe(s))
         self.status = 'passed'
         self.save()
 
@@ -417,15 +460,21 @@ class Workflow:
 def main(argv=None):
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--config', required=True)
-    parser.add_argument('--phase', choices=('plan', 'inputs', 'handoff', 'preflight', 'reconcile', 'verify'), default='plan')
+    parser.add_argument('--phase', choices=('plan', 'inputs', 'handoff', 'preflight', 'reconcile', 'verify', 'finalize'), default='plan')
+    parser.add_argument('--recovery-identity', help='Controller-only offline age identity; required for finalize')
+    parser.add_argument('--resume', help='Previous private finalization receipt; recheck inputs and reuse its point')
     args = parser.parse_args(argv)
     os.umask(0o077)
     try:
         config = load_config(args.config)
+        require(args.phase == 'finalize' or not (args.recovery_identity or args.resume),
+                'Recovery identity and resume apply only to finalize')
         if args.phase == 'plan':
             inputs = ['hou1-inputs', 'hou4-inputs', 'input-contracts'] if config['version'] == 2 else []
+            access = ['hou1-preflight', 'hou4-preflight']
+            admission = ['capture-admission']
             print(json.dumps({'scope': 'managed test hosts; no bootstrap',
-                              'sequence': inputs + ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile',
+                              'sequence': inputs + (admission + access if inputs else access + admission) + ['hou1-reconcile',
                                            'hou1-verify', 'hou4-reconcile', 'hou4-verify']}, indent=2))
             return 0
         with (Path(config['run_directory']) / '.workflow.lock').open('a') as lock:
@@ -433,7 +482,16 @@ def main(argv=None):
             run = Path(tempfile.mkdtemp(prefix=datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%SZ-'),
                                         dir=config['run_directory']))
             print('Private run directory: ' + str(run), flush=True)
-            Workflow(config, run).execute(args.phase)
+            runner = Workflow(config, run)
+            try:
+                if args.phase == 'finalize':
+                    runner.execute(args.phase, args.recovery_identity, args.resume)
+                else:
+                    runner.execute(args.phase)
+            except BaseException:
+                runner.status = 'failed'
+                runner.save()
+                raise
     except WorkflowError as error:
         print(str(error), file=sys.stderr)
         return 1
@@ -447,4 +505,5 @@ def main(argv=None):
 
 
 if __name__ == '__main__':
+    signal.signal(signal.SIGTERM, lambda *_: (_ for _ in ()).throw(KeyboardInterrupt()))
     raise SystemExit(main())

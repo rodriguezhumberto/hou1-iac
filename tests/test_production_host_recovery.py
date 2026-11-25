@@ -55,7 +55,9 @@ def fixture(root):
                   SECONDARY_CERT_DIR='shared', STAFF_CERT_DIR='shared')
     (payload / 'app-config/.env').write_text(''.join(key + '=' + value + '\n' for key, value in values.items()))
     (payload / 'netbird-files/config.yaml').write_text(yaml.safe_dump({'server': {
-        'exposedAddress': cfg['origins']['netbird'], 'disableGeoliteUpdate': True}}))
+        'exposedAddress': cfg['origins']['netbird'], 'disableGeoliteUpdate': True,
+        **{key: value for key, value in host.HostRecoveryPreparationTest().values()[-1]['server'].items()
+           if key in ('authSecret', 'store', 'auth')}}}))
     web_path = payload / 'app-config/docker-compose.yml'
     web = yaml.safe_load(web_path.read_text())
     web['networks'] = {'app-network': {'driver': 'bridge'}}
@@ -88,6 +90,22 @@ def fixture(root):
 
 
 class ProductionRecoveryTest(unittest.TestCase):
+    def test_production_recovery_still_rejects_private_controller_sources(self):
+        cfg = request()
+        metadata = dict(environment='production', staff_revision=cfg['staff_revision'],
+                        recovery_files=[cfg['runtime_age_path']], application_image=images.receipt(cfg['staff_revision']))
+        image_lock = host.lock()
+        image_lock.pop('node')
+        image_lock['astro-app'] = images.IMAGE
+        app = dict(staff_vpn_subnet=cfg['netbird_subnet'], HOU1_VPN_IP=cfg['server_ip'],
+                   STAFF_OIDC_ISSUER=cfg['origins']['auth'], STAFF_OIDC_REDIRECT_URI=cfg['origins']['staff'],
+                   PUBLIC_SITE_ORIGIN=cfg['origins']['public'])
+        vpn = {'server': {'exposedAddress': cfg['origins']['netbird']}}
+        self.assertEqual(host.prepare.validate(cfg, metadata, image_lock, app, vpn), cfg['origins'])
+        for source in ['10.20.30.40/32', '172.20.10.2/32', '192.168.50.20/32']:
+            with self.subTest(source=source), self.assertRaisesRegex(ValueError, 'bootstrap source'):
+                host.prepare.validate({**cfg, 'bootstrap_cidr': source}, metadata, image_lock, app, vpn)
+
     def test_real_templates_and_digest_backed_bundle_preserve_production_boundary(self):
         with tempfile.TemporaryDirectory() as directory:
             root = Path(directory)
@@ -120,7 +138,8 @@ class ProductionRecoveryTest(unittest.TestCase):
             cfg, payload, bundle, lock = fixture(root)
             path = payload / 'netbird-files/config.yaml'
             for index, setting in enumerate([None, False, True]):
-                config = {'server': {'exposedAddress': cfg['origins']['netbird']}}
+                config = {'server': {key: value for key, value in yaml.safe_load(path.read_text())['server'].items()
+                                     if key != 'disableGeoliteUpdate'}}
                 if setting is not None:
                     config['server']['disableGeoliteUpdate'] = setting
                 original = yaml.safe_dump(config).encode()
@@ -220,6 +239,9 @@ class ProductionRecoveryTest(unittest.TestCase):
                          staff_domain='staff.example.invalid', public_site_origin=cfg['origins']['public'],
                          netbird_management_url=cfg['origins']['netbird'])
         tasks = yaml.safe_load((ROLES / 'host_recovery/tasks/request.yml').read_text())
+        for task in tasks:
+            if task.get('ansible.builtin.include_tasks') == 'provider-isolation.yml':
+                task['ansible.builtin.include_tasks'] = str(ROLES / 'host_recovery/tasks/provider-isolation.yml')
         guard = tasks[-1]
         scenarios = [{}, {'app_directory': '/opt/wrong-environment'}, {'public_site_origin': 'https://wrong.example.invalid'},
                      {'deploy_ref': 'b' * 40}]
@@ -236,11 +258,15 @@ class ProductionRecoveryTest(unittest.TestCase):
             (source / 'live/example/privkey.pem').symlink_to('../../archive/example/key1.pem')
             (source / 'cloudflare.ini').write_text('synthetic DNS credential fixture')
             (source / 'accounts/registration').write_text('synthetic account fixture')
-            with patch.object(host.restore.os, 'chown'):
+            with patch.object(host.restore.os, 'chown') as chown:
                 host.restore.copy_certificates('production', source, destination)
             self.assertEqual({path.name for path in destination.iterdir()}, {'live', 'archive'})
             self.assertEqual((destination / 'live/example/privkey.pem').read_text(), 'synthetic key fixture')
             self.assertTrue((destination / 'live/example/privkey.pem').is_symlink())
+            self.assertTrue(chown.call_args_list)
+            self.assertTrue(all(call.args[1:] == (0, 0) for call in chown.call_args_list))
+            self.assertEqual((destination / 'archive/example/key1.pem').stat().st_mode & 0o777, 0o640)
+            self.assertEqual((destination / 'archive/example').stat().st_mode & 0o777, 0o750)
 
     def test_successful_production_publication_uses_the_completed_restore_contract(self):
         cfg = request(); cfg['application_image'] = images.receipt(cfg['staff_revision'])

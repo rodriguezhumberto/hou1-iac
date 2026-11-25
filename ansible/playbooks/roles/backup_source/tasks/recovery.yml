@@ -28,21 +28,32 @@
     name: hou1-backup-recover.service
     daemon_reload: true
     enabled: true
-    state: started
+    state: "{{ 'started' if hou1_backup_capture_on_initialize | default(true) | bool else omit }}"
 - name: Enable nightly local capture before off-host collection
   ansible.builtin.systemd_service:
     name: hou1-backup-prepare.timer
     daemon_reload: true
-    enabled: true
-    state: started
+    # Omit preserves established scheduling; a fresh unit stays disabled across
+    # reboot until the controller has verified the first off-host point.
+    enabled: "{{ true if hou1_backup_capture_on_initialize | default(true) | bool else omit }}"
+    state: "{{ 'started' if hou1_backup_capture_on_initialize | default(true) | bool else omit }}"
 
 - name: Check whether the restored host has an initial recovery point
   ansible.builtin.stat:
     path: /var/lib/hou1-backup/last-export.json
   register: hou1_backup_last_export
 
+- name: Read the initial capture result without treating a failed attempt as success
+  ansible.builtin.slurp:
+    src: /var/lib/hou1-backup/last-export.json
+  register: hou1_backup_capture_status
+  when: hou1_backup_last_export.stat.exists
+
 - name: Create the initial recovery point before dependent monitoring starts
   ansible.builtin.systemd_service:
     name: hou1-backup-prepare.service
     state: started
-  when: not hou1_backup_last_export.stat.exists
+  when: >-
+    (hou1_backup_capture_on_initialize | default(true) | bool) and
+    (not hou1_backup_last_export.stat.exists or
+    (hou1_backup_capture_status.content | b64decode | from_json).last_success | default(0) | int == 0)

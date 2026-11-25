@@ -1,7 +1,7 @@
 # SSH targets for rehearsal tools
 
-The current isolated lab is recorded in the
-[deployment evidence](../evidence/isolated-lab-2026-11-17.md). Select its private
+The isolated lab's accepted gates are summarized in
+[current status](../cleanup-plan.md). Select its private
 targets and verified SSH keys explicitly. Old aliases do not establish identity.
 
 `scripts/ssh_target.py` checks the resolved SSH address and ED25519 fingerprint

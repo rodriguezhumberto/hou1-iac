@@ -1,0 +1,8 @@
+[Unit]
+Description=Apply declared HOU1 {{ authentik_environment }} permissions after first login
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=60s
+AccuracySec=5s
+[Install]
+WantedBy=timers.target

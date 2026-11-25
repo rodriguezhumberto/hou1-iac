@@ -68,4 +68,6 @@
 - name: Restore existing monitoring probes and persistent isolation
   ansible.builtin.include_role:
     name: rehearsal_gates
-  when: cms_environment == 'test'
+  when:
+    - cms_environment == 'test'
+    - host_recovery_effective_isolation_mode == 'host'

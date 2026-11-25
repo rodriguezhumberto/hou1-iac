@@ -11,6 +11,15 @@
     fail_msg: Preserve and review the existing backup configuration before source migration.
   when: hou1_backup_layout_config.stat.exists
 
+- name: Install the shared capture and deployment lock before its consumer
+  ansible.builtin.copy:
+    src: operation_lock.py
+    dest: /usr/local/libexec/hou1-backup-operation-lock.py
+    owner: root
+    group: root
+    mode: '0700'
+  when: hou1_backup_layout_config.stat.isreg | default(false)
+
 - name: Install the source-aware exporter for configured backups
   ansible.builtin.copy:
     src: export.py

@@ -1,13 +1,13 @@
 #!/usr/bin/python3
 """Prepare one encrypted recovery point with durable interrupted-writer recovery."""
 from contextlib import contextmanager, closing
-import fcntl
 import hashlib
 import json
 import os
 from pathlib import Path
 import shutil
 import signal
+import stat
 import sqlite3
 import subprocess
 import sys
@@ -17,6 +17,7 @@ import time
 import uuid
 
 CONFIG = Path('/etc/hou1-backup/source.json')
+TLS_ACTIVATION = Path('/var/lib/hou1-tls/activation.json')
 WRITERS = {'authentik': ['authentik-server', 'authentik-worker'],
            'app': ['astro-app'], 'netbird': ['netbird-server']}
 
@@ -44,6 +45,24 @@ def compose(project):
     return ['docker', 'compose', '--project-directory', project['root'], '-p', project['name']]
 
 
+def wait_writers(project, services):
+    """Retain restart intent until every required container is running and healthy."""
+    deadline = time.monotonic() + 120
+    while time.monotonic() < deadline:
+        output = command(compose(project) + ['ps', '--all', '--format', 'json'], timeout=15).decode()
+        # Compose releases emit either a JSON array or one object per line.
+        containers = json.loads(output) if output.strip().startswith('[') else [
+            json.loads(line) for line in output.splitlines() if line.strip()]
+        if (isinstance(containers, list) and all(
+                any(item.get('Service') == service for item in containers)
+                and all(item.get('State') == 'running' and item.get('Health', '') in ('', 'healthy')
+                        for item in containers if item.get('Service') == service)
+                for service in services)):
+            return
+        time.sleep(1)
+    raise RuntimeError('Writer recovery incomplete')
+
+
 @contextmanager
 def frozen(project, services, journal=None):
     base = compose(project)
@@ -60,6 +79,7 @@ def frozen(project, services, journal=None):
         yield
     finally:
         command(base + ['start', *services], timeout=120)
+        wait_writers(project, services)
         if journal is not None:
             path.unlink(); sync_directory(path.parent)
 
@@ -68,6 +88,20 @@ def archive_tree(output, directory, names):
     with tarfile.open(output, 'w:gz', dereference=False) as archive:
         for name in names:
             archive.add(Path(directory) / name, arcname=name)
+
+
+def copy_media(source, destination):
+    """The schema-1 outer archive accepts only directories and regular files."""
+    source = Path(source)
+    for path in [source, *source.rglob('*')]:
+        mode = path.lstat().st_mode
+        if not (stat.S_ISDIR(mode) or stat.S_ISREG(mode)):
+            raise ValueError('Unsupported media entry; capture requires regular files and directories')
+    shutil.copytree(source, destination, symlinks=True)
+    # Recheck the staged tree too: no unsupported entry can enter a promoted point.
+    for path in [destination, *destination.rglob('*')]:
+        if not (path.is_dir() or path.is_file()) or path.is_symlink():
+            raise ValueError('Unsupported staged media entry')
 
 
 def artifact_module():
@@ -82,6 +116,24 @@ def artifact_module():
 
 def application_receipt(root, source_root=None):
     return artifact_module().running(root, source_root)
+
+
+def snapshot_sqlite(database, destination):
+    """Read a frozen database and its journals without writing to the source."""
+    # SQLite may need a writable shm file even for mode=ro on a WAL database.
+    # Rebuild it only in private staging; immutable=1 would ignore committed WAL.
+    with tempfile.TemporaryDirectory(prefix='.sqlite-', dir=destination.parent) as directory:
+        staged = Path(directory) / database.name
+        for suffix in ('', '-wal', '-journal'):
+            original = Path(str(database) + suffix)
+            if not suffix or original.exists():
+                shutil.copyfile(original, Path(str(staged) + suffix))
+        with closing(sqlite3.connect(staged)) as source:
+            with closing(sqlite3.connect(destination)) as target:
+                source.backup(target)
+                if (target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]
+                        or target.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 0):
+                    raise RuntimeError('Invalid SQLite snapshot')
 
 
 def snapshot(config, work):
@@ -100,13 +152,8 @@ def snapshot(config, work):
         source_root = str(artifact_module().source_directory(app['root'], app.get('source_root')))
         application_image = application_receipt(app['root'], source_root)
         database = Path(app['database']) / 'forms.db'
-        with closing(sqlite3.connect(database.resolve().as_uri() + '?mode=ro', uri=True)) as source:
-            with closing(sqlite3.connect(cms / 'database/forms.db')) as target:
-                source.backup(target)
-                if (target.execute('PRAGMA integrity_check').fetchall() != [('ok',)]
-                        or target.execute("SELECT count(*) FROM sqlite_master WHERE type='table'").fetchone()[0] == 0):
-                    raise RuntimeError('Invalid SQLite snapshot')
-        shutil.copytree(app['media'], cms / 'media', symlinks=True)
+        snapshot_sqlite(database, cms / 'database/forms.db')
+        copy_media(app['media'], cms / 'media')
         # Save runtime configuration and TLS, never the live database or plaintext backup directory.
         files = ['.env', 'docker-compose.yml', 'docker-compose.override.yml', 'certbot/conf']
         if application_image is not None:
@@ -116,11 +163,11 @@ def snapshot(config, work):
     # with this container, so preparation runs locally, independently of SSH.
     netbird_copy = work / 'netbird-copy'; netbird_copy.mkdir()
     with frozen(netbird, WRITERS['netbird'], (intent, 'netbird')):
-        for name in ['compose.yaml', 'config.yaml', 'dashboard.env']:
+        for name in ['compose.yaml', 'config.yaml', 'dashboard.env', 'secrets.json']:
             shutil.copy2(Path(netbird['root']) / name, netbird_copy / name)
         shutil.copytree(Path(netbird['root']) / 'data', netbird_copy / 'data', symlinks=True)
     try:
-        archive_tree(work / 'netbird.tar.gz', netbird_copy, ['compose.yaml', 'config.yaml', 'dashboard.env', 'data'])
+        archive_tree(work / 'netbird.tar.gz', netbird_copy, ['compose.yaml', 'config.yaml', 'dashboard.env', 'secrets.json', 'data'])
     finally:
         shutil.rmtree(netbird_copy)
     recovery = work / 'host-recovery'; recovery.mkdir()
@@ -207,8 +254,7 @@ def recover(config):
         # Paths and service arguments come from root-owned config/code, never the journal.
         base = compose(config[component]); services = WRITERS[component]
         command(base + ['start', *services], timeout=120)
-        running = command(base + ['ps', '--status', 'running', '--services']).decode().splitlines()
-        if not set(services).issubset(running): raise RuntimeError('Writer recovery incomplete')
+        wait_writers(config[component], services)
         status(root, False)
         intent.unlink(); sync_directory(root)
     for old in root.glob('.snapshot-*'):
@@ -238,25 +284,41 @@ def prepare(config):
         staged.unlink(missing_ok=True)
 
 
+def run(recovery_only=False):
+    import importlib.util
+    helper = Path(__file__).with_name('operation_lock.py')
+    if not helper.exists():
+        helper = Path(__file__).with_name('hou1-backup-operation-lock.py')
+    spec = importlib.util.spec_from_file_location('backup_operation_lock', helper)
+    operation_lock = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(operation_lock)
+    # Recovery retains its immediate failure when another operation owns the lock.
+    timeout = 0 if recovery_only else operation_lock.WAIT_SECONDS
+    with operation_lock.exclusive(timeout=timeout):
+        config = json.loads(CONFIG.read_text())
+        recover(config)
+        if recovery_only: return
+        # A hard kill cannot report failure; record the attempt before stopping writers.
+        status(config['work_root'], False)
+        try:
+            # Renewal shares this lock. A killed receiver releases admission
+            # but can leave a torn pair until its durable journal is recovered.
+            if TLS_ACTIVATION.exists() or TLS_ACTIVATION.is_symlink():
+                raise RuntimeError('Pending TLS activation requires bundle redelivery before capture')
+            manifest = prepare(config)
+            status(config['work_root'], True, manifest)
+        except Exception:
+            status(config['work_root'], False)
+            raise
+
+
 def main():
     if os.geteuid() != 0 or sys.argv[1:] not in ([], ['--recover']):
         raise PermissionError('Fixed root preparation or recovery only')
     os.umask(0o077)
     for sig in (signal.SIGTERM, signal.SIGINT, signal.SIGHUP):
         signal.signal(sig, lambda *_: (_ for _ in ()).throw(InterruptedError()))
-    with open('/run/lock/hou1-backup-export.lock', 'w') as lock:
-        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        config = json.loads(CONFIG.read_text())
-        recover(config)
-        if sys.argv[1:] == ['--recover']: return
-        # A hard kill cannot report failure; record the attempt before stopping writers.
-        status(config['work_root'], False)
-        try:
-            manifest = prepare(config)
-            status(config['work_root'], True, manifest)
-        except Exception:
-            status(config['work_root'], False)
-            raise
+    run(recovery_only=sys.argv[1:] == ['--recover'])
 
 
 if __name__ == '__main__':

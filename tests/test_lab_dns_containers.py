@@ -142,7 +142,7 @@ class LabDnsContainerTest(unittest.TestCase):
 @unittest.skipUnless(shutil.which('docker'), 'Docker is needed for the disposable preparation fixture')
 class ComposeDnsPreparationIntegrationTest(unittest.TestCase):
     def test_fresh_network_is_prepared_before_start_and_existing_container_is_preserved(self):
-        image = 'nginx:1.28.0-alpine'
+        image = 'nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3'
         if subprocess.run(['docker', 'image', 'inspect', image], capture_output=True, timeout=15).returncode:
             self.skipTest('Pinned fixture image is not cached locally')
         spec = importlib.util.spec_from_file_location('dns_runtime', ROLES / 'compose_runtime/files/apply.py')

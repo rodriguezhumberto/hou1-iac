@@ -38,13 +38,35 @@ live PGDATA is never copied. NetBird's integrated relay also stops temporarily,
 so capture is a local systemd job independent of SSH. Ingress and the host VPN
 client remain running. These are consistent component snapshots, not a distributed
 transaction; schedule identity/policy edits outside the capture window.
+SQLite and its recovery journals are copied while the application is stopped,
+then opened in private staging. This preserves committed WAL data while keeping
+the live database directory read-only to the capture service. Media must contain
+only regular files and directories: links and special entries fail capture before
+`ready.export` is replaced, matching the schema-1 outer extractor.
+
+New encrypted points include NetBird's original `secrets.json` alongside its
+configuration and state. Cold recovery checks all three 32-byte keys against the
+saved configuration; legacy points reconstruct this source from those saved
+values. The guest installs it as root:root `0600`, so normal control-plane
+reconciliation reuses the original keys without rotation.
 
 Before each stop, a root-only fsynced `restart-intent.json` records the fixed
 writer group. Normal cleanup, `ExecStopPost` and the enabled boot recovery service
-restart interrupted writers. SIGKILL or power loss cannot run Python cleanup;
+restart interrupted writers. Both ordinary restart and boot recovery require
+every recorded writer to be running, and healthy when a healthcheck is declared,
+before clearing intent (bounded to 120 seconds of polling). SIGKILL or power loss cannot run Python cleanup;
 boot recovery handles recorded intent. Invalid intent or failed restart remains
 for investigation. A failed attempt removes partial files and preserves the
 previous `ready.export` and last-success timestamp.
+A failed first capture is retried by the next backup playbook run. An existing
+successful point does not trigger another capture during unchanged deployment.
+
+The [managed workflow and failure matrix](deployment-workflow.md#capture-coordination)
+share the capture lock. Preparation waits up to fifteen minutes before reading
+configuration or touching writers; its service budget includes that wait. Admission
+timeout preserves the previous point and export status; inspect the systemd result.
+The fixed recovery helper keeps its nonblocking lock behavior. Lock files are
+never removed, so contenders keep using the same inode.
 
 HOU1 encrypts to `hou1_backup_recipient`; neither VPS receives the owner's private
 key. HOU4's locally generated transport key cannot decrypt backups. Its source-bound
@@ -57,7 +79,11 @@ HOU4 checks the pinned SSH identity/exit status, bounded manifest, environment,
 age header, exact byte count and SHA256 before atomically committing a point.
 Partial, stale, corrupt and replayed transfers fail. Retention runs only after a
 successful commit and does not delete retained points merely to fit an incoming
-archive. HOU1 has no HOU4 deletion credential. **Transfer integrity does not prove
+archive. The receiver atomically renames expired points to private `.pruned-*`
+directories before recursive deletion; the next collection cleans interrupted
+deletions. Observers still reject incomplete visible committed directories.
+Deploy the matching HOU4 collector change before relying on concurrent retention
+observation. HOU1 has no HOU4 deletion credential. **Transfer integrity does not prove
 decryption or service recoverability.**
 
 ## Pairing established nodes
@@ -137,12 +163,25 @@ credential. Follow their explicit review/publication and owner-access gates.
 
 ## Evidence and open limits
 
+[Capture/deployment coordination](evidence/capture-coordination-2026-11-19.md)
+records queued capture during both-host reconciliation, bounded guard release,
+failure-matrix acceptance and fresh offline verification. Standalone operations
+remain outside that guard; capture still pauses its writers.
+
 [Capture/interruption evidence](evidence/hou1-backup-interruption-2026-11-08.json)
-records writer SIGTERM/SIGKILL and reboot recovery. Receiver process-kill/retry
-checks were local; a live interrupted HOU4 transfer and provider-level power cut
-were not tested. [Original component restore](evidence/hou1-recovery-restore-2026-11-08.json),
+records writer SIGTERM/SIGKILL and reboot recovery. The
+[live transfer drill](evidence/backup-transfer-2026-11-19.md) subsequently passed
+SSH-child interruption, automatic retry, prior-point preservation and offline
+verification. Receiver-process termination remains a local fixture; a provider-level
+power cut was not tested. [Original component restore](evidence/hou1-recovery-restore-2026-11-08.json),
 [later clean test restore](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
 [production recovery](evidence/production-host-recovery-2026-11-12.json) and
 [owner decryption](evidence/owner-recovery-access-2026-11-12.json) are separate
 results. The production run needed corrections; uninterrupted automation remains
 [#78](https://github.com/rodriguezhumberto/hou1-iac/issues/78).
+
+Later [standalone first-capture acceptance](evidence/standalone-first-capture-2026-11-24.md)
+passed from an empty lab backup source, then restored its newly collected point
+into isolated services. The [collected-point drill](evidence/collected-point-restore-2026-11-24.md)
+records the constrained service-restore gate. These lab results close those
+specific evidence gaps without relabelling the earlier production run.

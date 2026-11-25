@@ -6,7 +6,8 @@ After=docker.service hou1-backup-recover.service
 Type=oneshot
 ExecStart=/usr/local/libexec/hou1-backup-prepare
 ExecStopPost=/usr/local/libexec/hou1-backup-prepare --recover
-TimeoutStartSec=1900
+# Preserve the capture budget after up to fifteen minutes of deployment admission.
+TimeoutStartSec=2800
 TimeoutStopSec=180
 UMask=0077
 Nice=10

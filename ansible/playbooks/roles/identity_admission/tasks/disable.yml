@@ -1,0 +1,20 @@
+---
+- name: Check for this environment's existing admission timer
+  ansible.builtin.stat:
+    path: '{{ lookup("env", "HOME") }}/.config/systemd/user/hou1-identity-{{ authentik_environment }}.timer'
+  register: identity_admission_removed_timer
+
+- name: Stop and disable the retired admission timer
+  ansible.builtin.systemd_service:
+    name: 'hou1-identity-{{ authentik_environment }}.timer'
+    scope: user
+    enabled: false
+    state: stopped
+  when: identity_admission_removed_timer.stat.exists
+
+- name: Stop any remaining retired admission job
+  ansible.builtin.systemd_service:
+    name: 'hou1-identity-{{ authentik_environment }}.service'
+    scope: user
+    state: stopped
+  when: identity_admission_removed_timer.stat.exists

@@ -1,4 +1,6 @@
 """Consistent snapshots, offline age recovery, restart safety and narrow transport policies."""
+from contextlib import closing
+import base64
 import importlib.util
 import io
 import json
@@ -25,6 +27,11 @@ recovery=load('backup_recovery',ROOT/'scripts/verify-recovery.py')
 policies=load('backup_policies',ROOT/'ansible/playbooks/filter_plugins/netbird_policies.py')
 
 
+def writer_status(services=None):
+    return json.dumps([dict(Service=service, State='running', Health='healthy')
+                       for service in (services or [item for group in source.WRITERS.values() for item in group])]).encode()
+
+
 class BackupProtocolTest(unittest.TestCase):
     @unittest.skipUnless(shutil.which('age'),'age required')
     def test_digest_receipt_survives_encrypted_capture_and_offline_extraction(self):
@@ -35,6 +42,7 @@ class BackupProtocolTest(unittest.TestCase):
                            revision=revision, platform='linux/amd64', image_id='sha256:' + 'c' * 64)
             (Path(config['app']['root']) / 'application-image.json').write_text(json.dumps(receipt))
             def command(argv, output=None, timeout=300):
+                if '--format' in argv: return writer_status()
                 if 'ps' in argv: return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv: output.write(b'CREATE TABLE restored (value text);'); return b''
                 if argv[0] == 'git': return revision.encode()
@@ -56,8 +64,16 @@ class BackupProtocolTest(unittest.TestCase):
         with sqlite3.connect(app/'database/forms.db') as db:
             db.executescript('CREATE TABLE fixture (value text); INSERT INTO fixture VALUES ("recover-me");')
         (app/'media/photo.jpg').write_bytes(b'fixture-media')
-        for p,names in [(auth,['compose.yaml','authentik.env','oidc-clients.env','secrets.enc.yaml']),(app,['.env','docker-compose.yml','docker-compose.override.yml']),(netbird,['compose.yaml','config.yaml','dashboard.env'])]:
+        for p,names in [(auth,['compose.yaml','authentik.env','oidc-clients.env','secrets.enc.yaml']),(app,['.env','docker-compose.yml','docker-compose.override.yml']),(netbird,['compose.yaml','config.yaml','dashboard.env','secrets.json'])]:
             for name in names:(p/name).write_text('synthetic-private-config')
+        keys = dict(relay_auth_secret=base64.b64encode(b'r' * 32).decode(),
+                    store_encryption_key=base64.b64encode(b's' * 32).decode(),
+                    cookie_encryption_key=base64.b64encode(b'c' * 32).decode())
+        (netbird/'secrets.json').write_text(json.dumps(keys))
+        (netbird/'config.yaml').write_text(json.dumps({'server': {
+            'authSecret': keys['relay_auth_secret'],
+            'store': {'encryptionKey': keys['store_encryption_key']},
+            'auth': {'sessionCookieEncryptionKey': keys['cookie_encryption_key']}}}))
         (app/'certbot/conf').mkdir(parents=True)
         (app/'certbot/conf/cert.pem').write_text('synthetic-certificate')
         # Certbot's relative renewal symlinks must survive safe offline extraction.
@@ -77,6 +93,7 @@ class BackupProtocolTest(unittest.TestCase):
             root=Path(directory);config,key=self.fixture(root);events=[]
             def command(argv,output=None,timeout=300):
                 events.append(argv)
+                if '--format' in argv: return writer_status()
                 if argv[-4:]==['ps','--status','running','--services']:
                     return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv:output.write(b'CREATE TABLE recovered (value text);\n');return b''
@@ -86,7 +103,8 @@ class BackupProtocolTest(unittest.TestCase):
             archive_tree=source.archive_tree
             def archive_after_restart(output,directory,names):
                 if Path(output).name=='netbird.tar.gz':
-                    self.assertEqual(events[-1][-2:],['start','netbird-server'])
+                    self.assertIn(['start','netbird-server'], [event[-2:] for event in events])
+                    self.assertEqual(events[-1][-4:], ['ps', '--all', '--format', 'json'])
                 return archive_tree(output,directory,names)
             with patch.object(source,'command',side_effect=command),patch.object(source,'archive_tree',side_effect=archive_after_restart),patch.object(source,'application_receipt',return_value=None):
                 source.prepare(config)
@@ -101,6 +119,18 @@ class BackupProtocolTest(unittest.TestCase):
             self.assertEqual((output/'cms/media/photo.jpg').read_bytes(),b'fixture-media')
             self.assertTrue((output/'app-config/certbot/conf/link.pem').is_symlink())
             self.assertEqual((output/'netbird-files/data/state.db').read_bytes(),b'netbird-fixture-state')
+            self.assertEqual((output/'netbird-files/secrets.json').read_bytes(),
+                             (Path(config['netbird']['root'])/'secrets.json').read_bytes())
+            prepare = load('backup_host_prepare', ROOT/'ansible/playbooks/roles/host_recovery/files/prepare.py')
+            restore = load('backup_host_restore', ROOT/'ansible/playbooks/roles/host_recovery/files/restore.py')
+            saved = output/'netbird-files'
+            values = prepare.netbird_secrets(json.loads((saved/'config.yaml').read_text()), saved)
+            secret_file = root/'validated-secrets.json'; secret_file.write_text(json.dumps(values))
+            with patch.object(restore.os, 'chown'):
+                restore.copy_netbird(saved, root/'guest-netbird', secret_file)
+            self.assertEqual(prepare.netbird_secrets(
+                json.loads((root/'guest-netbird/config.yaml').read_text()), root/'guest-netbird'), values)
+            self.assertEqual((root/'guest-netbird/secrets.json').stat().st_mode & 0o777, 0o600)
             self.assertEqual((output/'host-recovery/0').read_text(),'synthetic-host-runtime-key')
             stops=[e for e in events if 'stop' in e];starts=[e for e in events if 'start' in e]
             self.assertEqual(len(stops),3);self.assertEqual(len(starts),3)
@@ -108,6 +138,110 @@ class BackupProtocolTest(unittest.TestCase):
             for env,changes in [('production',{}),('test',{'size':manifest['size']+1}),('test',{'sha256':'0'*64})]:
                 metadata.write_text(json.dumps({**manifest,**changes}))
                 with self.assertRaises(ValueError):recovery.verify(archive,metadata,key,root/'failed',env)
+
+    @unittest.skipUnless(shutil.which('age'), 'age required')
+    def test_snapshot_includes_committed_wal_from_read_only_source(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            config, key = self.fixture(root)
+            database = Path(config['app']['database']) / 'forms.db'
+            # A stopped WAL writer can leave committed rows outside the main file.
+            # The service sandbox permits reading these files, but no shm creation.
+            with closing(sqlite3.connect(root / 'live.db')) as live:
+                live.execute('PRAGMA journal_mode=WAL')
+                live.execute('PRAGMA wal_autocheckpoint=0')
+                live.execute('CREATE TABLE fixture (value text)')
+                live.execute("INSERT INTO fixture VALUES ('committed-in-wal')")
+                live.commit()
+                for suffix in ('', '-wal'):
+                    shutil.copyfile(root / ('live.db' + suffix), Path(str(database) + suffix))
+            originals = {p.name: p.read_bytes() for p in database.parent.iterdir()}
+            for path in database.parent.iterdir():
+                path.chmod(0o400)
+            database.parent.chmod(0o500)
+            def command(argv, output=None, timeout=300):
+                if '--format' in argv: return writer_status()
+                if 'ps' in argv:
+                    return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
+                if 'pg_dump' in argv:
+                    output.write(b'CREATE TABLE restored (value text);')
+                if argv[0] == 'git':
+                    return b'a' * 40
+                return b''
+            try:
+                with patch.object(source, 'command', side_effect=command), \
+                        patch.object(source, 'application_receipt', return_value=None):
+                    source.prepare(config)
+                stream = io.BytesIO()
+                reader.serve(config, stream)
+                stream.seek(0)
+                manifest = root / 'manifest.json'
+                manifest.write_bytes(stream.readline())
+                archive = root / 'recovery.age'
+                archive.write_bytes(stream.read())
+                recovery.verify(archive, manifest, key, root / 'restored', 'test')
+                with closing(sqlite3.connect(root / 'restored/cms/database/forms.db')) as restored:
+                    self.assertEqual(restored.execute('SELECT value FROM fixture').fetchall(),
+                                     [('committed-in-wal',)])
+                self.assertEqual({p.name: p.read_bytes() for p in database.parent.iterdir()}, originals)
+                self.assertFalse(list((root / 'work').glob('.snapshot-*')))
+            finally:
+                database.parent.chmod(0o700)
+
+    def test_media_rejects_links_and_special_entries_before_point_promotion(self):
+        with tempfile.TemporaryDirectory() as directory:
+            root = Path(directory)
+            media = root / 'media'; media.mkdir()
+            (media / 'photo').write_bytes(b'synthetic media')
+            for kind in ('relative', 'escaping', 'fifo'):
+                with self.subTest(kind=kind):
+                    entry = media / 'unsupported'
+                    if kind == 'fifo': os.mkfifo(entry)
+                    else: entry.symlink_to('photo' if kind == 'relative' else '../outside')
+                    ready = root / 'ready.export'; ready.write_bytes(b'previous point')
+                    def capture(config, stream):
+                        source.copy_media(media, root / 'staged')
+                    with patch.object(source, 'export', side_effect=capture):
+                        with self.assertRaisesRegex(ValueError, 'Unsupported media'):
+                            source.prepare({'work_root': str(root)})
+                    self.assertEqual(ready.read_bytes(), b'previous point')
+                    self.assertFalse((root / 'staged').exists())
+                    entry.unlink()
+            source.copy_media(media, root / 'staged')
+            self.assertEqual((root / 'staged/photo').read_bytes(), b'synthetic media')
+
+    def test_restart_waits_for_health_and_keeps_intent_when_writer_exits(self):
+        project = {'name': 'fixture', 'root': '/fixture'}
+        with tempfile.TemporaryDirectory() as directory:
+            intent = Path(directory) / 'restart-intent.json'
+            states = [dict(Service='astro-app', State='running', Health='starting'),
+                      dict(Service='astro-app', State='exited', Health='')]
+            def command(argv, **kwargs):
+                if '--services' in argv: return b'astro-app\n'
+                if '--format' in argv: return json.dumps([states.pop(0)]).encode()
+                return b''
+            with patch.object(source, 'command', side_effect=command), \
+                    patch.object(source.time, 'monotonic', side_effect=[0, 1, 2, 121]), \
+                    patch.object(source.time, 'sleep'):
+                with self.assertRaisesRegex(RuntimeError, 'Writer recovery incomplete'):
+                    with source.frozen(project, ['astro-app'], (intent, 'app')): pass
+            self.assertTrue(intent.exists())
+            ready = json.dumps([dict(Service='astro-app', State='running', Health='healthy')]).encode()
+            with patch.object(source, 'command', side_effect=[b'', ready]):
+                source.recover({'work_root': directory, 'app': project})
+            self.assertFalse(intent.exists())
+
+    def test_writer_health_poll_accepts_compose_ndjson_and_absent_healthchecks(self):
+        project = {'name': 'fixture', 'root': '/fixture'}
+        states = [dict(Service='astro-app', State='running', Health='starting'),
+                  dict(Service='astro-app', State='running', Health='healthy')]
+        def poll(argv, **kwargs):
+            return json.dumps(states.pop(0)).encode() + b'\n'
+        with patch.object(source, 'command', side_effect=poll), patch.object(source.time, 'sleep') as sleep:
+            source.wait_writers(project, ['astro-app'])
+            sleep.assert_called_once_with(1)
+        with patch.object(source, 'command', return_value=b'{"Service":"netbird-server","State":"running","Health":""}\n'):
+            source.wait_writers(project, ['netbird-server'])
 
     def test_failed_preparation_preserves_previous_completed_ciphertext(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -153,6 +287,7 @@ class BackupProtocolTest(unittest.TestCase):
                 def command(argv,output=None,timeout=300):
                     if 'pg_dump' in argv:
                         return subprocess.run(['docker','exec',name,'pg_dump','-U','authentik','-d','authentik','--no-owner','--format=plain'],stdout=output,stderr=subprocess.PIPE,check=True).stdout
+                    if '--format' in argv: return writer_status()
                     if 'ps' in argv:return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                     if argv[0]=='git':return b'0123456789012345678901234567890123456789'
                     return b''
@@ -172,16 +307,17 @@ class BackupProtocolTest(unittest.TestCase):
         events=[]
         def command(argv,**kwargs):
             events.append(argv)
+            if '--format' in argv: return writer_status()
             if 'ps' in argv:return b'astro-app\n'
             if 'stop' in argv:raise RuntimeError('Synthetic failed stop')
         with patch.object(source,'command',side_effect=command):
             with self.assertRaises(RuntimeError):
                 with source.frozen(project,['astro-app']):pass
-        self.assertEqual(events[-1][-2:],['start','astro-app'])
-        with patch.object(source,'command',side_effect=lambda argv,**_:b'astro-app\n') as run:
+        self.assertIn(['start','astro-app'], [event[-2:] for event in events])
+        with patch.object(source,'command',side_effect=lambda argv,**_:writer_status() if '--format' in argv else b'astro-app\n') as run:
             with self.assertRaises(ValueError):
                 with source.frozen(project,['astro-app']):raise ValueError('snapshot failed')
-        self.assertEqual(run.call_args.args[0][-2:],['start','astro-app'])
+        self.assertEqual(run.call_args.args[0][-4:], ['ps', '--all', '--format', 'json'])
 
     def test_durable_intent_precedes_stop_and_survives_failed_restart(self):
         with tempfile.TemporaryDirectory() as directory:
@@ -189,6 +325,7 @@ class BackupProtocolTest(unittest.TestCase):
             project={'name':'fixture','root':'/fixture'}
             def command(argv,**kwargs):
                 events.append(argv)
+                if '--format' in argv: return writer_status()
                 if 'ps' in argv:return b'astro-app\n'
                 if 'stop' in argv:self.assertEqual(json.loads(intent.read_text()),dict(schema=1,component='app'))
                 if 'start' in argv:raise RuntimeError('Synthetic restart failure')
@@ -206,7 +343,7 @@ class BackupProtocolTest(unittest.TestCase):
                 (root/'ready.export').write_bytes(b'previous-complete-point')
                 (root/'.snapshot-fixture').mkdir();(root/'.snapshot-fixture/private').write_bytes(b'partial-plaintext')
                 (root/'.prepared-fixture').write_bytes(b'partial-ciphertext')
-                with patch.object(source,'command',side_effect=[b'',('\n'.join(services)+'\n').encode()]) as run:
+                with patch.object(source,'command',side_effect=[b'', writer_status(services)]) as run:
                     source.recover(config)
                 self.assertEqual(run.call_args_list[0].args[0],source.compose(config[component])+['start',*services])
                 self.assertEqual((root/'ready.export').read_bytes(),b'previous-complete-point')
@@ -224,7 +361,7 @@ class BackupProtocolTest(unittest.TestCase):
                     with self.assertRaises(ValueError):source.recover(dict(work_root=str(root)))
                     command.assert_not_called()
             intent.write_text(json.dumps(dict(schema=1,component='app')))
-            with patch.object(source,'command',return_value=b''):
+            with patch.object(source,'command',return_value=b''), patch.object(source.time, 'monotonic', side_effect=[0, 121]):
                 with self.assertRaises(RuntimeError):source.recover(dict(work_root=str(root),app=dict(name='app',root='/fixture')))
             self.assertTrue(intent.exists())
 
@@ -252,6 +389,84 @@ class BackupProtocolTest(unittest.TestCase):
                 execute.assert_not_called()
         with patch.dict(os.environ,{'SSH_ORIGINAL_COMMAND':'export-v1'}),patch.object(gateway.sys,'argv',['gateway']),patch.object(gateway.os,'execv') as execute:
             gateway.main();self.assertEqual(execute.call_args.args[1],['sudo','-n','/usr/local/libexec/hou1-backup-export'])
+
+    def test_initial_capture_retries_failure_and_then_preserves_success(self):
+        import yaml
+        from helpers import run_plays
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/backup_source/tasks/recovery.yml').read_text())
+        first = next(i for i, task in enumerate(tasks)
+                     if task['name'] == 'Check whether the restored host has an initial recovery point')
+        plays = []
+        with tempfile.TemporaryDirectory() as directory:
+            for case, status, expected, capture_enabled in [
+                    ('absent', None, 1, True), ('failed-first', {'last_run_success': 0, 'last_success': 0}, 1, True),
+                    ('successful', {'last_run_success': 1, 'last_success': 1234}, 0, True),
+                    ('failed-later', {'last_run_success': 0, 'last_success': 1234}, 0, True),
+                    ('controller-deferred', None, 0, False)]:
+                root = Path(directory) / case
+                root.mkdir()
+                record, calls = root / 'last-export.json', root / 'calls'
+                if status is not None:
+                    record.write_text(json.dumps(status))
+                selected = yaml.safe_load(yaml.safe_dump(tasks[first:]).replace(
+                    '/var/lib/hou1-backup/last-export.json', str(record)))
+                # Execute real stat/slurp/when behavior, replacing only the host service.
+                for task in selected:
+                    if 'ansible.builtin.systemd_service' in task:
+                        del task['ansible.builtin.systemd_service']
+                        task['ansible.builtin.command'] = {'argv': [
+                            '/usr/bin/python3', '-c',
+                            'import json; from pathlib import Path; '
+                            f'Path({str(record)!r}).write_text(json.dumps({{"last_success": 1234}})); '
+                            f'Path({str(calls)!r}).open("a").write("capture ")']}
+                # The same inputs must retry a failed first attempt once, then be a no-op.
+                checks = [{'ansible.builtin.assert': {'that':
+                    f"lookup('ansible.builtin.file', '{calls}', errors='ignore') | default('', true) "
+                    f"| split | length == {expected}"}}]
+                plays.append({'variables': {'hou1_backup_capture_on_initialize': capture_enabled},
+                              'tasks': selected + selected + checks})
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_deferred_initialization_does_not_activate_services_under_capture_lock(self):
+        import fcntl
+        import yaml
+        from helpers import run_plays
+        tasks = yaml.safe_load((ROOT / 'ansible/playbooks/roles/backup_source/tasks/recovery.yml').read_text())
+        names = {'Recover interrupted writers at boot and before enabling local capture',
+                 'Enable nightly local capture before off-host collection'}
+        selected = [task for task in tasks if task['name'] in names]
+        self.assertEqual(len(selected), 2)
+        with tempfile.TemporaryDirectory() as folder:
+            lock = Path(folder) / 'capture.lock'; calls = Path(folder) / 'requests.jsonl'
+            fixture = []
+            for task in selected:
+                fixture.append({'ansible.builtin.set_fact': {
+                    'service_request': task['ansible.builtin.systemd_service']}})
+                fixture.append({'ansible.builtin.command': {'argv': [
+                    '/usr/bin/python3', '-c',
+                    'import fcntl,json,sys; from pathlib import Path; '
+                    'request=json.load(sys.stdin); '
+                    f'handle=Path({str(lock)!r}).open("a+"); '
+                    'fcntl.flock(handle, fcntl.LOCK_EX|fcntl.LOCK_NB) if request.get("state")=="started" else None; '
+                    f'Path({str(calls)!r}).open("a").write(json.dumps(request)+"\\n")'],
+                    'stdin': '{{ service_request | to_json }}'}})
+            # A newly installed recover service must not compete for admission.
+            with lock.open('a+') as held:
+                fcntl.flock(held, fcntl.LOCK_EX | fcntl.LOCK_NB)
+                result = run_plays([{'variables': {'hou1_backup_capture_on_initialize': False}, 'tasks': fixture}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            requests = [json.loads(line) for line in calls.read_text().splitlines()]
+            self.assertTrue(requests[0]['enabled'])
+            self.assertNotIn('enabled', requests[1])
+            self.assertNotIn('state', requests[0])
+            self.assertNotIn('state', requests[1])
+            calls.unlink()
+            # The public playbook's default still activates both services.
+            result = run_plays([{'tasks': fixture}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual([json.loads(line)['state'] for line in calls.read_text().splitlines()],
+                             ['started', 'started'])
 
     def test_source_input_guards_run_before_policy_or_filesystem_changes(self):
         import yaml

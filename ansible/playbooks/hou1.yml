@@ -49,3 +49,7 @@
 
     - role: webstack
       tags: ['deploy', 'webstack', 'ssl']
+
+    - role: identity_admission
+      when: not (node_bootstrap | bool)
+      tags: [deploy, identity, admission]

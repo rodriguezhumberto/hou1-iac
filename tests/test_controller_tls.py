@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import signal
 from pathlib import Path
 import socket
 import ssl
@@ -60,6 +61,14 @@ class ControllerTlsTest(unittest.TestCase):
     @classmethod
     def tearDownClass(cls):
         cls.trust.stop();cls.temporary.cleanup()
+
+    def setUp(self):
+        state = tempfile.TemporaryDirectory()
+        self.addCleanup(state.cleanup)
+        self.state = Path(state.name)
+        self.state_patch = patch.object(receiver, 'STATE', self.state)
+        self.state_patch.start()
+        self.addCleanup(self.state_patch.stop)
 
     def config(self,root):
         return {'environment':'production','lineages':self.lineages,'app_directory':str(root/'app'),
@@ -133,6 +142,154 @@ class ControllerTlsTest(unittest.TestCase):
                     with self.assertRaisesRegex(RuntimeError,'ingress absent'):
                         receiver.install(c,bundle,bootstrap=bootstrap)
             self.assertEqual({p.name:p.read_bytes() for p in folder.iterdir()},before)
+
+    def test_rotation_and_failed_reload_preserve_certificate_metadata(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c=self.config(Path(directory))
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                receiver.install(c,self.bundles[0],bootstrap=True)
+            folder=Path(c['certificate_directory'])/'live/auth.example.invalid'
+            paths=[folder/name for name in ('fullchain.pem','privkey.pem')]
+            for path in paths:
+                path.chmod(0o640)
+                if os.geteuid()==0:
+                    os.chown(path,12345,12345)
+
+            def metadata():
+                return [(path.stat().st_mode & 0o777, path.stat().st_uid,
+                         path.stat().st_gid) for path in paths]
+
+            expected=metadata()
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                self.assertTrue(receiver.install(c,self.bundles[1])['changed'])
+            self.assertEqual(metadata(),expected)
+            before=[path.read_bytes() for path in paths]
+
+            def fail_first_reload(config,*args):
+                if args==('-s','reload') and not events:
+                    events.append('failed')
+                    raise RuntimeError('injected reload failure')
+
+            events=[]
+            with patch.object(receiver,'nginx',side_effect=fail_first_reload),patch.object(receiver,'served'):
+                with self.assertRaisesRegex(RuntimeError,'previous certificate files restored'):
+                    receiver.install(c,self.bundles[0])
+            self.assertEqual([path.read_bytes() for path in paths],before)
+            self.assertEqual(metadata(),expected)
+
+            archive=Path(c['certificate_directory'])/'archive'
+            archive.mkdir()
+            for path in paths:
+                path.replace(archive/path.name)
+                path.symlink_to('../../archive/'+path.name)
+                if os.geteuid()==0:
+                    os.lchown(path,12346,12346)
+            link_owners=[(path.lstat().st_uid,path.lstat().st_gid) for path in paths]
+            events=[]
+            with patch.object(receiver,'nginx',side_effect=fail_first_reload),patch.object(receiver,'served'):
+                with self.assertRaises(RuntimeError):
+                    receiver.install(c,self.bundles[0])
+            self.assertTrue(all(path.is_symlink() for path in paths))
+            self.assertEqual([os.readlink(path) for path in paths],
+                             ['../../archive/'+path.name for path in paths])
+            self.assertEqual([(path.lstat().st_uid,path.lstat().st_gid) for path in paths],link_owners)
+            self.assertEqual([path.read_bytes() for path in paths],before)
+            self.assertEqual(metadata(),expected)
+            with patch.object(receiver,'nginx'),patch.object(receiver,'served'):
+                receiver.install(c,self.bundles[0])
+            self.assertEqual(metadata(),expected)
+            self.assertFalse(list(Path(directory).rglob('.tls-*')))
+
+    def test_redelivery_recovers_real_process_death_between_writes_and_before_reload(self):
+        for writes in (1, 2):
+            with self.subTest(writes=writes), tempfile.TemporaryDirectory() as directory:
+                root = Path(directory)
+                c = self.config(root)
+                receiver.install(c, self.bundles[0], bootstrap=True)
+                folder = Path(c['certificate_directory']) / 'live/auth.example.invalid'
+                paths = [folder / name for name in ('fullchain.pem', 'privkey.pem')]
+                for path in paths:
+                    path.chmod(0o640)
+                old_metadata = material.validate_bundle(self.bundles[0], 'production', self.lineages)
+                served_generation = root / 'served.json'
+                served_generation.write_text(json.dumps(old_metadata))
+                source = ROLES / 'controller_tls/files/receive.py'
+                program = f"""
+import importlib.util,json,os,signal,sys
+from pathlib import Path
+sys.path.insert(0,{str(ROOT / 'scripts')!r})
+spec=importlib.util.spec_from_file_location('receiver',{str(source)!r})
+m=importlib.util.module_from_spec(spec);spec.loader.exec_module(m)
+m.STATE=Path({str(self.state)!r})
+c={c!r}
+bundle={self.bundles[1]!r}
+original=m.private_write
+count=0
+def interrupted(path,data,metadata=None):
+    global count
+    original(path,data,metadata)
+    if path.name in ('fullchain.pem','privkey.pem'):
+        count+=1
+        if count=={writes}:os.kill(os.getpid(),signal.SIGKILL)
+m.private_write=interrupted
+# Syntax validation uses the real certificate/key checks, so a torn pair is
+# fatal unless the journal is restored before the normal Nginx preflight.
+def nginx(config,*args):
+    folder=Path(config['certificate_directory'])/'live/auth.example.invalid'
+    current={{'environment':'production','certificates':{{'auth.example.invalid':{{
+        'fullchain':(folder/'fullchain.pem').read_text(),
+        'private_key':(folder/'privkey.pem').read_text()}}}}}}
+    metadata=m.validate_bundle(current,'production',config['lineages'])
+    if args==('-s','reload'):Path({str(served_generation)!r}).write_text(json.dumps(metadata))
+m.nginx=nginx
+m.install(c,bundle)
+"""
+                child = subprocess.run([sys.executable, '-c', program], capture_output=True, text=True)
+                self.assertEqual(child.returncode, -signal.SIGKILL, child.stdout + child.stderr)
+                journal = self.state / 'activation.json'
+                self.assertTrue(journal.exists())
+                self.assertEqual(journal.stat().st_mode & 0o777, 0o600)
+                self.assertEqual(json.loads(served_generation.read_text()), old_metadata)
+                with self.assertRaisesRegex(RuntimeError, 'redelivery'):
+                    receiver.verify_installed(c)
+                events = []
+                def nginx(config, *args):
+                    installed = {'environment': 'production', 'certificates': {'auth.example.invalid': {
+                        'fullchain': paths[0].read_text(), 'private_key': paths[1].read_text()}}}
+                    metadata = material.validate_bundle(installed, 'production', self.lineages)
+                    events.append(args)
+                    if args == ('-s', 'reload'):
+                        served_generation.write_text(json.dumps(metadata))
+                def served(config, metadata):
+                    self.assertEqual(json.loads(served_generation.read_text()), metadata)
+                with patch.object(receiver, 'nginx', side_effect=nginx), patch.object(receiver, 'served', side_effect=served):
+                    result = receiver.install(c, self.bundles[1])
+                    self.assertTrue(result['verified_served_certificate'])
+                    self.assertFalse(receiver.install(c, self.bundles[1])['changed'])
+                self.assertEqual(events.count(('-s', 'reload')), 2)
+                self.assertFalse(journal.exists())
+                self.assertEqual([path.stat().st_mode & 0o777 for path in paths], [0o640, 0o640])
+
+    def test_activation_rollback_failure_keeps_durable_intent_and_contract_binding(self):
+        with tempfile.TemporaryDirectory() as directory:
+            c = self.config(Path(directory))
+            receiver.install(c, self.bundles[0], bootstrap=True)
+            with patch.object(receiver, 'nginx', side_effect=lambda config, *args:
+                              (_ for _ in ()).throw(RuntimeError('reload failed')) if args == ('-s', 'reload') else None):
+                with self.assertRaisesRegex(RuntimeError, 'reload failed'):
+                    receiver.install(c, self.bundles[1])
+            journal = self.state / 'activation.json'
+            self.assertTrue(journal.exists())
+            with patch.object(receiver, 'nginx') as nginx:
+                with self.assertRaisesRegex(ValueError, 'contract'):
+                    receiver.install({**c, 'app_directory': c['app_directory'] + '-other'}, self.bundles[1])
+                nginx.assert_not_called()
+            with patch.object(receiver, 'nginx'), patch.object(receiver, 'served'):
+                # Returning to the original desired bundle still reports the
+                # interrupted transaction repair as a change.
+                self.assertTrue(receiver.install(c, self.bundles[0])['changed'])
+                self.assertTrue(receiver.install(c, self.bundles[1])['verified_served_certificate'])
+            self.assertFalse(journal.exists())
 
     def test_import_requests_bootstrap_only_for_explicit_bootstrap_inventory(self):
         tasks=yaml.safe_load((ROLES/'controller_tls/tasks/main.yml').read_text())
@@ -249,7 +406,7 @@ class ControllerTlsTest(unittest.TestCase):
 
     def test_gateway_denies_shell_arguments_bootstrap_and_other_commands(self):
         with patch.object(sys,'argv',['gateway']):
-            for action,tail in [('deploy-v1',[]),('status-v1',['--metrics'])]:
+            for action,tail in [('deploy-v1',['--renew']),('status-v1',['--metrics'])]:
                 with patch.dict(os.environ,SSH_ORIGINAL_COMMAND=action),patch.object(gateway.os,'execv') as execute:
                     gateway.main();execute.assert_called_once_with('/usr/bin/sudo',['sudo','-n','/usr/local/libexec/hou1-tls-receive',*tail])
             for action in ('bash','deploy-v1 --bootstrap','deploy-v1 --prepare','deploy-v1 --verify',
@@ -284,6 +441,13 @@ class ControllerTlsTest(unittest.TestCase):
             Path(c['ssh_config']).write_text(base);known.chmod(0o666)
             with self.assertRaises(ValueError):controller.read_config(config,transport=True)
             known.chmod(0o600);root.chmod(0o755)
+            with self.assertRaises(ValueError):controller.read_config(config)
+            root.chmod(0o700)
+            lock=root/'workflow.lock';lock.touch(mode=0o600)
+            c['coordination_lock']=str(lock)
+            controller.private_write(config,json.dumps(c).encode())
+            self.assertEqual(controller.read_config(config)[0],c)
+            lock.unlink();lock.symlink_to(root/'age.key')
             with self.assertRaises(ValueError):controller.read_config(config)
 
     def test_real_sops_issuance_dry_run_cleanup_and_failed_delivery_preserve_success(self):
@@ -437,7 +601,10 @@ class ControllerTlsTest(unittest.TestCase):
                     text=env.from_string((ROLES/'controller_tls/templates'/f'{name}.j2').read_text()).render(**variables)
                     unit='hou1-tls-'+environment+('-status' if name.startswith('status') else '')+'.'+name.rsplit('.',1)[1]
                     path=root/unit;path.write_text(text.replace('/private/tls/controller-tls.py','/usr/bin/true'));files.append(str(path))
-                    if name=='renew.service':self.assertIn('--deploy',text)
+                    if name=='renew.service':
+                        self.assertIn('--deploy',text)
+                        self.assertIn('Restart=on-failure',text)
+                        self.assertIn('StartLimitBurst=3',text)
                     if name.endswith('timer'):self.assertIn('Persistent=true',text)
                 result=subprocess.run(['systemd-analyze','--user','verify',*files],capture_output=True,text=True)
                 self.assertEqual(result.returncode,0,result.stderr)

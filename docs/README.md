@@ -16,6 +16,7 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 | Manage users and device access | [NetBird operations](netbird-operations.md), [identity admission](authentik-bootstrap.md#google-admission-and-staffvpn-assignments) |
 | Revoke access and sessions | [Offboarding](operator-offboarding.md) |
 | Recover identity/VPN access | [Break-glass recovery](netbird-break-glass.md) |
+| Understand or separate the operations controller | [Controller responsibilities and migration handoff](controller-responsibilities.md) |
 | Renew TLS or recover the controller | [Controller TLS](controller-tls.md), [renewal peer](controller-renewal-peer.md) |
 | Configure monitoring and SSO | [Monitoring](environment-monitoring.md), [Grafana SSO](grafana-sso.md) |
 | Inspect requests or synthetic logins | [Request metrics](request-login-monitoring.md), [staff probe](probes/staff-login-probe.md) |
@@ -28,7 +29,8 @@ guide says otherwise. [Development](development.md) maps the code and configurat
 [host policy](authentik-host-policy.md), [ingress](authentik-ingress.md),
 [identity bootstrap](authentik-bootstrap.md) and
 [NetBird compatibility](netbird-authentik-compatibility.md) describe supported contracts.
-The [cleanup plan](cleanup-plan.md) records development decisions and follow-up work.
+The [implementation status](cleanup-plan.md) records accepted lab gates and
+remaining work; its linked archive preserves the development journal.
 The [intervention audit](deployment-interventions.md) tracks reproducibility gaps;
 the [managed lab workflow](deployment-workflow.md) coordinates existing test hosts.
 [Lab DNS](lab-dns.md) owns opt-in bootstrap resolution and container DNS access.

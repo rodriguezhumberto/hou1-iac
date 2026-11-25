@@ -1,4 +1,5 @@
 """Persisted publication resumes only the pinned peer handoff after interruption."""
+import base64
 from copy import deepcopy
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
@@ -16,6 +17,47 @@ TASKS = ROLES / 'host_recovery/tasks'
 
 
 class RecoveryResumeTest(unittest.TestCase):
+    def test_backup_only_test_handoff_resumes_without_creating_monitoring_grants(self):
+        with tempfile.TemporaryDirectory() as folder:
+            root = Path(folder)
+            state, stage, evidence, daemon, trace, operations, values, pipeline = self.scenario(root, 'delete')
+            state['groups'] = [g for g in state['groups'] if not g['id'].startswith('metrics-')]
+            state['policies'] = [p for p in state['policies'] if p['id'] != 'metrics-policy']
+            values['host_recovery_monitoring_required'] = False
+            first = run_play(values, pipeline)
+            self.assertNotEqual(first.returncode, 0)
+            saved = json.loads((evidence / 'peer-handoff.json').read_text())
+            self.assertFalse(saved['scope']['monitoring_required'])
+            self.assertEqual([g['id'] for g in saved['source_groups']], ['backup-source'])
+            changed = run_play({**values, 'host_recovery_resume': True, 'host_recovery_monitoring_required': True}, pipeline)
+            self.assertNotEqual(changed.returncode, 0)
+            for _ in range(2):
+                result = run_play({**values, 'host_recovery_resume': True}, pipeline)
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual([op for op in operations if op[0] == 'DELETE'], [('DELETE', 'lost')])
+            self.assertEqual([op for op in operations if op[0] == 'PUT'], [('PUT', 'backup-source')])
+            self.assertFalse(any(g['id'].startswith('metrics-') for g in state['groups']))
+
+    def test_publication_requires_a_non_quarantined_retained_request(self):
+        checkpoint = yaml.safe_load((TASKS / 'publication-checkpoint.yml').read_text())
+        guard = next(task for task in checkpoint if task['name'] ==
+                     'Bind publication to the restored recovery ID, environment and VPN address')
+        values = dict(host_recovery_id='fixture-01', cms_environment='test',
+                      netbird_ip='100.91.0.10', host_recovery_quarantine=False)
+        request = dict(id='fixture-01', environment='test', server_ip='100.91.0.10')
+        scenarios = [({}, True), ({'quarantine': False}, True)]
+        scenarios += [({'quarantine': value}, False) for value in [True, 'false', 0, None]]
+        plays = []
+        for resume in [False, True]:
+            for change, valid in scenarios:
+                variables = {**values, 'host_recovery_resume': resume,
+                             'host_recovery_publication_request': {
+                                 'content': base64.b64encode(
+                                     json.dumps({**request, **change}).encode()).decode()}}
+                plays.append(guard_play(variables, [guard], None if valid else guard['name']))
+        result = run_plays(plays)
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def scenario(self, root, interruption=None):
         state = groups.fixture()
         state['peers'][1].update(name='lost-server', connected=False)
@@ -91,6 +133,7 @@ class RecoveryResumeTest(unittest.TestCase):
             cms_environment='test', netbird_ip='100.91.0.10', netbird_subnet='100.91.0.0/16',
             hou1_backup_receiver_ip='100.91.0.22', netbird_management_url='https://vpn.example.invalid')
         checkpoint = (TASKS / 'publication-checkpoint.yml').read_text().replace('/var/lib/hou1-host-recovery', str(root / 'host'))
+        checkpoint = checkpoint.replace('provider-isolation.yml', str(TASKS / 'provider-isolation.yml'))
         (root / 'publication-checkpoint.yml').write_text(checkpoint)
         preflight = yaml.safe_load((TASKS / 'replacement-preflight.yml').read_text())
         local = next(task for task in preflight if 'ansible.builtin.command' in task)

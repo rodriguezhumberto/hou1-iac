@@ -9,9 +9,11 @@ The [cleanup plan](cleanup-plan.md) records the work order and design choices.
 | --- | --- | --- |
 | Update the app and host configuration | `ansible/playbooks/hou1.yml` | [Production runbook](production-oidc-runbook.md) |
 | Coordinate existing HOU1/HOU4 test hosts | `scripts/deploy-lab.py` | [Managed lab workflow](deployment-workflow.md) |
+| Finalize a published lab restore and verify off-host recovery | `scripts/deploy-lab.py --phase finalize` | [Finalization](deployment-workflow.md#finalize-a-published-restore) |
 | Check lab release, identity and backup inputs locally | `scripts/deploy-lab.py --phase inputs` | [Input contracts](lab-inputs.md) |
 | Generate private inventories and verify managed access | `scripts/prepare-lab.py` | [Inventory generation](lab-inventory.md) |
-| Use an existing isolated controller VPN | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
+| Bootstrap empty isolated VMs from frozen inputs | Existing rehearsal and host playbooks | [Fresh lab bootstrap](probes/lab-bootstrap.md) |
+| Run commands through isolated bootstrap or VPN transport | `scripts/lab-network.py` | [Controller transport](deployment-workflow.md#isolated-controller-transport) |
 | Prepare isolated host/container DNS | `ansible/playbooks/lab-dns.yml` | [Lab DNS](lab-dns.md) |
 | Initialize public ingress and VPN control plane | `ansible/playbooks/bootstrap-control-plane.yml` | [Production runbook](production-oidc-runbook.md) |
 | Upgrade installed OS packages | `ansible/playbooks/os-maintenance.yml` | [OS maintenance](os-maintenance.md) |
@@ -48,6 +50,9 @@ through `scripts/ssh_target.py`. Old fixture domains, containers and paths still
 need review before use with a newly provisioned test environment.
 
 ## Execution locations
+
+[Controller responsibilities](controller-responsibilities.md) distinguish persistent
+operations from the coding agent and record the future separation handoff.
 
 - The controller runs Ansible, decrypts deployment inputs, validates release
   artifacts and manages TLS issuance and renewal. Local tests use disposable fixtures.
@@ -88,8 +93,23 @@ The [SOPS/age guide](sops-age-secrets.md) documents keys, bundles and recovery a
 
 The [intervention audit](deployment-interventions.md) assigns the lab's manual
 steps to code, private inputs or external prerequisites. The
-[deployment workflow](deployment-workflow.md) describes the supported automation
-and the fresh-bootstrap gaps. Keep reusable logic in Git and private values outside it.
+[deployment workflow](deployment-workflow.md) describes the supported automation.
+The [fresh-host result](evidence/lab-bootstrap-2026-11-19.md) records bootstrap
+and repeat checks. [Capture coordination](evidence/capture-coordination-2026-11-19.md)
+records the subsequent deployment/backup exclusion and controller-loss checks.
+The [clean recovery replay](evidence/uninterrupted-replay-2026-11-20.md) records
+uninterrupted restore, publication, backup finalization, unchanged repeat and reboot.
+The [unattended follow-up](evidence/unattended-lab-2026-11-20.md) records scoped
+renewal scheduling, coordinated delivery, source metrics and periodic reader checks.
+The [identity follow-up](evidence/identity-failure-matrix-2026-11-23.md) records
+human access acceptance and the updated failure matrix. Declared base-user
+permissions belong to encrypted inputs consumed by `identity_admission`; its
+controller timer reconciles external users after first login.
+Keep reusable logic in Git and private values outside it.
+`scripts/lab_finalize.py` orders restore finalization through component playbooks;
+`lab_backup_client.py` shares pinned backup transport and offline verification
+with the failure matrix. Source configuration stays under admission; writer
+recovery and capture start after release. Scheduling activates after verification.
 The [ingress migration sequence](ingress-separation.md) records the routing,
 TLS/monitoring and recovery dependencies. Independent ingress is opt-in through
 `shared_ingress_independent`; the combined project remains the default.

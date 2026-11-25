@@ -5,6 +5,14 @@ UUID. It uses the existing private, pinned SSH/sudo management path, not a publi
 HTTP endpoint. The runtime image must advertise staff-offboarding schema 1 and
 include persistent subject blocking. Authentik
 2025.10.4 and NetBird 0.82.0 are the supported releases.
+The default checks require their existing version tags. After digest-locked
+recovery, add `release_images` to the encrypted operator configuration with
+exactly `authentik-server` and `netbird-server`, copied from the reviewed recovery
+image lock. Each value must be its canonical `repository@sha256:<64 hex>` reference.
+Review that these artifacts are the supported releases before approval; a digest
+alone proves no version. The worker requires exact reference matches, without
+registry lookups, retagging or accepting arbitrary digests. Keep this approval
+unchanged for retries; it is bound into the operation manifest.
 
 ## Management and secrets
 
@@ -54,9 +62,11 @@ The operator environment is `test` or `production`; existing Ansible/admission
 configuration calls production `prod`. Test addresses use `100.91.0.0/16`;
 production uses `100.90.0.0/16`. A production app must have
 `STAFF_ENVIRONMENT=production` and the exact issuer; the webstack playbook
-renders that value. Test fixtures alone may use internal `offboard-test-*`
-users with `@example.invalid` addresses. Production targets must be external
-Google-source users. Service, superuser, recovery, and NetBird owner/admin
+renders that value. Internal and external application users at the exact
+`goauthentik.io/sources/google` path are eligible, including users created by
+managed Google enrollment or preprovisioning. Other internal users are refused
+except test-only `offboard-test-*` fixtures with `@example.invalid` addresses.
+Service, superuser, local recovery, and NetBird owner/admin
 identities are refused. Retain independent emergency management access.
 
 ## Execution and retry

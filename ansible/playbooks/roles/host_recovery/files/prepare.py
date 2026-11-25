@@ -1,6 +1,7 @@
 #!/usr/bin/env python3
 """Prepare an environment-bound replacement-host bundle without touching either VPS."""
 import argparse
+import base64
 import importlib.util
 import ipaddress
 import json
@@ -33,28 +34,37 @@ REPOSITORIES = {'postgresql': 'postgres', 'authentik-server': 'ghcr.io/goauthent
 
 def validate(request, metadata, lock, app, netbird):
     contract.layout(request)
+    isolation = contract.isolation(request)
     production = request['environment'] == 'production'
+    quarantine = request.get('quarantine', False)
+    if type(quarantine) is not bool or (quarantine and request['environment'] != 'test'):
+        raise ValueError('Quarantined restore requires an explicit test request')
     if (request['environment'] not in ('test', 'production') or metadata['environment'] != request['environment']
             or not re.fullmatch(r'[a-z0-9][a-z0-9-]{5,39}', request['id'])
             or not re.fullmatch(r'[a-f0-9]{40}', request['staff_revision'])
             or metadata['staff_revision'] != request['staff_revision']
             or metadata['recovery_files'] != [request['runtime_age_path']]
-            or not re.fullmatch(r'/root/\.config/sops/age/[a-z0-9-]+\.key', request['runtime_age_path'])):
+            or not re.fullmatch(r'/root/\.config/sops/age/(?:[a-z0-9-]+\.key|keys\.txt)', request['runtime_age_path'])):
         raise ValueError('Require matching immutable recovery and host-only runtime key')
     if not production:
         suffix = request['test_suffix']
         if (not re.fullmatch(r'[a-z0-9.-]+', suffix) or not re.search(r'(^|[.-])test([.-]|$)', suffix)
-                or 'test' not in Path(request['runtime_age_path']).name):
+                or ('test' not in Path(request['runtime_age_path']).name
+                    and Path(request['runtime_age_path']).name != 'keys.txt')):
             raise ValueError('Require the isolated test suffix and test runtime key')
     subnet = ipaddress.ip_network(request['netbird_subnet'], strict=True)
     source = ipaddress.ip_network(request['bootstrap_cidr'], strict=True)
+    lan_source = (not production and source.version == 4 and any(
+        source.subnet_of(ipaddress.ip_network(cidr))
+        for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16')))
     if (subnet.version != 4 or subnet.prefixlen < 16 or not subnet.subnet_of(ipaddress.ip_network('100.64.0.0/10'))
             or (not production and str(subnet) == '100.90.0.0/16')
-            or source.version != 4 or source.prefixlen != 32 or not source.network_address.is_global
+            or source.version != 4 or source.prefixlen != 32
+            or not (source.network_address.is_global or lan_source)
             or app.get('staff_vpn_subnet') != str(subnet)
             or app['HOU1_VPN_IP'] != request['server_ip']
             or ipaddress.ip_address(request['server_ip']) not in subnet):
-        raise ValueError('Require the saved VPN boundary and one public bootstrap source')
+        raise ValueError('Require the saved VPN boundary and one public bootstrap source (RFC1918 allowed for test only)')
     repositories = dict(REPOSITORIES)
     receipt = metadata.get('application_image')
     if production and receipt is None:
@@ -86,7 +96,7 @@ def validate(request, metadata, lock, app, netbird):
     # Production retains its saved updater setting and normal outbound policy.
     if not production and netbird['server'].get('disableGeoliteUpdate') is not True:
         raise ValueError('Require offline geolocation startup for test recovery')
-    if not production and (not request['deny_cidrs'] or not request['test_addresses']):
+    if not production and not quarantine and isolation == 'host' and (not request['deny_cidrs'] or not request['test_addresses']):
         raise ValueError('Require the existing production isolation inputs')
     for key in ['deny_cidrs', 'allow_local_cidrs', 'allow_update_cidrs']:
         for value in request.get(key, []):
@@ -98,13 +108,14 @@ def validate_compose(request, auth, vpn, web, override):
     """Saved Compose must not grant execution or attach unrelated external state."""
     deployment = request['deployment']
     networks = deployment['networks']
+    allowed_networks = (networks['auth'], networks['netbird'], deployment['projects']['app'] + '-application')
     for key, config in [('auth', auth), ('netbird', vpn), ('app', web), ('app', override)]:
         if config.get('name', deployment['projects'][key]) != deployment['projects'][key]:
             raise ValueError('Saved Compose project differs from the recovery contract')
         if any(config.get(field) for field in ('include', 'secrets', 'configs')):
             raise ValueError('Unexpected saved Compose resource')
         for network in config.get('networks', {}).values():
-            if network.get('external') and network.get('name') not in (networks['auth'], networks['netbird']):
+            if network.get('external') and network.get('name') not in allowed_networks:
                 raise ValueError('Unexpected external recovery network')
     for config in [auth, vpn, web, override]:
         if any(config.get(field) for field in ('include', 'secrets', 'configs')):
@@ -118,10 +129,17 @@ def validate_compose(request, auth, vpn, web, override):
     if any(override.get(field) for field in ('volumes', 'name')):
         raise ValueError('Override must not replace project resources')
     for service in override.get('services', {}).values():
-        if not set(service).issubset({'volumes', 'networks'}):
+        if not set(service).issubset({'volumes', 'networks', 'profiles', 'stop_signal', 'stop_grace_period'}):
             raise ValueError('Recovery overrides may change only declared storage and ingress attachments')
+        if ('profiles' in service and service['profiles'] != ['integrated-ingress-disabled']
+                or 'stop_signal' in service and service['stop_signal'] != 'SIGQUIT'
+                or 'stop_grace_period' in service and service['stop_grace_period'] != '30s'):
+            raise ValueError('Unexpected saved ingress lifecycle override')
+    if any(set(value) & {'profiles', 'stop_signal', 'stop_grace_period'}
+           for name, value in override.get('services', {}).items() if name != 'nginx'):
+        raise ValueError('Only the managed ingress lifecycle can be recovered')
     for network in override.get('networks', {}).values():
-        if not network.get('external') or network.get('name') not in (networks['auth'], networks['netbird']):
+        if not network.get('external') or network.get('name') not in allowed_networks:
             raise ValueError('Override must declare only the selected external ingress networks')
 
     if request['environment'] == 'production':
@@ -137,6 +155,49 @@ def validate_compose(request, auth, vpn, web, override):
             raise ValueError('Saved identity alias differs from the selected production profile')
 
 
+def recovery_ingress(web, override):
+    """Reactivate the saved integrated listener for the cold-recovery layout."""
+    override['services'].get('nginx', {}).pop('profiles', None)
+    if 'app-network' in override.get('networks', {}):
+        # The declared external application network replaces the source network.
+        web['networks']['app-network'] = dict(override['networks']['app-network'])
+
+
+def quarantine_networks(request, auth, vpn, web, override):
+    """Keep restored services on Docker-internal networks with local DNS aliases."""
+    if not request.get('quarantine', False):
+        return
+    names = sorted(set(request['hostnames']))
+    nginx = override['services']['nginx']
+    # Local Docker DNS resolves the saved issuers to this copy's ingress.
+    for options in nginx['networks'].values():
+        options['aliases'] = names
+    for config in (auth, vpn, web, override):
+        for network in config.get('networks', {}).values():
+            if not network.get('external'):
+                network['internal'] = True
+
+
+def netbird_secrets(config, source):
+    """Recover original schema-1 keys, including points predating secrets.json."""
+    try:
+        server = config['server']
+        values = {'relay_auth_secret': server['authSecret'],
+                  'store_encryption_key': server['store']['encryptionKey'],
+                  'cookie_encryption_key': server['auth']['sessionCookieEncryptionKey']}
+        for value in values.values():
+            if (not isinstance(value, str) or len(base64.b64decode(value, validate=True)) != 32
+                    or base64.b64encode(base64.b64decode(value, validate=True)).decode() != value):
+                raise ValueError('Invalid original NetBird encryption material')
+        path = Path(source) / 'secrets.json'
+        if path.is_symlink() or (path.exists() and (not path.is_file()
+                or json.loads(path.read_text()) != values)):
+            raise ValueError('Saved NetBird secrets disagree with server configuration')
+        return values
+    except (KeyError, TypeError) as error:
+        raise ValueError('Missing original NetBird encryption material') from error
+
+
 def prepare(request, payload, source_bundle, image_lock, output):
     os.umask(0o077)
     payload, output = Path(payload).resolve(), Path(output)
@@ -145,6 +206,7 @@ def prepare(request, payload, source_bundle, image_lock, output):
     app = drill.environment(payload / 'app-config/.env')
     netbird = yaml.safe_load((payload / 'netbird-files/config.yaml').read_text())
     origins = validate(request, metadata, lock, app, netbird)
+    original_netbird_secrets = netbird_secrets(netbird, payload / 'netbird-files')
     receipt = artifact.saved(payload, request['staff_revision'])
     auth = yaml.safe_load((payload / 'authentik/compose.yaml').read_text())
     vpn = yaml.safe_load((payload / 'netbird-files/compose.yaml').read_text())
@@ -192,6 +254,9 @@ def prepare(request, payload, source_bundle, image_lock, output):
         raise ValueError('Never reuse a staging directory')
     output.mkdir(parents=True, mode=0o700)
     try:
+        secrets_path = output / 'netbird-secrets.json'
+        secrets_path.write_text(json.dumps(original_netbird_secrets) + '\n')
+        secrets_path.chmod(0o600)
         repository = output / 'source.git'
         subprocess.run(['git', 'clone', '--bare', '--branch', 'recovery', str(source_bundle), str(repository)], capture_output=True, check=True)
         def git(*args):
@@ -208,6 +273,10 @@ def prepare(request, payload, source_bundle, image_lock, output):
             for name, service in config['services'].items():
                 if name in lock:
                     service['image'] = lock[name]
+        recovery_ingress(web, override)
+        quarantine_networks(request, auth, vpn, web, override)
+        # This is a reviewed recovery rendering, not an edit to the saved point.
+        (output / 'app.override.json').write_text(json.dumps(override, indent=2) + '\n')
         web['services']['astro-app'].pop('build', None)
         web['services']['astro-app']['image'] = receipt['image'] if receipt else 'hou1-restored-staff:' + request['staff_revision']
         for name, value in [('auth.compose.json', auth), ('netbird.compose.json', vpn), ('app.compose.json', web)]:
@@ -242,7 +311,7 @@ def prepare(request, payload, source_bundle, image_lock, output):
         shutil.copyfile(HERE / 'restore.py', output / 'restore.py')
         shutil.copyfile(HERE / 'contract.py', output / 'contract.py')
         shutil.copyfile(ROLES / 'application_image/files/artifact.py', output / 'artifact.py')
-        if request['environment'] == 'test':
+        if request['environment'] == 'test' and contract.isolation(request) == 'host':
             shutil.copyfile(ROLES / 'rehearsal_gates/files/isolation.py', output / 'isolation.py')
         with tarfile.open(output / 'bundle.tar', 'w') as archive:
             archive.add(payload, arcname='payload')

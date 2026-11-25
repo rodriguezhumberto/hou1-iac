@@ -1,6 +1,12 @@
 ---
 host_recovery_root: '/var/lib/hou1-host-recovery/{{ host_recovery_id }}'
 host_recovery_console_confirmed: false
+# Separate test replacement: no enrollment, external networks or publication.
+host_recovery_quarantine: false
+# Existing recoveries use host isolation. Provider ownership is explicit and test-only.
+host_recovery_isolation_mode: host
+host_recovery_provider_isolation: {}
 # Optional handoffs require private inventory inputs; no transport is inferred.
 host_recovery_renewal_handoff: false
 host_recovery_resume: false
+host_recovery_monitoring_required: true

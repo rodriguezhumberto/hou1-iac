@@ -1,0 +1,14 @@
+---
+- name: Explicitly seed credentials for existing isolated test identities
+  hosts: "{{ target_hosts | default('hou1_test') }}"
+  gather_facts: false
+  become: true
+  pre_tasks:
+    - name: Validate inventory targeting before any connection or controller changes
+      ansible.builtin.import_tasks: tasks/validate-target.yml
+      tags: [always]
+  tasks:
+    - name: Apply test identity credentials without changing access grants
+      ansible.builtin.import_role:
+        name: authentik
+        tasks_from: seed-test-users

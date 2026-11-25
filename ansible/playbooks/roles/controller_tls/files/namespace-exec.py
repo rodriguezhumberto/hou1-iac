@@ -15,6 +15,17 @@ MODES = {'controller-tls.py': {'--deploy', '--publish-status', '--check-config',
          'publish-renewal-metrics.py': {''}}
 
 
+def configuration(launcher):
+    """The root-installed filename selects one profile; callers cannot select it."""
+    name = Path(launcher).name
+    if name == 'controller-renewal-exec':
+        return CONFIG
+    match = re.fullmatch(r'controller-renewal-exec-([a-z][a-z0-9-]{0,31})', name)
+    if not match:
+        raise ValueError('Unknown installed renewal launcher')
+    return CONFIG.with_name('exec-' + match[1] + '.json')
+
+
 def private(path, owner):
     path = Path(path)
     if (not path.is_absolute() or path.is_symlink() or not path.is_file()
@@ -53,10 +64,11 @@ def invocation(config, job, container):
 def main():
     if os.getuid() != 0 or len(sys.argv) != 2 or not re.fullmatch(r'[a-z][a-z0-9-]{1,80}', sys.argv[1]):
         raise ValueError('Require one fixed job identifier')
-    private(CONFIG, 0)
-    if CONFIG.parent.stat().st_uid != 0 or CONFIG.parent.stat().st_mode & 0o077:
+    path = configuration(__file__)
+    private(path, 0)
+    if path.parent.stat().st_uid != 0 or path.parent.stat().st_mode & 0o077:
         raise ValueError('Executor configuration must be root-private')
-    config = json.loads(CONFIG.read_text())
+    config = json.loads(path.read_text())
     if not re.fullmatch(r'[a-z][a-z0-9-]{2,62}', config['container']):
         raise ValueError('Invalid namespace selector')
     result = subprocess.run(['/usr/bin/docker', 'inspect', config['container']],

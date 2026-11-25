@@ -325,7 +325,7 @@ class ComposeRuntimeTest(unittest.TestCase):
 @unittest.skipUnless(shutil.which('docker'), 'Docker is needed for the disposable Compose fixture')
 class ComposeRuntimeIntegrationTest(unittest.TestCase):
     def test_real_noop_atomic_rotation_environment_and_stopped_service(self):
-        image = 'nginx:1.28.0-alpine'
+        image = 'nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3'
         if subprocess.run(['docker', 'image', 'inspect', image], capture_output=True, timeout=15).returncode:
             self.skipTest('Pinned fixture image is not cached locally')
         with tempfile.TemporaryDirectory(prefix='hou1-apply-') as folder:

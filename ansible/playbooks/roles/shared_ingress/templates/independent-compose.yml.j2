@@ -1,6 +1,6 @@
 services:
   nginx:
-    image: '{{ application_image_compose.services.nginx.image }}'
+    image: '{{ shared_ingress_nginx_service.image }}'
     restart: unless-stopped
     # Let in-flight requests finish before Docker force-stops the listener.
     stop_signal: SIGQUIT

@@ -4,7 +4,8 @@ HOU1 hosts the application, Nginx, Authentik/PostgreSQL and the NetBird control
 plane in Compose projects. HOU4 hosts monitoring and backup collection. Host
 security, NetBird clients and systemd jobs remain OS services. Application images
 are CI-built and deployed by digest. See [production operations](production-oidc-runbook.md)
-for current evidence and the remaining recovery tests.
+for dated production evidence, and [implementation status](cleanup-plan.md) for
+later lab acceptance and remaining recovery gates.
 
 ## Identity boundaries
 
@@ -70,5 +71,5 @@ opening ingress. Never run two copies of the same VPN identity. A code or
 configuration rollback does not undo data or external-provider changes. After
 website cutover, reconcile new writes before reopening the old application.
 
-See [production status](production-oidc-runbook.md#production-status) for accepted
+See [dated production acceptance](production-oidc-runbook.md#dated-production-acceptance) for accepted
 results and outstanding recovery validation.

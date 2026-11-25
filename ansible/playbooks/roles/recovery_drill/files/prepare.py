@@ -20,6 +20,9 @@ spec.loader.exec_module(certificates)
 spec = importlib.util.spec_from_file_location('application_artifact', HERE.parents[1] / 'application_image/files/artifact.py')
 artifact = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(artifact)
+spec = importlib.util.spec_from_file_location('recovery_resources', HERE / 'resources.py')
+resources = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(resources)
 
 
 def environment(path):
@@ -43,6 +46,7 @@ def isolated_origin(value, suffix):
 
 
 def validate(request, metadata):
+    resources.profile(request)
     project = request['project']
     if (request['environment'] != 'test' or metadata['environment'] != 'test'
             or not re.fullmatch(r'hou1-recovery-drill-[a-z0-9][a-z0-9-]{5,39}', project)
@@ -62,7 +66,7 @@ def validate(request, metadata):
                    or 'test' not in name for name in request['primary_containers'])):
         raise ValueError('Declare exactly seven distinct test primary containers in service order')
     for key in ('admin_username', 'reader_username'):
-        if not re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,63}', request[key]) or 'test' not in request[key] and not request[key].startswith('vps-staff-'):
+        if not re.fullmatch(r'[a-z0-9][a-z0-9_.-]{1,63}', request[key]) or 'test' not in request[key] and not request[key].startswith(('vps-staff-', 'lab-staff-')):
             raise ValueError('Use separate internal test fixture usernames')
 
 
@@ -72,6 +76,8 @@ def prepare(request, payload, output):
     metadata = json.loads((payload / 'recovery.json').read_text())
     validate(request, metadata)
     receipt = artifact.saved(payload, request['staff_revision'])
+    if resources.profile(request) == 'constrained' and receipt is None:
+        raise ValueError('Constrained recovery requires the saved CI image; no source build')
     if output.exists():
         raise ValueError('Staging output must not exist')
     app = environment(payload / 'app-config/.env')
@@ -119,7 +125,7 @@ def prepare(request, payload, output):
                                 healthcheck=saved_app['healthcheck'], networks=['recovery'], mem_limit='768m', pids_limit=256,
                                 volumes=[root + '/payload/cms/database:/var/data', root + '/payload/cms/media:/var/data/media'])
     aliases = [urlsplit(value).hostname for value in origins.values()]
-    services['proxy'] = dict(image='nginx:1.28.0-alpine', restart='no', networks={'recovery': {'aliases': aliases}},
+    services['proxy'] = dict(image='nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3', restart='no', networks={'recovery': {'aliases': aliases}},
                              mem_limit='128m', pids_limit=128, volumes=[root + '/proxy.conf:/etc/nginx/nginx.conf:ro', root + '/payload/app-config/certbot/conf:/etc/letsencrypt:ro'])
     if set(services) != {'postgresql', 'authentik-server', 'authentik-worker', 'netbird-server', 'dashboard', 'astro-app', 'proxy'}:
         raise ValueError('Recovery requires exactly the seven expected services')
@@ -132,6 +138,7 @@ def prepare(request, payload, output):
             raise ValueError('Saved service violates drill isolation')
         service['logging'] = {'driver': 'json-file', 'options': {'max-size': '5m', 'max-file': '2'}}
     compose = {'services': services, 'networks': {'recovery': {'internal': True, 'name': request['project']}}}
+    resources.apply(request, compose)
     common = 'proxy_set_header Host $host; proxy_set_header X-Real-IP $remote_addr; proxy_set_header X-Forwarded-For $remote_addr; proxy_set_header X-Forwarded-Proto https; proxy_set_header X-Forwarded-Host $host; proxy_http_version 1.1; proxy_set_header Connection "";'
     servers = []
     for origin, backend in [('auth_origin', 'authentik-server:9000'), ('staff_origin', 'astro-app:4321'), ('netbird_origin', 'netbird-server:80'), ('public_origin', 'astro-app:4321')]:
@@ -151,7 +158,7 @@ def prepare(request, payload, output):
     (output / 'compose.json').write_text(json.dumps(compose, indent=2) + '\n')
     (output / 'proxy.conf').write_text(proxy)
     (output / 'certificate-mapping.json').write_text(json.dumps(mapping, indent=2) + '\n')
-    for name in ('runtime.py', 'build.py', 'check.py', 'http_probe.py', 'identity_smoke.py', 'driver.py'):
+    for name in ('runtime.py', 'build.py', 'check.py', 'http_probe.py', 'identity_smoke.py', 'driver.py', 'resources.py'):
         shutil.copyfile(HERE / name, output / name)
     shutil.copyfile(HERE.parents[1] / 'application_image/files/artifact.py', output / 'artifact.py')
     shutil.copyfile(HERE.parents[4] / 'scripts/verify-recovery.py', output / 'safe_archive.py')

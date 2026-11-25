@@ -3,6 +3,7 @@
 import argparse
 import datetime
 import hashlib
+import importlib.util
 import json
 import os
 from pathlib import Path
@@ -13,11 +14,20 @@ import sys
 ROOT = Path(__file__).resolve().parent
 
 
+def resource_module():
+    spec = importlib.util.spec_from_file_location('recovery_resources', ROOT / 'resources.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    return module
+
+
 def config():
     cfg = json.loads((ROOT / 'drill-input.json').read_text())
     if (cfg['environment'] != 'test' or cfg['root'] != str(ROOT) or ROOT.parent != Path('/var/tmp')
             or cfg['project'] != ROOT.name or not re.fullmatch(r'hou1-recovery-drill-[a-z0-9][a-z0-9-]{5,39}', ROOT.name)):
         raise ValueError('Not a dedicated isolated recovery root')
+    if cfg.get('resource_profile', 'standard') not in ('standard', 'constrained'):
+        raise ValueError('Unknown recovery resource profile')
     return cfg
 
 
@@ -70,6 +80,8 @@ def run(phase):
         raise ValueError('Previous recovery phase has not passed')
     result = {'phase': phase, 'recorded_at': datetime.datetime.now(datetime.timezone.utc).isoformat()}
     try:
+        constrained = cfg.get('resource_profile', 'standard') == 'constrained'
+        resources = resource_module() if constrained else None
         inputs = None
         if phase == 'identity':
             command = compose(cfg, 'exec', '-T', '-e', 'RECOVERY_ADMIN_USERNAME=' + cfg['admin_username'],
@@ -81,8 +93,9 @@ def run(phase):
         else:
             command = [sys.executable, str(ROOT / {'build': 'build.py', 'start': 'runtime.py', 'http': 'check.py'}[phase])]
         with (ROOT / (phase + '-private.log')).open('xb') as output:
-            process = subprocess.run(command, input=inputs, stdout=output, stderr=subprocess.STDOUT, timeout=1000)
-        if process.returncode:
+            returncode = (resources.execute(cfg, ROOT, command, output, inputs) if constrained else
+                          subprocess.run(command, input=inputs, stdout=output, stderr=subprocess.STDOUT, timeout=1000).returncode)
+        if returncode:
             raise RuntimeError('Recovery phase failed')
         if phase == 'identity':
             for line in (ROOT / 'identity-private.log').read_text().splitlines():

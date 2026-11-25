@@ -1,7 +1,7 @@
 """Local Ansible/OpenSSH fixtures and read-only probe tests; no managed hosts."""
 
 import copy
-from contextlib import redirect_stderr
+from contextlib import nullcontext, redirect_stderr
 import importlib.util
 import io
 import json
@@ -224,18 +224,21 @@ class LabWorkflowTest(unittest.TestCase):
             deploy.assert_not_called()
         first = self.root / 'first'; first.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, first)
-        with patch.object(runner, 'preflight'), patch.object(runner, 'probe'), patch.object(
+        with patch.object(runner, 'capture_guard', return_value=nullcontext()), \
+                patch.object(runner, 'preflight'), patch.object(runner, 'probe'), patch.object(
                 runner, 'playbook', side_effect=workflow.WorkflowError('fixture failed')) as deploy:
             with self.assertRaises(workflow.WorkflowError): runner.execute('reconcile')
             self.assertEqual(deploy.call_count, 1)
         receipt = json.loads((first / 'receipt.json').read_text())
         self.assertEqual(receipt['status'], 'failed')
-        self.assertEqual([r['step'] for r in receipt['steps']], ['hou1-preflight', 'hou4-preflight', 'hou1-reconcile'])
+        self.assertEqual([r['step'] for r in receipt['steps']],
+                         ['hou1-preflight', 'hou4-preflight', 'capture-admission', 'hou1-reconcile'])
         self.assertEqual(receipt['steps'][-1]['status'], 'failed')
         self.assertEqual((first / 'receipt.json').stat().st_mode & 0o777, 0o600)
         retry = self.root / 'retry'; retry.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, retry)
-        with patch.object(runner, 'preflight') as preflight, patch.object(runner, 'probe'), patch.object(runner, 'playbook'):
+        with patch.object(runner, 'capture_guard', return_value=nullcontext()), \
+                patch.object(runner, 'preflight') as preflight, patch.object(runner, 'probe'), patch.object(runner, 'playbook'):
             runner.execute('reconcile')
             self.assertEqual([c.args[0] for c in preflight.call_args_list], ['hou1', 'hou4'])
         self.assertEqual(json.loads((retry / 'receipt.json').read_text())['status'], 'passed')
@@ -252,6 +255,18 @@ class LabWorkflowTest(unittest.TestCase):
             runner.execute('verify')
             self.assertEqual(probe.call_count, 2)
             deploy.assert_not_called()
+
+    def test_finalization_rejects_legacy_or_missing_identity_before_host_access(self):
+        run = self.root / 'finalize'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        with patch.object(runner, 'preflight') as access, patch.object(runner, 'playbook') as deploy:
+            with self.assertRaisesRegex(workflow.WorkflowError, 'version 2'):
+                runner.execute('finalize', str(self.private('offline-key', 'fixture')))
+            access.assert_not_called(); deploy.assert_not_called()
+        with patch.object(workflow.Workflow, 'execute') as execute:
+            self.assertEqual(workflow.main(['--config', str(self.input), '--phase', 'verify',
+                                           '--resume', '/private/receipt.json']), 1)
+            execute.assert_not_called()
 
     def test_workflow_rejects_input_drift_before_invoking_ansible(self):
         host = self.config['hosts']['hou1']
@@ -271,15 +286,19 @@ class LabWorkflowTest(unittest.TestCase):
                            f'Path({str(invocation)!r}).write_text(json.dumps(sys.argv[1:]))\n')
         program.chmod(0o700)
         self.config['ansible_bin_directory'] = str(binary)
+        host = self.config['hosts']['hou1']
+        host['inputs'].append(str(self.private('stale-admission.json', json.dumps({
+            'identity_admission_capture_admitted': True}))))
         run = self.root / 'invocation'; run.mkdir(mode=0o700)
         runner = workflow.Workflow(self.config, run)
-        host = self.config['hosts']['hou1']
         runner.transports['hou1'] = workflow.transport(host)
         runner.playbook('hou1', Path(host['repository']) / 'ansible/playbooks/hou1.yml', 'deploy')
         argv = json.loads(invocation.read_text())
         self.assertEqual(argv[argv.index('--limit') + 1], host['target'])
         extra = json.loads(argv[-1])
-        self.assertEqual(extra, {'target_hosts': host['target']})
+        self.assertEqual(extra, {'target_hosts': host['target'],
+                                'identity_admission_capture_admitted': False,
+                                'security_netbird_ssh_options': runner.transports['hou1'][0][1:]})
         hosts = {name: json.loads((run / 'host_vars' / (name + '.json')).read_text())
                  for name in (host['target'], 'localhost')}
         self.assertEqual(hosts[host['target']]['ansible_host'], host['ssh_host_ip'])
@@ -288,6 +307,27 @@ class LabWorkflowTest(unittest.TestCase):
         self.assertIn('StrictHostKeyChecking=yes', hosts[host['target']]['ansible_ssh_common_args'])
         self.assertEqual(hosts['localhost']['ansible_connection'], 'local')
         self.assertNotIn('--tags', argv)
+        with patch.object(runner, 'capture') as capture:
+            capture.run.side_effect = subprocess.run
+            runner.playbook('hou1', Path(host['repository']) / 'ansible/playbooks/hou1.yml', 'admitted-deploy')
+        admitted = json.loads(json.loads(invocation.read_text())[-1])
+        self.assertTrue(admitted['identity_admission_capture_admitted'])
+
+    def test_public_playbook_can_select_a_tagged_recovery_phase(self):
+        binary = self.root / 'tagged-bin'; binary.mkdir()
+        invocation = self.root / 'tagged-invocation.json'
+        program = binary / 'ansible-playbook'
+        program.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                           f'Path({str(invocation)!r}).write_text(json.dumps(sys.argv[1:]))\n')
+        program.chmod(0o700)
+        self.config['ansible_bin_directory'] = str(binary)
+        run = self.root / 'tagged'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        host = self.config['hosts']['hou4']
+        runner.transports['hou4'] = workflow.transport(host)
+        runner.playbook('hou4', Path(host['repository']) / 'ansible/playbooks/hou4.yml',
+                        'monitoring', extra_args=['--tags', 'monitoring'])
+        self.assertEqual(json.loads(invocation.read_text())[-2:], ['--tags', 'monitoring'])
 
     def test_frozen_transport_preserves_real_controller_delegation(self):
         self.inventory('hou1', ansible_connection='unusable', ansible_ssh_host='100.91.0.99')
@@ -318,11 +358,62 @@ class LabWorkflowTest(unittest.TestCase):
         import socket
         self.assertEqual(json.loads(output.read_text())['hostname'], socket.gethostname())
 
+    def test_security_probe_uses_workflow_pin_despite_old_extra_variable_options(self):
+        self.inventory('hou1', new_user='fixture')
+        host = self.config['hosts']['hou1']
+        stale = self.private('stale-security.yml', yaml.safe_dump({
+            'security_netbird_ssh_options': ['-F', '/old/ssh-config', '-o',
+                                             'UserKnownHostsFile=/old/known-hosts']}))
+        host['inputs'] = [str(stale)]
+        capture = self.root / 'security-probe-argv.json'
+        binary = self.root / 'probe-bin'; binary.mkdir()
+        ssh = binary / 'ssh'
+        ssh.write_text(f'#!{sys.executable}\nimport json,sys\nfrom pathlib import Path\n'
+                       f'Path({str(capture)!r}).write_text(json.dumps(sys.argv[1:]))\n')
+        ssh.chmod(0o700)
+        play = Path(host['repository']) / 'ansible/playbooks/hou1.yml'
+        play.write_text(yaml.safe_dump([{'hosts': host['target'], 'gather_facts': False,
+            'tasks': [{'ansible.builtin.import_tasks': str(
+                ROOT / 'ansible/playbooks/roles/security/tasks/verify-access.yml')}]}]))
+        subprocess.run(['git', '-C', host['repository'], 'add', '.'], check=True)
+        subprocess.run(['git', '-C', host['repository'], '-c', 'user.name=Fixture', '-c',
+            'user.email=fixture@example.invalid', 'commit', '-qm', 'security probe fixture'], check=True)
+        host['revision'] = subprocess.check_output(
+            ['git', '-C', host['repository'], 'rev-parse', 'HEAD'], text=True).strip()
+        run = self.root / 'security-probe'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        fixed = workflow.transport(host)
+        runner.transports['hou1'] = fixed
+        env = workflow.environment(self.config, host)
+        env['PATH'] = str(binary) + os.pathsep + env['PATH']
+        with patch.object(workflow, 'environment', return_value=env):
+            runner.playbook('hou1', play, 'security-probe')
+        argv = json.loads(capture.read_text())
+        self.assertEqual(argv[:len(fixed[0]) - 1], fixed[0][1:])
+        self.assertNotIn('UserKnownHostsFile=/old/known-hosts', argv)
+        self.assertEqual(argv[-2:], ['fixture@' + host['ssh_host_ip'], 'sudo -n true'])
+
     def test_global_ansible_extra_vars_are_rejected_before_execution(self):
         source = self.private('extra.yml', 'ansible_connection: ssh\n')
         self.config['hosts']['hou1']['inputs'] = [str(source)]
         with self.assertRaisesRegex(workflow.WorkflowError, 'in inventory'):
             self.load()
+
+    def test_missing_host_pattern_fails_instead_of_reporting_an_empty_deployment(self):
+        host = self.config['hosts']['hou1']
+        play = Path(host['repository']) / 'ansible/playbooks/hou1.yml'
+        play.write_text(yaml.safe_dump([{'hosts': 'missing_monitoring_targets',
+            'gather_facts': False, 'tasks': [{'ansible.builtin.fail': {'msg': 'must not connect'}}]}]))
+        subprocess.run(['git', '-C', host['repository'], 'add', '.'], check=True)
+        subprocess.run(['git', '-C', host['repository'], '-c', 'user.name=Fixture', '-c',
+            'user.email=fixture@example.invalid', 'commit', '-qm', 'unmatched play fixture'], check=True)
+        host['revision'] = subprocess.check_output(
+            ['git', '-C', host['repository'], 'rev-parse', 'HEAD'], text=True).strip()
+        run = self.root / 'missing-hosts'; run.mkdir(mode=0o700)
+        runner = workflow.Workflow(self.config, run)
+        runner.transports['hou1'] = workflow.transport(host)
+        with self.assertRaisesRegex(workflow.WorkflowError, 'missing-hosts failed'):
+            runner.playbook('hou1', play, 'missing-hosts')
 
     def test_invalid_private_yaml_does_not_expose_input_content(self):
         source = self.private('malformed.yml', 'credential: [private-marker\n')

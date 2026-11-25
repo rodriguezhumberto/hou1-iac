@@ -1,5 +1,7 @@
 ---
 hou1_backup_enabled: false
+# Controllers defer recovery/capture activation until admission is released.
+hou1_backup_capture_on_initialize: true
 hou1_backup_environment: '{{ cms_environment }}'
 hou1_backup_receiver_ip: ''
 hou1_backup_transport_public_key: ''

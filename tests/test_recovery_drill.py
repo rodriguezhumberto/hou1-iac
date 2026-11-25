@@ -9,6 +9,7 @@ from pathlib import Path
 import shutil
 import sqlite3
 import subprocess
+import sys
 import tarfile
 import tempfile
 import unittest
@@ -44,6 +45,30 @@ def request():
 
 
 class RecoveryPreparationTest(unittest.TestCase):
+    def test_managed_lab_fixture_names_are_supported_without_accepting_arbitrary_users(self):
+        cfg={**request(),'admin_username':'lab-staff-admin','reader_username':'lab-staff-reader'}
+        prepare.validate(cfg,{'environment':'test','staff_revision':cfg['staff_revision']})
+        for name in ['person','akadmin','person@example.invalid']:
+            with self.subTest(username=name),self.assertRaises(ValueError):
+                prepare.validate({**cfg,'admin_username':name},{'environment':'test','staff_revision':cfg['staff_revision']})
+
+    def test_constrained_preparation_requires_saved_image_and_bounds_every_service(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root = Path(temp); payload = self.fixture(root / 'payload')
+            cfg = {**request(), 'resource_profile': 'constrained'}
+            with self.assertRaisesRegex(ValueError, 'saved CI image'):
+                prepare.prepare(cfg, payload, root / 'no-artifact')
+            receipt = {'image': 'ghcr.io/example/staff@sha256:' + 'b' * 64}
+            with patch.object(prepare.artifact, 'saved', return_value=receipt):
+                prepare.prepare(cfg, payload, root / 'bounded')
+            compose = json.loads((root / 'bounded/compose.json').read_text())
+            self.assertEqual(sum(s['mem_limit'] for s in compose['services'].values()), 2 * 1024**3)
+            self.assertEqual(sum(s['memswap_limit'] - s['mem_limit'] for s in compose['services'].values()),512*1024**2)
+            self.assertTrue(compose['networks']['recovery']['internal'])
+            self.assertTrue(all(not s.get('ports') for s in compose['services'].values()))
+            with tarfile.open(root / 'bounded/bundle.tar') as archive:
+                self.assertIn('resources.py', archive.getnames())
+
     def test_origin_validation_precedes_default_port_normalization(self):
         host = 'netbird-test.' + request()['test_suffix']
         for value in ['https://' + host, 'https://' + host + ':443/']:
@@ -113,6 +138,8 @@ class RecoveryPreparationTest(unittest.TestCase):
             app = compose['services']['astro-app']
             self.assertIn('HOST=0.0.0.0', app['environment'])
             self.assertEqual(app['healthcheck']['test'][-1], 'http://localhost:4321/api/health.json')
+            self.assertEqual(compose['services']['proxy']['image'],
+                             'nginx:1.30.7-alpine@sha256:caf4e1e032a20f9c3c5e28fc7f25ffd768ad8677b4975c54193075997b3a97e3')
             self.assertTrue(compose['networks']['recovery']['internal'])
             for service in compose['services'].values():
                 self.assertFalse(service.get('ports'))
@@ -205,11 +232,14 @@ class RecoveryPreparationTest(unittest.TestCase):
 
     def test_insufficient_headroom_blocks_an_additional_restore_stack(self):
         tasks = yaml.safe_load((FILES.parent / 'tasks/main.yml').read_text())
-        code = next(task for task in tasks if task['name'] == 'Require headroom for the additional isolated stack')['ansible.builtin.command']['argv'][-1]
-        for disk_gib, ram_gib, accepted in [(12, 6, True), (9, 6, False), (12, 3, False)]:
+        code = next(task for task in tasks if task['name'] == 'Require headroom for the additional isolated stack')['ansible.builtin.command']['argv'][-2]
+        for disk_gib, ram_gib, profile, accepted in [(12, 6, 'standard', True), (9, 6, 'standard', False),
+                (12, 3, 'standard', False), (12, 2.6, 'constrained', True), (12, 2, 'constrained', False)]:
             with self.subTest(disk=disk_gib, ram=ram_gib), \
                  patch('os.statvfs', return_value=SimpleNamespace(f_bavail=disk_gib * 1024**3, f_frsize=1)), \
-                 patch('pathlib.Path.read_text', return_value='MemAvailable: ' + str(ram_gib * 1024**2) + ' kB\n'):
+                 patch('sys.argv', ['guard', profile]), \
+                 patch('subprocess.check_output', return_value=b'{"MemoryLimit":true,"SwapLimit":true,"CgroupVersion":"2"}'), \
+                 patch('pathlib.Path.read_text', return_value='MemAvailable: ' + str(int(ram_gib * 1024**2)) + ' kB\n'):
                 if accepted:
                     exec(code, {})
                 else:
@@ -218,6 +248,29 @@ class RecoveryPreparationTest(unittest.TestCase):
 
 
 class RecoveryRuntimeTest(unittest.TestCase):
+    def test_private_sqlite_snapshot_recovers_hot_journal_without_using_uncommitted_rows(self):
+        with tempfile.TemporaryDirectory() as temp:
+            root=Path(temp);module=self.runtime(root);payload=root/'payload';payload.mkdir()
+            database=payload/'store.db'
+            with sqlite3.connect(database) as db:
+                db.execute('CREATE TABLE fixture (value BLOB)')
+                db.execute('INSERT INTO fixture VALUES (?)',(b'committed',))
+            program='''import os,sqlite3,sys
+db=sqlite3.connect(sys.argv[1]);db.execute('PRAGMA cache_size=5');db.execute('BEGIN IMMEDIATE')
+db.executemany('INSERT INTO fixture VALUES (randomblob(4096))',[()]*100)
+os._exit(77)
+'''
+            child=subprocess.run([sys.executable,'-c',program,str(database)],capture_output=True)
+            self.assertEqual(child.returncode,77)
+            with sqlite3.connect(database.as_uri()+'?mode=ro',uri=True) as db:
+                with self.assertRaisesRegex(sqlite3.OperationalError,'readonly'):
+                    db.execute('PRAGMA integrity_check').fetchall()
+            self.assertEqual(module.sqlite_report(database),{'fixture':1})
+            self.assertFalse(Path(str(database)+'-journal').exists())
+            external=root/'outside.db';external.write_bytes(b'synthetic')
+            with self.assertRaisesRegex(AssertionError,'restored payload'):
+                module.sqlite_report(external)
+
     def test_saved_fixture_hashes_are_checked_without_resetting_users_or_exposing_values(self):
         tree = ast.parse((FILES / 'identity_smoke.py').read_text())
         function = next(n for n in tree.body if isinstance(n, ast.FunctionDef) and n.name == 'verify_fixture_passwords')

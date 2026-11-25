@@ -1,0 +1,11 @@
+---
+# Empty source keeps existing deployments unchanged.
+identity_admission_secret_source: ''
+identity_admission_state_directory: '{{ lookup("env", "HOME") }}/.local/state/hou1-identity/{{ authentik_environment }}'
+identity_admission_schedule_enabled: false
+identity_admission_python: /usr/bin/python3
+# The managed workflow sets this only while it owns HOU1's capture admission.
+identity_admission_capture_admitted: false
+# The controller's existing transport wrapper, used only by the scheduled job.
+identity_admission_transport_argv: []
+identity_admission_coordination_lock: ''

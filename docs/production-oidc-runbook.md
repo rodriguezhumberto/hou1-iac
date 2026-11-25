@@ -6,9 +6,12 @@ identity setup, use [bootstrap](authentik-bootstrap.md). A documentation update
 does not authorize deployment, a wipe or a traffic change. Keep secrets, account
 lists and customer data out of commands, Git and evidence reports.
 
-## Production status
+## Dated production acceptance
 
-Current production evidence and remaining handoff limits:
+The records below describe their dated executions, not a fresh inspection of
+production. Later lab passes do not extend their production acceptance scope.
+The [Nginx release record](evidence/nginx-release-status-2026-11-24.md) separates
+the previously applied production image fix from later source versioning.
 
 | Area | Accepted result / remaining limit |
 | --- | --- |
@@ -18,13 +21,15 @@ Current production evidence and remaining handoff limits:
 | Monitoring and renewal | Collection, reboot, probes, backups and TLS status passed after replacement. [Alert delivery](evidence/production-operations-2026-11-11.json) was verified before replacement and not repeated afterward. |
 | Controller recovery | Scoped jobs work after admin access retirement; replacement-controller execution remains [#77](https://github.com/rodriguezhumberto/hou1-iac/issues/77). |
 
-Secret consolidation remains [#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45).
+[#45](https://github.com/rodriguezhumberto/hou1-iac/issues/45) remains open for
+secret-migration acceptance; its original dual-secret description predates the
+current [controller-side SOPS/age inputs](sops-age-secrets.md).
 Independent HOU4 outage monitoring is deferred. Historical results retain exact
 refs and do not select the next release: [isolated recovery](evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json),
 [OIDC acceptance](evidence/oidc-security-acceptance-2026-11-07.md) and
 [signing-key overlap](evidence/jwks-overlap-evidence-2026-11-07.md). Keep test-only guards intact.
 
-The legacy website remains stopped. Retain its node and encrypted copies.
+The recorded cutover left the legacy website stopped. Retain its node and encrypted copies.
 **Reconcile replacement writes before any traffic rollback.**
 
 ## Release record and access

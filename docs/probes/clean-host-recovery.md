@@ -11,18 +11,49 @@ commands. See [production replacement recovery](../production-host-recovery.md) 
 the separate environment-bound entry points. Keep HOU4 and its retained backups
 intact.
 
-[Clean CI-image evidence](../evidence/hou1-ci-clean-host-recovery-2026-11-10-02.json)
-records completed test restore, handoff and reboot. Earlier failed attempts and
-continued-host repairs remain separate historical reports; see
-[evidence](../evidence/README.md). A repaired-host
-result does not establish an uninterrupted run. See the production recovery
-guide for the separate production acceptance requirements.
+The [uninterrupted identity replay](../evidence/uninterrupted-identity-replay-2026-11-23.md)
+accepted test restore, publication, unchanged repeat and reboot with the final
+identity inputs and owner-confirmed external access. The later
+[standalone finalization](../evidence/standalone-first-capture-2026-11-24.md)
+accepted an empty backup source and service restore of its resulting point.
+Earlier failed attempts and continued-host repairs retain their original scope
+in [evidence](../evidence/README.md). These lab results do not establish the
+separate production acceptance requirements.
 
-No test hosts are currently available. Provision a new isolated fixture and
-review its inventory and identities before using this procedure; the former test
-server is production.
+Use an isolated replacement VM with reviewed inventory and identities. The
+[disposable restore gate](../evidence/clean-restore-2026-11-19.md) verifies the
+point and PostgreSQL import without changing either current VM; it does not
+release the fresh-VM wipe checkpoint below.
+The earlier [quarantined VM run](../evidence/quarantined-recovery-2026-11-19.md)
+accepted cold startup and local application/identity behavior on a separate VM,
+with peer handoff and companion transport deliberately deferred.
+Those exclusions describe that earlier run, not the later full replacement result.
+Use the [lab handoff plan](lab-peer-handoff.md) before replacing the active lab.
 
 ## Before wiping HOU1
+
+For a separate fresh VM while HOU1 remains active, set
+`host_recovery_quarantine: true` and bind its private bootstrap inventory to that
+VM's distinct LAN address. The controller source must remain one explicit `/32`;
+test restores accept a public or RFC1918 source; production requires a public
+source. Normal test restore requires its production-deny and test-address inputs,
+or the explicit test-only [provider isolation contract](../../ansible/playbooks/roles/host_recovery/README.md).
+Run `restore-test-host.yml` with
+frozen point/source/image inputs and independent recovery access confirmed.
+
+Quarantine creates every restored Docker network as internal, declares published
+ports on loopback and validates actual running network/port bindings. Docker
+internal networks may not provide host-loopback forwarding; use the declared
+private bridge proxy address for local probes. Saved issuers
+resolve to the restored proxy inside Docker. Publication is refused; do not run
+the peer handoff against the active HOU1. HOU4 connectivity/firewall exceptions
+are unnecessary for local recovery checks and remain a separate decision.
+Changing inventory flags cannot promote this copy: publication checks the
+retained request and rejects quarantine without stopping its services or
+writing a failure marker. A normal handoff requires a fresh restore attempt.
+
+The following wipe/publication checkpoints apply to replacement of the active
+host, not to an unpublished quarantined copy.
 
 1. Confirm HOU4 provider-console login independently of NetBird. Restoring
    NetBird's database and keys should reconnect existing peers, but that is a
@@ -91,6 +122,11 @@ refuses production, an existing installation, existing attempt/evidence IDs,
 and nonempty Docker container/image stores.
 
 ## Restore, review, publish
+
+After verifying the new SSH key, render the managed inventory and run its
+[`inputs` phase](../lab-inventory.md#render-and-inspect) before cold restore.
+This checks the receiver's new source-key pin too; private extra-variable files
+override inventory values. Update their owning inputs, not generated snapshots.
 
 Run once from the immutable infrastructure revision under review:
 
@@ -193,9 +229,12 @@ Verify HOU4 reconnects with its retained peer; use its console if re-enrollment
 is necessary. Confirm the operator's personal SSH key on both nodes. Update
 HOU4's backup source SSH pin through its existing Ansible backup role using the
 verified **new** HOU1 host public key. Do not disable host-key verification.
-Reapply the existing HOU1 `monitoring.yml` and `backups.yml` over VPN, with their
-preserved private inputs, to reconcile policies referring to the replacement
-peer. Prove a fresh off-host collection and real Discord delivery/recovery.
+For the managed two-host lab, run the [finalize phase](../deployment-workflow.md#finalize-a-published-restore).
+It reconciles the source/storage layout before backup initialization, updates
+the receiver and verifies the collected point offline. Reconcile any separately
+declared HOU1 exporter through `monitoring.yml`; do not create missing monitoring
+grants during recovery. Prove a fresh off-host collection and real Discord
+delivery/recovery.
 
 Run the isolated application/session/media/rollback drill against the recovered
 services, external Google sign-in, approved/rejected VPN access, public staff
@@ -236,9 +275,11 @@ with the original private handoff plan. It validates the retained replacement
 identity and exact group/policy scope before repairing remaining stages. Missing
 plans or latched restore/publication errors still stop recovery. Empty groups
 alone do not establish ownership or authorize reassignment.
-Reapply `monitoring.yml` and `backups.yml` over VPN, then HOU4's backup receiver
-role with the verified HOU1 SSH host key. Existing group membership and policy
-ownership guards still apply; do not bypass them to adopt unknown groups.
+Use the managed lab's `finalize` phase with the verified HOU1 SSH host key.
+Outside that workflow, reconcile the normal source/storage layout before
+`backups.yml`, then the receiver; maintain separately declared monitoring through
+its owning playbook. Existing group membership and policy ownership guards still
+apply; do not bypass them to adopt unknown groups.
 Preserve the checked repair separately from the automated recovery evidence.
 
 Use these iterations to prove metrics, backup capture/collection, alert delivery,

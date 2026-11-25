@@ -22,7 +22,9 @@ in this role. Use a scoped controller grant to read the existing encrypted
 NetBird API token. Retire the grant after the release checks.
 
 Run `ansible/playbooks/monitoring.yml` with the selected inventory and the inputs
-above. It must connect through `netbird_ip`, with bootstrap disabled. Check mode,
+above. Supply `hou1_monitoring_inventory_group` through explicit extra-vars: host
+selection happens before host-scoped inventory variables are available.
+It must connect through `netbird_ip`, with bootstrap disabled. Check mode,
 multiple target hosts, public management and mismatched environments fail before
 API writes or package installation. The existing isolated package lease remains
 in effect during rehearsals; production uses ordinary package management.
@@ -59,7 +61,7 @@ backup freshness; and request/login metrics. Configure separate production
 synthetic identities and enable the [environment-bound login probe](probes/staff-login-probe.md)
 before relying on end-to-end login monitoring. Repeat affected checks after
 routing/receiver changes and keep rehearsal-only guards intact. See the
-[production status](production-oidc-runbook.md#production-status) for accepted
+[dated production acceptance](production-oidc-runbook.md#dated-production-acceptance) for accepted
 results and remaining validation limits.
 
 For rollback, remove the HOU1 scrape job and disable its HOU4 rule switches,

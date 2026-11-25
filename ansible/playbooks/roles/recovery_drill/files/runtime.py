@@ -1,5 +1,6 @@
 #!/usr/bin/python3
 """Start only the private recovery project; retain diagnostics in its root-only directory."""
+from contextlib import closing
 import hashlib,json,os,shutil,sqlite3,subprocess,time
 from pathlib import Path
 ROOT=Path(__file__).resolve().parent;PROJECT=json.loads((ROOT/'drill-input.json').read_text())['project']
@@ -15,7 +16,11 @@ def dc(*args,**kwargs):return run(base+list(args),**kwargs)
 def inspect(names):return json.loads(run(['docker','inspect',*names]))
 def sql(query):return dc('exec','-T','postgresql','psql','-h','127.0.0.1','-XqAt','-U','authentik','-d','authentik','-c',query).decode().strip()
 def sqlite_report(path):
- with sqlite3.connect(path.resolve().as_uri()+'?mode=ro',uri=True) as db:
+ # A captured rollback journal must be replayed, never ignored. Only the
+ # private restored copy may be opened writable; live source paths are refused.
+ path=path.resolve(strict=True)
+ assert path.is_relative_to((ROOT/'payload').resolve()),'SQLite recovery must stay in the restored payload'
+ with closing(sqlite3.connect(path.as_uri()+'?mode=rw',uri=True)) as db:
   assert db.execute('PRAGMA integrity_check').fetchall()==[('ok',)]
   tables=[r[0] for r in db.execute("SELECT name FROM sqlite_master WHERE type='table' AND name NOT LIKE 'sqlite_%' ORDER BY name")]
   return {table:db.execute('SELECT count(*) FROM "'+table.replace('"','""')+'"').fetchone()[0] for table in tables}
@@ -64,7 +69,9 @@ def main():
  deployed=run(['git','-C',cfg['app_source'],'rev-parse','HEAD']).decode().strip();assert deployed==saved['staff_revision']
  names=cfg['primary_containers']
  live=inspect(names);baseline={c['Name']:dict(id=c['Id'],started=c['State']['StartedAt']) for c in live}
- (ROOT/'live-baseline.json').write_text(json.dumps(baseline))
+ baseline_path=ROOT/'live-baseline.json'
+ if baseline_path.exists():assert json.loads(baseline_path.read_text())==baseline,'Primary stack changed before restore'
+ else:baseline_path.write_text(json.dumps(baseline))
  compose=json.loads((ROOT/'compose.json').read_text());images={}
  mapping={'postgresql':names[2],'authentik-server':names[0],'authentik-worker':names[1],'netbird-server':names[3],'dashboard':names[4],'astro-app':names[5],'proxy':names[6]}
  for service,name in mapping.items():

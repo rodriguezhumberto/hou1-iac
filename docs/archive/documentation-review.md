@@ -4,8 +4,10 @@ Scope: repository Markdown, cross-checked against Ansible roles, templates and
 accepted production evidence. No live node changes or new production tests were
 performed. Dated evidence reports retain their original results and limitations.
 
-> Historical snapshot. Later SOPS changes supersede the secret-handling findings
-> below. Use the [SOPS/age guide](../sops-age-secrets.md) for current deployment inputs.
+> Historical snapshot, not a current issue list. Later SOPS, inventory-targeting
+> and lab recovery changes supersede several findings and pending gates below.
+> Use the [SOPS/age guide](../sops-age-secrets.md), [current status](../cleanup-plan.md)
+> and [evidence index](../evidence/README.md) for subsequent results.
 
 ## Corrected documentation
 

@@ -1,10 +1,12 @@
 #!/usr/bin/env python3
 """Provision a persistent, isolated NetBird peer for certificate delivery only."""
 import ipaddress
+from http.client import HTTPSConnection
 import json
 import os
 from pathlib import Path
 import re
+import socket
 import subprocess
 import sys
 import time
@@ -16,7 +18,7 @@ OWNER = 'controller-renewal-peer/v1'
 
 
 def validate(config):
-    if set(config) != {'environment', 'management_url', 'subnet', 'server_group', 'targets', 'runtime', 'container'}:
+    if set(config) - {'management_address'} != {'environment', 'management_url', 'subnet', 'server_group', 'targets', 'runtime', 'container'}:
         raise ValueError('Declare the complete peer contract')
     if config['environment'] not in ('test', 'production'):
         raise ValueError('Unknown environment')
@@ -46,6 +48,13 @@ def validate(config):
     if (not root.is_dir() or root.is_symlink() or root.stat().st_uid != os.getuid()
             or root.stat().st_mode & 0o077):
         raise ValueError('Runtime must be controller-owned and private')
+    if 'management_address' in config:
+        if not isinstance(config['management_address'], str):
+            raise ValueError('Declare the management address as an IPv4 string')
+        address = ipaddress.IPv4Address(config['management_address'])
+        if (address.is_unspecified or address.is_loopback or address.is_link_local
+                or address.is_multicast or address == ipaddress.IPv4Address('255.255.255.255')):
+            raise ValueError('Declare a reachable IPv4 management address')
 
 
 def command(argv):
@@ -116,6 +125,8 @@ def require_owned_policy(policy, expected):
 def require_container(container, config, running=True):
     host = container['HostConfig']
     mounts = container['Mounts']
+    pins = ([urlsplit(config['management_url']).hostname + ':' + config['management_address']]
+            if 'management_address' in config else [])
     if (running and not container['State']['Running'] or container['Config']['Image'] != IMAGE
             or host['NetworkMode'] != 'bridge' or host['Privileged']
             or host['CapAdd'] != ['NET_ADMIN'] or host.get('PortBindings')
@@ -124,6 +135,8 @@ def require_container(container, config, running=True):
             or mounts[0]['Destination'] != '/var/lib/netbird' or not mounts[0]['RW']
             or 'no-new-privileges=true' not in host['SecurityOpt']):
         raise ValueError('Unexpected renewal peer container boundary')
+    if (host.get('ExtraHosts') or []) != pins:
+        raise ValueError('Unexpected renewal management address pin')
 
 
 class NoRedirect(urllib.request.HTTPRedirectHandler):
@@ -131,11 +144,35 @@ class NoRedirect(urllib.request.HTTPRedirectHandler):
         raise ValueError('Management API redirects are forbidden')
 
 
+class PinnedHTTPSHandler(urllib.request.HTTPSHandler):
+    """Use the private address without changing TLS SNI, CA checks or Host."""
+    def __init__(self, address, context=None):
+        super().__init__(context=context)
+        self.address = address
+
+    def https_open(self, request):
+        address = self.address
+
+        class Connection(HTTPSConnection):
+            def connect(self):
+                raw = socket.create_connection((address, self.port), self.timeout)
+                try:
+                    self.sock = self._context.wrap_socket(raw, server_hostname=self.host)
+                except BaseException:
+                    raw.close()
+                    raise
+
+        return self.do_open(Connection, request, context=self._context)
+
+
 def provision(config, token):
     validate(config)
     if not isinstance(token, str) or not token or any(c.isspace() for c in token):
         raise ValueError('Missing protected management token')
-    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    handlers = [urllib.request.ProxyHandler({}), NoRedirect()]
+    if 'management_address' in config:
+        handlers.append(PinnedHTTPSHandler(config['management_address']))
+    opener = urllib.request.build_opener(*handlers)
 
     def api(method, path, body=None):
         request = urllib.request.Request(config['management_url'] + '/api' + path, method=method,
@@ -187,7 +224,9 @@ def provision(config, token):
             with os.fdopen(descriptor, 'w') as stream:
                 stream.write(setup['key'])
             command(['docker', 'run', '-d', '--name', config['container'], '--hostname', config['container'],
-                     '--restart', 'unless-stopped', '--network', 'bridge', '--cap-add', 'NET_ADMIN',
+                     '--restart', 'unless-stopped', '--network', 'bridge',
+                     *(['--add-host', urlsplit(config['management_url']).hostname + ':' + config['management_address']]
+                       if 'management_address' in config else []), '--cap-add', 'NET_ADMIN',
                      '--device', '/dev/net/tun', '--security-opt', 'no-new-privileges=true',
                      '--pids-limit', '128', '--memory', '256m', '--cpus', '0.5',
                      '--log-driver', 'local', '--log-opt', 'max-size=10m', '--log-opt', 'max-file=2',

@@ -1,6 +1,8 @@
 """Offboarding safety boundaries; fixtures never contain real identities/secrets."""
 import base64
+import contextlib
 import importlib.util
+import io
 import json
 import os
 from pathlib import Path
@@ -8,6 +10,7 @@ import subprocess
 import sys
 import tempfile
 import unittest
+import uuid
 from unittest.mock import patch
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -17,6 +20,9 @@ import offboard_remote as worker
 spec = importlib.util.spec_from_file_location('offboard', ROOT / 'scripts/offboard-user.py')
 co = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(co)
+spec = importlib.util.spec_from_file_location('admission', ROOT / 'scripts/rehearsal-netbird-admission.py')
+admission = importlib.util.module_from_spec(spec)
+spec.loader.exec_module(admission)
 
 OP = '65ed67a8-f61b-497f-a1be-d65aad432ea9'
 TARGET = '403626e9-21ef-42bf-9d4c-dcf2e6e970f5'
@@ -29,6 +35,8 @@ CONFIG = dict(environment='test', staff_issuer='https://auth-test.example.org/ap
               ssh_fingerprint='SHA256:' + 'a' * 43)
 REMOTE_CONFIG = {k: CONFIG[k] for k in ('environment', 'staff_issuer', 'staff_application',
                                       'staff_client_id', 'netbird_application', 'netbird_client_id')}
+LOCKED_IMAGES = {'authentik-server': 'ghcr.io/goauthentik/server@sha256:' + 'a' * 64,
+                 'netbird-server': 'netbirdio/netbird-server@sha256:' + 'b' * 64}
 REQUEST = dict(operation_id=OP, target_uuid=TARGET, reason='test-drill', reference='issue-47',
                config=REMOTE_CONFIG, action='begin')
 PLAN = dict(target_uuid=TARGET, authentik_pk=42, staff_subject='immutable-sub',
@@ -124,7 +132,9 @@ class BindingTests(unittest.TestCase):
 
     def test_recovery_and_ordinary_internal_identities_protected(self):
         for fields in ({'is_superuser': True}, {'type': 'service_account'},
-                       {'type': 'internal', 'username': 'recovery'}):
+                       {'type': 'internal', 'username': 'recovery', 'path': 'users'},
+                       {'type': 'internal', 'path': 'goauthentik.io/sources/other'},
+                       {'type': 'internal', 'path': 'goauthentik.io/sources/google/child'}):
             user = dict(uuid=TARGET, pk=42, uid='a' * 64, type='external',
                         path='goauthentik.io/sources/google', is_superuser=False,
                         username='synthetic', email='fixture@example.invalid')
@@ -155,6 +165,70 @@ class BindingTests(unittest.TestCase):
             state['staff_environment'] = 'production'
             with self.assertRaisesRegex(worker.Failure, 'staff_runtime_identity_mismatch'):
                 worker.capabilities(REMOTE_CONFIG)
+
+    def test_recovery_digests_require_exact_operator_approval(self):
+        images = dict(LOCKED_IMAGES)
+
+        def inspect(command):
+            self.assertEqual(command[:2], ['docker', 'inspect'])
+            if 'astro-app' in command[-1]:
+                return [{'Config': {'Labels': {'io.pearlandpaws.staff-offboarding-schema': '1'},
+                                    'Env': ['STAFF_ENVIRONMENT=test',
+                                            'STAFF_OIDC_ISSUER=' + CONFIG['staff_issuer']]}}]
+            service = 'authentik-server' if 'authentik' in command[-1] else 'netbird-server'
+            return [{'Config': {'Image': images[service]}}]
+
+        config = {**REMOTE_CONFIG, 'release_images': LOCKED_IMAGES}
+        with patch.object(worker, 'run', side_effect=inspect):
+            self.assertTrue(worker.capabilities(config)['persistent_subject_blocking'])
+            with self.assertRaisesRegex(worker.Failure, 'untested_authentik_release'):
+                worker.capabilities(REMOTE_CONFIG)
+            for service, error in (('authentik-server', 'untested_authentik_release'),
+                                   ('netbird-server', 'untested_netbird_release')):
+                with self.subTest(service=service):
+                    images[service] = LOCKED_IMAGES[service].split('@')[0] + '@sha256:' + 'f' * 64
+                    with self.assertRaisesRegex(worker.Failure, error):
+                        worker.capabilities(config)
+                    images[service] = LOCKED_IMAGES[service]
+
+    def test_release_approval_validated_on_controller_and_worker(self):
+        approved = {**CONFIG, 'release_images': LOCKED_IMAGES}
+        co.validate_config(approved, 'test')
+        self.assertEqual(worker.validate_request({**REQUEST, 'config': {
+            **REMOTE_CONFIG, 'release_images': LOCKED_IMAGES}})['release_images'], LOCKED_IMAGES)
+        for images in (None, {}, {**LOCKED_IMAGES, 'extra': 'value'},
+                       {**LOCKED_IMAGES, 'authentik-server': worker.RELEASE_IMAGES['authentik-server']},
+                       {**LOCKED_IMAGES, 'netbird-server': 'other/repository@sha256:' + 'b' * 64},
+                       {**LOCKED_IMAGES, 'netbird-server': 'netbirdio/netbird-server@sha256:' + 'B' * 64}):
+            with self.subTest(images=images):
+                with self.assertRaisesRegex(worker.Failure, 'invalid_release_images'):
+                    co.validate_config({**CONFIG, 'release_images': images}, 'test')
+                with self.assertRaisesRegex(worker.Failure, 'invalid_release_images'):
+                    worker.validate_request({**REQUEST, 'config': {**REMOTE_CONFIG, 'release_images': images}})
+
+    def test_public_cli_forwards_approved_lock_to_privileged_worker(self):
+        config = {**CONFIG, 'release_images': LOCKED_IMAGES, 'netbird_token_file': '/private/token.enc.json'}
+        calls = []
+
+        def management(command, input, **kwargs):
+            request = json.loads(input)
+            calls.append(request)
+            worker.validate_request(request)
+            return subprocess.CompletedProcess(command, 0, stdout=json.dumps({
+                'actor': {'user': 'operator'}, 'plan': PLAN}))
+
+        argv = ['offboard-user.py', '--config', '/private/operator.enc.json',
+                '--age-key-file', '/private/operator.key', '--environment', 'test',
+                '--target', TARGET, '--operation-id', OP, '--reason', 'departure', '--reference', 'ticket-1']
+        with patch.object(sys, 'argv', argv), patch.object(co, 'sops_read', side_effect=[config, {
+                'netbird_management_url': CONFIG['netbird_url'], 'netbird_api_token': 'synthetic'}]), \
+                patch.object(co, 'pinned_ssh', return_value=(['ssh', 'fixture'], 'operator')), \
+                patch.object(co.subprocess, 'run', side_effect=management), \
+                patch.object(co, 'netbird_binding', return_value=None), contextlib.redirect_stdout(io.StringIO()) as output:
+            self.assertEqual(co.main(), 0)
+        self.assertEqual(calls[0]['config']['release_images'], LOCKED_IMAGES)
+        self.assertEqual(calls[0]['action'], 'plan')
+        self.assertNotIn('synthetic', output.getvalue())
 
     def test_cached_plan_cannot_mutate_newly_protected_identity(self):
         user = dict(uuid=TARGET, pk=42, type='service_account', is_superuser=False,
@@ -205,6 +279,15 @@ class AuditTests(unittest.TestCase):
         self.assertEqual(json.loads(audit)['actor']['user'], 'operator')
         self.assertNotIn('example.invalid', audit)
 
+    def test_retry_cannot_change_release_approval(self):
+        config = {**REMOTE_CONFIG, 'release_images': LOCKED_IMAGES}
+        request = {**REQUEST, 'config': config}
+        worker.manifest(config, request, PLAN)
+        changed = {**config, 'release_images': {**LOCKED_IMAGES,
+                   'netbird-server': 'netbirdio/netbird-server@sha256:' + 'c' * 64}}
+        with self.assertRaisesRegex(worker.Failure, 'operation_identity_mismatch'):
+            worker.manifest(changed, {**request, 'config': changed})
+
     def test_symlink_audit_rejected(self):
         _, path = worker.paths(CONFIG, OP)
         other = Path(self.tmp.name) / 'other'
@@ -230,6 +313,95 @@ class AuditTests(unittest.TestCase):
             self.assertEqual(worker.handle(REQUEST)['plan'], PLAN)
             capabilities.assert_called_once_with(REMOTE_CONFIG)
             resolve.assert_not_called()
+
+    def test_current_google_producers_complete_public_plan_apply_and_retry(self):
+        class GoogleAPI:
+            def __init__(self):
+                self.user_type = None
+
+            def find(self, resource, key, value):
+                if resource == 'flows/instances':
+                    return dict(pk=value, slug=value, policy_engine_mode='all', authentication='none')
+                if resource == 'stages/identification':
+                    return dict(pk='ident', sources=['source'])
+                if resource == 'stages/user_write':
+                    return dict(pk='writer', user_type='external')
+                raise AssertionError(resource)
+
+            def ensure(self, resource, *args):
+                return 'source' if resource == 'sources/oauth' else 'policy'
+
+            def request(self, method, path, body=None):
+                if path == '/stages/user_write/writer/':
+                    self.user_type = body['user_type']
+                return {'results': []}
+
+        google = GoogleAPI()
+        admission.identity.apply_google({'allowed_emails': ['person@example.invalid'], 'client_id': 'fixture'},
+                                        google, 'synthetic-secret')
+        users = []
+
+        def create(method, path, body):
+            self.assertEqual((method, path), ('POST', 'core/users/'))
+            return dict(pk=42, uuid=TARGET, uid='a' * 64, is_superuser=False, groups=['staff'], **body)
+
+        admission.provision_base_users([{'email': 'person@example.invalid'}], users, create)
+        for producer, environment in ((name, env) for name in ('enrollment', 'preprovisioning')
+                                      for env in ('test', 'production')):
+            with self.subTest(producer=producer, environment=environment):
+                user = dict(users[0])
+                if producer == 'enrollment':
+                    user['type'] = google.user_type
+                self.assertEqual(user['type'], 'internal')
+                config = {**CONFIG, 'environment': environment, 'admission_file': '/synthetic/admission.enc.json'}
+                remote_config = {**REMOTE_CONFIG, 'environment': environment}
+                request = {**REQUEST, 'config': remote_config, 'operation_id': str(uuid.uuid4())}
+                sessions = [{'pk': 7, 'uuid': 'session-fixture', 'user': 42}]
+                blocked = set()
+
+                def auth(c, path, method='GET', body=None):
+                    if path.startswith('core/users/'):
+                        if method == 'PATCH':
+                            user.update(body)
+                        return user
+                    if path.startswith('core/applications/'):
+                        return {'provider': 1 if 'staff-test' in path else 2}
+                    if path.startswith('providers/oauth2/'):
+                        return dict(client_id='staff-test' if '/1/' in path else 'netbird-test',
+                                    issuer_mode='per_provider', sub_mode='hashed_user_id')
+                    if method == 'DELETE':
+                        sessions.clear()
+                        return {}
+                    raise AssertionError((method, path))
+
+                def pages(c, path):
+                    return [user] if path.startswith('core/users/') else list(sessions)
+
+                def staff(command, data=None):
+                    self.assertEqual(data['subject'], user['uid'])
+                    blocked.add(data['subject'])
+                    return {'blocked': True}
+
+                def remote(action, **extra):
+                    return worker.handle({**request, 'action': action, **extra})
+
+                with patch.object(worker, 'actor', return_value={'user': 'operator'}), \
+                        patch.object(worker, 'capabilities'), patch.object(worker, 'auth', side_effect=auth), \
+                        patch.object(worker, 'pages', side_effect=pages), patch.object(worker, 'run', side_effect=staff), \
+                        patch.object(co, 'netbird_binding', return_value=None), \
+                        patch.object(co, 'remove_admission', return_value={'admission_entries_removed': 1}), \
+                        patch.object(co, 'sops_read', return_value={}):
+                    plan = co.execute(config, request, remote, None, None)
+                    self.assertFalse(plan['mutations'])
+                    self.assertTrue(user['is_active'])
+                    for _ in range(2):
+                        result = co.execute(config, request, remote, None, None, apply=True)
+                        self.assertTrue(result['complete'], result)
+                        self.assertTrue(result['steps']['verification']['denial_readback'])
+                    self.assertFalse(user['is_active'])
+                    self.assertFalse(user['groups'])
+                    self.assertFalse(sessions)
+                    self.assertIn(user['uid'], blocked)
 
 
 class CoordinatorTests(unittest.TestCase):

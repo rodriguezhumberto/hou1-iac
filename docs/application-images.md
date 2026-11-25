@@ -93,4 +93,4 @@ publication, deployment, migration rollback and 29 isolated recovery checks.
 records a digest-backed restore and reboot. That migration rollback used a
 pre-CI image. Test rollback between the selected CI release digests before
 deployment and record their database compatibility.
-See [production recovery status](production-host-recovery.md#latest-live-result).
+See [production recovery status](production-host-recovery.md#dated-production-recovery-result).

@@ -47,6 +47,18 @@ hou1_tls_peer_jobs:
     mode: --check-config
 ```
 
+Set `hou1_tls_executor_profile: lab` when another renewal namespace already uses
+this controller. It installs separate `controller-renewal-exec-lab`,
+`/etc/controller-renewal/exec-lab.json` and sudoers files; existing jobs keep their
+original owner. Use the same profile when configuring scheduling. Empty retains
+the original paths. Profiles do not change the environment-bound timer names.
+
+For a private management origin unavailable through container DNS, optionally
+set `hou1_tls_peer_config.management_address` to its reachable IPv4 address.
+The provisioning API client and peer container use that address; TLS still
+verifies the configured hostname. Reconciliation refuses an unexplained pin
+change/removal. No controller-wide resolver or hosts-file edit is needed.
+
 Install the maintained TLS programs and their companion modules in the private
 job directories using Ansible `copy`, mode `0700`. Configurations must belong to
 the non-root renewal operator and must not be writable by other users. Supply
@@ -65,6 +77,8 @@ recurring jobs do not require it. Preserve the peer's private runtime directory
 on this controller; keep any exported recovery copy encrypted. Do not copy it
 to HOU1 or HOU4. Recreating a lost identity requires a new setup grant and
 explicit reconciliation of the old peer/group and receiver source restrictions.
+Run this controller-local playbook outside command wrappers that set
+`NoNewPrivileges`: its installer needs local Ansible privilege escalation.
 
 The enrollment receipt records the stable VPN address. Use it for the dedicated
 renewal receiver grants on both nodes, with their existing pinned host keys.
@@ -74,7 +88,7 @@ environment-name mapping. The renewal source may belong only to its dedicated
 group and NetBird's implicit All group; ephemeral identities and login or
 inactivity expiration are refused.
 
-The root-owned `/usr/local/libexec/controller-renewal-exec` accepts only a fixed
+The root-owned `/usr/local/libexec/controller-renewal-exec` (or named profile) accepts only a fixed
 job identifier from its root-private configuration. It checks the pinned running
 container and joins its network namespace. Before running the configured TLS
 program it switches to the non-root operator, clears all capabilities, and sets

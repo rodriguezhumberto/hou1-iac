@@ -1,0 +1,36 @@
+---
+- name: Check for the existing independent ingress Compose file
+  ansible.builtin.stat:
+    path: '{{ shared_ingress_directory }}/docker-compose.yml'
+  register: shared_ingress_existing_compose
+  when: application_image_compose is not defined
+
+- name: Read the deployed listener or the legacy migration model
+  ansible.builtin.command:
+    argv: >-
+      {{ (['docker', 'compose', '--project-directory', shared_ingress_directory,
+           '--project-name', shared_ingress_project,
+           '--file', shared_ingress_directory ~ '/docker-compose.yml']
+          if shared_ingress_existing_compose.stat.exists else
+          ['docker', 'compose', '--project-directory', app_directory])
+         + ['config', '--format', 'json'] }}
+  register: shared_ingress_deployed_model
+  changed_when: false
+  no_log: true
+  when: application_image_compose is not defined
+
+- name: Select only the Nginx service without overwriting the application model
+  ansible.builtin.set_fact:
+    shared_ingress_nginx_service: >-
+      {{ (application_image_compose if application_image_compose is defined else
+          (shared_ingress_deployed_model.stdout | from_json)).services.nginx | default({}) }}
+  no_log: true
+
+- name: Require a supported Nginx service in the selected listener model
+  ansible.builtin.assert:
+    that:
+      - shared_ingress_nginx_service is mapping
+      - shared_ingress_nginx_service.image is string
+      - shared_ingress_nginx_service.ports is defined
+    fail_msg: The selected ingress Compose model has no supported Nginx service.
+  no_log: true

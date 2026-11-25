@@ -58,7 +58,9 @@ def verify(archive, manifest_file, identity, output, environment):
     if (manifest['schema'] != 1 or manifest['environment'] != environment
             or manifest['size'] != Path(archive).stat().st_size or manifest['sha256'] != digest):
         raise ValueError('Wrong environment, size or checksum')
-    with tempfile.TemporaryDirectory(prefix='.verify-', dir=output.parent) as temporary:
+    # The caller owns the entire output tree, including interrupted decryption.
+    # Keeping staging inside it lets timeout cleanup remove every plaintext file.
+    with tempfile.TemporaryDirectory(prefix='.verify-', dir=output) as temporary:
         root = Path(temporary); plaintext = root / 'recovery.tar.gz'
         with plaintext.open('wb') as stream:
             subprocess.run(['age', '--decrypt', '--identity', str(identity), str(archive)],

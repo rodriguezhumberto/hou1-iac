@@ -26,8 +26,23 @@
       - request.id == host_recovery_id
       - request.environment == cms_environment
       - request.server_ip == netbird_ip
+      - request.quarantine | default(false) is sameas false
+      - request.isolation_mode | default('host') == host_recovery_isolation_mode | default('host')
+      - request.provider_isolation | default({}) == host_recovery_provider_isolation | default({})
+    fail_msg: Publication requires a matching non-quarantined restore; changing inventory flags cannot promote a quarantined copy.
   vars:
     request: '{{ host_recovery_publication_request.content | b64decode | from_json }}'
+  no_log: true
+
+- name: Recheck the retained isolation owner before publication or resume
+  ansible.builtin.include_tasks: provider-isolation.yml
+  vars:
+    host_recovery_isolation_request: '{{ host_recovery_publication_request.content | b64decode | from_json }}'
+
+- name: Retain the verified isolation owner for the remaining handoff
+  ansible.builtin.set_fact:
+    host_recovery_effective_isolation_mode: >-
+      {{ (host_recovery_publication_request.content | b64decode | from_json) | host_recovery_isolation_contract }}
   no_log: true
 
 - name: Validate the retained successful publication checkpoint on resume

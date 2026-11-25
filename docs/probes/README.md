@@ -2,14 +2,15 @@
 
 Commands run from the repository root. Executable programs remain in `scripts/`
 and their owning Ansible roles; this folder holds their procedures.
-An isolated HOU1/HOU4 lab is available; see its
-[deployment evidence](../evidence/isolated-lab-2026-11-17.md). These procedures
-still contain older fixture aliases; check their targets before use. See
+The isolated HOU1/HOU4 lab's recorded acceptance is summarized in
+[current status](../cleanup-plan.md). Some fixed-fixture tools retain older
+aliases enforced by their code; check their targets before use. See
 [environment targeting](../development.md#environment-targeting).
 Direct-SSH tools require [explicit destinations and host-key pins](rehearsal-targets.md).
 
 | Procedure | Scope |
 | --- | --- |
+| [Backup transfer interruption](backup-transfer.md) | Guarded live transport failure, automatic retry and offline verification |
 | [Synthetic staff login](staff-login-probe.md) | Optional environment-bound monitoring deployed through HOU1 and HOU4 |
 | [NetBird compatibility spike](netbird-oidc-spike.md) | Isolated external-provider checks and manual protocol acceptance |
 | [Live OIDC security suite](live-security-tests.md) | Mutating tests bound to the fixed isolated VPS fixture; never production |

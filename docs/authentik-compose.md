@@ -1,7 +1,8 @@
 # Isolated Authentik Compose deployment
 
-Test examples require a new isolated host and private inventory; no test server
-is currently available. See [environment targeting](development.md#environment-targeting).
+Test examples require an explicitly selected isolated host and private inventory.
+The [recorded lab acceptance](cleanup-plan.md) does not select a host for a new run;
+see [environment targeting](development.md#environment-targeting).
 
 Each environment has a pinned Compose project. The default names are
 `hou1-authentik-test` and `hou1-authentik-prod`, selected by the identity profile;

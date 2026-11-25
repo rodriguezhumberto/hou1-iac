@@ -68,9 +68,11 @@ class RecoveryRenewalTest(unittest.TestCase):
                 with self.assertRaises(Exception): plan(altered, values)
 
     def test_real_tasks_rebind_once_retry_partial_work_and_reject_interference(self):
-        for interference in (None, 'partial', 'source-member', 'receiver-member', 'policy', 'resource'):
+        for interference in (None, 'display-counts', 'partial', 'source-member', 'receiver-member', 'policy', 'resource'):
             with self.subTest(interference=interference):
                 state, config = fixture()
+                if interference == 'display-counts':
+                    state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = 2
                 writes = []
 
                 class Handler(BaseHTTPRequestHandler):
@@ -92,6 +94,7 @@ class RecoveryRenewalTest(unittest.TestCase):
                         for group in state['groups']:
                             group['peers'] = [peer for peer in group['peers'] if peer['id'] != 'lost']
                         state['groups'][0]['peers'].append({'id': 'new'})
+                        if interference == 'display-counts': state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = 1
                         if interference == 'partial': state['groups'][2]['peers'] = [{'id': 'new'}]
                         if interference == 'source-member': state['groups'][-2]['peers'].append({'id': 'foreign'})
                         if interference == 'receiver-member': state['groups'][-1]['peers'].append({'id': 'foreign'})
@@ -104,6 +107,8 @@ class RecoveryRenewalTest(unittest.TestCase):
                         writes.append(identifier)
                         group = next(g for g in state['groups'] if g['id'] == identifier)
                         group.update(body, peers=[{'id': peer} for peer in body['peers']])
+                        if interference == 'display-counts' and identifier == 'renewal-targets':
+                            state['policies'][-1]['rules'][0]['destinations'][0]['peers_count'] = len(group['peers'])
                         self.respond(group)
 
                 server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
@@ -124,17 +129,41 @@ class RecoveryRenewalTest(unittest.TestCase):
                     result = run_play(values, tasks)
                 finally:
                     server.shutdown(); server.server_close(); thread.join()
-                success = interference in (None, 'partial')
+                success = interference in (None, 'partial', 'display-counts')
                 self.assertEqual(result.returncode == 0, success, result.stdout + result.stderr)
                 if success:
                     self.assertEqual(writes, ['metrics-source', 'backup-source', 'renewal-targets']
-                                     if interference is None else ['backup-source', 'renewal-targets'])
+                                     if interference in (None, 'display-counts') else ['backup-source', 'renewal-targets'])
                     self.assertEqual(state['groups'][-1]['peers'], [{'id': 'monitor'}, {'id': 'new'}])
                 else:
                     self.assertEqual(writes, [])
 
 
 class RecoveryTransportTest(unittest.TestCase):
+    def test_monitoring_omission_is_explicit_and_test_only_before_publication(self):
+        guard = yaml.safe_load((TASKS / 'transport-preflight.yml').read_text())[0]
+        scenarios = [({'cms_environment': 'test', 'host_recovery_monitoring_required': False}, True),
+                     ({'cms_environment': 'production', 'host_recovery_monitoring_required': True}, True),
+                     ({'cms_environment': 'production', 'host_recovery_monitoring_required': False}, False),
+                     ({'cms_environment': 'test', 'host_recovery_monitoring_required': 'false'}, False)]
+        result = run_plays([guard_play(values, [guard], None if valid else guard['name'])
+                            for values, valid in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_receiver_input_is_required_before_publication(self):
+        tasks = yaml.safe_load((TASKS / 'transport-preflight.yml').read_text())
+        guard = next(task for task in tasks if task['name'] == 'Require the declared backup receiver before opening ingress')
+        self.assertEqual(guard['name'], 'Require the declared backup receiver before opening ingress')
+        values = dict(netbird_subnet='100.91.0.0/16', netbird_ip='100.91.0.10')
+        scenarios = [({}, False), ({'hou1_backup_receiver_ip': ''}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.22/32'}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.10'}, False),
+                     ({'hou1_backup_receiver_ip': '100.90.0.22'}, False),
+                     ({'hou1_backup_receiver_ip': '100.91.0.22'}, True)]
+        result = run_plays([guard_play({**values, **change}, [guard], None if valid else guard['name'])
+                            for change, valid in scenarios])
+        self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_companion_requires_an_explicit_independent_pinned_destination(self):
         config = dict(inventory_host='hou4-recovery', public_ip='8.8.8.8', known_hosts_file='/private/known_hosts')
         inventory = {'hou4-recovery': {'ansible_host': '8.8.8.8'}}
@@ -257,7 +286,9 @@ class RecoveryTransportTest(unittest.TestCase):
                            {'host_recovery_renewal_handoff': 'true'},
                            {'host_recovery_companion': {'inventory_host': 'localhost', 'public_ip': '8.8.8.8',
                                                         'known_hosts_file': '/private/known_hosts'}}):
-                result = run_play(values, [preflight, {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}}])
+                complete = dict(cms_environment='test', netbird_subnet='100.91.0.0/16',
+                                netbird_ip='100.91.0.10', hou1_backup_receiver_ip='100.91.0.22')
+                result = run_play({**complete, **values}, [preflight, {'ansible.builtin.file': {'path': str(marker), 'state': 'touch'}}])
                 self.assertNotEqual(result.returncode, 0)
                 self.assertFalse(marker.exists())
 

@@ -21,6 +21,11 @@
       renewal_config: '{{ hou1_tls_peer_config if host_recovery_renewal_handoff | default(false) else {} }}'
       renewal_peer_id: '{{ host_recovery_renewal_peer_id if host_recovery_renewal_handoff | default(false) else "" }}'
 
+- name: Pin explicit monitoring omission without changing legacy handoff scopes
+  ansible.builtin.set_fact:
+    host_recovery_handoff_scope: '{{ host_recovery_handoff_scope | combine({"monitoring_required": false}) }}'
+  when: not (host_recovery_monitoring_required | default(true))
+
 - name: Read a retained handoff without changing its selected identity or grants
   when: host_recovery_handoff_file.stat.exists
   block:
@@ -42,7 +47,7 @@
         that:
           - host_recovery_handoff.scope == host_recovery_handoff_scope
           - host_recovery_handoff.source_groups is sequence
-          - host_recovery_handoff.source_groups | length >= 2
+          - host_recovery_handoff.source_groups | length >= (2 if host_recovery_monitoring_required | default(true) else 1)
 
 - name: Read only the pinned lost HOU1 peer
   ansible.builtin.uri:

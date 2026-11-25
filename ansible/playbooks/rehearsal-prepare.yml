@@ -10,6 +10,12 @@
     - name: Gather host facts after validating the target
       ansible.builtin.setup:
       tags: [always]
+    - name: Validate opted-in lab DNS before package installation
+      ansible.builtin.import_role:
+        name: lab_dns
+        tasks_from: guard
+      when: lab_dns_state | default('unmanaged') != 'unmanaged'
+      tags: [always]
     - name: Require the explicit fresh test host before installing prerequisites
       ansible.builtin.assert:
         that:
@@ -58,4 +64,6 @@
 
   roles:
     - common
+    - role: lab_dns
+      when: lab_dns_state | default('unmanaged') == 'present'
     - docker

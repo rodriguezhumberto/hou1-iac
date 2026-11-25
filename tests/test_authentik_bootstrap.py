@@ -253,7 +253,25 @@ class AuthentikBootstrapTest(unittest.TestCase):
         api.writes.clear()
         bootstrap.apply_google(google, api, 'rotated-fixture-secret')
         self.assertEqual(api.writes, [('PATCH', '/sources/oauth/google/', {
-            'consumer_secret': 'rotated-fixture-secret', 'provider_type': 'google'})])
+            'consumer_secret': 'rotated-fixture-secret', 'provider_type': 'google', 'pkce': 'S256'})])
+
+    def test_google_repeat_update_preserves_managed_pkce_during_discovery_inference(self):
+        api = self.google_api()
+        google = self.google_manifest()['google']
+        bootstrap.apply_google(google, api, 'fixture-secret')
+        del api.objects['sources/oauth'][0]['consumer_secret']
+        original = api.request
+
+        def request(method, path, payload=None):
+            if method == 'PATCH' and path == '/sources/oauth/google/' and 'pkce' not in payload:
+                # The pinned serializer infers omitted fields from discovery,
+                # including on partial updates of the write-only secret.
+                payload = {**payload, 'pkce': 'inferred-discovery-methods'}
+            return original(method, path, payload)
+
+        with patch.object(api, 'request', side_effect=request):
+            bootstrap.apply_google(google, api, 'fixture-secret')
+        self.assertEqual(api.objects['sources/oauth'][0]['pkce'], 'S256')
 
     def test_emergency_password_is_optional_and_rendered_from_private_inputs(self):
         env = Environment()

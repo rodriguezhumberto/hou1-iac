@@ -11,7 +11,7 @@ from helpers import ROOT, ROLES
 
 
 def probe(role_specs, assertions, overrides=None, tags=None, extra_vars=None,
-          vars_files=None):
+          vars_files=None, play_vars=None):
     """Use production defaults in inert roles; do not install or contact hosts."""
     with tempfile.TemporaryDirectory() as directory:
         root = Path(directory)
@@ -44,6 +44,8 @@ def probe(role_specs, assertions, overrides=None, tags=None, extra_vars=None,
                                  'tags': ['always']}])
         if vars_files:
             play['vars_files'] = vars_files
+        if play_vars is not None:
+            play['vars'] = play_vars
         play_path = root / 'play.yml'
         play_path.write_text(yaml.safe_dump([play]))
         argv = ['ansible-playbook', '-i', str(inventory), '-c', 'local', str(play_path)]
@@ -56,6 +58,25 @@ def probe(role_specs, assertions, overrides=None, tags=None, extra_vars=None,
 
 
 class ConfigurationDefaultsTest(unittest.TestCase):
+    def test_authentik_entrypoints_preserve_private_inventory_secret_sources(self):
+        for name in ['authentik.yml', 'authentik-bootstrap.yml']:
+            with self.subTest(playbook=name):
+                play = yaml.safe_load((ROOT / 'ansible/playbooks' / name).read_text())[0]
+                result = probe(play['roles'],
+                    ["authentik_secret_source == '/private/scoped-authentik.enc.yaml'"],
+                    overrides={'authentik_secret_source': '/private/scoped-authentik.enc.yaml'},
+                    play_vars=play['vars'])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
+    def test_authentik_entrypoints_keep_the_environment_scoped_secret_default(self):
+        for name in ['authentik.yml', 'authentik-bootstrap.yml']:
+            with self.subTest(playbook=name):
+                play = yaml.safe_load((ROOT / 'ansible/playbooks' / name).read_text())[0]
+                result = probe(play['roles'],
+                    ["authentik_secret_source == playbook_dir ~ '/../secrets/authentik-test.enc.yaml'"],
+                    play_vars=play['vars'])
+                self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+
     def test_standalone_component_roles_load_their_own_defaults(self):
         scenarios = [
             ('webstack', "cms_storage_owner == '100'"),

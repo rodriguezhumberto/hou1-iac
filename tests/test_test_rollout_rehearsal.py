@@ -1,10 +1,12 @@
 import argparse
 import copy
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 import json
 from pathlib import Path
 import runpy
 import sys
 import tempfile
+import threading
 import unittest
 import yaml
 from helpers import guard_play, run_plays
@@ -32,6 +34,65 @@ def args(**overrides):
 
 
 class TestRolloutRehearsal(unittest.TestCase):
+    def test_fresh_preparation_adopts_opted_in_dns_before_docker(self):
+        play = yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-prepare.yml').read_text())[0]
+        with tempfile.TemporaryDirectory() as directory:
+            ready = Path(directory) / 'resolver-ready'
+            tasks = []
+            for entry in play['roles']:
+                role = entry if isinstance(entry, str) else entry['role']
+                if role == 'lab_dns':
+                    tasks.append({'ansible.builtin.file': {'path': str(ready), 'state': 'touch'},
+                                  'when': entry['when']})
+                if role == 'docker':
+                    # Docker's DNS owner refuses activation without an active resolver.
+                    tasks.append({'ansible.builtin.command': {'argv': [sys.executable, '-c',
+                        f'from pathlib import Path;assert Path({str(ready)!r}).exists()']}})
+            result = run_plays([{'variables': {'lab_dns_state': 'present'}, 'tasks': tasks}])
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertTrue(ready.exists())
+
+    def test_external_provider_uses_the_deployed_identity_and_preserves_foreign_issuers(self):
+        posts = []
+        class Handler(BaseHTTPRequestHandler):
+            def do_POST(self):
+                if self.path != '/api/identity-providers':
+                    self.send_error(404)
+                    return
+                posts.append(json.loads(self.rfile.read(int(self.headers['Content-Length']))))
+                self.send_response(200)
+                self.send_header('Content-Type', 'application/json')
+                self.end_headers()
+                self.wfile.write(b'{"id":"fixture-provider"}')
+            def log_message(self, *args):
+                pass
+        server = ThreadingHTTPServer(('127.0.0.1', 0), Handler)
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            tasks = yaml.safe_load((ROOT / 'ansible/playbooks/rehearse-vps.yml').read_text())[0]['post_tasks']
+            select = next(t for t in tasks if t['name'] == 'Select the NetBird provider from the deployed identity profile')
+            guard = next(t for t in tasks if t['name'] == 'Refuse to replace a provider belonging to a different issuer')
+            create = next(t for t in tasks if t['name'] == "Connect Authentik through NetBird's external-provider API")
+            issuer = 'https://identity.lab-test.example.invalid/application/o/vpn-fixture/'
+            variables = dict(authentik_environment='test',
+                authentik_identity_profiles={'test': {'issuer_host': 'identity.lab-test.example.invalid',
+                                                      'netbird': {'client_id': 'vpn-fixture'}}},
+                netbird_management_url=f'http://127.0.0.1:{server.server_port}',
+                netbird_api_headers={'Authorization': 'Token fixture-token'},
+                netbird_oidc_client_secret='fixture-secret', netbird_authentik_issuer='')
+            plays = []
+            for existing, valid in [([], True), ([{'issuer': issuer}], True),
+                                    ([{'issuer': 'https://foreign.example.invalid/'}], False)]:
+                plays.append(guard_play({**variables, 'rehearsal_existing_provider': existing},
+                                        [select, guard, create], None if valid else guard['name']))
+            result = run_plays(plays)
+            self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
+            self.assertEqual(posts, [{'type': 'authentik', 'name': 'vps-authentik-test', 'issuer': issuer,
+                                     'client_id': 'vpn-fixture', 'client_secret': 'fixture-secret'}])
+        finally:
+            server.shutdown(); server.server_close(); thread.join()
+
     def test_provider_initialization_finishes_before_package_installation(self):
         tasks = yaml.safe_load((ROOT / 'ansible/playbooks/rehearsal-prepare.yml').read_text())[0]['pre_tasks']
         detect = next(task for task in tasks if task.get('register') == 'rehearsal_cloud_init')

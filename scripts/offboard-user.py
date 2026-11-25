@@ -23,7 +23,7 @@ import urllib.parse
 import urllib.request
 import uuid
 
-from offboard_remote import Failure, require
+from offboard_remote import Failure, release_images, require
 
 
 class Unavailable(Failure):
@@ -43,6 +43,7 @@ def sops_read(path, key):
 
 
 def validate_config(c, environment):
+    release_images(c)
     require(c['environment'] == environment and environment in ('test', 'production'), 'environment_mismatch')
     nb = urllib.parse.urlsplit(c['netbird_url'])
     issuer = urllib.parse.urlsplit(c['netbird_issuer'])
@@ -313,6 +314,8 @@ def main():
         request = {'operation_id': args.operation_id or str(uuid.uuid4()), 'target_uuid': str(uuid.UUID(args.target)),
                    'reason': args.reason, 'reference': args.reference,
                    'config': {k: c[k] for k in ('environment', 'staff_issuer', 'staff_application', 'staff_client_id', 'netbird_application', 'netbird_client_id')}}
+        if 'release_images' in c:
+            request['config']['release_images'] = c['release_images']
         source = Path(__file__).with_name('offboard_remote.py').read_text()
 
         def remote(action, **extra):

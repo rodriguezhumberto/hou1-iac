@@ -220,6 +220,7 @@ class SourceRuntimeTest(unittest.TestCase):
             events = []
             def command(argv, output=None, timeout=300):
                 events.append(argv)
+                if '--format' in argv: return backups.writer_status()
                 if 'ps' in argv:
                     return b'authentik-server\nauthentik-worker\nastro-app\nnetbird-server\n'
                 if 'pg_dump' in argv:
@@ -267,15 +268,22 @@ class SourceRuntimeTest(unittest.TestCase):
             copy['src'] = str(ROLES / 'backup_source/files/export.py')
             copy['dest'] = str(exporter)
             copy.pop('owner'); copy.pop('group')
+            helper = layout[-2]['ansible.builtin.copy']
+            helper['src'] = str(ROLES / 'backup_source/files/operation_lock.py')
+            helper['dest'] = str(root / 'hou1-backup-operation-lock.py')
+            helper.pop('owner'); helper.pop('group')
             variables = {}
             result = run_play(variables, layout)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertFalse(exporter.exists())
+            self.assertFalse((root / 'hou1-backup-operation-lock.py').exists())
             config.write_text('existing installed private configuration')
             exporter.write_text('old revision reader')
             result = run_play(variables, layout)
             self.assertEqual(result.returncode, 0, result.stdout + result.stderr)
             self.assertEqual(exporter.read_bytes(), (ROLES / 'backup_source/files/export.py').read_bytes())
+            self.assertEqual((root / 'hou1-backup-operation-lock.py').read_bytes(),
+                             (ROLES / 'backup_source/files/operation_lock.py').read_bytes())
             self.assertEqual(config.read_text(), 'existing installed private configuration')
 
     def test_shared_source_default_is_a_sibling_and_public_runtime_root_stays_unchanged(self):

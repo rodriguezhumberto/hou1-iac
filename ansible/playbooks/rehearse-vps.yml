@@ -153,6 +153,12 @@
     - role: netbird_dns
 
   post_tasks:
+    - name: Select the NetBird provider from the deployed identity profile
+      ansible.builtin.set_fact:
+        rehearsal_netbird_provider:
+          issuer: "https://{{ authentik_identity_profiles[authentik_environment].issuer_host }}/application/o/{{ authentik_identity_profiles[authentik_environment].netbird.client_id }}/"
+          client_id: "{{ authentik_identity_profiles[authentik_environment].netbird.client_id }}"
+
     - name: Read external identity providers in this isolated NetBird account
       ansible.builtin.uri:
         url: "{{ netbird_management_url }}/api/identity-providers"
@@ -172,7 +178,7 @@
       ansible.builtin.assert:
         that:
           - rehearsal_existing_provider | length <= 1
-          - rehearsal_existing_provider | length == 0 or rehearsal_existing_provider[0].issuer == 'https://auth-test.' ~ primary_domain ~ '/application/o/netbird-test/'
+          - rehearsal_existing_provider | length == 0 or rehearsal_existing_provider[0].issuer == rehearsal_netbird_provider.issuer
       no_log: true
 
     - name: Connect Authentik through NetBird's external-provider API
@@ -184,14 +190,18 @@
         body:
           type: authentik
           name: vps-authentik-test
-          issuer: "https://auth-test.{{ primary_domain }}/application/o/netbird-test/"
-          client_id: netbird-test
+          issuer: "{{ rehearsal_netbird_provider.issuer }}"
+          client_id: "{{ rehearsal_netbird_provider.client_id }}"
           client_secret: "{{ netbird_oidc_client_secret }}"
         status_code: 200
       when: rehearsal_existing_provider | length == 0
       delegate_to: localhost
       become: false
       no_log: true
+
+    - name: Apply declared base-user permissions after registering Authentik
+      ansible.builtin.include_role:
+        name: identity_admission
 
     - name: Reassert private test egress and credential boundaries after a managed rerun
       ansible.builtin.include_role:

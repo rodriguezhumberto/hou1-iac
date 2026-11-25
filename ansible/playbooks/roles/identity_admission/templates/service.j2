@@ -1,0 +1,9 @@
+[Unit]
+Description=Reconcile declared HOU1 {{ authentik_environment }} identity permissions
+[Service]
+Type=oneshot
+ExecStart={{ (identity_admission_transport_argv + identity_admission_argv + ['--coordination-lock', identity_admission_coordination_lock, '--capture-lock']) | map('to_json') | join(' ') }}
+TimeoutStartSec=180
+UMask=0077
+# The selected lab namespace wrapper drops privileges after entering its network.
+NoNewPrivileges=no

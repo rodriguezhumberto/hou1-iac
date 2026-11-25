@@ -1,0 +1,10 @@
+{
+  "application": {"host": "hou1", "compose_index": 0, "service": "astro-app"},
+  "monitoring": {"host": "hou4", "compose_index": 0, "service": "prometheus"},
+  "dependency": {
+    "host": "hou1", "compose_index": 2, "service": "authentik-server",
+    "probe_query": "probe_success{job=\"hou1-authentik-ready\"}",
+    "readiness": {"port": 9090, "path": "/-/ready"}
+  },
+  "backup": {"host": "hou4", "recovery_identity": "/private/lab/offline-recovery.agekey"}
+}

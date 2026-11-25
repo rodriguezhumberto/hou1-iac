@@ -92,6 +92,6 @@ and avoid appending a different schema to the same stream. Existing host,
 PostgreSQL, container, backup and renewal monitoring continue separately.
 
 The [collector](environment-monitoring.md) supports test and production. See
-[production status](production-oidc-runbook.md#production-status) and the
+[dated production acceptance](production-oidc-runbook.md#dated-production-acceptance) and the
 [isolated rehearsal results](evidence/request-login-monitoring-2026-11-08.json)
 for recorded validation.

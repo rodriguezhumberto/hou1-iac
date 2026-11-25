@@ -5,6 +5,35 @@ import re
 from urllib.parse import urlsplit
 
 
+def isolation(request, address=None, mac=None):
+    """Bind test-only provider ownership to an independently verified policy receipt."""
+    mode = request.get('isolation_mode', 'host')
+    boundary = request.get('provider_isolation', {})
+    if mode == 'host':
+        if boundary != {}:
+            raise ValueError('Host isolation cannot declare a provider boundary')
+        return mode
+    if (mode != 'provider' or request['environment'] != 'test' or request.get('quarantine', False)
+            or not isinstance(boundary, dict)
+            or set(boundary) != {'address', 'mac', 'policy_sha256', 'verified'}
+            or boundary['verified'] is not True):
+        raise ValueError('Provider isolation requires a verified, non-quarantined test boundary')
+    target = ipaddress.IPv4Address(boundary['address'])
+    if (str(target) != boundary['address'] or not any(target in ipaddress.ip_network(cidr)
+            for cidr in ('10.0.0.0/8', '172.16.0.0/12', '192.168.0.0/16'))
+            or not isinstance(boundary['mac'], str)
+            or not re.fullmatch(r'(?:[0-9a-f]{2}:){5}[0-9a-f]{2}', boundary['mac'])
+            or int(boundary['mac'][:2], 16) & 1 or boundary['mac'] == '00:00:00:00:00:00'
+            or not isinstance(boundary['policy_sha256'], str)
+            or not re.fullmatch(r'[a-f0-9]{64}', boundary['policy_sha256'])
+            or address is not None and boundary['address'] != address
+            or mac is not None and boundary['mac'] != mac.lower()
+            or any(request.get(key) for key in
+                   ('deny_cidrs', 'test_addresses', 'allow_local_cidrs', 'allow_update_cidrs'))):
+        raise ValueError('Provider isolation must match the LAN target, MAC and policy digest without host isolation inputs')
+    return mode
+
+
 def origin(value):
     url = urlsplit(value)
     if (url.scheme != 'https' or url.port not in (None, 443) or url.username or url.password
